@@ -1,0 +1,17 @@
+# 環境設定 (含密碼)
+.env
+
+# 日誌
+logs/*.log
+
+# 上傳檔案
+public/uploads/cases/*
+!public/uploads/cases/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,43 @@
+# 弱電工程排程系統 - Apache 設定
+# 智邦虛擬主機
+
+# 禁止目錄瀏覽
+Options -Indexes
+
+# 啟用 URL Rewrite
+RewriteEngine On
+
+# 強制 HTTPS (智邦虛擬主機)
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# 預設首頁
+DirectoryIndex index.php
+
+# 未登入時導向登入頁 (API 除外)
+# 注意: 實際權限控制在 PHP 中處理
+
+# 禁止存取隱藏檔案
+RewriteRule (^\.|/\.) - [F]
+
+# 設定上傳目錄的安全性
+<IfModule mod_headers.c>
+    # 安全標頭
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# 禁止在 uploads 目錄執行 PHP
+<Directory "uploads">
+    <FilesMatch "\.php$">
+        Deny from all
+    </FilesMatch>
+</Directory>
+
+# PHP 設定
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 60
+</IfModule>

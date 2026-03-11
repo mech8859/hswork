@@ -1,0 +1,3 @@
+# 禁止直接存取專案根目錄
+# 只允許透過 public/ 目錄存取
+Deny from all
