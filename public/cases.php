@@ -122,6 +122,26 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 刪除案件 ----
+    case 'delete':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!verify_csrf()) {
+                Session::flash('error', '安全驗證失敗');
+                redirect('/cases.php');
+            }
+            if (!Auth::canEditSection('delete')) {
+                Session::flash('error', '無刪除權限');
+                redirect('/cases.php');
+            }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $model->deleteCase($id);
+                Session::flash('success', '案件已刪除');
+            }
+        }
+        redirect('/cases.php');
+        break;
+
     // ---- AJAX: 取得帳款交易 ----
     case 'get_payment':
         header('Content-Type: application/json');

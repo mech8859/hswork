@@ -12,7 +12,7 @@
             $updaterName = $uStmt->fetchColumn() ?: '';
         }
         ?>
-        <span style="font-size:.8rem;color:var(--gray-500)">最後修改：<?= date('Y/m/d H:i', strtotime($record['updated_at'])) ?><?= $updaterName ? ' by ' . e($updaterName) : '' ?></span>
+        <small class="text-muted">最後修改 <?= e($record['updated_at']) ?><?= $updaterName ? ' / ' . e($updaterName) : '' ?></small>
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
@@ -76,8 +76,30 @@
         <div class="form-row">
             <div class="form-group">
                 <label>付款期間</label>
-                <input type="text" name="payment_period" class="form-control" placeholder="例：2026/03"
-                       value="<?= e($isEdit && !empty($record['payment_period']) ? $record['payment_period'] : '') ?>">
+                <?php
+                $ppYear = ''; $ppMonth = '';
+                if ($isEdit && !empty($record['payment_period'])) {
+                    $ppParts = explode('-', $record['payment_period']);
+                    if (count($ppParts) >= 2) { $ppYear = $ppParts[0]; $ppMonth = ltrim($ppParts[1], '0') ?: $ppParts[1]; }
+                }
+                ?>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <select id="ppYear" style="flex:1" class="form-control" onchange="updatePP()">
+                        <option value="">年</option>
+                        <?php for ($y = 2024; $y <= 2030; $y++): ?>
+                        <option value="<?= $y ?>" <?= $ppYear == $y ? 'selected' : '' ?>><?= $y ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <span>年</span>
+                    <select id="ppMonth" style="flex:1" class="form-control" onchange="updatePP()">
+                        <option value="">月</option>
+                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                        <option value="<?= sprintf('%02d', $m) ?>" <?= $ppMonth == $m ? 'selected' : '' ?>><?= sprintf('%02d', $m) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <span>月</span>
+                    <input type="hidden" name="payment_period" id="ppValue" value="<?= e($isEdit && !empty($record['payment_period']) ? $record['payment_period'] : '') ?>">
+                </div>
             </div>
             <div class="form-group">
                 <label>付款條件</label>
@@ -521,3 +543,10 @@ function addReturnDetailRow() {
 .detail-full { padding:12px 12px 12px 48px; background:#fafbfc; border-radius:0 0 6px 6px; }
 .detail-full .form-row { margin-bottom:10px; }
 </style>
+<script>
+function updatePP() {
+    var y = document.getElementById('ppYear').value;
+    var m = document.getElementById('ppMonth').value;
+    document.getElementById('ppValue').value = (y && m) ? y + '-' + m : '';
+}
+</script>
