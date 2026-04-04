@@ -4,7 +4,8 @@
  */
 class Session
 {
-    private static bool $started = false;
+    /** @var bool */
+    private static $started = false;
 
     public static function start(): void
     {
@@ -18,13 +19,13 @@ class Session
         ini_set('session.cookie_samesite', 'Lax');
 
         session_name($sessionConfig['name']);
-        session_set_cookie_params([
-            'lifetime' => $sessionConfig['lifetime'],
-            'path'     => '/',
-            'secure'   => isset($_SERVER['HTTPS']),
-            'httponly'  => true,
-            'samesite'  => 'Lax',
-        ]);
+        session_set_cookie_params(
+            $sessionConfig['lifetime'],
+            '/; SameSite=Lax',
+            '',
+            isset($_SERVER['HTTPS']),
+            true
+        );
 
         session_start();
         self::$started = true;

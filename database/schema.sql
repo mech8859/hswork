@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `can_view_all_branches` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '可查看全區',
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `last_login_at` DATETIME DEFAULT NULL,
+  `locked_until` DATETIME DEFAULT NULL COMMENT '帳號鎖定到何時',
+  `failed_login_count` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '連續登入失敗次數',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`branch_id`) REFERENCES `branches`(`id`)
@@ -424,5 +426,16 @@ CREATE TABLE IF NOT EXISTS `sync_logs` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`synced_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同步記錄';
+
+-- -------------------------------------------
+-- 24. login_attempts 登入失敗記錄
+-- -------------------------------------------
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `username` VARCHAR(50) NOT NULL COMMENT '嘗試登入的帳號',
+  `ip_address` VARCHAR(45) DEFAULT NULL COMMENT 'IP位址',
+  `attempted_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_username_time` (`username`, `attempted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登入失敗記錄';
 
 SET FOREIGN_KEY_CHECKS = 1;

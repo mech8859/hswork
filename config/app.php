@@ -25,26 +25,111 @@ return [
         'cases_path'     => '/uploads/cases/',
     ],
 
-    // 角色定義
+    // 角色定義（靜態預設，優先使用 system_roles 資料表）
     'roles' => [
-        'boss'            => '老闆',
-        'sales_manager'   => '業務主管',
-        'eng_manager'     => '工程主管',
-        'eng_deputy'      => '工程副主管',
-        'sales'           => '業務',
-        'sales_assistant' => '業務助理',
-        'admin_staff'     => '行政人員',
+        'boss'              => '系統管理者',
+        'vice_president'    => '副總',
+        'manager'           => '分公司／部門管理者',
+        'assistant_manager' => '協理',
+        'sales_manager'     => '業務主管',
+        'eng_manager'       => '工程主管',
+        'eng_deputy'        => '工程副主管',
+        'engineer'          => '工程人員',
+        'sales'             => '業務',
+        'sales_assistant'   => '業務助理',
+        'admin_staff'       => '行政人員',
+        'accountant'        => '會計人員',
+        'warehouse'         => '倉管',
+        'purchaser'         => '採購',
+        'hq'                => '總公司',
     ],
 
     // 角色權限
     'permissions' => [
-        'boss'            => ['all'],
-        'sales_manager'   => ['cases.manage', 'staff.view', 'schedule.view', 'reports.view'],
-        'eng_manager'     => ['cases.view', 'staff.manage', 'schedule.manage', 'reports.view'],
-        'eng_deputy'      => ['cases.view', 'staff.view', 'schedule.manage'],
-        'sales'           => ['cases.own', 'schedule.view'],
-        'sales_assistant' => ['cases.assist', 'schedule.view'],
-        'admin_staff'     => ['cases.view', 'staff.view', 'schedule.view', 'payments.manage'],
+        'boss'              => ['all', 'cases.delete', 'schedule.delete', 'repairs.delete', 'quotations.delete', 'customers.delete', 'leaves.delete', 'inter_branch.delete', 'products.delete', 'inventory.delete', 'finance.delete', 'accounting.manage'],
+        'vice_president'    => ['all', 'cases.delete', 'schedule.delete', 'repairs.delete', 'quotations.delete', 'customers.delete', 'leaves.delete', 'inter_branch.delete', 'products.delete', 'inventory.delete', 'finance.delete', 'accounting.manage'],
+        'manager'           => ['all'],
+        'assistant_manager' => [],
+        'sales_manager'   => ['cases.manage', 'staff.view', 'schedule.view', 'reports.view', 'leaves.manage', 'inter_branch.view', 'repairs.view', 'quotations.manage', 'customers.manage', 'business_calendar.manage', 'business_tracking.manage', 'engineering_tracking.view', 'finance.view', 'procurement.view', 'inventory.view'],
+        'eng_manager'     => ['cases.view', 'staff_skills.manage', 'schedule.manage', 'reports.view', 'leaves.manage', 'inter_branch.manage', 'repairs.manage', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view', 'engineering_tracking.manage', 'finance.view', 'procurement.view', 'inventory.manage'],
+        'eng_deputy'      => ['cases.view', 'staff.view', 'schedule.manage', 'leaves.manage', 'inter_branch.view', 'repairs.view', 'engineering_tracking.view'],
+        'engineer'        => ['cases.view', 'schedule.view', 'leaves.own', 'repairs.view', 'engineering_tracking.own'],
+        'sales'           => ['cases.own', 'schedule.view', 'leaves.own', 'repairs.own', 'quotations.own', 'customers.own', 'business_calendar.manage', 'business_tracking.own'],
+        'sales_assistant' => ['cases.assist', 'schedule.view', 'leaves.own', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view'],
+        'admin_staff'       => ['cases.view', 'staff.view', 'schedule.view', 'payments.manage', 'leaves.view', 'inter_branch.manage', 'repairs.manage', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view', 'engineering_tracking.view', 'finance.manage', 'procurement.manage', 'inventory.manage', 'accounting.manage'],
+        'accountant'        => ['cases.view', 'finance.manage', 'procurement.view', 'inventory.view', 'accounting.manage', 'reports.view'],
+        'warehouse'         => ['inventory.manage', 'procurement.view', 'products.view'],
+        'purchaser'         => ['procurement.manage', 'inventory.view', 'products.view', 'approvals.view'],
+        'hq'                => ['cases.view', 'staff.view', 'schedule.view', 'reports.view', 'leaves.view', 'inter_branch.view', 'repairs.view', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view', 'engineering_tracking.view', 'finance.view', 'procurement.view', 'inventory.view', 'products.view'],
+    ],
+
+    // 案件編輯區域權限（角色預設）
+    'case_section_defaults' => [
+        'boss'              => ['basic','finance','schedule','attach','worklog','site','contacts','skills','delete'],
+        'vice_president'    => ['basic','finance','schedule','attach','worklog','site','contacts','skills','delete'],
+        'manager'           => ['basic','finance','schedule','attach','worklog','site','contacts','skills','delete'],
+        'assistant_manager' => ['basic','finance','schedule','attach','contacts'],
+        'sales_manager'     => ['basic','finance','contacts'],
+        'eng_manager'     => ['basic','schedule','worklog','site','skills'],
+        'eng_deputy'      => ['basic','schedule','worklog','site'],
+        'engineer'        => ['schedule','worklog','site'],
+        'sales'           => ['basic','finance','contacts'],
+        'sales_assistant' => ['basic','contacts'],
+        'admin_staff'       => ['basic','finance','attach','worklog','contacts'],
+        'accountant'        => ['finance'],
+        'warehouse'         => [],
+        'purchaser'         => [],
+        'hq'                => ['basic','finance'],
+    ],
+
+    // 區域標籤
+    'case_section_labels' => [
+        'basic'    => '基本資料',
+        'finance'  => '帳務資訊',
+        'schedule' => '施工時程',
+        'attach'   => '附件管理',
+        'worklog'  => '施工回報',
+        'site'     => '現場環境',
+        'contacts' => '聯絡人',
+        'skills'   => '所需技能',
+        'delete'   => '刪除案件',
+    ],
+
+    // 報表權限（角色預設）
+    'report_defaults' => [
+        'boss'              => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal'],
+        'vice_president'    => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal'],
+        'manager'           => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal'],
+        'assistant_manager' => ['case_summary','case_profit','finance_summary'],
+        'sales_manager'   => ['case_summary','case_profit','sales_personal'],
+        'eng_manager'     => ['case_summary','staff_value','inter_branch_monthly'],
+        'eng_deputy'      => ['staff_value'],
+        'engineer'        => [],
+        'sales'           => ['case_summary','sales_personal'],
+        'sales_assistant' => [],
+        'admin_staff'       => ['case_summary','finance_summary','inter_branch_monthly'],
+        'accountant'        => ['finance_summary'],
+        'warehouse'         => [],
+        'purchaser'         => [],
+        'hq'                => ['case_summary','case_profit','finance_summary','sales_personal'],
+    ],
+
+    // 報表標籤（新增報表只要加在這裡，權限管理會自動出現）
+    'report_labels' => [
+        'case_summary'          => '案件綜合分析',
+        'case_profit'           => '案件利潤分析',
+        'staff_value'           => '員工產值統計',
+        'finance_summary'       => '帳務綜合分析',
+        'inter_branch_monthly'  => '跨點點工費月結',
+        'sales_personal'        => '業務個人分析',
+    ],
+
+    // 假別
+    'leave_types' => [
+        'annual'   => '特休',
+        'personal' => '事假',
+        'sick'     => '病假',
+        'official' => '公假',
     ],
 
     // 證照到期預警天數

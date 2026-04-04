@@ -1,0 +1,17 @@
+-- 案件帳款交易紀錄
+CREATE TABLE IF NOT EXISTS case_payments (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  case_id INT UNSIGNED NOT NULL,
+  payment_date DATE NOT NULL,
+  payment_type VARCHAR(30) DEFAULT NULL COMMENT '訂金/尾款/全款/其他',
+  transaction_type VARCHAR(30) DEFAULT NULL COMMENT '匯款/現金/支票/轉帳',
+  amount DECIMAL(12,0) NOT NULL DEFAULT 0,
+  note TEXT,
+  image_path VARCHAR(500) DEFAULT NULL,
+  ragic_id VARCHAR(50) DEFAULT NULL COMMENT 'Ragic子表格ID',
+  created_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_case (case_id),
+  INDEX idx_date (payment_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -16,7 +16,7 @@ if ($isEdit) {
         <div class="form-row">
             <div class="form-group">
                 <label>施工日期 *</label>
-                <input type="date" name="schedule_date" id="scheduleDate" class="form-control"
+                <input type="date" max="2099-12-31" name="schedule_date" id="scheduleDate" class="form-control"
                        value="<?= e($schedule['schedule_date'] ?? $date ?? date('Y-m-d')) ?>" required
                        onchange="reloadSuggestions()">
             </div>
@@ -39,8 +39,9 @@ if ($isEdit) {
         <div class="form-row">
             <div class="form-group">
                 <label>第幾次施工</label>
-                <input type="number" name="visit_number" class="form-control" min="1"
-                       value="<?= e($schedule['visit_number'] ?? 1) ?>">
+                <input type="text" class="form-control" readonly
+                       value="<?= $isEdit ? e($schedule['visit_number']) : '（儲存時自動計算）' ?>"
+                       style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>狀態</label>
@@ -127,6 +128,44 @@ if ($isEdit) {
         </div>
     </div>
 
+    <!-- 點工人員選擇 -->
+    <?php
+    $currentDW = array();
+    if ($isEdit && !empty($schedule['dispatch_workers'])) {
+        $currentDW = array_column($schedule['dispatch_workers'], 'dispatch_worker_id');
+    }
+    ?>
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <span>點工人員</span>
+            <span class="text-muted" style="font-size:.8rem" id="dwCount">已選 <?= count($currentDW) ?> 人</span>
+        </div>
+        <?php if (!empty($dispatch_workers)): ?>
+        <div id="dwList">
+            <?php foreach ($dispatch_workers as $dw): ?>
+            <div class="engineer-option">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="dispatch_worker_ids[]" value="<?= $dw['id'] ?>"
+                           onchange="updateDWCount()"
+                           <?= in_array($dw['id'], $currentDW) ? 'checked' : '' ?>>
+                    <span>
+                        <?= e($dw['name']) ?>
+                        <?php if ($dw['vendor']): ?>
+                        <span class="text-muted" style="font-size:.8rem">(<?= e($dw['vendor']) ?>)</span>
+                        <?php endif; ?>
+                    </span>
+                </label>
+                <?php if ($dw['specialty']): ?>
+                <span class="badge" style="background:#e3f2fd;color:#1565c0"><?= e($dw['specialty']) ?></span>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <p class="text-muted">尚無點工人員資料，請先在人員管理新增</p>
+        <?php endif; ?>
+    </div>
+
     <div class="d-flex gap-1 mt-2">
         <button type="submit" class="btn btn-primary"><?= $isEdit ? '儲存變更' : '建立排工' ?></button>
         <a href="/schedule.php" class="btn btn-outline">取消</a>
@@ -150,6 +189,10 @@ if ($isEdit) {
 function updateCount() {
     var checked = document.querySelectorAll('#engineerList input[type="checkbox"]:checked').length;
     document.getElementById('engineerCount').textContent = '已選 ' + checked + ' 人';
+}
+function updateDWCount() {
+    var checked = document.querySelectorAll('#dwList input[type="checkbox"]:checked').length;
+    document.getElementById('dwCount').textContent = '已選 ' + checked + ' 人';
 }
 
 function reloadSuggestions() {

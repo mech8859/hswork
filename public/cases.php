@@ -48,9 +48,13 @@ switch ($action) {
         }
 
         $case = null;
+        $worklogTimeline = array();
         $branches = $model->getAllBranches();
         $skills = $model->getAllSkills();
         $salesUsers = $model->getSalesUsers($branchIds);
+        $extraCss = array('/css/cases-form.css?v=20260403');
+        $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
+        $extraHeadHtml = '<script>var CASE_DATA={contactCount:0,caseId:0};</script>';
 
         $pageTitle = '新增案件';
         $currentPage = 'cases';
@@ -86,9 +90,14 @@ switch ($action) {
             redirect('/cases.php?action=view&id=' . $id);
         }
 
+        $worklogTimeline = array();
+        $contacts = $case['contacts'] ?? array();
         $branches = $model->getAllBranches();
         $skills = $model->getAllSkills();
         $salesUsers = $model->getSalesUsers($branchIds);
+        $extraCss = array('/css/cases-form.css?v=20260403');
+        $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
+        $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
 
         $pageTitle = '編輯案件';
         $currentPage = 'cases';
@@ -111,6 +120,233 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/cases/view.php';
         require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- AJAX: 取得帳款交易 ----
+    case 'get_payment':
+        header('Content-Type: application/json');
+        $pid = (int)($_GET['id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('SELECT * FROM case_payments WHERE id = ?');
+        $stmt->execute(array($pid));
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode($data ? array('success' => true, 'data' => $data) : array('success' => false, 'error' => '找不到紀錄'));
+        break;
+
+    // ---- AJAX: 新增帳款交易 ----
+    case 'add_payment':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array($caseId, $_POST['payment_date'] ?? '', $_POST['payment_type'] ?? '', $_POST['transaction_type'] ?? '', (int)($_POST['amount'] ?? 0), $_POST['note'] ?? '', Auth::id()));
+        $newId = (int)Database::getInstance()->lastInsertId();
+        // Handle images
+        if (!empty($_FILES['images']['name'][0])) {
+            $imgPaths = array();
+            $dir = __DIR__ . '/uploads/cases/' . $caseId;
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            foreach ($_FILES['images']['tmp_name'] as $i => $tmp) {
+                if (!$tmp) continue;
+                $fname = date('Ymd_His') . '_pay_' . $newId . '_' . $i . '.' . pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION);
+                move_uploaded_file($tmp, $dir . '/' . $fname);
+                $imgPaths[] = 'uploads/cases/' . $caseId . '/' . $fname;
+            }
+            if ($imgPaths) {
+                Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($imgPaths), $newId));
+            }
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 編輯帳款交易 ----
+    case 'edit_payment':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $pid = (int)($_POST['payment_id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('SELECT * FROM case_payments WHERE id = ?');
+        $stmt->execute(array($pid));
+        $pay = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pay) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
+        Database::getInstance()->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, note=? WHERE id=?')
+            ->execute(array($_POST['payment_date'] ?? '', $_POST['payment_type'] ?? '', $_POST['transaction_type'] ?? '', (int)($_POST['amount'] ?? 0), $_POST['note'] ?? '', $pid));
+        // Handle new images
+        if (!empty($_FILES['images']['name'][0])) {
+            $existing = $pay['image_path'] ? json_decode($pay['image_path'], true) : array();
+            if (!is_array($existing)) $existing = $pay['image_path'] ? array($pay['image_path']) : array();
+            $dir = __DIR__ . '/uploads/cases/' . $pay['case_id'];
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            foreach ($_FILES['images']['tmp_name'] as $i => $tmp) {
+                if (!$tmp) continue;
+                $fname = date('Ymd_His') . '_pay_' . $pid . '_' . $i . '.' . pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION);
+                move_uploaded_file($tmp, $dir . '/' . $fname);
+                $existing[] = 'uploads/cases/' . $pay['case_id'] . '/' . $fname;
+            }
+            Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($existing), $pid));
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 刪除帳款交易 ----
+    case 'delete_payment':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $pid = (int)($_POST['payment_id'] ?? 0);
+        Database::getInstance()->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 取得施工回報 ----
+    case 'get_worklog':
+        header('Content-Type: application/json');
+        $wid = (int)($_GET['id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('SELECT * FROM case_work_logs WHERE id = ?');
+        $stmt->execute(array($wid));
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode($data ? array('success' => true, 'data' => $data) : array('success' => false, 'error' => '找不到紀錄'));
+        break;
+
+    // ---- AJAX: 新增施工回報 ----
+    case 'add_worklog':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('INSERT INTO case_work_logs (case_id, work_date, work_content, equipment_used, cable_used, created_by) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array($caseId, $_POST['work_date'] ?? '', $_POST['work_content'] ?? '', $_POST['equipment_used'] ?? '', $_POST['cable_used'] ?? '', Auth::id()));
+        $newId = (int)Database::getInstance()->lastInsertId();
+        // Handle photos
+        if (!empty($_FILES['photos']['name'][0])) {
+            $photoPaths = array();
+            $dir = __DIR__ . '/uploads/cases/' . $caseId . '/worklogs';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            foreach ($_FILES['photos']['tmp_name'] as $i => $tmp) {
+                if (!$tmp) continue;
+                $fname = date('Ymd_His') . '_wl_' . $newId . '_' . $i . '.' . pathinfo($_FILES['photos']['name'][$i], PATHINFO_EXTENSION);
+                move_uploaded_file($tmp, $dir . '/' . $fname);
+                $photoPaths[] = 'uploads/cases/' . $caseId . '/worklogs/' . $fname;
+            }
+            if ($photoPaths) {
+                Database::getInstance()->prepare('UPDATE case_work_logs SET photo_paths = ? WHERE id = ?')->execute(array(json_encode($photoPaths), $newId));
+            }
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 編輯施工回報 ----
+    case 'edit_worklog':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $wid = (int)($_POST['worklog_id'] ?? 0);
+        $stmt = Database::getInstance()->prepare('SELECT * FROM case_work_logs WHERE id = ?');
+        $stmt->execute(array($wid));
+        $wl = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$wl) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
+        Database::getInstance()->prepare('UPDATE case_work_logs SET work_date=?, work_content=?, equipment_used=?, cable_used=? WHERE id=?')
+            ->execute(array($_POST['work_date'] ?? '', $_POST['work_content'] ?? '', $_POST['equipment_used'] ?? '', $_POST['cable_used'] ?? '', $wid));
+        if (!empty($_FILES['photos']['name'][0])) {
+            $existing = $wl['photo_paths'] ? json_decode($wl['photo_paths'], true) : array();
+            if (!is_array($existing)) $existing = array();
+            $dir = __DIR__ . '/uploads/cases/' . $wl['case_id'] . '/worklogs';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            foreach ($_FILES['photos']['tmp_name'] as $i => $tmp) {
+                if (!$tmp) continue;
+                $fname = date('Ymd_His') . '_wl_' . $wid . '_' . $i . '.' . pathinfo($_FILES['photos']['name'][$i], PATHINFO_EXTENSION);
+                move_uploaded_file($tmp, $dir . '/' . $fname);
+                $existing[] = 'uploads/cases/' . $wl['case_id'] . '/worklogs/' . $fname;
+            }
+            Database::getInstance()->prepare('UPDATE case_work_logs SET photo_paths = ? WHERE id = ?')->execute(array(json_encode($existing), $wid));
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 刪除施工回報 ----
+    case 'delete_worklog':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $wid = (int)($_POST['worklog_id'] ?? 0);
+        Database::getInstance()->prepare('DELETE FROM case_work_logs WHERE id = ?')->execute(array($wid));
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 上傳附件 ----
+    case 'upload_attachment':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $caseId = (int)($_GET['id'] ?? 0);
+        $fileType = $_POST['file_type'] ?? 'other';
+        if (empty($_FILES['file']['tmp_name'])) { echo json_encode(array('success' => false, 'error' => '無檔案')); break; }
+        $dir = __DIR__ . '/uploads/cases/' . $caseId;
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $origName = $_FILES['file']['name'];
+        $fname = date('Ymd_His') . '_' . mt_rand(1000,9999) . '_' . preg_replace('/[^a-zA-Z0-9._\x{4e00}-\x{9fff}-]/u', '', $origName);
+        $filePath = '/uploads/cases/' . $caseId . '/' . $fname;
+        move_uploaded_file($_FILES['file']['tmp_name'], $dir . '/' . $fname);
+        $attId = $model->saveAttachment($caseId, $fileType, $origName, $filePath);
+        if (function_exists('backup_to_drive')) { backup_to_drive($dir . '/' . $fname, 'cases/' . $caseId . '/' . $fname); }
+        echo json_encode(array('success' => true, 'id' => $attId, 'file_name' => $origName, 'file_path' => $filePath));
+        break;
+
+    // ---- AJAX: 刪除附件 ----
+    case 'delete_attachment':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $attId = (int)($_POST['attachment_id'] ?? 0);
+        $model->deleteAttachment($attId);
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 新增附件分類 ----
+    case 'add_attach_type':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $label = trim($_POST['label'] ?? '');
+        if (!$label) { echo json_encode(array('success' => false, 'error' => '名稱不可為空')); break; }
+        $key = 'custom_' . time();
+        CaseModel::addAttachType($key, $label);
+        echo json_encode(array('success' => true, 'key' => $key));
+        break;
+
+    // ---- AJAX: 切換客戶不允許拍照 ----
+    case 'toggle_no_photo':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $noPhoto = (int)($_POST['no_photo'] ?? 0);
+        Database::getInstance()->prepare('UPDATE case_readiness SET no_photo_allowed = ? WHERE case_id = ?')->execute(array($noPhoto, $caseId));
+        echo json_encode(array('success' => true));
+        break;
+
+    // ---- AJAX: 搜尋客戶 ----
+    case 'ajax_search_customer':
+        header('Content-Type: application/json');
+        $keyword = $_GET['keyword'] ?? '';
+        if (mb_strlen($keyword) < 2) { echo '[]'; break; }
+        $stmt = Database::getInstance()->prepare("SELECT c.id, c.customer_no, c.name, c.phone, c.mobile, c.tax_id, c.site_address, c.contact_person, c.line_official, c.source_company, c.is_blacklisted, c.blacklist_reason FROM customers c WHERE c.name LIKE ? OR c.phone LIKE ? OR c.mobile LIKE ? OR c.tax_id LIKE ? OR c.customer_no LIKE ? ORDER BY c.name LIMIT 20");
+        $like = '%' . $keyword . '%';
+        $stmt->execute(array($like, $like, $like, $like, $like));
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Load contacts for each customer
+        foreach ($customers as &$c) {
+            $cs = Database::getInstance()->prepare('SELECT contact_name, phone, role FROM customer_contacts WHERE customer_id = ? LIMIT 5');
+            $cs->execute(array($c['id']));
+            $c['contacts'] = $cs->fetchAll(PDO::FETCH_ASSOC);
+        }
+        echo json_encode($customers);
+        break;
+
+    // ---- AJAX: 快速新增客戶 ----
+    case 'ajax_create_customer':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $name = trim($_POST['name'] ?? '');
+        if (!$name) { echo json_encode(array('success' => false, 'error' => '名稱不可為空')); break; }
+        $db = Database::getInstance();
+        // Generate customer_no
+        $maxNo = $db->query("SELECT MAX(CAST(SUBSTRING(customer_no, 3) AS UNSIGNED)) FROM customers WHERE customer_no LIKE 'A-%'")->fetchColumn();
+        $customerNo = 'A-' . str_pad(($maxNo ?: 0) + 1, 6, '0', STR_PAD_LEFT);
+        $db->prepare('INSERT INTO customers (customer_no, name, contact_person, phone, mobile, site_address, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute(array($customerNo, $name, $_POST['contact_person'] ?? '', $_POST['phone'] ?? '', $_POST['mobile'] ?? '', $_POST['address'] ?? '', Auth::id()));
+        $newId = (int)$db->lastInsertId();
+        echo json_encode(array('success' => true, 'customer' => array('id' => $newId, 'customer_no' => $customerNo, 'name' => $name, 'phone' => $_POST['phone'] ?? '', 'mobile' => $_POST['mobile'] ?? '', 'site_address' => $_POST['address'] ?? '', 'contact_person' => $_POST['contact_person'] ?? '', 'contacts' => array())));
         break;
 
     default:

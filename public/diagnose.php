@@ -1,0 +1,22 @@
+<?php
+ini_set("display_errors","1");
+error_reporting(E_ALL);
+require_once "/raid/vhost/hswork.com.tw/includes/bootstrap.php";
+echo "1. bootstrap OK<br>";
+Auth::requireLogin();
+echo "2. login OK<br>";
+$pageTitle = '儀表板';
+$currentPage = 'dashboard';
+$user = Auth::user();
+echo "3. user=" . json_encode($user) . "<br>";
+$db = Database::getInstance();
+$branchIds = Auth::getAccessibleBranchIds();
+$placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+echo "4. branchIds=" . json_encode($branchIds) . "<br>";
+$stmt = $db->prepare("SELECT s.*, c.title as case_title, c.address, c.case_number, v.plate_number, v.vehicle_type FROM schedules s JOIN cases c ON s.case_id = c.id LEFT JOIN vehicles v ON s.vehicle_id = v.id WHERE c.branch_id IN ($placeholders) AND s.schedule_date = CURDATE() ORDER BY s.created_at ASC LIMIT 20");
+$stmt->execute($branchIds);
+echo "5. schedules query OK<br>";
+require "/raid/vhost/hswork.com.tw/www/templates/layouts/header.php";
+echo "6. header OK<br>";
+require "/raid/vhost/hswork.com.tw/www/templates/layouts/footer.php";
+echo "7. footer OK<br>";

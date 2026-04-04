@@ -4,7 +4,8 @@
  */
 class Database
 {
-    private static ?PDO $instance = null;
+    /** @var PDO|null */
+    private static $instance = null;
 
     public static function getInstance(): PDO
     {

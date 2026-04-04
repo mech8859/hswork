@@ -3,6 +3,24 @@
     <a href="/worklog.php?action=history" class="btn btn-outline btn-sm">歷史記錄</a>
 </div>
 
+<!-- 主管提醒：未完成回報 -->
+<?php if (!empty($reminders)): ?>
+<div class="alert alert-warning">
+    <strong>未完成回報提醒</strong>（<?= format_date(date('Y-m-d')) ?>）
+    <div style="margin-top:6px">
+    <?php foreach ($reminders as $r): ?>
+        <div style="font-size:.85rem;padding:2px 0">
+            <strong><?= e($r['real_name']) ?></strong> -
+            <?= e($r['case_title']) ?>
+            <?php if (!$r['arrival_time']): ?><span class="text-danger">未到場</span><?php endif; ?>
+            <?php if ($r['arrival_time'] && !$r['departure_time']): ?><span class="text-danger">未離場</span><?php endif; ?>
+            <?php if ($r['arrival_time'] && $r['departure_time'] && !$r['work_description']): ?><span class="text-danger">未填回報</span><?php endif; ?>
+        </div>
+    <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php if (empty($todaySchedules)): ?>
 <div class="card text-center" style="padding:40px 16px">
     <p class="text-muted" style="font-size:1.1rem">今日無排工</p>

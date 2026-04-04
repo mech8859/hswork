@@ -4,11 +4,11 @@
  * 部署時請修改為實際的資料庫連線資訊
  */
 return [
-    'host'     => getenv('DB_HOST') ?: 'localhost',
-    'port'     => getenv('DB_PORT') ?: '3306',
-    'dbname'   => getenv('DB_NAME') ?: 'hswork',
-    'username' => getenv('DB_USER') ?: 'root',
-    'password' => getenv('DB_PASS') ?: '',
+    'host'     => 'localhost',
+    'port'     => '3306',
+    'dbname'   => 'vhost158992',
+    'username' => 'vhost158992',
+    'password' => 'Kss9227456',
     'charset'  => 'utf8mb4',
     'options'  => [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

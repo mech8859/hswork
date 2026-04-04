@@ -4,7 +4,8 @@
  */
 class CaseModel
 {
-    private PDO $db;
+    /** @var PDO */
+    private $db;
 
     public function __construct()
     {
@@ -14,22 +15,39 @@ class CaseModel
     /**
      * 取得案件清單 (含分頁/篩選)
      */
-    public function getList(array $branchIds, array $filters = [], int $page = 1, int $perPage = 20): array
+    public function getList(array $branchIds, array $filters = [], int $page = 1, int $perPage = 100): array
     {
-        $where = 'c.branch_id IN (' . implode(',', array_fill(0, count($branchIds), '?')) . ')';
-        $params = $branchIds;
+        $branchPh = implode(',', array_fill(0, count($branchIds), '?'));
+        $where = '(c.branch_id IN (' . $branchPh . ') OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN (' . $branchPh . ')))';
+        $params = array_merge($branchIds, $branchIds);
 
         if (!empty($filters['status'])) {
-            $where .= ' AND c.status = ?';
-            $params[] = $filters['status'];
+            // 支援逗號分隔多值，例如 status=incomplete,awaiting_dispatch
+            $statuses = explode(',', $filters['status']);
+            if (count($statuses) > 1) {
+                $ph = implode(',', array_fill(0, count($statuses), '?'));
+                $where .= " AND c.status IN ($ph)";
+                foreach ($statuses as $sv) {
+                    $params[] = trim($sv);
+                }
+            } else {
+                $where .= ' AND c.status = ?';
+                $params[] = $filters['status'];
+            }
         }
         if (!empty($filters['case_type'])) {
             $where .= ' AND c.case_type = ?';
             $params[] = $filters['case_type'];
         }
+        if (!empty($filters['sub_status'])) {
+            $where .= ' AND c.sub_status = ?';
+            $params[] = $filters['sub_status'];
+        }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (c.title LIKE ? OR c.case_number LIKE ? OR c.address LIKE ?)';
+            $where .= ' AND (c.title LIKE ? OR c.case_number LIKE ? OR c.address LIKE ? OR c.customer_name LIKE ? OR u.real_name LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
+            $params[] = $kw;
+            $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
@@ -38,33 +56,53 @@ class CaseModel
             $where .= ' AND c.branch_id = ?';
             $params[] = $filters['branch_id'];
         }
+        if (!empty($filters['sales_id'])) {
+            $where .= ' AND c.sales_id = ?';
+            $params[] = $filters['sales_id'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where .= ' AND c.created_at >= ?';
+            $params[] = $filters['date_from'] . ' 00:00:00';
+        }
+        if (!empty($filters['date_to'])) {
+            $where .= ' AND c.created_at <= ?';
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
 
-        // 計算總數
-        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM cases c WHERE $where");
+        // 計算總數與金額合計
+        $countStmt = $this->db->prepare("SELECT COUNT(*), COALESCE(SUM(c.balance_amount),0), COALESCE(SUM(c.deal_amount),0) FROM cases c LEFT JOIN users u ON c.sales_id = u.id WHERE $where");
         $countStmt->execute($params);
-        $total = (int)$countStmt->fetchColumn();
+        $countRow = $countStmt->fetch(PDO::FETCH_NUM);
+        $total = (int)$countRow[0];
+        $totalBalance = (float)$countRow[1];
+        $totalDeal = (float)$countRow[2];
 
         $offset = ($page - 1) * $perPage;
         $stmt = $this->db->prepare("
             SELECT c.*, b.name AS branch_name,
                    u.real_name AS sales_name,
-                   cr.has_quotation, cr.has_site_photos, cr.has_amount_confirmed, cr.has_site_info
+                   cr.has_quotation, cr.has_site_photos, cr.has_amount_confirmed, cr.has_site_info,
+                   cust.is_blacklisted, cust.blacklist_reason,
+                   EXISTS(SELECT 1 FROM cases c2 WHERE c2.customer_id = c.customer_id AND ( c2.sub_status IN ('已成交','跨月成交','現簽','電話報價成交') OR c2.case_type IN ('old_repair','addition') )) as customer_has_deal
             FROM cases c
             JOIN branches b ON c.branch_id = b.id
             LEFT JOIN users u ON c.sales_id = u.id
             LEFT JOIN case_readiness cr ON cr.case_id = c.id
+            LEFT JOIN customers cust ON c.customer_id = cust.id
             WHERE $where
-            ORDER BY c.updated_at DESC
+            ORDER BY COALESCE(c.updated_at, c.created_at) DESC
             LIMIT $perPage OFFSET $offset
         ");
         $stmt->execute($params);
 
         return [
-            'data'     => $stmt->fetchAll(),
-            'total'    => $total,
-            'page'     => $page,
-            'perPage'  => $perPage,
-            'lastPage' => (int)ceil($total / $perPage),
+            'data'         => $stmt->fetchAll(),
+            'total'        => $total,
+            'totalBalance' => $totalBalance,
+            'totalDeal'    => $totalDeal,
+            'page'         => $page,
+            'perPage'      => $perPage,
+            'lastPage'     => (int)ceil($total / $perPage),
         ];
     }
 
@@ -75,10 +113,12 @@ class CaseModel
     {
         $stmt = $this->db->prepare('
             SELECT c.*, b.name AS branch_name, b.code AS branch_code,
-                   u.real_name AS sales_name
+                   u.real_name AS sales_name,
+                   cu.customer_no AS linked_customer_no
             FROM cases c
             JOIN branches b ON c.branch_id = b.id
             LEFT JOIN users u ON c.sales_id = u.id
+            LEFT JOIN customers cu ON c.customer_id = cu.id
             WHERE c.id = ?
         ');
         $stmt->execute([$id]);
@@ -122,9 +162,40 @@ class CaseModel
         $case['attachments'] = $stmt->fetchAll();
 
         // 收款
-        $stmt = $this->db->prepare('SELECT * FROM payments WHERE case_id = ? ORDER BY created_at');
-        $stmt->execute([$id]);
-        $case['payments'] = $stmt->fetchAll();
+        try {
+            $stmt = $this->db->prepare('SELECT * FROM payments WHERE case_id = ? ORDER BY created_at');
+            $stmt->execute([$id]);
+            $case['payments'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['payments'] = array();
+        }
+
+        // 帳款交易紀錄
+        try {
+            $stmt = $this->db->prepare('SELECT cp.*, u.real_name as creator_name FROM case_payments cp LEFT JOIN users u ON cp.created_by = u.id WHERE cp.case_id = ? ORDER BY cp.payment_date DESC');
+            $stmt->execute([$id]);
+            $case['case_payments'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['case_payments'] = array();
+        }
+
+        // 請款流程
+        try {
+            $stmt = $this->db->prepare('SELECT * FROM case_billing_items WHERE case_id = ? ORDER BY seq_no');
+            $stmt->execute([$id]);
+            $case['billing_items'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['billing_items'] = array();
+        }
+
+        // 施工回報紀錄（手動/Ragic匯入）
+        try {
+            $stmt = $this->db->prepare('SELECT cwl.*, u.real_name as creator_name FROM case_work_logs cwl LEFT JOIN users u ON cwl.created_by = u.id WHERE cwl.case_id = ? ORDER BY cwl.work_date DESC');
+            $stmt->execute([$id]);
+            $case['case_work_logs'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['case_work_logs'] = array();
+        }
 
         return $case;
     }
@@ -134,33 +205,103 @@ class CaseModel
      */
     public function create(array $data): int
     {
-        $stmtBranch = $this->db->prepare('SELECT code FROM branches WHERE id = ?');
-        $stmtBranch->execute([$data['branch_id']]);
-        $branchCode = $stmtBranch->fetchColumn();
+        $caseNumber = generate_doc_number('cases');
 
-        $caseNumber = generate_case_number($branchCode);
+        // 有指派業務時，狀態自動設為待聯絡
+        if (!empty($data['sales_id']) && (empty($data['sub_status']) || $data['sub_status'] === '未指派')) {
+            $data['sub_status'] = '待聯絡';
+        }
 
         $stmt = $this->db->prepare('
-            INSERT INTO cases (branch_id, case_number, title, case_type, status, difficulty,
+            INSERT INTO cases (branch_id, case_number, title, case_type, status, sub_status, difficulty,
                              estimated_hours, total_visits, max_engineers, address, description,
-                             ragic_id, sales_id, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             system_type, quote_amount, notes,
+                             deal_date, deal_amount, is_tax_included, tax_amount, total_amount,
+                             deposit_amount, deposit_payment_date, deposit_method,
+                             balance_amount, completion_amount, total_collected,
+                             ragic_id, sales_id, created_by,
+                             planned_start_date, planned_end_date, is_flexible,
+                             work_time_start, work_time_end, has_time_restriction,
+                             customer_break_time, allow_night_work, urgency, is_large_project,
+                             customer_id, customer_name, customer_category, customer_phone, customer_mobile, contact_person, contact_line_id, customer_email,
+                             billing_title, billing_tax_id, billing_contact, billing_phone, billing_mobile, billing_address, billing_email, billing_note,
+                             registrar, updated_by,
+                             repair_report_date, repair_fault_reason, repair_by_sales, repair_equipment, repair_staff, repair_helper,
+                             repair_result, repair_description, repair_original_case, repair_original_complete_date, repair_original_warranty_date,
+                             repair_is_charged, repair_no_charge_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $data['branch_id'],
             $caseNumber,
             $data['title'],
             $data['case_type'] ?? 'new_install',
-            $data['status'] ?? 'pending',
+            $data['status'] ?? 'tracking',
+            $data['sub_status'] ?: null,
             $data['difficulty'] ?? 3,
             $data['estimated_hours'] ?: null,
             $data['total_visits'] ?? 1,
             $data['max_engineers'] ?? 4,
             $data['address'] ?? null,
             $data['description'] ?? null,
+            $data['system_type'] ?: null,
+            $data['quote_amount'] ?: null,
+            $data['notes'] ?: null,
+            !empty($data['deal_date']) ? $data['deal_date'] : null,
+            $data['deal_amount'] ?: null,
+            $data['is_tax_included'] ?: null,
+            $data['tax_amount'] ?: null,
+            $data['total_amount'] ?: null,
+            $data['deposit_amount'] ?: null,
+            !empty($data['deposit_payment_date']) ? $data['deposit_payment_date'] : null,
+            $data['deposit_method'] ?: null,
+            $data['balance_amount'] ?: null,
+            $data['completion_amount'] ?: null,
+            $data['total_collected'] ?: null,
             $data['ragic_id'] ?: null,
             $data['sales_id'] ?: null,
             Auth::id(),
+            !empty($data['planned_start_date']) ? $data['planned_start_date'] : null,
+            !empty($data['planned_end_date']) ? $data['planned_end_date'] : null,
+            $data['is_flexible'] ?? 0,
+            !empty($data['work_time_start']) ? $data['work_time_start'] : null,
+            !empty($data['work_time_end']) ? $data['work_time_end'] : null,
+            $data['has_time_restriction'] ?? 0,
+            $data['customer_break_time'] ?? null,
+            $data['allow_night_work'] ?? 0,
+            $data['urgency'] ?? 3,
+            $data['is_large_project'] ?? 0,
+            !empty($data['customer_id']) ? $data['customer_id'] : null,
+            !empty($data['customer_name']) ? $data['customer_name'] : null,
+            !empty($data['customer_category']) ? $data['customer_category'] : null,
+            !empty($data['customer_phone']) ? $data['customer_phone'] : null,
+            !empty($data['customer_mobile']) ? $data['customer_mobile'] : null,
+            !empty($data['contact_person']) ? $data['contact_person'] : null,
+            !empty($data['contact_line_id']) ? $data['contact_line_id'] : null,
+            !empty($data['customer_email']) ? $data['customer_email'] : null,
+            !empty($data['billing_title']) ? $data['billing_title'] : null,
+            !empty($data['billing_tax_id']) ? $data['billing_tax_id'] : null,
+            !empty($data['billing_contact']) ? $data['billing_contact'] : null,
+            !empty($data['billing_phone']) ? $data['billing_phone'] : null,
+            !empty($data['billing_mobile']) ? $data['billing_mobile'] : null,
+            !empty($data['billing_address']) ? $data['billing_address'] : null,
+            !empty($data['billing_email']) ? $data['billing_email'] : null,
+            !empty($data['billing_note']) ? $data['billing_note'] : null,
+            !empty($data['registrar']) ? $data['registrar'] : null,
+            Auth::id(),
+            !empty($data['repair_report_date']) ? $data['repair_report_date'] : null,
+            !empty($data['repair_fault_reason']) ? $data['repair_fault_reason'] : null,
+            isset($data['repair_by_sales']) && $data['repair_by_sales'] !== '' ? $data['repair_by_sales'] : null,
+            !empty($data['repair_equipment']) ? $data['repair_equipment'] : null,
+            !empty($data['repair_staff']) ? $data['repair_staff'] : null,
+            !empty($data['repair_helper']) ? $data['repair_helper'] : null,
+            !empty($data['repair_result']) ? $data['repair_result'] : null,
+            !empty($data['repair_description']) ? $data['repair_description'] : null,
+            !empty($data['repair_original_case']) ? $data['repair_original_case'] : null,
+            !empty($data['repair_original_complete_date']) ? $data['repair_original_complete_date'] : null,
+            !empty($data['repair_original_warranty_date']) ? $data['repair_original_warranty_date'] : null,
+            !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
+            !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
         ]);
 
         $caseId = (int)$this->db->lastInsertId();
@@ -179,27 +320,172 @@ class CaseModel
      */
     public function update(int $id, array $data): void
     {
+        // 指派業務時自動調整狀態：僅在 sub_status 為「未指派」時才改為「待聯絡」
+        if (!empty($data['sales_id'])) {
+            $chk = $this->db->prepare("SELECT sales_id, sub_status FROM cases WHERE id = ?");
+            $chk->execute(array($id));
+            $old = $chk->fetch(PDO::FETCH_ASSOC);
+            // 判斷目前實際的 sub_status（POST 資料優先，否則用 DB 值）
+            $currentSubStatus = isset($data['sub_status']) && $data['sub_status'] !== ''
+                ? $data['sub_status']
+                : ($old ? $old['sub_status'] : '');
+            // 只在「未指派」時自動改為「待聯絡」
+            if ($currentSubStatus === '未指派') {
+                $data['sub_status'] = '待聯絡';
+                AuditLog::log('cases', 'auto_status', $id, '指派業務自動變更：未指派 → 待聯絡');
+            }
+        }
+
         $stmt = $this->db->prepare('
             UPDATE cases SET
-                title = ?, case_type = ?, status = ?, difficulty = ?,
+                title = ?, case_type = ?, status = ?, sub_status = ?, difficulty = ?,
                 estimated_hours = ?, total_visits = ?, max_engineers = ?,
-                address = ?, description = ?, ragic_id = ?, sales_id = ?
+                address = ?, description = ?,
+                system_type = ?, quote_amount = ?, notes = ?,
+                deal_date = ?, deal_amount = ?, is_tax_included = ?, tax_amount = ?, total_amount = ?,
+                deposit_amount = ?, deposit_payment_date = ?, deposit_method = ?,
+                balance_amount = ?, completion_amount = ?, total_collected = ?,
+                ragic_id = ?, sales_id = ?,
+                planned_start_date = ?, planned_end_date = ?, is_flexible = ?,
+                work_time_start = ?, work_time_end = ?, has_time_restriction = ?,
+                customer_break_time = ?, allow_night_work = ?, urgency = ?, is_large_project = ?,
+                branch_id = ?,
+                customer_id = ?, customer_name = ?, customer_category = ?, customer_phone = ?, customer_mobile = ?, contact_person = ?, contact_line_id = ?, customer_email = ?, construction_note = ?,
+                contact_address = ?, construction_area = ?, company = ?, case_source = ?, completion_date = ?, survey_date = ?, visit_method = ?,
+                billing_title = ?, billing_tax_id = ?, billing_contact = ?,
+                billing_phone = ?, billing_mobile = ?, billing_address = ?, billing_email = ?,
+                billing_note = ?, updated_by = ?,
+                repair_report_date = ?, repair_fault_reason = ?, repair_by_sales = ?, repair_equipment = ?,
+                repair_staff = ?, repair_helper = ?, repair_result = ?, repair_description = ?,
+                repair_original_case = ?, repair_original_complete_date = ?, repair_original_warranty_date = ?,
+                repair_is_charged = ?, repair_no_charge_reason = ?
             WHERE id = ?
         ');
         $stmt->execute([
-            $data['title'],
-            $data['case_type'] ?? 'new_install',
-            $data['status'] ?? 'pending',
-            $data['difficulty'] ?? 3,
-            $data['estimated_hours'] ?: null,
-            $data['total_visits'] ?? 1,
-            $data['max_engineers'] ?? 4,
-            $data['address'] ?? null,
-            $data['description'] ?? null,
-            $data['ragic_id'] ?: null,
-            $data['sales_id'] ?: null,
+            isset($data['title']) ? $data['title'] : '',
+            isset($data['case_type']) && $data['case_type'] !== '' ? $data['case_type'] : 'new_install',
+            isset($data['status']) && $data['status'] !== '' ? $data['status'] : 'tracking',
+            !empty($data['sub_status']) ? $data['sub_status'] : null,
+            isset($data['difficulty']) ? $data['difficulty'] : 3,
+            !empty($data['estimated_hours']) ? $data['estimated_hours'] : null,
+            isset($data['total_visits']) && $data['total_visits'] !== '' ? $data['total_visits'] : 1,
+            isset($data['max_engineers']) && $data['max_engineers'] !== '' ? $data['max_engineers'] : 4,
+            !empty($data['address']) ? $data['address'] : null,
+            !empty($data['description']) ? $data['description'] : null,
+            !empty($data['system_type']) ? $data['system_type'] : null,
+            !empty($data['quote_amount']) ? $data['quote_amount'] : null,
+            !empty($data['notes']) ? $data['notes'] : null,
+            !empty($data['deal_date']) ? $data['deal_date'] : null,
+            !empty($data['deal_amount']) ? $data['deal_amount'] : null,
+            !empty($data['is_tax_included']) ? $data['is_tax_included'] : null,
+            !empty($data['tax_amount']) ? $data['tax_amount'] : null,
+            !empty($data['total_amount']) ? $data['total_amount'] : null,
+            !empty($data['deposit_amount']) ? $data['deposit_amount'] : null,
+            !empty($data['deposit_payment_date']) ? $data['deposit_payment_date'] : null,
+            !empty($data['deposit_method']) ? $data['deposit_method'] : null,
+            !empty($data['balance_amount']) ? $data['balance_amount'] : null,
+            !empty($data['completion_amount']) ? $data['completion_amount'] : null,
+            !empty($data['total_collected']) ? $data['total_collected'] : null,
+            !empty($data['ragic_id']) ? $data['ragic_id'] : null,
+            !empty($data['sales_id']) ? $data['sales_id'] : null,
+            !empty($data['planned_start_date']) ? $data['planned_start_date'] : null,
+            !empty($data['planned_end_date']) ? $data['planned_end_date'] : null,
+            isset($data['is_flexible']) ? $data['is_flexible'] : 0,
+            !empty($data['work_time_start']) ? $data['work_time_start'] : null,
+            !empty($data['work_time_end']) ? $data['work_time_end'] : null,
+            isset($data['has_time_restriction']) ? $data['has_time_restriction'] : 0,
+            isset($data['customer_break_time']) ? $data['customer_break_time'] : null,
+            isset($data['allow_night_work']) ? $data['allow_night_work'] : 0,
+            isset($data['urgency']) ? $data['urgency'] : 3,
+            isset($data['is_large_project']) ? $data['is_large_project'] : 0,
+            !empty($data['branch_id']) ? $data['branch_id'] : null,
+            !empty($data['customer_id']) ? $data['customer_id'] : null,
+            !empty($data['customer_name']) ? $data['customer_name'] : null,
+            !empty($data['customer_category']) ? $data['customer_category'] : null,
+            !empty($data['customer_phone']) ? $data['customer_phone'] : null,
+            !empty($data['customer_mobile']) ? $data['customer_mobile'] : null,
+            !empty($data['contact_person']) ? $data['contact_person'] : null,
+            !empty($data['contact_line_id']) ? $data['contact_line_id'] : null,
+            !empty($data['customer_email']) ? $data['customer_email'] : null,
+            !empty($data['construction_note']) ? $data['construction_note'] : null,
+            !empty($data['contact_address']) ? $data['contact_address'] : null,
+            !empty($data['construction_area']) ? $data['construction_area'] : null,
+            !empty($data['company']) ? $data['company'] : null,
+            !empty($data['case_source']) ? $data['case_source'] : null,
+            !empty($data['completion_date']) ? $data['completion_date'] : null,
+            !empty($data['survey_date']) ? $data['survey_date'] : null,
+            !empty($data['visit_method']) ? $data['visit_method'] : null,
+            !empty($data['billing_title']) ? $data['billing_title'] : null,
+            !empty($data['billing_tax_id']) ? $data['billing_tax_id'] : null,
+            !empty($data['billing_contact']) ? $data['billing_contact'] : null,
+            !empty($data['billing_phone']) ? $data['billing_phone'] : null,
+            !empty($data['billing_mobile']) ? $data['billing_mobile'] : null,
+            !empty($data['billing_address']) ? $data['billing_address'] : null,
+            !empty($data['billing_email']) ? $data['billing_email'] : null,
+            !empty($data['billing_note']) ? $data['billing_note'] : null,
+            !empty($data['updated_by']) ? $data['updated_by'] : null,
+            !empty($data['repair_report_date']) ? $data['repair_report_date'] : null,
+            !empty($data['repair_fault_reason']) ? $data['repair_fault_reason'] : null,
+            isset($data['repair_by_sales']) && $data['repair_by_sales'] !== '' ? $data['repair_by_sales'] : null,
+            !empty($data['repair_equipment']) ? $data['repair_equipment'] : null,
+            !empty($data['repair_staff']) ? $data['repair_staff'] : null,
+            !empty($data['repair_helper']) ? $data['repair_helper'] : null,
+            !empty($data['repair_result']) ? $data['repair_result'] : null,
+            !empty($data['repair_description']) ? $data['repair_description'] : null,
+            !empty($data['repair_original_case']) ? $data['repair_original_case'] : null,
+            !empty($data['repair_original_complete_date']) ? $data['repair_original_complete_date'] : null,
+            !empty($data['repair_original_warranty_date']) ? $data['repair_original_warranty_date'] : null,
+            !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
+            !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
             $id,
         ]);
+
+        // 更新系統自動判斷難易度
+        $this->updateSystemDifficulty($id);
+
+        // 同步更新 stage
+        $this->syncStage($id);
+
+        // 場勘日期同步到業務行事曆
+        if (!empty($data['survey_date'])) {
+            $this->syncSurveyToCalendar($id, $data);
+        }
+    }
+
+    /**
+     * 場勘日期同步到業務行事曆
+     */
+    private function syncSurveyToCalendar($caseId, $data)
+    {
+        // 檢查是否已有此案件的場勘事件
+        $stmt = $this->db->prepare('SELECT id, event_date FROM business_calendar WHERE case_id = ? AND activity_type = ?');
+        $stmt->execute(array($caseId, 'survey'));
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $surveyDate = $data['survey_date'];
+        $staffId = !empty($data['sales_id']) ? $data['sales_id'] : (Auth::id() ?: 1);
+
+        // 取案件完整資料
+        $caseStmt = $this->db->prepare('SELECT case_number, title, customer_name, customer_phone, customer_mobile, address, visit_method FROM cases WHERE id = ?');
+        $caseStmt->execute(array($caseId));
+        $c = $caseStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return;
+
+        $phone = $c['customer_phone'] ?: $c['customer_mobile'];
+        $note = $c['case_number'] . ' ' . $c['title'];
+        if (!empty($c['visit_method'])) {
+            $note .= ' (拜訪方式: ' . $c['visit_method'] . ')';
+        }
+
+        if ($existing) {
+            // 更新既有事件
+            $upd = $this->db->prepare('UPDATE business_calendar SET event_date = ?, staff_id = ?, customer_name = ?, phone = ?, address = ?, note = ? WHERE id = ?');
+            $upd->execute(array($surveyDate, $staffId, $c['customer_name'], $phone, $c['address'], $note, $existing['id']));
+        } else {
+            // 新建事件
+            $ins = $this->db->prepare("INSERT INTO business_calendar (event_date, staff_id, case_id, customer_name, activity_type, phone, address, note, status, created_by, created_at) VALUES (?, ?, ?, ?, 'survey', ?, ?, ?, 'planned', ?, NOW())");
+            $ins->execute(array($surveyDate, $staffId, $caseId, $c['customer_name'], $phone, $c['address'], $note, Auth::id() ?: 1));
+        }
     }
 
     /**
@@ -236,16 +522,21 @@ class CaseModel
         $conduitType = !empty($data['conduit_type']) ? (is_array($data['conduit_type']) ? implode(',', $data['conduit_type']) : $data['conduit_type']) : null;
 
         $stmt = $this->db->prepare('
-            INSERT INTO case_site_conditions (case_id, structure_type, conduit_type, floor_count, has_elevator, has_ladder_needed, special_requirements)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO case_site_conditions (case_id, structure_type, conduit_type, floor_count, has_elevator, has_ladder_needed, ladder_size, high_ceiling_height, needs_scissor_lift, special_requirements)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 structure_type = VALUES(structure_type),
                 conduit_type = VALUES(conduit_type),
                 floor_count = VALUES(floor_count),
                 has_elevator = VALUES(has_elevator),
                 has_ladder_needed = VALUES(has_ladder_needed),
+                ladder_size = VALUES(ladder_size),
+                high_ceiling_height = VALUES(high_ceiling_height),
+                needs_scissor_lift = VALUES(needs_scissor_lift),
                 special_requirements = VALUES(special_requirements)
         ');
+        $ladderSize = !empty($data['has_ladder_needed']) ? ($data['ladder_size'] ?? null) : null;
+        $highCeiling = !empty($data['high_ceiling_height']) ? $data['high_ceiling_height'] : null;
         $stmt->execute([
             $caseId,
             $structureType,
@@ -253,6 +544,9 @@ class CaseModel
             $data['floor_count'] ?: null,
             $data['has_elevator'] ?? 0,
             $data['has_ladder_needed'] ?? 0,
+            $ladderSize ?: null,
+            $highCeiling,
+            $data['needs_scissor_lift'] ?? 0,
             $data['special_requirements'] ?? null,
         ]);
     }
@@ -312,15 +606,15 @@ class CaseModel
     }
 
     /**
-     * 取得業務人員清單
+     * 取得業務人員清單（含離職）
      */
     public function getSalesUsers(array $branchIds): array
     {
         $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
         $stmt = $this->db->prepare("
-            SELECT id, real_name, branch_id FROM users
+            SELECT id, real_name, branch_id, is_active FROM users
             WHERE branch_id IN ($placeholders)
-              AND role IN ('sales','sales_manager','boss')
+              AND role IN ('sales','sales_manager','sales_assistant','boss')
               AND is_active = 1
             ORDER BY real_name
         ");
@@ -329,49 +623,776 @@ class CaseModel
     }
 
     /**
-     * 狀態中文
+     * 系統自動判斷難易度
      */
-    public static function statusLabel(string $status): string
+    public function updateSystemDifficulty($caseId)
     {
-        $map = [
-            'pending'     => '待處理',
-            'ready'       => '可排工',
-            'scheduled'   => '已排工',
-            'in_progress' => '施工中',
-            'completed'   => '已完工',
-            'cancelled'   => '已取消',
-        ];
-        return $map[$status] ?? $status;
+        $case = $this->db->prepare('SELECT * FROM cases WHERE id = ?');
+        $case->execute(array($caseId));
+        $c = $case->fetch();
+        if (!$c) return;
+
+        $score = 0;
+
+        // 施工次數 (多次=難)
+        $visits = (int)($c['total_visits'] ?: 1);
+        if ($visits >= 5) $score += 2;
+        elseif ($visits >= 3) $score += 1;
+
+        // 人數需求 (多人=難)
+        $maxEng = (int)($c['max_engineers'] ?: 4);
+        if ($maxEng >= 6) $score += 2;
+        elseif ($maxEng >= 4) $score += 1;
+
+        // 預估工時
+        $hours = (float)($c['estimated_hours'] ?: 0);
+        if ($hours >= 16) $score += 2;
+        elseif ($hours >= 8) $score += 1;
+
+        // 現場環境
+        $site = $this->db->prepare('SELECT * FROM case_site_conditions WHERE case_id = ?');
+        $site->execute(array($caseId));
+        $s = $site->fetch();
+        if ($s) {
+            if (!empty($s['has_ladder_needed'])) $score += 1;
+            if (!empty($s['needs_scissor_lift'])) $score += 1;
+            $floors = (int)($s['floor_count'] ?: 0);
+            if ($floors >= 5) $score += 1;
+        }
+
+        // 時間限制
+        if (!empty($c['has_time_restriction'])) $score += 1;
+
+        // 所需技能數
+        $skillStmt = $this->db->prepare('SELECT COUNT(*) FROM case_required_skills WHERE case_id = ?');
+        $skillStmt->execute(array($caseId));
+        $skillCount = (int)$skillStmt->fetchColumn();
+        if ($skillCount >= 4) $score += 1;
+
+        // 換算為 1-5
+        $difficulty = min(5, max(1, (int)ceil($score / 2)));
+
+        $this->db->prepare('UPDATE cases SET system_difficulty = ? WHERE id = ?')
+                 ->execute(array($difficulty, $caseId));
     }
 
     /**
-     * 狀態 badge class
+     * 儲存案件附件
      */
-    public static function statusBadge(string $status): string
+    public function saveAttachment($caseId, $fileType, $fileName, $filePath)
     {
-        $map = [
-            'pending'     => 'warning',
-            'ready'       => 'info',
-            'scheduled'   => 'primary',
-            'in_progress' => 'warning',
-            'completed'   => 'success',
-            'cancelled'   => 'danger',
-        ];
-        return 'badge-' . ($map[$status] ?? 'primary');
+        $stmt = $this->db->prepare('
+            INSERT INTO case_attachments (case_id, file_type, file_name, file_path, uploaded_by)
+            VALUES (?, ?, ?, ?, ?)
+        ');
+        $stmt->execute(array($caseId, $fileType, $fileName, $filePath, Auth::id()));
+        return (int)$this->db->lastInsertId();
     }
 
     /**
-     * 案件類型中文
+     * 刪除案件附件
      */
-    public static function typeLabel(string $type): string
+    public function deleteAttachment($attachmentId)
     {
-        $map = [
-            'new_install'  => '新裝',
-            'maintenance'  => '保養',
-            'repair'       => '維修',
-            'inspection'   => '勘查',
+        $stmt = $this->db->prepare('SELECT file_path FROM case_attachments WHERE id = ?');
+        $stmt->execute(array($attachmentId));
+        $path = $stmt->fetchColumn();
+        if ($path) {
+            $fullPath = __DIR__ . '/../../public' . $path;
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+        }
+        $this->db->prepare('DELETE FROM case_attachments WHERE id = ?')->execute(array($attachmentId));
+    }
+
+    /**
+     * 刪除案件及所有關聯資料
+     */
+    public function deleteCase($caseId)
+    {
+        $caseId = (int)$caseId;
+        // 刪除附件檔案
+        $stmt = $this->db->prepare('SELECT file_path FROM case_attachments WHERE case_id = ?');
+        $stmt->execute(array($caseId));
+        while ($path = $stmt->fetchColumn()) {
+            $fullPath = __DIR__ . '/../../public' . $path;
+            if (file_exists($fullPath)) @unlink($fullPath);
+        }
+        // 刪除關聯表
+        $tables = array('case_attachments','case_contacts','case_readiness','case_site_conditions','case_required_skills');
+        foreach ($tables as $t) {
+            $this->db->prepare("DELETE FROM {$t} WHERE case_id = ?")->execute(array($caseId));
+        }
+        // 刪除主表
+        $this->db->prepare('DELETE FROM cases WHERE id = ?')->execute(array($caseId));
+    }
+
+    /**
+     * 取得據點 (可選 branchIds 過濾)
+     */
+    public function getBranches($branchIds = array())
+    {
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $stmt = $this->db->prepare("SELECT * FROM branches WHERE is_active = 1 AND id IN ($placeholders) ORDER BY id");
+            $stmt->execute($branchIds);
+            return $stmt->fetchAll();
+        }
+        return $this->db->query('SELECT * FROM branches WHERE is_active = 1 ORDER BY id')->fetchAll();
+    }
+
+    /**
+     * 業務追蹤列表 (stage 1~4, 8)
+     */
+    public function getSalesTrackingList($filters = array())
+    {
+        $where = "c.stage IN (1,2,3,4,8)";
+        $params = array();
+
+        if (!empty($filters['sales_id'])) {
+            $where .= " AND c.sales_id = ?";
+            $params[] = $filters['sales_id'];
+        }
+        if (!empty($filters['stage'])) {
+            $where .= " AND c.stage = ?";
+            $params[] = $filters['stage'];
+        }
+        if (!empty($filters['branch_id'])) {
+            $where .= " AND c.branch_id = ?";
+            $params[] = $filters['branch_id'];
+        }
+        if (!empty($filters['case_type'])) {
+            $where .= " AND c.case_type = ?";
+            $params[] = $filters['case_type'];
+        }
+        if (!empty($filters['case_source'])) {
+            $where .= " AND c.case_source = ?";
+            $params[] = $filters['case_source'];
+        }
+        if (!empty($filters['keyword'])) {
+            $kw = '%' . $filters['keyword'] . '%';
+            $where .= " AND (c.title LIKE ? OR c.customer_name LIKE ? OR c.address LIKE ? OR c.case_number LIKE ?)";
+            $params = array_merge($params, array($kw, $kw, $kw, $kw));
+        }
+        if (!empty($filters['start_date'])) {
+            $where .= " AND c.created_at >= ?";
+            $params[] = $filters['start_date'] . ' 00:00:00';
+        }
+        if (!empty($filters['end_date'])) {
+            $where .= " AND c.created_at <= ?";
+            $params[] = $filters['end_date'] . ' 23:59:59';
+        }
+
+        $sql = "SELECT c.*, b.name as branch_name, u.real_name as sales_name
+                FROM cases c
+                LEFT JOIN branches b ON c.branch_id = b.id
+                LEFT JOIN users u ON c.sales_id = u.id
+                WHERE {$where}
+                ORDER BY GREATEST(COALESCE(c.updated_at, c.created_at), c.created_at) DESC
+                LIMIT 500";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 各階段統計
+     */
+    public function getStageStats($filters = array())
+    {
+        $where = "stage IN (1,2,3,4,8)";
+        $params = array();
+
+        if (!empty($filters['sales_id'])) {
+            $where .= " AND sales_id = ?";
+            $params[] = $filters['sales_id'];
+        }
+        if (!empty($filters['branch_id'])) {
+            $where .= " AND branch_id = ?";
+            $params[] = $filters['branch_id'];
+        }
+
+        $sql = "SELECT stage, COUNT(*) as cnt, COALESCE(SUM(deal_amount),0) as total_amount FROM cases WHERE {$where} GROUP BY stage";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stats = array(1 => array('count' => 0, 'amount' => 0), 2 => array('count' => 0, 'amount' => 0), 3 => array('count' => 0, 'amount' => 0), 4 => array('count' => 0, 'amount' => 0), 8 => array('count' => 0, 'amount' => 0));
+        foreach ($rows as $r) {
+            $s = (int)$r['stage'];
+            if (isset($stats[$s])) {
+                $stats[$s]['count'] = (int)$r['cnt'];
+                $stats[$s]['amount'] = (float)$r['total_amount'];
+            }
+        }
+        return $stats;
+    }
+
+    /**
+     * 工程追蹤 - 案件清單 (stage 4-7)
+     */
+    public function getEngineeringTrackingList($filters = array())
+    {
+        $where = "(c.stage BETWEEN 4 AND 7 OR c.status = 'awaiting_dispatch')";
+        $params = array();
+
+        if (!empty($filters['engineer_id'])) {
+            $where .= " AND EXISTS (SELECT 1 FROM schedules s2 JOIN schedule_engineers se2 ON se2.schedule_id = s2.id WHERE s2.case_id = c.id AND se2.user_id = ?)";
+            $params[] = $filters['engineer_id'];
+        }
+        if (!empty($filters['stage'])) {
+            $where .= " AND c.stage = ?";
+            $params[] = $filters['stage'];
+        }
+        if (!empty($filters['branch_id'])) {
+            $where .= " AND c.branch_id = ?";
+            $params[] = $filters['branch_id'];
+        }
+        if (!empty($filters['case_type'])) {
+            $where .= " AND c.case_type = ?";
+            $params[] = $filters['case_type'];
+        }
+        if (!empty($filters['keyword'])) {
+            $kw = '%' . $filters['keyword'] . '%';
+            $where .= " AND (c.title LIKE ? OR c.customer_name LIKE ? OR c.address LIKE ? OR c.case_number LIKE ?)";
+            $params = array_merge($params, array($kw, $kw, $kw, $kw));
+        }
+
+        $sql = "SELECT c.*, b.name as branch_name, u.real_name as sales_name,
+                (SELECT COUNT(DISTINCT se3.user_id) FROM schedules s3 JOIN schedule_engineers se3 ON se3.schedule_id = s3.id WHERE s3.case_id = c.id) as engineer_count
+                FROM cases c
+                LEFT JOIN branches b ON c.branch_id = b.id
+                LEFT JOIN users u ON c.sales_id = u.id
+                WHERE {$where}
+                ORDER BY GREATEST(COALESCE(c.updated_at, c.created_at), c.created_at) DESC
+                LIMIT 500";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 工程追蹤 - 各階段統計 (stage 4-7)
+     */
+    public function getEngineeringStageStats($filters = array())
+    {
+        $where = "(stage BETWEEN 4 AND 7 OR status = 'awaiting_dispatch')";
+        $params = array();
+
+        if (!empty($filters['engineer_id'])) {
+            $where .= " AND EXISTS (SELECT 1 FROM schedules s2 JOIN schedule_engineers se2 ON se2.schedule_id = s2.id WHERE s2.case_id = cases.id AND se2.user_id = ?)";
+            $params[] = $filters['engineer_id'];
+        }
+        if (!empty($filters['branch_id'])) {
+            $where .= " AND branch_id = ?";
+            $params[] = $filters['branch_id'];
+        }
+
+        // 先算 stage 4-7
+        $sql = "SELECT stage, COUNT(*) as cnt, COALESCE(SUM(deal_amount),0) as total_amount FROM cases WHERE {$where} AND status != 'awaiting_dispatch' GROUP BY stage";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stats = array('ad' => array('count' => 0, 'amount' => 0), 4 => array('count' => 0, 'amount' => 0), 5 => array('count' => 0, 'amount' => 0), 6 => array('count' => 0, 'amount' => 0), 7 => array('count' => 0, 'amount' => 0));
+        foreach ($rows as $r) {
+            $s = (int)$r['stage'];
+            if (isset($stats[$s])) {
+                $stats[$s]['count'] = (int)$r['cnt'];
+                $stats[$s]['amount'] = (float)$r['total_amount'];
+            }
+        }
+
+        // 再算待安排派工查修
+        $sqlAd = "SELECT COUNT(*) as cnt, COALESCE(SUM(deal_amount),0) as total_amount FROM cases WHERE status = 'awaiting_dispatch'";
+        $paramsAd = array();
+        if (!empty($filters['engineer_id'])) {
+            $sqlAd .= " AND EXISTS (SELECT 1 FROM schedules s2 JOIN schedule_engineers se2 ON se2.schedule_id = s2.id WHERE s2.case_id = cases.id AND se2.user_id = ?)";
+            $paramsAd[] = $filters['engineer_id'];
+        }
+        if (!empty($filters['branch_id'])) {
+            $sqlAd .= " AND branch_id = ?";
+            $paramsAd[] = $filters['branch_id'];
+        }
+        $stmtAd = $this->db->prepare($sqlAd);
+        $stmtAd->execute($paramsAd);
+        $adRow = $stmtAd->fetch(PDO::FETCH_ASSOC);
+        if ($adRow) {
+            $stats['ad']['count'] = (int)$adRow['cnt'];
+            $stats['ad']['amount'] = (float)$adRow['total_amount'];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * 取得工程人員列表
+     */
+    public function getEngineers()
+    {
+        $stmt = $this->db->query("SELECT id, real_name, is_active FROM users WHERE role IN ('engineer','eng_manager','eng_deputy') ORDER BY is_active DESC, real_name");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 檢查工程師是否參與該案件（透過排工）
+     */
+    public function isEngineerAssigned($caseId, $userId)
+    {
+        $stmt = $this->db->prepare("SELECT 1 FROM schedules s JOIN schedule_engineers se ON se.schedule_id = s.id WHERE s.case_id = ? AND se.user_id = ? LIMIT 1");
+        $stmt->execute(array($caseId, $userId));
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
+     * 更新案件階段
+     */
+    public function updateStage($id, $stage, $data = array())
+    {
+        $sets = array('stage = ?');
+        $params = array($stage);
+
+        if (!empty($data['sub_status'])) {
+            $sets[] = 'sub_status = ?';
+            $params[] = $data['sub_status'];
+        }
+        if (isset($data['deal_amount'])) {
+            $sets[] = 'deal_amount = ?';
+            $params[] = $data['deal_amount'];
+        }
+        if (!empty($data['deal_date'])) {
+            $sets[] = 'deal_date = ?';
+            $params[] = $data['deal_date'];
+        }
+        if (!empty($data['lost_reason'])) {
+            $sets[] = 'lost_reason = ?';
+            $params[] = $data['lost_reason'];
+        }
+
+        $params[] = $id;
+        $sql = "UPDATE cases SET " . implode(', ', $sets) . " WHERE id = ?";
+        $this->db->prepare($sql)->execute($params);
+    }
+
+    /**
+     * 業務進件（簡化版建立案件）
+     */
+    public function createSalesCase($data)
+    {
+        $caseNumber = generate_doc_number('cases');
+
+        $sql = "INSERT INTO cases (case_number, title, branch_id, case_type, case_source, company,
+                customer_name, customer_phone, customer_mobile, customer_id, contact_person, contact_address,
+                construction_area, city, district, address, sales_id, deal_amount, deal_date, sales_note, sub_status, survey_date, visit_method,
+                stage, status, created_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'tracking', ?, NOW())";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(array(
+            $caseNumber,
+            $data['title'],
+            $data['branch_id'] ?: null,
+            $data['case_type'] ?: null,
+            $data['case_source'] ?: null,
+            $data['company'] ?: null,
+            $data['customer_name'] ?: null,
+            $data['customer_phone'] ?: null,
+            $data['customer_mobile'] ?: null,
+            $data['customer_id'] ?: null,
+            $data['contact_person'] ?: null,
+            !empty($data['contact_address']) ? $data['contact_address'] : null,
+            !empty($data['construction_area']) ? $data['construction_area'] : null,
+            $data['city'] ?: null,
+            $data['district'] ?: null,
+            $data['address'] ?: null,
+            $data['sales_id'] ?: Auth::id(),
+            $data['deal_amount'] ?: null,
+            !empty($data['deal_date']) ? $data['deal_date'] : null,
+            $data['sales_note'] ?: null,
+            !empty($data['sub_status']) ? $data['sub_status'] : null,
+            !empty($data['survey_date']) ? $data['survey_date'] : null,
+            !empty($data['visit_method']) ? $data['visit_method'] : null,
+            Auth::id()
+        ));
+        $newId = $this->db->lastInsertId();
+
+        // 場勘日期同步到業務行事曆
+        if (!empty($data['survey_date'])) {
+            $this->syncSurveyToCalendar($newId, $data);
+        }
+
+        return $newId;
+    }
+
+    /**
+     * 取得業務人員列表（含離職，離職排後面）
+     */
+    public function getSalespeople()
+    {
+        $stmt = $this->db->query("SELECT id, real_name, is_active FROM users WHERE role IN ('sales','sales_manager','sales_assistant','boss') ORDER BY is_active DESC, real_name");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 階段名稱
+     */
+    /**
+     * 自動計算案件階段（根據條件判斷）
+     */
+    public function calcAutoStage($caseId)
+    {
+        // 取得案件基本資料
+        $stmt = $this->db->prepare("SELECT c.*, cr.has_quotation, cr.has_site_photos, cr.has_site_info
+            FROM cases c LEFT JOIN case_readiness cr ON cr.case_id = c.id WHERE c.id = ?");
+        $stmt->execute(array($caseId));
+        $c = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return 1;
+
+        // 8 未成交/無效
+        if ($c['status'] === 'lost' || $c['status'] === 'customer_cancel' || $c['status'] === 'breach') return 8;
+        if (in_array($c['sub_status'], array('無效', '已報價無意願', '報價無下文', '客戶毀約'))) return 8;
+
+        // 7 結案：已完工結案 或 完工未收款
+        if ($c['status'] === 'closed' || $c['status'] === 'unpaid' || $c['status'] === 'completed') return 7;
+
+        // 檢查是否有施工回報
+        $wlCount = $this->db->prepare("SELECT COUNT(*) FROM work_logs wl JOIN schedules s ON wl.schedule_id = s.id WHERE s.case_id = ? AND wl.work_description IS NOT NULL AND wl.work_description != ''");
+        $wlCount->execute(array($caseId));
+        $hasWorklog = (int)$wlCount->fetchColumn() > 0;
+
+        // 6 已進場/需再安排：有施工回報
+        if ($hasWorklog) return 6;
+
+        // 檢查是否有排工
+        $schCount = $this->db->prepare("SELECT COUNT(*) FROM schedules WHERE case_id = ? AND status != 'cancelled'");
+        $schCount->execute(array($caseId));
+        $hasSchedule = (int)$schCount->fetchColumn() > 0;
+
+        // 5 已排工/已排行事曆：有排工紀錄
+        if ($hasSchedule) return 5;
+
+        // 檢查報價單是否客戶接受
+        $accCount = $this->db->prepare("SELECT COUNT(*) FROM quotations WHERE case_id = ? AND status IN ('customer_accepted','accepted')");
+        $accCount->execute(array($caseId));
+        $hasAccepted = (int)$accCount->fetchColumn() > 0;
+
+        // 4 成交：報價單客戶已接受 或 有成交金額
+        if ($hasAccepted || !empty($c['deal_amount'])) return 4;
+
+        // 檢查是否有報價單
+        $qCount = $this->db->prepare("SELECT COUNT(*) FROM quotations WHERE case_id = ?");
+        $qCount->execute(array($caseId));
+        $hasQuotation = (int)$qCount->fetchColumn() > 0;
+
+        // 3 報價：有報價單
+        if ($hasQuotation || !empty($c['has_quotation'])) return 3;
+
+        // 2 場勘：有場勘日期、已聯絡安排場勘、或有現場資料
+        if (!empty($c['survey_date']) || $c['sub_status'] === '已聯絡安排場勘' || $c['sub_status'] === '已聯絡待場勘' || $c['sub_status'] === '待場勘') return 2;
+        if (!empty($c['has_site_info']) || !empty($c['has_site_photos']) || !empty($c['planned_start_date'])) return 2;
+
+        // 1 進件
+        return 1;
+    }
+
+    /**
+     * 同步更新案件階段
+     */
+    public function syncStage($caseId)
+    {
+        $newStage = $this->calcAutoStage($caseId);
+        $this->db->prepare("UPDATE cases SET stage = ? WHERE id = ?")->execute(array($newStage, $caseId));
+        return $newStage;
+    }
+
+    public static function stageLabels()
+    {
+        return array(
+            1 => '進件',
+            2 => '場勘',
+            3 => '報價',
+            4 => '成交待排工',
+            5 => '已排工/已排行事曆',
+            6 => '已進場/需再安排',
+            7 => '已完工結案',
+            8 => '未成交/無效',
+        );
+    }
+
+    /**
+     * 案別選項
+     */
+    public static function caseTypeOptions()
+    {
+        $fallback = array(
+            'new_install'  => '新案',
+            'addition'     => '老客戶追加',
+            'old_repair'   => '舊客戶維修案',
+            'new_repair'   => '新客戶維修案',
+            'maintenance'  => '維護保養',
+        );
+        return self::loadDropdownOptions('case_type', $fallback);
+    }
+
+    /**
+     * 案件進度選項 (status)
+     */
+    public static function progressOptions()
+    {
+        $fallback = array(
+            'tracking'           => '待追蹤',
+            'incomplete'         => '未完工',
+            'unpaid'             => '完工未收款',
+            'completed_pending'  => '已完工待簽核',
+            'closed'             => '已完工結案',
+            'lost'               => '未成交',
+            'maint_case'         => '保養案件',
+            'breach'             => '毀約',
+            'scheduled'          => '已排工/已排行事曆',
+            'needs_reschedule'   => '已進場/需再安排',
+            'awaiting_dispatch'  => '待安排派工查修',
+            'customer_cancel'    => '客戶取消',
+        );
+        return self::loadDropdownOptions('case_progress', $fallback);
+    }
+
+    /**
+     * 狀態選項 (sub_status)
+     */
+    public static function subStatusOptions()
+    {
+        $fallback = array(
+            '未指派'           => '未指派',
+            '待聯絡'           => '待聯絡',
+            '電話不通或未接'   => '電話不通或未接',
+            '待場勘'           => '待場勘',
+            '已聯絡安排場勘'   => '已聯絡安排場勘',
+            '已聯絡電話報價'   => '已聯絡電話報價',
+            '已會勘未報價'     => '已會勘未報價',
+            '已報價待追蹤'     => '已報價待追蹤',
+            '規劃或預算案'     => '規劃或預算案',
+            '電話報價成交'     => '電話報價成交',
+            '已成交'           => '已成交',
+            '跨月成交'         => '跨月成交',
+            '現簽'             => '現簽',
+            '已報價無意願'     => '已報價無意願',
+            '報價無下文'       => '報價無下文',
+            '無效'             => '無效',
+            '客戶毀約'         => '客戶毀約',
+        );
+        return self::loadDropdownOptions('case_status', $fallback);
+    }
+
+    /**
+     * 案件來源選項
+     */
+    public static function caseSourceOptions()
+    {
+        return array(
+            'phone'        => '電話',
+            'headquarters' => '總公司',
+            'sales_dev'    => '業務開發',
+            'referral'     => '老客戶介紹',
+            'internet'     => '網路',
+            'builder'      => '建商配合',
+            'cross_biz'    => '異業合作',
             'other'        => '其他',
-        ];
-        return $map[$type] ?? $type;
+        );
+    }
+
+    /**
+     * 階段顏色
+     */
+    public static function stageColor($stage)
+    {
+        $colors = array(
+            1 => '#2196F3',
+            2 => '#FF9800',
+            3 => '#9C27B0',
+            4 => '#4CAF50',
+            5 => '#00BCD4',
+            6 => '#F44336',
+            7 => '#607D8B',
+            8 => '#9E9E9E',
+        );
+        return isset($colors[$stage]) ? $colors[$stage] : '#9E9E9E';
+    }
+
+    /**
+     * 案件進度中文
+     */
+    public static function statusLabel($status)
+    {
+        $map = self::progressOptions();
+        // 相容實際資料庫值
+        $extra = array(
+            'pending'           => '待追蹤',
+            'in_progress'       => '未完工',
+            'completed'         => '已完工結案',
+            'cancelled'         => '客戶取消',
+            'ready'             => '待安排派工',
+            'scheduled'         => '已排工/已排行事曆',
+            'needs_reschedule'  => '已進場/需再安排',
+            'active'            => '進行中',
+        );
+        if (isset($map[$status])) return $map[$status];
+        if (isset($extra[$status])) return $extra[$status];
+        return $status;
+    }
+
+    /**
+     * 案件進度 badge class
+     */
+    public static function statusBadge($status)
+    {
+        $map = array(
+            'tracking'          => 'warning',
+            'incomplete'        => 'primary',
+            'unpaid'            => 'info',
+            'completed_pending' => 'warning',
+            'lost'              => 'danger',
+            'maint_case'        => 'success',
+            'breach'            => 'danger',
+            'awaiting_dispatch' => 'warning',
+            'customer_cancel'   => 'danger',
+            'pending'           => 'warning',
+            'in_progress'       => 'primary',
+            'completed'         => 'success',
+            'cancelled'         => 'danger',
+            'scheduled'         => 'info',
+            'active'            => 'primary',
+            'closed'            => 'success',
+        );
+        return 'badge-' . (isset($map[$status]) ? $map[$status] : 'primary');
+    }
+
+    /**
+     * 案別中文
+     */
+    public static function typeLabel($type)
+    {
+        $all = self::caseTypeOptions();
+        // 相容舊值
+        $legacy = array(
+            'new'        => '新案',
+            'repair'     => '維修',
+            'inspection' => '勘查',
+            'other'      => '其他',
+        );
+        if (isset($all[$type])) return $all[$type];
+        if (isset($legacy[$type])) return $legacy[$type];
+        return $type;
+    }
+
+    /**
+     * 從 dropdown_options 表載入選項，若表不存在或無資料則回傳 fallback
+     * @param string $category
+     * @param array $fallback key => label 的陣列
+     * @return array
+     */
+    private static function loadDropdownOptions($category, $fallback)
+    {
+        static $cache = array();
+        if (isset($cache[$category])) {
+            return $cache[$category];
+        }
+        try {
+            $db = Database::getInstance();
+            // 檢查 option_key 欄位是否存在
+            $cols = $db->query("SHOW COLUMNS FROM dropdown_options LIKE 'option_key'")->fetchAll();
+            if (empty($cols)) {
+                $cache[$category] = $fallback;
+                return $fallback;
+            }
+            $stmt = $db->prepare(
+                'SELECT option_key, label FROM dropdown_options WHERE category = ? AND is_active = 1 ORDER BY sort_order, label'
+            );
+            $stmt->execute(array($category));
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($rows)) {
+                $cache[$category] = $fallback;
+                return $fallback;
+            }
+            $result = array();
+            foreach ($rows as $row) {
+                $key = $row['option_key'] ? $row['option_key'] : $row['label'];
+                $result[$key] = $row['label'];
+            }
+            $cache[$category] = $result;
+            return $result;
+        } catch (PDOException $e) {
+            $cache[$category] = $fallback;
+            return $fallback;
+        }
+    }
+
+    /**
+     * 取得下拉選單選項
+     */
+    public function getDropdownOptions($category)
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, label FROM dropdown_options WHERE category = ? AND is_active = 1 ORDER BY sort_order, label'
+        );
+        $stmt->execute(array($category));
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * 附件類型選項（從 dropdown_options 載入，fallback 到預設值）
+     */
+    public static function attachTypeOptions()
+    {
+        $fallback = array(
+            'drawing'    => '施工圖',
+            'quotation'  => '報價單',
+            'warranty'   => '保固書',
+            'wire_plan'  => '預計使用線材',
+            'site_photo' => '現場照片',
+            'other'      => '其他',
+        );
+        return self::loadDropdownOptions('case_attach_type', $fallback);
+    }
+
+    /**
+     * 新增自訂附件類型到 dropdown_options
+     */
+    public static function addAttachType($key, $label)
+    {
+        $db = Database::getInstance();
+        $maxSort = (int)$db->query("SELECT COALESCE(MAX(sort_order),0) FROM dropdown_options WHERE category = 'case_attach_type'")->fetchColumn();
+        $stmt = $db->prepare("INSERT INTO dropdown_options (category, option_key, label, sort_order, is_active, is_system) VALUES ('case_attach_type', ?, ?, ?, 1, 0)");
+        $stmt->execute(array($key, $label, $maxSort + 1));
+        return $db->lastInsertId();
+    }
+
+    // ===== 編輯鎖定（防衝突） =====
+
+    public function setEditingLock($caseId, $userId, $userName)
+    {
+        $this->db->prepare("INSERT INTO case_editing_locks (case_id, user_id, user_name, locked_at, heartbeat_at) VALUES (?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE user_name = VALUES(user_name), heartbeat_at = NOW()")
+            ->execute(array($caseId, $userId, $userName));
+    }
+
+    public function getEditingUsers($caseId, $excludeUserId, $timeoutMinutes = 5)
+    {
+        $stmt = $this->db->prepare("SELECT user_id, user_name, heartbeat_at FROM case_editing_locks WHERE case_id = ? AND user_id != ? AND heartbeat_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)");
+        $stmt->execute(array($caseId, $excludeUserId, $timeoutMinutes));
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function refreshEditingLock($caseId, $userId)
+    {
+        $this->db->prepare("UPDATE case_editing_locks SET heartbeat_at = NOW() WHERE case_id = ? AND user_id = ?")
+            ->execute(array($caseId, $userId));
+    }
+
+    public function releaseEditingLock($caseId, $userId)
+    {
+        $this->db->prepare("DELETE FROM case_editing_locks WHERE case_id = ? AND user_id = ?")
+            ->execute(array($caseId, $userId));
     }
 }

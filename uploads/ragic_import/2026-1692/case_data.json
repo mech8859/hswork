@@ -1,0 +1,64 @@
+{
+    "ragic_id": 2546,
+    "case_number": "2026-1692",
+    "case_date": "2026-03-25",
+    "case_type": "老客戶追加",
+    "case_source": "老客戶",
+    "status": "已成交",
+    "progress": "完工未收款",
+    "system_type": "老客戶查修,移機,追加,更換",
+
+    "customer_code": "Y210-2",
+    "customer_name": "台鑫堆高機",
+    "contact_person": "林先生",
+    "mobile_phone": "0927-965-592",
+    "address": "彰化縣鹿港鎮濱海路598號",
+    "county_district": "彰化縣鹿港鎮",
+    "invoice_title": "台鑫堆高機有限公司",
+    "tax_id": "24217232",
+    "customer_needs": "弱電",
+
+    "salesperson": "謝旻倫",
+    "branch": "員林分公司",
+    "company": "禾順",
+    "registrar": "蕭竹芸",
+
+    "deal_date": "2026-03-25",
+    "quote_amount": 120000,
+    "deal_amount_pretax": 120000,
+    "tax_included": "含稅(需開發票)",
+    "tax": 6000,
+    "total_amount": 126000,
+    "deposit": "無訂金",
+    "balance": 126000,
+
+    "is_completed": "已完工",
+    "completion_date": "2026-03-09",
+    "payment_settled": "已結清",
+    "settlement_date": "2026-03-25",
+    "settlement_method": "支票",
+    "total_collected": 126000,
+    "collection_note": "2026/03/26發票以開 3/27郵寄客戶",
+
+    "payment_records": [
+        {
+            "date": "2026-03-25",
+            "method": "支票",
+            "amount": 126000,
+            "note": "3/25(三)阿倫收支票2張\n到期日期115/4/15\n支票號碼FA2178249 $200,000(尾款合併)\n到期日期115/4/30\n支票號碼FA2178250 $188,500(尾款合併)",
+            "photo": "check_photo.jpg"
+        }
+    ],
+
+    "attachments": {
+        "quotation_images": ["quotation_1.jpg", "quotation_2.jpg"],
+        "files": ["ZN00168827.pdf", "ZN00168828.pdf"]
+    },
+
+    "work_records": [
+        {
+            "date": "2026-03-09",
+            "content": "弱電工程"
+        }
+    ]
+}

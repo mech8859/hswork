@@ -96,6 +96,16 @@ a:hover { text-decoration: underline; }
     border-left-color: var(--primary);
     text-decoration: none;
 }
+.nav-section {
+    padding: 16px 20px 4px;
+    font-size: .7rem;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    pointer-events: none;
+}
+.nav-section:first-of-type { padding-top: 8px; }
 .nav-divider { border-top: 1px solid var(--gray-200); margin: 8px 0; }
 
 /* --- Main Content --- */
@@ -211,6 +221,9 @@ table.table tbody tr:hover { background: var(--gray-50); }
 .badge-success { background: #e6f4ea; color: var(--success); }
 .badge-warning { background: #fef7e0; color: #b06000; }
 .badge-danger { background: #fce8e6; color: var(--danger); }
+.badge-secondary { background: #f1f3f4; color: #5f6368; }
+.badge-info { background: #e0f2f1; color: #00796b; }
+.badge-purple { background: #f3e8fd; color: #7b1fa2; }
 
 /* --- Stars (技能/配對度) --- */
 .stars { color: var(--warning); font-size: 1rem; letter-spacing: 1px; }
@@ -277,3 +290,14 @@ table.table tbody tr:hover { background: var(--gray-50); }
 @media (min-width: 1024px) {
     .content { padding: 24px 32px; }
 }
+
+/* --- Form Row Layout (補充) --- */
+.form-row { display: flex !important; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.form-row > .form-group { flex: 1; min-width: 0; }
+@media (max-width: 767px) {
+    .form-row { flex-direction: column; gap: 8px; }
+}
+
+/* --- Google Maps Button --- */
+.map-btn { display: inline-block; text-decoration: none; font-size: 1.1rem; vertical-align: middle; margin-left: 4px; opacity: .7; transition: opacity .2s; }
+.map-btn:hover { opacity: 1; }

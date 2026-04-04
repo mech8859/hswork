@@ -1,0 +1,229 @@
+<?php
+require_once __DIR__ . '/../includes/bootstrap.php';
+Auth::requireLogin();
+Auth::requirePermission('reports.view');
+require_once __DIR__ . '/../modules/reports/ReportModel.php';
+require_once __DIR__ . '/../modules/cases/CaseModel.php';
+
+$model = new ReportModel();
+$action = $_GET['action'] ?? 'index';
+$branchIds = Auth::getAccessibleBranchIds();
+
+switch ($action) {
+    // ---- 報表首頁 ----
+    case 'index':
+        $summaryYear = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $summaryMonth = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $caseSummary = $model->getCaseStatusSummary($branchIds, $summaryYear);
+        $caseSummaryMonth = $model->getCaseStatusSummaryByMonth($branchIds, $summaryMonth);
+        $currentMonth = date('Y-m');
+        $monthlyStats = $model->getMonthlyScheduleStats($branchIds, $currentMonth);
+
+        $pageTitle = '報表與分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/index.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 案件利潤 ----
+    case 'case_profit':
+        $startDate = $_GET['start_date'] ?? date('Y-m-01');
+        $endDate = $_GET['end_date'] ?? date('Y-m-t');
+        $data = $model->getCaseProfitReport($branchIds, $startDate, $endDate);
+
+        $pageTitle = '案件利潤分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/case_profit.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 員工產值 ----
+    case 'staff_productivity':
+        $startDate = $_GET['start_date'] ?? date('Y-m-01');
+        $endDate = $_GET['end_date'] ?? date('Y-m-t');
+        $data = $model->getStaffProductivityReport($branchIds, $startDate, $endDate);
+
+        $pageTitle = '員工產值統計';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/staff_productivity.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 案件綜合分析 ----
+    case 'case_analysis':
+        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $analysis = $model->getCaseAnalysis($branchIds, $year);
+
+        $pageTitle = '案件綜合分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/case_analysis.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 帳務綜合分析 ----
+    case 'finance_analysis':
+        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $analysis = $model->getFinanceAnalysis($year);
+
+        $pageTitle = '帳務綜合分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/finance_analysis.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 業務個人分析 ----
+    case 'sales_personal':
+        $salesId = isset($_GET['sales_id']) ? (int)$_GET['sales_id'] : Auth::id();
+        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $analysis = $model->getSalesPersonalAnalysis($salesId, $year, $branchIds);
+        // Get sales list for dropdown
+        $caseModel = new CaseModel();
+        $salespeople = $caseModel->getSalespeople();
+
+        $pageTitle = '業務個人分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/sales_personal.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 點工費月結 ----
+    case 'inter_branch':
+        $month = $_GET['month'] ?? date('Y-m');
+        $data = $model->getInterBranchMonthlyReport($branchIds, $month);
+
+        $pageTitle = '跨點點工費月結報表';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/inter_branch_monthly.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- AJAX 報表鑽取明細 ----
+    case 'drill_down':
+        header('Content-Type: application/json; charset=utf-8');
+        $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+        $month = isset($_GET['month']) ? $_GET['month'] : ''; // '2026-03' or ''
+        $salesName = isset($_GET['sales_name']) ? $_GET['sales_name'] : '';
+        $type = isset($_GET['type']) ? $_GET['type'] : 'deal_amount'; // deal_amount, closed, entry, receipt
+
+        $db = Database::getInstance();
+        $closedStatuses = array('已成交', '跨月成交', '現簽', '電話報價成交');
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = $branchIds;
+
+        if ($type === 'deal_amount' || $type === 'closed') {
+            // 成交金額或成交件數：依 deal_date 月份
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, c.deal_date,
+                        COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)
+                      AND c.sub_status IN ('已成交','跨月成交','現簽','電話報價成交')";
+            if ($month) {
+                $sql .= " AND DATE_FORMAT(c.deal_date, '%Y-%m') = ?";
+                $params[] = $month;
+            } else {
+                $sql .= " AND c.deal_date BETWEEN ? AND ?";
+                $params[] = $year . '-01-01';
+                $params[] = $year . '-12-31';
+            }
+            if ($salesName) {
+                $sql .= " AND u.real_name = ?";
+                $params[] = $salesName;
+            }
+            $sql .= " ORDER BY c.deal_date DESC, c.id DESC";
+        } elseif ($type === 'entry') {
+            // 進件數：依 created_at 月份
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, DATE(c.created_at) AS created_date,
+                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)";
+            if ($month) {
+                $sql .= " AND DATE_FORMAT(c.created_at, '%Y-%m') = ?";
+                $params[] = $month;
+            } else {
+                $sql .= " AND c.created_at BETWEEN ? AND ?";
+                $params[] = $year . '-01-01';
+                $params[] = $year . '-12-31 23:59:59';
+            }
+            if ($salesName) {
+                $sql .= " AND u.real_name = ?";
+                $params[] = $salesName;
+            }
+            $sql .= " ORDER BY c.created_at DESC, c.id DESC";
+        } elseif ($type === 'status') {
+            // 案件狀態（sub_status）篩選
+            $statusVal = isset($_GET['status_val']) ? $_GET['status_val'] : '';
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, DATE(c.created_at) AS created_date,
+                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)";
+            if ($month) {
+                $sql .= " AND DATE_FORMAT(c.created_at, '%Y-%m') = ?";
+                $params[] = $month;
+            } else {
+                $sql .= " AND c.created_at BETWEEN ? AND ?";
+                $params[] = $year . '-01-01';
+                $params[] = $year . '-12-31 23:59:59';
+            }
+            if ($statusVal) {
+                $sql .= " AND c.sub_status = ?";
+                $params[] = $statusVal;
+            }
+            if ($salesName) {
+                $sql .= " AND u.real_name = ?";
+                $params[] = $salesName;
+            }
+            $sql .= " ORDER BY c.created_at DESC, c.id DESC";
+        } elseif ($type === 'receipt') {
+            // 收款金額：從 receipts
+            $sql = "SELECT r.id, r.receipt_number AS case_number,
+                        r.customer_name AS title, r.customer_name,
+                        u.real_name AS sales_name, r.deposit_date AS deal_date,
+                        r.subtotal AS total_amount, r.status AS sub_status,
+                        'receipt' AS case_type
+                    FROM receipts r
+                    LEFT JOIN users u ON r.sales_id = u.id
+                    WHERE r.status = '已收款'";
+            $params = array();
+            if ($month) {
+                $sql .= " AND DATE_FORMAT(r.deposit_date, '%Y-%m') = ?";
+                $params[] = $month;
+            } else {
+                $sql .= " AND r.deposit_date BETWEEN ? AND ?";
+                $params[] = $year . '-01-01';
+                $params[] = $year . '-12-31';
+            }
+            if ($salesName) {
+                $sql .= " AND u.real_name = ?";
+                $params[] = $salesName;
+            }
+            $sql .= " ORDER BY r.deposit_date DESC";
+        } else {
+            echo json_encode(array('cases' => array()));
+            exit;
+        }
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $cases = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(array('cases' => $cases), JSON_UNESCAPED_UNICODE);
+        exit;
+
+    default:
+        redirect('/reports.php');
+}

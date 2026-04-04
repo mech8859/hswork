@@ -4,23 +4,26 @@
         <span class="badge <?= CaseModel::statusBadge($case['status']) ?>"><?= e(CaseModel::statusLabel($case['status'])) ?></span>
         <span class="badge badge-primary"><?= e(CaseModel::typeLabel($case['case_type'])) ?></span>
         <span class="text-muted" style="font-size:.85rem"><?= e($case['branch_name']) ?></span>
+        <?php
+        $warnings = get_readiness_warnings($case['readiness'] ?: [], $case['case_type'] ?: 'new_install');
+        if (!empty($warnings)):
+        ?>
+        <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?></span>
+        <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
+        <?php if (Auth::hasPermission('schedule.manage') && in_array($case['status'], ['pending','ready','scheduled','in_progress','tracking','incomplete'])): ?>
+        <a href="/schedule.php?action=create&case_id=<?= $case['id'] ?>" class="btn btn-sm" style="background:#FF9800;color:#fff">手動排工</a>
+        <?php if (!empty($warnings)): ?>
+        <button type="button" class="btn btn-success btn-sm" onclick="alert('排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?>\n\n請先補齊資料再使用智慧排工。')">智慧排工</button>
+        <?php else: ?>
+        <a href="/schedule.php?action=smart&case_id=<?= $case['id'] ?>" class="btn btn-success btn-sm">智慧排工</a>
+        <?php endif; ?>
+        <?php endif; ?>
         <a href="/cases.php?action=edit&id=<?= $case['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <a href="/cases.php" class="btn btn-outline btn-sm">返回列表</a>
     </div>
 </div>
-
-<!-- 排工條件驗證 -->
-<?php
-$warnings = get_readiness_warnings($case['readiness'] ?: []);
-if (!empty($warnings)):
-?>
-<div class="alert alert-warning">
-    <strong>排工條件尚未備齊：</strong>
-    <?= implode('、', array_map('e', $warnings)) ?>
-</div>
-<?php endif; ?>
 
 <!-- 基本資料 -->
 <div class="card">
@@ -34,6 +37,12 @@ if (!empty($warnings)):
             <span class="detail-label">施工地址</span>
             <span class="detail-value"><?= e($case['address'] ?: '-') ?></span>
         </div>
+        <?php if (!empty($case['address'])): ?>
+        <div class="detail-item" style="grid-column: span 2">
+            <span class="detail-label">地圖</span>
+            <iframe src="https://maps.google.com/maps?q=<?= urlencode($case['address']) ?>&output=embed&hl=zh-TW" style="width:100%;max-width:480px;height:200px;border:1px solid var(--gray-200);border-radius:6px" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <?php endif; ?>
         <div class="detail-item">
             <span class="detail-label">難易度</span>
             <span class="detail-value stars"><?= str_repeat('&#9733;', $case['difficulty']) ?><?= str_repeat('&#9734;', 5 - $case['difficulty']) ?></span>
@@ -51,7 +60,7 @@ if (!empty($warnings)):
             <span class="detail-value"><?= $case['max_engineers'] ?> 人</span>
         </div>
         <div class="detail-item">
-            <span class="detail-label">業務負責人</span>
+            <span class="detail-label">承辦業務</span>
             <span class="detail-value"><?= e($case['sales_name'] ?: '-') ?></span>
         </div>
         <?php if ($case['ragic_id']): ?>
@@ -69,6 +78,162 @@ if (!empty($warnings)):
     <?php endif; ?>
 </div>
 
+<!-- 帳務資訊 -->
+<?php
+$hasFinancial = !empty($case['quote_amount']) || !empty($case['deal_amount']) || !empty($case['total_amount'])
+    || !empty($case['deposit_amount']) || !empty($case['balance_amount']) || !empty($case['completion_amount'])
+    || !empty($case['total_collected']);
+if ($hasFinancial):
+?>
+<div class="card">
+    <div class="card-header">帳務資訊</div>
+    <div class="detail-grid">
+        <?php if (!empty($case['quote_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">報價金額</span>
+            <span class="detail-value">$<?= number_format($case['quote_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['deal_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">成交金額 (未稅)</span>
+            <span class="detail-value">$<?= number_format($case['deal_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['is_tax_included'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">是否含稅</span>
+            <span class="detail-value"><?= e($case['is_tax_included']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['tax_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">稅金</span>
+            <span class="detail-value">$<?= number_format($case['tax_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['total_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">含稅金額</span>
+            <span class="detail-value financial-highlight">$<?= number_format($case['total_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['deposit_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">訂金金額</span>
+            <span class="detail-value">$<?= number_format($case['deposit_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['deposit_method'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">訂金支付方式</span>
+            <span class="detail-value"><?= e($case['deposit_method']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['deposit_payment_date'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">訂金付款日</span>
+            <span class="detail-value"><?= format_date($case['deposit_payment_date']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['balance_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">尾款</span>
+            <span class="detail-value">$<?= number_format($case['balance_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['completion_amount'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">完工金額 (含稅)</span>
+            <span class="detail-value">$<?= number_format($case['completion_amount']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['total_collected'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">總收款金額</span>
+            <span class="detail-value financial-highlight">$<?= number_format($case['total_collected']) ?></span>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 施工時程與條件 -->
+<?php if ($case['planned_start_date'] || $case['urgency'] || $case['work_time_start'] || $case['is_large_project']): ?>
+<div class="card">
+    <div class="card-header">施工時程與條件</div>
+    <div class="detail-grid">
+        <?php if ($case['planned_start_date']): ?>
+        <div class="detail-item">
+            <span class="detail-label">預計施工日</span>
+            <span class="detail-value"><?= format_date($case['planned_start_date']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($case['planned_end_date']): ?>
+        <div class="detail-item">
+            <span class="detail-label">預計完工日</span>
+            <span class="detail-value"><?= format_date($case['planned_end_date']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($case['urgency']): ?>
+        <div class="detail-item">
+            <span class="detail-label">急迫性</span>
+            <span class="detail-value"><?= $case['urgency'] ?> / 5 <?= $case['urgency'] <= 2 ? '(低)' : ($case['urgency'] >= 4 ? '(高)' : '(中)') ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($case['system_difficulty']): ?>
+        <div class="detail-item">
+            <span class="detail-label">系統評估難度</span>
+            <span class="detail-value stars"><?= str_repeat('&#9733;', $case['system_difficulty']) ?><?= str_repeat('&#9734;', 5 - $case['system_difficulty']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($case['work_time_start']): ?>
+        <div class="detail-item">
+            <span class="detail-label">施工時間</span>
+            <span class="detail-value"><?= substr($case['work_time_start'], 0, 5) ?> ~ <?= $case['work_time_end'] ? substr($case['work_time_end'], 0, 5) : '' ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($case['customer_break_time']): ?>
+        <div class="detail-item">
+            <span class="detail-label">客戶休息時間</span>
+            <span class="detail-value"><?= e($case['customer_break_time']) ?></span>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php
+    $tags = array();
+    if (!empty($case['has_time_restriction'])) $tags[] = '有施工時間限制';
+    if (!empty($case['allow_night_work'])) $tags[] = '可夜間加班';
+    if (!empty($case['is_flexible'])) $tags[] = '可隨時安排';
+    if (!empty($case['is_large_project'])) $tags[] = '大型案件';
+    if (!empty($tags)):
+    ?>
+    <div class="d-flex flex-wrap gap-1 mt-1">
+        <?php foreach ($tags as $tag): ?>
+        <span class="badge badge-info"><?= $tag ?></span>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- 附件 -->
+<?php if (!empty($case['attachments'])): ?>
+<div class="card">
+    <div class="card-header">附件</div>
+    <?php
+    $typeLabels = array('drawing'=>'施工圖','quotation'=>'報價單','warranty'=>'保固書','wire_plan'=>'線材','site_photo'=>'現場照片','other'=>'其他');
+    foreach ($case['attachments'] as $att):
+    ?>
+    <div class="attachment-item">
+        <span class="badge badge-info" style="font-size:.7rem"><?= e(isset($typeLabels[$att['file_type']]) ? $typeLabels[$att['file_type']] : $att['file_type']) ?></span>
+        <a href="<?= e($att['file_path']) ?>" target="_blank"><?= e($att['file_name']) ?></a>
+        <span class="text-muted" style="font-size:.75rem"><?= e($att['uploader_name'] ?? '') ?></span>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <!-- 現場環境 -->
 <?php if (!empty($case['site_conditions'])): ?>
 <?php $sc = $case['site_conditions']; ?>
@@ -81,7 +246,7 @@ if (!empty($warnings)):
             <span class="detail-value">
                 <?php
                 $structMap = ['RC'=>'RC結構','steel_sheet'=>'鐵皮','open_area'=>'空曠地','construction_site'=>'建築工地'];
-                echo implode('、', array_map(fn($v) => $structMap[$v] ?? $v, explode(',', $sc['structure_type'])));
+                echo implode('、', array_map(function($v) use ($structMap) { return isset($structMap[$v]) ? $structMap[$v] : $v; }, explode(',', $sc['structure_type'])));
                 ?>
             </span>
         </div>
@@ -92,7 +257,7 @@ if (!empty($warnings)):
             <span class="detail-value">
                 <?php
                 $condMap = ['PVC'=>'PVC','EMT'=>'EMT','RSG'=>'RSG','molding'=>'壓條','wall_penetration'=>'穿牆','aerial'=>'架空','underground'=>'切地埋管'];
-                echo implode('、', array_map(fn($v) => $condMap[$v] ?? $v, explode(',', $sc['conduit_type'])));
+                echo implode('、', array_map(function($v) use ($condMap) { return isset($condMap[$v]) ? $condMap[$v] : $v; }, explode(',', $sc['conduit_type'])));
                 ?>
             </span>
         </div>
@@ -182,11 +347,18 @@ if (!empty($warnings)):
 .detail-item { display: flex; flex-direction: column; }
 .detail-label { font-size: .8rem; color: var(--gray-500); }
 .detail-value { font-size: .95rem; }
+.financial-highlight { font-weight: 600; color: var(--primary); }
 .skill-badge {
     display: inline-flex; align-items: center; gap: 4px;
     background: var(--gray-100); padding: 4px 10px; border-radius: 16px;
     font-size: .85rem;
 }
+.attachment-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: var(--gray-50); border-radius: var(--radius); margin-bottom: 6px;
+    font-size: .9rem;
+}
+.attachment-item a { color: var(--primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (min-width: 768px) {
     .detail-grid { grid-template-columns: repeat(2, 1fr); }
 }
