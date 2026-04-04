@@ -197,6 +197,15 @@ class CaseModel
             $case['case_work_logs'] = array();
         }
 
+        // 支援分公司
+        try {
+            $stmt = $this->db->prepare('SELECT cbs.branch_id, b.name AS branch_name FROM case_branch_support cbs JOIN branches b ON cbs.branch_id = b.id WHERE cbs.case_id = ? ORDER BY b.id');
+            $stmt->execute([$id]);
+            $case['support_branches'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['support_branches'] = array();
+        }
+
         return $case;
     }
 
@@ -605,6 +614,55 @@ class CaseModel
     public function getAllBranches(): array
     {
         return $this->db->query('SELECT * FROM branches WHERE is_active = 1 ORDER BY id')->fetchAll();
+    }
+
+    /**
+     * 取得案件的支援分公司
+     */
+    public function getSupportBranches($caseId)
+    {
+        $stmt = $this->db->prepare('
+            SELECT cbs.*, b.name AS branch_name, u.real_name AS requested_by_name
+            FROM case_branch_support cbs
+            JOIN branches b ON cbs.branch_id = b.id
+            LEFT JOIN users u ON cbs.requested_by = u.id
+            WHERE cbs.case_id = ?
+            ORDER BY cbs.created_at
+        ');
+        $stmt->execute(array($caseId));
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * 儲存案件的支援分公司（全量替換）
+     */
+    public function saveSupportBranches($caseId, array $branchIds, $requestedBy)
+    {
+        $this->db->beginTransaction();
+        try {
+            $oldStmt = $this->db->prepare('SELECT branch_id FROM case_branch_support WHERE case_id = ?');
+            $oldStmt->execute(array($caseId));
+            $oldIds = array_column($oldStmt->fetchAll(), 'branch_id');
+
+            $this->db->prepare('DELETE FROM case_branch_support WHERE case_id = ?')->execute(array($caseId));
+
+            if (!empty($branchIds)) {
+                $stmt = $this->db->prepare('INSERT INTO case_branch_support (case_id, branch_id, requested_by) VALUES (?, ?, ?)');
+                foreach ($branchIds as $bid) {
+                    $stmt->execute(array($caseId, (int)$bid, $requestedBy));
+                }
+            }
+
+            $this->db->commit();
+
+            AuditLog::log('cases', 'update_support_branches', $caseId,
+                '支援分公司變更',
+                json_encode(array('old' => $oldIds, 'new' => $branchIds), JSON_UNESCAPED_UNICODE)
+            );
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     /**

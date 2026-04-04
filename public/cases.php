@@ -381,6 +381,39 @@ switch ($action) {
         echo json_encode(array('success' => true, 'customer' => array('id' => $newId, 'customer_no' => $customerNo, 'name' => $name, 'phone' => $_POST['phone'] ?? '', 'mobile' => $_POST['mobile'] ?? '', 'site_address' => $_POST['address'] ?? '', 'contact_person' => $_POST['contact_person'] ?? '', 'contacts' => array())));
         break;
 
+    // ---- AJAX: 取得支援分公司 ----
+    case 'get_support_branches':
+        header('Content-Type: application/json');
+        $caseId = (int)($_GET['id'] ?? 0);
+        try {
+            $supportBranches = $model->getSupportBranches($caseId);
+            echo json_encode(array('success' => true, 'data' => $supportBranches));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => true, 'data' => array()));
+        }
+        break;
+
+    // ---- AJAX: 儲存支援分公司 ----
+    case 'save_support_branches':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) {
+            echo json_encode(array('success' => false, 'error' => 'CSRF'));
+            break;
+        }
+        if (!Auth::hasPermission('cases.manage') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無權限'));
+            break;
+        }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $selectedBranches = $_POST['branch_ids'] ?? array();
+        if (!is_array($selectedBranches)) {
+            $selectedBranches = array();
+        }
+        $selectedBranches = array_map('intval', $selectedBranches);
+        $model->saveSupportBranches($caseId, $selectedBranches, Auth::id());
+        echo json_encode(array('success' => true));
+        break;
+
     default:
         redirect('/cases.php');
 }

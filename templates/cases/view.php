@@ -4,6 +4,11 @@
         <span class="badge <?= CaseModel::statusBadge($case['status']) ?>"><?= e(CaseModel::statusLabel($case['status'])) ?></span>
         <span class="badge badge-primary"><?= e(CaseModel::typeLabel($case['case_type'])) ?></span>
         <span class="text-muted" style="font-size:.85rem"><?= e($case['branch_name']) ?></span>
+        <?php if (!empty($case['support_branches'])): ?>
+            <?php foreach ($case['support_branches'] as $sb): ?>
+                <span class="badge" style="background:#ede9fe;color:#6366f1;font-size:.78rem">支援：<?= e($sb['branch_name']) ?></span>
+            <?php endforeach; ?>
+        <?php endif; ?>
         <?php
         $warnings = get_readiness_warnings($case['readiness'] ?: [], $case['case_type'] ?: 'new_install');
         if (!empty($warnings)):
@@ -19,6 +24,9 @@
         <?php else: ?>
         <a href="/schedule.php?action=smart&case_id=<?= $case['id'] ?>" class="btn btn-success btn-sm">智慧排工</a>
         <?php endif; ?>
+        <?php endif; ?>
+        <?php if (Auth::hasPermission('cases.manage') || Auth::hasPermission('all')): ?>
+        <button type="button" class="btn btn-sm" style="background:#6366f1;color:#fff" onclick="openSupportModal()">支援</button>
         <?php endif; ?>
         <a href="/cases.php?action=edit&id=<?= $case['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <a href="/cases.php" class="btn btn-outline btn-sm">返回列表</a>
@@ -365,4 +373,136 @@ if ($hasFinancial):
 @media (min-width: 1024px) {
     .detail-grid { grid-template-columns: repeat(3, 1fr); }
 }
+.support-modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.5); display: flex; align-items: center;
+    justify-content: center; z-index: 1000;
+}
+.support-modal-content {
+    background: #fff; border-radius: 12px; width: 90%; max-width: 420px; padding: 0;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.support-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; border-bottom: 1px solid var(--gray-200);
+}
+.support-modal-body { padding: 20px; max-height: 60vh; overflow-y: auto; }
+.support-modal-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 16px 20px; border-top: 1px solid var(--gray-200);
+}
+.support-branch-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+    background: var(--gray-50); cursor: pointer;
+}
+.support-branch-item:hover { background: var(--gray-100); }
+.support-branch-item input[type="checkbox"] { width: 18px; height: 18px; }
+.support-branch-item label { cursor: pointer; flex: 1; font-size: .95rem; }
 </style>
+
+<?php if (Auth::hasPermission('cases.manage') || Auth::hasPermission('all')): ?>
+<!-- 支援分公司 Modal -->
+<div id="supportBranchModal" class="support-modal-overlay" style="display:none" onclick="if(event.target===this)closeSupportModal()">
+    <div class="support-modal-content">
+        <div class="support-modal-header">
+            <h3 style="margin:0;font-size:1.1rem">支援分公司設定</h3>
+            <button type="button" onclick="closeSupportModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;line-height:1">&times;</button>
+        </div>
+        <div class="support-modal-body">
+            <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:12px">選擇可以看到此案件的其他分公司：</p>
+            <div id="supportBranchList">載入中...</div>
+        </div>
+        <div class="support-modal-footer">
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeSupportModal()">取消</button>
+            <button type="button" class="btn btn-primary btn-sm" id="saveSupportBtn" onclick="saveSupportBranches()">儲存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var SUPPORT_CASE_ID = <?= (int)$case['id'] ?>;
+var SUPPORT_OWN_BRANCH = <?= (int)$case['branch_id'] ?>;
+var SUPPORT_CSRF = '<?= e(Session::getCsrfToken()) ?>';
+var SUPPORT_BRANCHES = <?= json_encode($model->getAllBranches()) ?>;
+
+function openSupportModal() {
+    document.getElementById('supportBranchModal').style.display = 'flex';
+    loadSupportBranches();
+}
+function closeSupportModal() {
+    document.getElementById('supportBranchModal').style.display = 'none';
+}
+function loadSupportBranches() {
+    var container = document.getElementById('supportBranchList');
+    container.innerHTML = '載入中...';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/cases.php?action=get_support_branches&id=' + SUPPORT_CASE_ID);
+    xhr.onload = function() {
+        try {
+            var res = JSON.parse(xhr.responseText);
+            var currentIds = {};
+            if (res.success && res.data) {
+                for (var i = 0; i < res.data.length; i++) {
+                    currentIds[res.data[i].branch_id] = true;
+                }
+            }
+            renderBranchCheckboxes(currentIds);
+        } catch(e) { container.innerHTML = '載入失敗'; }
+    };
+    xhr.onerror = function() { container.innerHTML = '載入失敗'; };
+    xhr.send();
+}
+function renderBranchCheckboxes(currentIds) {
+    var container = document.getElementById('supportBranchList');
+    var html = '';
+    for (var i = 0; i < SUPPORT_BRANCHES.length; i++) {
+        var b = SUPPORT_BRANCHES[i];
+        if (parseInt(b.id) === SUPPORT_OWN_BRANCH) continue;
+        var checked = currentIds[b.id] ? ' checked' : '';
+        html += '<div class="support-branch-item" onclick="toggleSupportCb(this)">';
+        html += '<input type="checkbox" id="sb_' + b.id + '" value="' + b.id + '"' + checked + ' onclick="event.stopPropagation()">';
+        html += '<label for="sb_' + b.id + '" onclick="event.stopPropagation()">' + escSupportHtml(b.name) + '</label>';
+        html += '</div>';
+    }
+    if (!html) html = '<p style="color:var(--gray-400)">沒有其他分公司可選擇</p>';
+    container.innerHTML = html;
+}
+function toggleSupportCb(el) {
+    var cb = el.querySelector('input[type="checkbox"]');
+    cb.checked = !cb.checked;
+}
+function saveSupportBranches() {
+    var btn = document.getElementById('saveSupportBtn');
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+    var cbs = document.querySelectorAll('#supportBranchList input[type="checkbox"]:checked');
+    var fd = new FormData();
+    fd.append('csrf_token', SUPPORT_CSRF);
+    fd.append('case_id', SUPPORT_CASE_ID);
+    for (var i = 0; i < cbs.length; i++) {
+        fd.append('branch_ids[]', cbs[i].value);
+    }
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/cases.php?action=save_support_branches');
+    xhr.onload = function() {
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.success) {
+                location.reload();
+            } else {
+                alert(res.error || '儲存失敗');
+                btn.disabled = false; btn.textContent = '儲存';
+            }
+        } catch(e) { alert('儲存失敗'); btn.disabled = false; btn.textContent = '儲存'; }
+    };
+    xhr.onerror = function() { alert('網路錯誤'); btn.disabled = false; btn.textContent = '儲存'; };
+    xhr.send(fd);
+}
+function escSupportHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+<?php endif; ?>
