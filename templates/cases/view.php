@@ -71,6 +71,10 @@
             <span class="detail-label">承辦業務</span>
             <span class="detail-value"><?= e($case['sales_name'] ?: '-') ?></span>
         </div>
+        <div class="detail-item">
+            <span class="detail-label">完工日期</span>
+            <span class="detail-value"><?= e($case['completion_date'] ?: '-') ?></span>
+        </div>
         <?php if ($case['ragic_id']): ?>
         <div class="detail-item">
             <span class="detail-label">Ragic ID</span>

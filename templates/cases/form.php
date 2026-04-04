@@ -105,11 +105,15 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <label>進件編號</label>
                 <input type="text" class="form-control" value="<?= e($case ? $case['case_number'] : peek_next_doc_number('cases')) ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
             </div>
-            <div class="form-group" style="flex:0 0 120px">
+            <div class="form-group" style="flex:0 0 130px">
+                <label>進件日期</label>
+                <input type="text" class="form-control" value="<?= e($case ? substr($case['created_at'], 0, 10) : date('Y-m-d')) ?>" readonly style="background:#f0f7ff;color:var(--gray-600)">
+            </div>
+            <div class="form-group" style="flex:0 0 100px">
                 <label>客戶編號</label>
                 <input type="text" class="form-control" value="<?= e($case ? ($case['customer_no'] ?? '') : peek_next_doc_number('customers')) ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
             </div>
-            <div class="form-group" style="flex:2;min-width:200px;position:relative">
+            <div class="form-group" style="flex:1;min-width:160px;position:relative">
                 <label>客戶名稱</label>
                 <input type="hidden" name="customer_id" id="customerId" value="<?= e($case['customer_id'] ?? '') ?>">
                 <input type="text" name="customer_name" id="customerNameInput" class="form-control" value="<?= e($case['customer_name'] ?? '') ?>" placeholder="輸入客戶名稱搜尋..." autocomplete="off" onkeyup="onCustomerKeyup(event)">
@@ -215,6 +219,10 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                     <option value="<?= $v ?>" <?= $defaultSubStatus === $v ? 'selected' : '' ?>><?= e($l) ?></option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>完工日期</label>
+                <input type="date" name="completion_date" class="form-control" value="<?= e($case['completion_date'] ?? '') ?>">
             </div>
         </div>
         <div class="form-row">
