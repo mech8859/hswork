@@ -22,10 +22,10 @@ $qs = http_build_query(array_filter(array(
 
 <!-- 篩選 -->
 <div class="card mb-2">
-    <form method="GET" action="/inventory.php" class="filter-form">
+    <form method="GET" action="/inventory.php">
         <input type="hidden" name="action" value="movements">
         <input type="hidden" name="tab" value="<?= e($activeTab) ?>">
-        <div class="filter-row">
+        <div class="form-row" style="align-items:flex-end">
             <div class="form-group">
                 <label>倉庫</label>
                 <select name="warehouse_id" class="form-control">

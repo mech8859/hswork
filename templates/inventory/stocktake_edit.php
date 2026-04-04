@@ -22,7 +22,8 @@
     <h2>盤點 - <?= e($stocktake['stocktake_number']) ?></h2>
     <div class="d-flex gap-1 align-center">
         <?php
-            $statusClass = ($stocktake['status'] === '盤點中') ? 'badge-warning' : (($stocktake['status'] === '已完成') ? 'badge-success' : 'badge-muted');
+            $statusMap = array('盤點中' => 'badge-warning', '待簽核' => 'badge-primary', '已完成' => 'badge-success', '已取消' => 'badge-muted');
+            $statusClass = isset($statusMap[$stocktake['status']]) ? $statusMap[$stocktake['status']] : 'badge-muted';
         ?>
         <span class="badge <?= $statusClass ?>" style="font-size:.85rem"><?= e($stocktake['status']) ?></span>
         <button type="button" class="btn btn-outline btn-sm no-print" onclick="window.print()">列印</button>
@@ -161,7 +162,7 @@
     <?php if ($isEditable): ?>
     <div class="d-flex gap-1 mt-2" style="flex-wrap:wrap">
         <button type="submit" class="btn btn-primary" onclick="document.getElementById('postAction').value='save'">儲存盤點</button>
-        <button type="submit" class="btn btn-success" onclick="if(!confirm('確認完成盤點？差異將自動調整庫存數量')){event.preventDefault();return;}document.getElementById('postAction').value='complete'">完成盤點</button>
+        <button type="submit" class="btn btn-success" onclick="if(!confirm('確認提交盤點？')){event.preventDefault();return;}document.getElementById('postAction').value='complete'">提交簽核</button>
         <form method="POST" action="/inventory.php?action=stocktake_cancel" style="display:inline" onsubmit="return confirm('確認取消此盤點？')">
             <?= csrf_field() ?>
             <input type="hidden" name="id" value="<?= e($stocktake['id']) ?>">
@@ -169,6 +170,79 @@
         </form>
     </div>
     </form>
+    <?php endif; ?>
+
+    <?php
+    // 簽核狀態顯示
+    if ($stocktake['status'] === '待簽核' || $stocktake['status'] === '已完成'):
+        require_once __DIR__ . '/../../modules/approvals/ApprovalModel.php';
+        $approvalModel = new ApprovalModel();
+        $flowStatus = $approvalModel->getFlowStatus('stocktakes', $stocktake['id']);
+        $isApprover = false;
+        $myFlowId = 0;
+        foreach ($flowStatus['flows'] as $fl) {
+            if ((int)$fl['approver_id'] === Auth::id() && $fl['status'] === 'pending') {
+                $isApprover = true;
+                $myFlowId = (int)$fl['id'];
+            }
+        }
+    ?>
+    <?php if (!empty($flowStatus['flows'])): ?>
+    <div class="card mt-2">
+        <div class="card-header">簽核紀錄</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>簽核人</th><th>狀態</th><th>意見</th><th>時間</th></tr></thead>
+                <tbody>
+                <?php foreach ($flowStatus['flows'] as $fl): ?>
+                <tr>
+                    <td><?= e($fl['approver_name'] ?? '-') ?></td>
+                    <td>
+                        <?php if ($fl['status'] === 'pending'): ?>
+                        <span class="badge badge-warning">待簽核</span>
+                        <?php elseif ($fl['status'] === 'approved'): ?>
+                        <span class="badge badge-success">已核准</span>
+                        <?php elseif ($fl['status'] === 'rejected'): ?>
+                        <span class="badge" style="background:#ffebee;color:#c62828">已駁回</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?= e($fl['comment'] ?? '') ?></td>
+                    <td><?= $fl['decided_at'] ? e(substr($fl['decided_at'], 0, 16)) : '-' ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($isApprover && $stocktake['status'] === '待簽核'): ?>
+    <div class="card mt-2" style="border-left:4px solid var(--primary)">
+        <div class="card-header">簽核操作</div>
+        <div style="padding:16px">
+            <div class="form-group">
+                <label>簽核意見</label>
+                <textarea id="approvalComment" class="form-control" rows="2" placeholder="選填"></textarea>
+            </div>
+            <div class="d-flex gap-1">
+                <form method="POST" action="/inventory.php?action=stocktake_approve" style="display:inline">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= e($stocktake['id']) ?>">
+                    <input type="hidden" name="flow_id" value="<?= $myFlowId ?>">
+                    <input type="hidden" name="comment" id="approveComment" value="">
+                    <button type="submit" class="btn btn-success" onclick="document.getElementById('approveComment').value=document.getElementById('approvalComment').value;return confirm('確認核准此盤點？庫存將依差異調整')">核准</button>
+                </form>
+                <form method="POST" action="/inventory.php?action=stocktake_reject" style="display:inline">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= e($stocktake['id']) ?>">
+                    <input type="hidden" name="flow_id" value="<?= $myFlowId ?>">
+                    <input type="hidden" name="comment" id="rejectComment" value="">
+                    <button type="submit" class="btn btn-outline" style="color:var(--danger)" onclick="document.getElementById('rejectComment').value=document.getElementById('approvalComment').value;return confirm('確認駁回此盤點？')">駁回</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 

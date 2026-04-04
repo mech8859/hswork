@@ -423,6 +423,16 @@ class ApprovalModel
                     $row['amount'] = !empty($total['total']) ? $total['total'] : 0;
                 }
                 return $row ?: array();
+            case 'stocktakes':
+                $stmt = $this->db->prepare("SELECT s.*, w.name AS warehouse_name FROM stocktakes s LEFT JOIN warehouses w ON s.warehouse_id = w.id WHERE s.id = ?");
+                $stmt->execute(array($targetId));
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $row['label'] = $row['stocktake_number'] . ' - ' . ($row['warehouse_name'] ?: '');
+                    $row['url'] = '/inventory.php?action=stocktake_edit&id=' . $targetId;
+                    $row['amount'] = 0;
+                }
+                return $row ?: array();
             default:
                 return array('label' => $module . ' #' . $targetId, 'url' => '#');
         }

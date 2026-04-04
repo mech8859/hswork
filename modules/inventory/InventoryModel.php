@@ -672,6 +672,26 @@ class InventoryModel
         return $stmt->rowCount() > 0;
     }
 
+    /**
+     * 提交盤點簽核
+     */
+    public function submitStocktake($stocktakeId)
+    {
+        $stmt = $this->db->prepare("UPDATE stocktakes SET status = '待簽核', updated_at = NOW() WHERE id = ? AND status = '盤點中'");
+        $stmt->execute(array($stocktakeId));
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * 駁回盤點（回到盤點中）
+     */
+    public function rejectStocktake($stocktakeId)
+    {
+        $stmt = $this->db->prepare("UPDATE stocktakes SET status = '盤點中', updated_at = NOW() WHERE id = ? AND status = '待簽核'");
+        $stmt->execute(array($stocktakeId));
+        return $stmt->rowCount() > 0;
+    }
+
     // ============================================================
     // 倉庫管理
     // ============================================================

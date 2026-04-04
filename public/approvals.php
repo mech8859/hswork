@@ -139,6 +139,15 @@ switch ($action) {
                         }
                     }
                     Session::flash('success', '已核准');
+                } elseif ($module === 'stocktakes' && $targetId) {
+                    if ($model->isFullyApproved('stocktakes', $targetId)) {
+                        require_once __DIR__ . '/../modules/inventory/InventoryModel.php';
+                        $invModel = new InventoryModel();
+                        $invModel->completeStocktake($targetId, Auth::id());
+                        Session::flash('success', '已核准，庫存差異已調整');
+                    } else {
+                        Session::flash('success', '已核准，等待其他簽核人');
+                    }
                 } elseif ($module && $targetId && $model->isFullyApproved($module, $targetId)) {
                     // 其他模組：自動更新單據狀態
                     if ($module === 'quotations') {
@@ -203,6 +212,12 @@ switch ($action) {
                     }
                     AuditLog::log('approvals', 'reject', $flowId, '收款簽核退回 #' . $targetId . ' - ' . $comment);
                     Session::flash('success', '已退回');
+                } elseif ($module === 'stocktakes' && $targetId) {
+                    require_once __DIR__ . '/../modules/inventory/InventoryModel.php';
+                    $invModel = new InventoryModel();
+                    $invModel->rejectStocktake($targetId);
+                    AuditLog::log('approvals', 'reject', $flowId, '盤點簽核退回 #' . $targetId . ' - ' . $comment);
+                    Session::flash('success', '已退回，倉管可修改後重新提交');
                 } else {
                     // 其他模組退回
                     if ($module === 'quotations' && $targetId) {

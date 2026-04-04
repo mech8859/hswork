@@ -282,9 +282,23 @@ switch ($action) {
             $model->updateStocktakeItems($items);
 
             if ($postAction === 'complete') {
-                $model->completeStocktake($id, Auth::id());
-                Session::flash('success', '盤點已完成，差異已調整');
-                redirect('/inventory.php?action=stocktake_list');
+                // 檢查是否需要簽核
+                require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+                $approvalModel = new ApprovalModel();
+                $needsApproval = $approvalModel->needsApproval('stocktakes', 0);
+
+                if ($needsApproval) {
+                    // 需要簽核：提交簽核
+                    $model->submitStocktake($id);
+                    $approvalModel->submitForApproval('stocktakes', $id, 0, null, Auth::id());
+                    Session::flash('success', '盤點已提交簽核，等待審核');
+                    redirect('/inventory.php?action=stocktake_edit&id=' . $id);
+                } else {
+                    // 不需簽核：直接完成
+                    $model->completeStocktake($id, Auth::id());
+                    Session::flash('success', '盤點已完成，差異已調整');
+                    redirect('/inventory.php?action=stocktake_list');
+                }
             } else {
                 Session::flash('success', '盤點資料已儲存');
                 redirect('/inventory.php?action=stocktake_edit&id=' . $id);
@@ -312,6 +326,49 @@ switch ($action) {
         $model->cancelStocktake($id);
         Session::flash('success', '盤點已取消');
         redirect('/inventory.php?action=stocktake_list');
+        break;
+
+    // ============================================================
+    // 盤點簽核 - 核准
+    // ============================================================
+    case 'stocktake_approve':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('/inventory.php?action=stocktake_list');
+        verify_csrf();
+        $id = (int)$_POST['id'];
+        $flowId = (int)($_POST['flow_id'] ?? 0);
+        $comment = $_POST['comment'] ?? '';
+
+        require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+        $approvalModel = new ApprovalModel();
+        $approvalModel->approve($flowId, Auth::id(), $comment);
+
+        // 檢查是否全部核准
+        $flowStatus = $approvalModel->getFlowStatus('stocktakes', $id);
+        if ($flowStatus['overall'] === 'approved') {
+            $model->completeStocktake($id, Auth::id());
+            Session::flash('success', '盤點已核准，庫存差異已調整');
+        } else {
+            Session::flash('success', '已核准，等待其他簽核人');
+        }
+        redirect('/inventory.php?action=stocktake_edit&id=' . $id);
+        break;
+
+    // ============================================================
+    // 盤點簽核 - 駁回
+    // ============================================================
+    case 'stocktake_reject':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('/inventory.php?action=stocktake_list');
+        verify_csrf();
+        $id = (int)$_POST['id'];
+        $flowId = (int)($_POST['flow_id'] ?? 0);
+        $comment = $_POST['comment'] ?? '';
+
+        require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+        $approvalModel = new ApprovalModel();
+        $approvalModel->reject($flowId, Auth::id(), $comment);
+        $model->rejectStocktake($id);
+        Session::flash('success', '盤點已駁回，倉管可修改後重新提交');
+        redirect('/inventory.php?action=stocktake_edit&id=' . $id);
         break;
 
     // ============================================================

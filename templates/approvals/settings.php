@@ -27,6 +27,9 @@
                     <optgroup label="財務相關">
                         <option value="expenses">支出單簽核</option>
                     </optgroup>
+                    <optgroup label="庫存管理">
+                        <option value="stocktakes">盤點單簽核</option>
+                    </optgroup>
                     <optgroup label="人事行政">
                         <option value="leaves">請假單簽核</option>
                         <option value="overtime">加班單簽核</option>
