@@ -171,6 +171,7 @@
         <li><a href="/returns.php" class="<?= ($currentPage ?? '') === 'returns' ? 'active' : '' ?>">🔄 退貨單</a></li>
         <li><a href="/warehouse_transfers.php" class="<?= ($currentPage ?? '') === 'warehouse_transfers' ? 'active' : '' ?>">🔀 調撥單</a></li>
         <li><a href="/inventory.php?action=stocktake_list" class="<?= ($currentPage ?? '') === 'stocktake' ? 'active' : '' ?>">📋 盤點單</a></li>
+        <li><a href="/inventory.php?action=movements" class="<?= ($currentPage ?? '') === 'movements' ? 'active' : '' ?>">📊 庫存異動表</a></li>
         <?php endif; ?>
 
         <!-- 人事行政 -->

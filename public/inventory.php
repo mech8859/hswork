@@ -160,6 +160,37 @@ switch ($action) {
         break;
 
     // ============================================================
+    // 庫存異動表（明細 + 匯總）
+    // ============================================================
+    case 'movements':
+        $tab = $_GET['tab'] ?? 'detail';
+        $filters = array(
+            'warehouse_id' => !empty($_GET['warehouse_id']) ? $_GET['warehouse_id'] : '',
+            'type'         => !empty($_GET['type']) ? $_GET['type'] : '',
+            'keyword'      => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
+            'date_from'    => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'      => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
+        );
+
+        if ($tab === 'summary') {
+            $summaryData = $model->getMovementSummary($filters);
+            $transactions = array();
+        } else {
+            $transactions = $model->getTransactions($filters, 500);
+            $summaryData = array();
+        }
+
+        $warehouses = $model->getWarehouses();
+        $typeOptions = InventoryModel::transactionTypeOptions();
+
+        $pageTitle = '庫存異動表';
+        $currentPage = 'movements';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/inventory/movements.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ============================================================
     // 盤點列表
     // ============================================================
     case 'stocktake_list':

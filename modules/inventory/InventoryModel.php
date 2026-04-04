@@ -410,6 +410,63 @@ class InventoryModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * 庫存異動匯總（依產品 GROUP BY）
+     */
+    public function getMovementSummary($filters = array())
+    {
+        $where = '1=1';
+        $params = array();
+
+        if (!empty($filters['warehouse_id'])) {
+            $where .= ' AND t.warehouse_id = ?';
+            $params[] = $filters['warehouse_id'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where .= ' AND t.created_at >= ?';
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where .= ' AND t.created_at <= ?';
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        if (!empty($filters['keyword'])) {
+            $where .= ' AND (p.name LIKE ? OR p.model LIKE ?)';
+            $kw = '%' . $filters['keyword'] . '%';
+            $params[] = $kw;
+            $params[] = $kw;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT t.product_id,
+                   p.name AS product_name, p.model AS product_model,
+                   SUM(CASE WHEN t.type IN ('purchase_in','manual_in','transfer_in','return_in') THEN t.quantity ELSE 0 END) AS total_in,
+                   SUM(CASE WHEN t.type IN ('manual_out','transfer_out','case_out') THEN ABS(t.quantity) ELSE 0 END) AS total_out,
+                   SUM(CASE WHEN t.type = 'adjust' THEN t.quantity ELSE 0 END) AS total_adjust,
+                   COUNT(*) AS txn_count
+            FROM inventory_transactions t
+            LEFT JOIN products p ON t.product_id = p.id
+            WHERE {$where}
+            GROUP BY t.product_id, p.name, p.model
+            HAVING total_in != 0 OR total_out != 0 OR total_adjust != 0
+            ORDER BY p.name
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 附加現有庫存
+        foreach ($rows as &$r) {
+            $invStmt = $this->db->prepare('SELECT COALESCE(SUM(stock_qty), 0) FROM inventory WHERE product_id = ?' . (!empty($filters['warehouse_id']) ? ' AND warehouse_id = ?' : ''));
+            $invParams = array($r['product_id']);
+            if (!empty($filters['warehouse_id'])) $invParams[] = $filters['warehouse_id'];
+            $invStmt->execute($invParams);
+            $r['current_stock'] = (int)$invStmt->fetchColumn();
+            $r['net_change'] = (int)$r['total_in'] - (int)$r['total_out'] + (int)$r['total_adjust'];
+        }
+
+        return $rows;
+    }
+
     // ============================================================
     // 盤點管理
     // ============================================================
