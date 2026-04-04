@@ -126,7 +126,7 @@ switch ($action) {
         $date = $_GET['date'] ?? date('Y-m-d');
         $cases = $model->getSchedulableCases($branchIds);
         $vehicles = $model->getAvailableVehicles($date, $branchIds);
-        $dispatch_workers = $model->getDispatchWorkers();
+        $dispatch_workers = $model->getDispatchWorkers($date);
 
         // 如果有指定案件，取得推薦工程師
         $caseId = (int)($_GET['case_id'] ?? 0);
@@ -207,7 +207,7 @@ switch ($action) {
         $cases = $model->getSchedulableCases($branchIds);
         $vehicles = $model->getAvailableVehicles($date, $branchIds);
         $engineers = $model->getAvailableEngineers($date, (int)$schedule['case_id'], $branchIds);
-        $dispatch_workers = $model->getDispatchWorkers();
+        $dispatch_workers = $model->getDispatchWorkers($date);
 
         $pageTitle = '編輯排工';
         $currentPage = 'schedule';
@@ -230,6 +230,13 @@ switch ($action) {
         $date = $_GET['date'] ?? date('Y-m-d');
         $vehicles = $model->getAvailableVehicles($date, $branchIds);
         json_response(['data' => $vehicles]);
+        break;
+
+    // ---- AJAX: 取得可用點工人員（依日期過濾） ----
+    case 'ajax_dispatch_workers':
+        $date = $_GET['date'] ?? date('Y-m-d');
+        $workers = $model->getDispatchWorkers($date);
+        json_response(array('data' => $workers));
         break;
 
     // ---- 智慧排工 ----

@@ -244,6 +244,31 @@ function reloadSuggestions() {
         });
         document.getElementById('vehicleSelect').innerHTML = html;
     });
+
+    // 載入可用點工人員
+    fetch('/schedule.php?action=ajax_dispatch_workers&date=' + date, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        var html = '';
+        if (result.data && result.data.length > 0) {
+            result.data.forEach(function(dw) {
+                html += '<div class="engineer-option">';
+                html += '<label class="checkbox-label">';
+                html += '<input type="checkbox" name="dispatch_worker_ids[]" value="' + dw.id + '" onchange="updateDWCount()">';
+                html += '<span>' + dw.name;
+                if (dw.vendor) html += ' <span class="text-muted" style="font-size:.8rem">(' + dw.vendor + ')</span>';
+                html += '</span></label>';
+                if (dw.specialty) html += '<span class="badge" style="background:#e3f2fd;color:#1565c0">' + dw.specialty + '</span>';
+                html += '</div>';
+            });
+        } else {
+            html = '<p class="text-muted" style="padding:12px">該日期無已登錄可上工的點工人員</p>';
+        }
+        document.getElementById('dwList').innerHTML = html;
+        updateDWCount();
+    });
 }
 
 updateCount();

@@ -276,4 +276,52 @@ switch ($action) {
         require __DIR__ . '/../templates/dispatch_workers/pairs.php';
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
+
+    // ---- 可上工日期登錄 ----
+    case 'availability':
+        // 新增登錄
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
+            if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/dispatch_workers.php?action=availability'); }
+            $workerId = (int)($_POST['dispatch_worker_id'] ?? 0);
+            $dateVal = $_POST['available_date'] ?? '';
+            if ($workerId && $dateVal) {
+                try {
+                    $db->prepare('INSERT INTO dispatch_worker_availability (dispatch_worker_id, available_date, registered_by) VALUES (?, ?, ?)')
+                       ->execute(array($workerId, $dateVal, Auth::id()));
+                    Session::flash('success', '已登錄可上工日期');
+                } catch (Exception $e) {
+                    Session::flash('error', '該人員該日期已登錄過');
+                }
+            }
+            redirect('/dispatch_workers.php?action=availability&worker_id=' . $workerId);
+        }
+
+        // 刪除登錄
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) {
+            if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/dispatch_workers.php?action=availability'); }
+            $avId = (int)($_POST['availability_id'] ?? 0);
+            $workerId = (int)($_POST['worker_id'] ?? 0);
+            if ($avId) {
+                $db->prepare('DELETE FROM dispatch_worker_availability WHERE id = ?')->execute(array($avId));
+                Session::flash('success', '已刪除');
+            }
+            redirect('/dispatch_workers.php?action=availability&worker_id=' . $workerId);
+        }
+
+        // 載入資料
+        $workers = $db->query("SELECT id, name, specialty, vendor FROM dispatch_workers WHERE is_active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        $selectedWorker = (int)($_GET['worker_id'] ?? 0);
+        $records = array();
+        if ($selectedWorker) {
+            $stmt = $db->prepare("SELECT dwa.*, u.real_name AS registered_by_name FROM dispatch_worker_availability dwa LEFT JOIN users u ON dwa.registered_by = u.id WHERE dwa.dispatch_worker_id = ? AND dwa.available_date >= CURDATE() ORDER BY dwa.available_date");
+            $stmt->execute(array($selectedWorker));
+            $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $pageTitle = '可上工日期登錄';
+        $currentPage = 'staff';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/dispatch_workers/availability.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
 }

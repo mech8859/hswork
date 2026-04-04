@@ -4,6 +4,7 @@
         <a href="/dispatch_workers.php?type=vendor" class="btn btn-outline">外包廠商</a>
         <a href="/dispatch_workers.php?type=outsource" class="btn btn-outline <?= $type==='outsource'?'btn-primary':'' ?>">外包人員</a>
         <a href="/dispatch_workers.php?type=dispatch" class="btn btn-outline <?= $type==='dispatch'?'btn-primary':'' ?>">點工人員</a>
+        <a href="/dispatch_workers.php?action=availability" class="btn btn-sm" style="background:#1976d2;color:#fff">可上工登錄</a>
         <a href="/dispatch_workers.php?action=create&type=<?= e($type) ?>" class="btn btn-primary">+ 新增</a>
     </div>
 </div>

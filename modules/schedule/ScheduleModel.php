@@ -280,8 +280,18 @@ class ScheduleModel
     /**
      * 取得所有點工人員（啟用中）
      */
-    public function getDispatchWorkers()
+    public function getDispatchWorkers($date = null)
     {
+        if ($date) {
+            $stmt = $this->db->prepare("
+                SELECT dw.* FROM dispatch_workers dw
+                INNER JOIN dispatch_worker_availability dwa ON dw.id = dwa.dispatch_worker_id AND dwa.available_date = ?
+                WHERE dw.is_active = 1
+                ORDER BY dw.name
+            ");
+            $stmt->execute(array($date));
+            return $stmt->fetchAll();
+        }
         return $this->db->query("SELECT * FROM dispatch_workers WHERE is_active = 1 ORDER BY name")->fetchAll();
     }
 
@@ -839,9 +849,34 @@ class ScheduleModel
     {
         if (empty($candidates)) return $candidates;
 
-        // 載入所有啟用的點工人員
-        $dwStmt = $this->db->query("SELECT id, name, specialty, daily_rate FROM dispatch_workers WHERE is_active = 1 ORDER BY name");
+        // 收集所有推薦日期
+        $allDates = array();
+        foreach ($candidates as $c) { $allDates[$c['date']] = true; }
+        $allDateKeys = array_keys($allDates);
+
+        // 載入在推薦日期有登錄可上工的點工人員
+        if (empty($allDateKeys)) {
+            foreach ($candidates as &$c) { $c['dispatch_workers'] = array(); }
+            return $candidates;
+        }
+        $datePh = implode(',', array_fill(0, count($allDateKeys), '?'));
+        $dwStmt = $this->db->prepare("
+            SELECT DISTINCT dw.id, dw.name, dw.specialty, dw.daily_rate
+            FROM dispatch_workers dw
+            INNER JOIN dispatch_worker_availability dwa ON dw.id = dwa.dispatch_worker_id
+            WHERE dw.is_active = 1 AND dwa.available_date IN ($datePh)
+            ORDER BY dw.name
+        ");
+        $dwStmt->execute($allDateKeys);
         $allWorkers = $dwStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 建立每日可用點工索引
+        $availByDate = array();
+        $avStmt = $this->db->prepare("SELECT dispatch_worker_id, available_date FROM dispatch_worker_availability WHERE available_date IN ($datePh)");
+        $avStmt->execute($allDateKeys);
+        foreach ($avStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $availByDate[$row['available_date']][(int)$row['dispatch_worker_id']] = true;
+        }
         if (empty($allWorkers)) {
             foreach ($candidates as &$c) { $c['dispatch_workers'] = array(); }
             return $candidates;
@@ -854,10 +889,8 @@ class ScheduleModel
             $dwSkills[(int)$row['dispatch_worker_id']][(int)$row['skill_id']] = (int)$row['proficiency'];
         }
 
-        // 收集所有推薦日期，批次查詢已排工/出勤的點工
-        $dates = array();
-        foreach ($candidates as $c) { $dates[$c['date']] = true; }
-        $dates = array_keys($dates);
+        // 批次查詢已排工/出勤的點工
+        $dates = $allDateKeys;
 
         $busyWorkers = array(); // date => [worker_id => true]
         if ($dates) {
@@ -899,8 +932,10 @@ class ScheduleModel
             $teamEngIds = isset($c['engineer_ids']) ? $c['engineer_ids'] : array();
 
             $recommended = array();
+            $dateAvail = isset($availByDate[$date]) ? $availByDate[$date] : array();
             foreach ($allWorkers as $w) {
                 $wid = (int)$w['id'];
+                if (!isset($dateAvail[$wid])) continue; // 當天未登錄可上工
                 if (isset($busy[$wid])) continue; // 當天已被排工
 
                 // 技能匹配度計算
