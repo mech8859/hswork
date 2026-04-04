@@ -115,7 +115,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <input type="text" name="customer_name" id="customerNameInput" class="form-control" value="<?= e($case['customer_name'] ?? '') ?>" placeholder="輸入客戶名稱搜尋..." autocomplete="off" onkeyup="onCustomerKeyup(event)">
                 <div id="customerDropdown" class="customer-dropdown" style="display:none"></div>
                 <?php if ($case && !empty($case['customer_id'])): ?>
-                <small class="text-muted" id="customerInfo">已關聯客戶 #<?= e($case['customer_id']) ?></small>
+                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem">已關聯客戶 #<?= e($case['customer_id']) ?></small>
                 <?php endif; ?>
             </div>
             <div class="form-group" style="flex:0 0 160px">

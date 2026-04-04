@@ -284,12 +284,15 @@ class ScheduleModel
     {
         if ($date) {
             $stmt = $this->db->prepare("
-                SELECT dw.* FROM dispatch_workers dw
-                INNER JOIN dispatch_worker_availability dwa ON dw.id = dwa.dispatch_worker_id AND dwa.available_date = ?
+                SELECT DISTINCT dw.* FROM dispatch_workers dw
                 WHERE dw.is_active = 1
+                  AND (
+                    dw.id IN (SELECT dispatch_worker_id FROM dispatch_worker_availability WHERE available_date = ?)
+                    OR dw.id IN (SELECT dispatch_worker_id FROM dispatch_attendance WHERE attendance_date = ? AND status = 'present')
+                  )
                 ORDER BY dw.name
             ");
-            $stmt->execute(array($date));
+            $stmt->execute(array($date, $date));
             return $stmt->fetchAll();
         }
         return $this->db->query("SELECT * FROM dispatch_workers WHERE is_active = 1 ORDER BY name")->fetchAll();
@@ -557,11 +560,22 @@ class ScheduleModel
         // 刪除排工點工人員
         $this->db->prepare('DELETE FROM schedule_dispatch_workers WHERE schedule_id = ?')->execute(array($id));
 
+        // 刪除點工出勤預排紀錄
+        try {
+            $this->db->prepare("DELETE FROM dispatch_attendance WHERE schedule_id = ? AND status = 'scheduled'")->execute(array($id));
+        } catch (Exception $e) {
+            // schedule_id 欄位可能不存在，忽略
+        }
+
         // 清除跨點點工的 schedule_id 參考
         $this->db->prepare('UPDATE inter_branch_support SET schedule_id = NULL WHERE schedule_id = ?')->execute(array($id));
 
         // 刪除施工檢查紀錄
-        $this->db->prepare('DELETE FROM schedule_visit_check WHERE schedule_id = ?')->execute(array($id));
+        try {
+            $this->db->prepare('DELETE FROM schedule_visit_check WHERE schedule_id = ?')->execute(array($id));
+        } catch (Exception $e) {
+            // schedule_id 欄位可能不存在，改用 case_id 清理
+        }
 
         // 最後刪除排工本身
         $this->db->prepare('DELETE FROM schedules WHERE id = ?')->execute(array($id));
@@ -863,19 +877,27 @@ class ScheduleModel
         $dwStmt = $this->db->prepare("
             SELECT DISTINCT dw.id, dw.name, dw.specialty, dw.daily_rate
             FROM dispatch_workers dw
-            INNER JOIN dispatch_worker_availability dwa ON dw.id = dwa.dispatch_worker_id
-            WHERE dw.is_active = 1 AND dwa.available_date IN ($datePh)
+            WHERE dw.is_active = 1
+              AND (
+                dw.id IN (SELECT dispatch_worker_id FROM dispatch_worker_availability WHERE available_date IN ($datePh))
+                OR dw.id IN (SELECT dispatch_worker_id FROM dispatch_attendance WHERE attendance_date IN ($datePh) AND status = 'present')
+              )
             ORDER BY dw.name
         ");
-        $dwStmt->execute($allDateKeys);
+        $dwStmt->execute(array_merge($allDateKeys, $allDateKeys));
         $allWorkers = $dwStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 建立每日可用點工索引
+        // 建立每日可用點工索引（可上工登錄 + 出勤登錄都算）
         $availByDate = array();
         $avStmt = $this->db->prepare("SELECT dispatch_worker_id, available_date FROM dispatch_worker_availability WHERE available_date IN ($datePh)");
         $avStmt->execute($allDateKeys);
         foreach ($avStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $availByDate[$row['available_date']][(int)$row['dispatch_worker_id']] = true;
+        }
+        $atStmt = $this->db->prepare("SELECT dispatch_worker_id, attendance_date FROM dispatch_attendance WHERE attendance_date IN ($datePh) AND status = 'present'");
+        $atStmt->execute($allDateKeys);
+        foreach ($atStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $availByDate[$row['attendance_date']][(int)$row['dispatch_worker_id']] = true;
         }
         if (empty($allWorkers)) {
             foreach ($candidates as &$c) { $c['dispatch_workers'] = array(); }
@@ -910,7 +932,7 @@ class ScheduleModel
             $aStmt = $this->db->prepare("
                 SELECT attendance_date, dispatch_worker_id
                 FROM dispatch_attendance
-                WHERE attendance_date IN ($ph) AND status IN ('present','scheduled')
+                WHERE attendance_date IN ($ph) AND status = 'present'
             ");
             $aStmt->execute($dates);
             foreach ($aStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {

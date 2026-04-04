@@ -366,7 +366,7 @@ switch ($action) {
         }
 
         // 處理報價章圖片
-        $uploadDir = __DIR__ . '/../uploads/settings/';
+        $uploadDir = __DIR__ . '/uploads/settings/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
