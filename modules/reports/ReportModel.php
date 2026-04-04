@@ -70,7 +70,7 @@ class ReportModel
             LEFT JOIN schedule_engineers se ON se.user_id = u.id
             LEFT JOIN schedules s ON se.schedule_id = s.id AND s.status != 'cancelled'
                 AND s.schedule_date BETWEEN ? AND ?
-            LEFT JOIN work_logs wl ON wl.user_id = u.id AND wl.work_date BETWEEN ? AND ?
+            LEFT JOIN work_logs wl ON wl.user_id = u.id AND DATE(wl.arrival_time) BETWEEN ? AND ?
             WHERE u.branch_id IN ($ph) AND u.is_engineer = 1 AND u.is_active = 1
             GROUP BY u.id, u.real_name, b.name
             ORDER BY schedule_count DESC

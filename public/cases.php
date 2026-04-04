@@ -11,14 +11,19 @@ switch ($action) {
     // ---- 案件清單 ----
     case 'list':
         $filters = [
-            'status'    => $_GET['status'] ?? '',
-            'case_type' => $_GET['case_type'] ?? '',
-            'keyword'   => $_GET['keyword'] ?? '',
-            'branch_id' => $_GET['branch_id'] ?? '',
+            'status'     => $_GET['status'] ?? '',
+            'case_type'  => $_GET['case_type'] ?? '',
+            'keyword'    => $_GET['keyword'] ?? '',
+            'branch_id'  => $_GET['branch_id'] ?? '',
+            'sub_status' => $_GET['sub_status'] ?? '',
+            'sales_id'   => $_GET['sales_id'] ?? '',
+            'date_from'  => $_GET['date_from'] ?? '',
+            'date_to'    => $_GET['date_to'] ?? '',
         ];
         $page = max(1, (int)($_GET['page'] ?? 1));
         $result = $model->getList($branchIds, $filters, $page);
         $branches = $model->getAllBranches();
+        $salesUsers = $model->getSalesUsers($branchIds);
 
         $pageTitle = '案件管理';
         $currentPage = 'cases';
