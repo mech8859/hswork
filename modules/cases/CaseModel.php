@@ -220,7 +220,7 @@ class CaseModel
                              deposit_amount, deposit_payment_date, deposit_method,
                              balance_amount, completion_amount, total_collected,
                              ragic_id, sales_id, created_by,
-                             planned_start_date, planned_end_date, is_flexible,
+                             planned_start_date, planned_end_date, planned_start_time, is_flexible,
                              work_time_start, work_time_end, has_time_restriction,
                              customer_break_time, allow_night_work, urgency, is_large_project,
                              customer_id, customer_name, customer_category, customer_phone, customer_mobile, contact_person, contact_line_id, customer_email,
@@ -229,7 +229,7 @@ class CaseModel
                              repair_report_date, repair_fault_reason, repair_by_sales, repair_equipment, repair_staff, repair_helper,
                              repair_result, repair_description, repair_original_case, repair_original_complete_date, repair_original_warranty_date,
                              repair_is_charged, repair_no_charge_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $data['branch_id'],
@@ -263,6 +263,7 @@ class CaseModel
             Auth::id(),
             !empty($data['planned_start_date']) ? $data['planned_start_date'] : null,
             !empty($data['planned_end_date']) ? $data['planned_end_date'] : null,
+            !empty($data['planned_start_time']) ? $data['planned_start_time'] : null,
             $data['is_flexible'] ?? 0,
             !empty($data['work_time_start']) ? $data['work_time_start'] : null,
             !empty($data['work_time_end']) ? $data['work_time_end'] : null,
@@ -346,7 +347,7 @@ class CaseModel
                 deposit_amount = ?, deposit_payment_date = ?, deposit_method = ?,
                 balance_amount = ?, completion_amount = ?, total_collected = ?,
                 ragic_id = ?, sales_id = ?,
-                planned_start_date = ?, planned_end_date = ?, is_flexible = ?,
+                planned_start_date = ?, planned_end_date = ?, planned_start_time = ?, is_flexible = ?,
                 work_time_start = ?, work_time_end = ?, has_time_restriction = ?,
                 customer_break_time = ?, allow_night_work = ?, urgency = ?, is_large_project = ?,
                 branch_id = ?,
@@ -390,6 +391,7 @@ class CaseModel
             !empty($data['sales_id']) ? $data['sales_id'] : null,
             !empty($data['planned_start_date']) ? $data['planned_start_date'] : null,
             !empty($data['planned_end_date']) ? $data['planned_end_date'] : null,
+            !empty($data['planned_start_time']) ? $data['planned_start_time'] : null,
             isset($data['is_flexible']) ? $data['is_flexible'] : 0,
             !empty($data['work_time_start']) ? $data['work_time_start'] : null,
             !empty($data['work_time_end']) ? $data['work_time_end'] : null,

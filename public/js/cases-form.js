@@ -800,3 +800,10 @@ function updateConstructionArea() {
     var evt = new Event('change');
     document.getElementById('constructionDistrict').dispatchEvent(evt);
 }
+
+// 指定施工時間
+function updatePlannedTime() {
+    var h = document.querySelector('select[name="planned_start_hour"]').value;
+    var m = document.querySelector('select[name="planned_start_min"]').value;
+    document.getElementById('plannedStartTime').value = (h && m) ? h + ':' + m : '';
+}

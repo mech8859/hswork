@@ -210,6 +210,10 @@ switch ($action) {
     case 'delete_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        if (!Auth::canEditSection('delete') && !Auth::hasPermission('finance.delete') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無刪除權限'));
+            break;
+        }
         $pid = (int)($_POST['payment_id'] ?? 0);
         Database::getInstance()->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
         echo json_encode(array('success' => true));
@@ -282,6 +286,10 @@ switch ($action) {
     case 'delete_worklog':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        if (!Auth::canEditSection('delete') && !Auth::hasPermission('schedule.delete') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無刪除權限'));
+            break;
+        }
         $wid = (int)($_POST['worklog_id'] ?? 0);
         Database::getInstance()->prepare('DELETE FROM case_work_logs WHERE id = ?')->execute(array($wid));
         echo json_encode(array('success' => true));
@@ -309,6 +317,10 @@ switch ($action) {
     case 'delete_attachment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        if (!Auth::canEditSection('attach') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無權限'));
+            break;
+        }
         $attId = (int)($_POST['attachment_id'] ?? 0);
         $model->deleteAttachment($attId);
         echo json_encode(array('success' => true));

@@ -844,6 +844,33 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         </div>
         <div class="form-row">
             <div class="form-group">
+                <label>指定施工時間</label>
+                <?php
+                $pstHour = ''; $pstMin = '';
+                if (!empty($case['planned_start_time'])) {
+                    $pts = explode(':', $case['planned_start_time']);
+                    $pstHour = $pts[0] ?? '';
+                    $pstMin = $pts[1] ?? '';
+                }
+                ?>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <select name="planned_start_hour" class="form-control" style="flex:1" onchange="updatePlannedTime()">
+                        <option value="">時</option>
+                        <?php for ($h = 6; $h <= 22; $h++): ?>
+                        <option value="<?= sprintf('%02d', $h) ?>" <?= $pstHour === sprintf('%02d', $h) ? 'selected' : '' ?>><?= sprintf('%02d', $h) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <span>:</span>
+                    <select name="planned_start_min" class="form-control" style="flex:1" onchange="updatePlannedTime()">
+                        <option value="">分</option>
+                        <?php foreach (array('00','15','30','45') as $mm): ?>
+                        <option value="<?= $mm ?>" <?= $pstMin === $mm ? 'selected' : '' ?>><?= $mm ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="hidden" name="planned_start_time" id="plannedStartTime" value="<?= e($case['planned_start_time'] ?? '') ?>">
+                </div>
+            </div>
+            <div class="form-group">
                 <label>施工時間起</label>
                 <input type="time" name="work_time_start" class="form-control" value="<?= e($case['work_time_start'] ?? '') ?>">
             </div>
