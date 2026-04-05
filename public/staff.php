@@ -26,6 +26,20 @@ switch ($action) {
         $branches = $model->getAllBranches();
         $appConfig = require __DIR__ . '/../config/app.php';
 
+        // 在職人數統計
+        $db = Database::getInstance();
+        $staffCounts = array('active' => 0, 'probation' => 0, 'suspended' => 0, 'resigned' => 0, 'total' => 0);
+        try {
+            $cntStmt = $db->query("SELECT employment_status, COUNT(*) as cnt FROM users WHERE employment_status IN ('active','probation','suspended') AND employee_id IS NOT NULL AND employee_id != '' GROUP BY employment_status");
+            foreach ($cntStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $key = $row['employment_status'];
+                if (isset($staffCounts[$key])) {
+                    $staffCounts[$key] = (int)$row['cnt'];
+                }
+            }
+            $staffCounts['total'] = $staffCounts['active'] + $staffCounts['probation'] + $staffCounts['suspended'];
+        } catch (Exception $e) {}
+
         $pageTitle = '人員管理';
         $currentPage = 'staff';
         require __DIR__ . '/../templates/layouts/header.php';

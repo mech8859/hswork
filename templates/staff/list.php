@@ -1,6 +1,16 @@
 <?php $skillsOnly = !Auth::hasPermission('staff.manage') && !Auth::hasPermission('staff.view') && Auth::hasPermission('staff_skills.manage'); ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
-    <h2>人員管理</h2>
+    <div class="d-flex align-center gap-1 flex-wrap">
+        <h2 style="margin:0">人員管理</h2>
+        <div class="d-flex gap-1" style="font-size:.8rem">
+            <span class="badge" style="background:#e8f5e9;color:#2e7d32;padding:4px 10px">在職 <?= $staffCounts['active'] ?></span>
+            <span class="badge" style="background:#fff3e0;color:#e65100;padding:4px 10px">試用 <?= $staffCounts['probation'] ?></span>
+            <?php if ($staffCounts['suspended'] > 0): ?>
+            <span class="badge" style="background:#fce4ec;color:#c62828;padding:4px 10px">留停 <?= $staffCounts['suspended'] ?></span>
+            <?php endif; ?>
+            <span class="badge" style="background:#e3f2fd;color:#1565c0;padding:4px 10px;font-weight:600">合計 <?= $staffCounts['total'] ?> 人</span>
+        </div>
+    </div>
     <div class="d-flex gap-1">
         <?php if (Auth::hasPermission('staff_skills.manage') || Auth::hasPermission('staff.manage')): ?>
         <a href="/staff.php?action=manage_skills" class="btn btn-outline btn-sm">技能管理</a>
