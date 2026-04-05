@@ -221,6 +221,13 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 </select>
             </div>
             <div class="form-group">
+                <label>是否已完工</label>
+                <select name="is_completed" class="form-control">
+                    <option value="0" <?= empty($case['is_completed']) ? 'selected' : '' ?>>未完工</option>
+                    <option value="1" <?= !empty($case['is_completed']) ? 'selected' : '' ?>>已完工</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>完工日期</label>
                 <input type="date" name="completion_date" class="form-control" value="<?= e($case['completion_date'] ?? '') ?>">
             </div>
@@ -600,7 +607,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             </div>
             <div class="form-group">
                 <label>是否含稅 <span class="tax-required-mark" style="<?= !empty($case['deal_amount']) ? '' : 'display:none' ?>">*</span></label>
-                <select name="is_tax_included" id="isTaxIncluded" class="form-control" <?= !empty($case['deal_amount']) ? 'required' : '' ?> onchange="document.getElementById('taxRow').style.display=this.value==='未稅(不開發票)'?'none':''">
+                <select name="is_tax_included" id="isTaxIncluded" class="form-control" <?= !empty($case['deal_amount']) ? 'required' : '' ?>>
                     <option value="">請選擇</option>
                     <option value="含稅(需開發票)" <?= ($case['is_tax_included'] ?? '') === '含稅(需開發票)' ? 'selected' : '' ?>>含稅(需開發票)</option>
                     <option value="未稅(不開發票)" <?= ($case['is_tax_included'] ?? '') === '未稅(不開發票)' ? 'selected' : '' ?>>未稅(不開發票)</option>
@@ -611,11 +618,11 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         <div class="form-row" id="taxRow" style="<?= ($case['is_tax_included'] ?? '') === '未稅(不開發票)' ? 'display:none' : '' ?>">
             <div class="form-group">
                 <label>稅金</label>
-                <input type="number" name="tax_amount" class="form-control" min="0" value="<?= e($case['tax_amount'] ?? '') ?>" placeholder="元">
+                <input type="text" name="tax_amount" class="form-control" value="<?= !empty($case['tax_amount']) ? number_format($case['tax_amount']) : '' ?>" placeholder="元">
             </div>
             <div class="form-group">
                 <label>含稅金額</label>
-                <input type="number" name="total_amount" class="form-control" min="0" value="<?= e($case['total_amount'] ?? '') ?>" placeholder="元">
+                <input type="text" name="total_amount" class="form-control" value="<?= !empty($case['total_amount']) ? number_format($case['total_amount']) : '' ?>" placeholder="元">
             </div>
         </div>
         <div class="form-row">
@@ -635,7 +642,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         <div class="form-row">
             <div class="form-group">
                 <label>尾款 <small style="color:#999">(自動計算)</small></label>
-                <input type="number" name="balance_amount" id="balanceInput" class="form-control" value="<?= e($case['balance_amount'] ?? '') ?>" readonly style="background:#f5f5f5">
+                <input type="text" name="balance_amount" id="balanceInput" class="form-control" value="<?= !empty($case['balance_amount']) ? number_format($case['balance_amount']) : '' ?>" readonly style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>完工金額 (含稅)</label>
@@ -750,7 +757,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         <?php else: ?>
         <div class="table-responsive">
             <table class="table" style="font-size:.9rem">
-                <thead><tr><th>日期</th><th>類別</th><th>方式</th><th class="text-right">金額</th><th>備註</th><th>憑證</th><?php if (Auth::canEditSection('finance')): ?><th>操作</th><?php endif; ?></tr></thead>
+                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">金額</th><th>備註</th><th style="width:50px">憑證</th><?php if (Auth::canEditSection('finance')): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
                 <tbody>
                     <?php $payTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; ?>
                     <tr style="cursor:pointer" onclick="openPaymentDetail(<?= $cp['id'] ?>)">
@@ -758,7 +765,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                         <td><span class="badge"><?= e($cp['payment_type'] ?: '-') ?></span></td>
                         <td><?= e($cp['transaction_type'] ?: '-') ?></td>
                         <td class="text-right" style="font-weight:600">$<?= number_format($cp['amount']) ?></td>
-                        <td style="white-space:pre-line;max-width:300px"><?= e($cp['note'] ?: '-') ?></td>
+                        <td style="white-space:pre-line"><?= e($cp['note'] ?: '-') ?></td>
                         <td><?php
                             $cpImages = array();
                             if ($cp['image_path']) {
@@ -1399,8 +1406,8 @@ var CASE_DATA = {
     caseId: <?= $case ? $case['id'] : 0 ?>
 };
 </script>
-<script src="/js/cases-form.js?v=20260403"></script>
 <script src="/js/tw_districts.js"></script>
+<script src="/js/cases-form.js?v=20260405e"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">
@@ -2062,49 +2069,7 @@ function saveNewCustomer() {
     xhr.send(fd);
 }
 
-// === 帳務資訊自動計算 ===
-(function() {
-    var taxSelect = document.querySelector('select[name="is_tax_included"]');
-    var dealInput = document.querySelector('input[name="deal_amount"]');
-    var taxInput = document.querySelector('input[name="tax_amount"]');
-    var totalInput = document.querySelector('input[name="total_amount"]');
-    var balanceInput = document.getElementById('balanceInput');
-    var totalCollectedDisplay = document.getElementById('totalCollectedDisplay');
-
-    if (!taxSelect || !dealInput || !taxInput || !totalInput) return;
-
-    // 成交金額有值時，是否含稅才必填
-    var taxMark = document.querySelector('.tax-required-mark');
-    dealInput.addEventListener('input', function() {
-        var hasAmount = this.value && parseInt(this.value) > 0;
-        taxSelect.required = hasAmount;
-        if (taxMark) taxMark.style.display = hasAmount ? '' : 'none';
-    });
-
-    function recalcFinance() {
-        var deal = parseInt(dealInput.value) || 0;
-        var taxVal = taxSelect.value;
-        var tax = 0;
-        var total = deal;
-
-        if (taxVal.indexOf('含稅') === 0 && taxVal.indexOf('免開發票') === -1) {
-            tax = Math.round(deal * 0.05);
-            total = deal + tax;
-        }
-
-        taxInput.value = tax || '';
-        totalInput.value = total || '';
-
-        // 尾款 = 含稅金額 - 總收款金額（總收款為 readonly，由後端計算）
-        if (balanceInput) {
-            var collected = totalCollectedDisplay ? (parseInt(totalCollectedDisplay.value) || 0) : 0;
-            balanceInput.value = total > 0 ? (total - collected) : '';
-        }
-    }
-
-    taxSelect.addEventListener('change', recalcFinance);
-    dealInput.addEventListener('input', recalcFinance);
-})();
+// 帳務計算已移至 cases-form.js
 </script>
 
 <!-- 新增客戶 Modal -->
@@ -2277,8 +2242,16 @@ function openPaymentDetail(id) {
         var methodEl = document.getElementById('pd_method');
         methodEl.value = d.transaction_type || '';
         if (!methodEl.value && d.transaction_type) {
+            var found = false;
             for (var i = 0; i < methodEl.options.length; i++) {
-                if (methodEl.options[i].value === d.transaction_type) { methodEl.selectedIndex = i; break; }
+                if (methodEl.options[i].value === d.transaction_type) { methodEl.selectedIndex = i; found = true; break; }
+            }
+            if (!found) {
+                var opt = document.createElement('option');
+                opt.value = d.transaction_type;
+                opt.textContent = d.transaction_type;
+                methodEl.appendChild(opt);
+                methodEl.value = d.transaction_type;
             }
         }
 

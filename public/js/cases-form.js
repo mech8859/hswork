@@ -531,24 +531,35 @@ function saveNewCustomer() {
         if (taxMark) taxMark.style.display = hasAmount ? '' : 'none';
     });
 
+    function parseNum(v) { return parseInt(String(v).replace(/,/g, '')) || 0; }
+    function fmtNum(n) { return n ? n.toLocaleString('en-US') : ''; }
+    function setNum(el, n) { if (!el) return; el.value = fmtNum(n); el.dataset.raw = n || ''; }
     function recalcFinance() {
-        var deal = parseInt(dealInput.value) || 0;
+        var deal = parseNum(dealInput.value);
         var taxVal = taxSelect.value;
-        var tax = 0;
-        var total = deal;
+        var taxRow = document.getElementById('taxRow');
+        var collected = totalCollectedDisplay ? parseNum(totalCollectedDisplay.value) : 0;
 
-        if (taxVal.indexOf('含稅') === 0 && taxVal.indexOf('免開發票') === -1) {
-            tax = Math.round(deal * 0.05);
-            total = deal + tax;
-        }
-
-        taxInput.value = tax || '';
-        totalInput.value = total || '';
-
-        // 尾款 = 含稅金額 - 總收款金額（總收款為 readonly，由後端計算）
-        if (balanceInput) {
-            var collected = totalCollectedDisplay ? (parseInt(totalCollectedDisplay.value) || 0) : 0;
-            balanceInput.value = total > 0 ? (total - collected) : '';
+        if (taxVal === '含稅(需開發票)') {
+            var tax = Math.round(deal * 0.05);
+            var total = deal + tax;
+            setNum(taxInput, tax);
+            setNum(totalInput, total);
+            if (taxRow) taxRow.style.display = '';
+            setNum(balanceInput, deal > 0 ? (total - collected) : 0);
+        } else if (taxVal === '含稅(免開發票)') {
+            var total = deal;
+            var untaxed = Math.round(deal / 1.05);
+            var tax = deal - untaxed;
+            setNum(taxInput, tax);
+            setNum(totalInput, total);
+            if (taxRow) taxRow.style.display = '';
+            setNum(balanceInput, deal > 0 ? (total - collected) : 0);
+        } else {
+            setNum(taxInput, 0);
+            setNum(totalInput, 0);
+            if (taxRow) taxRow.style.display = 'none';
+            setNum(balanceInput, deal > 0 ? (deal - collected) : 0);
         }
     }
 

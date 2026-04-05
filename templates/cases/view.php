@@ -72,6 +72,10 @@
             <span class="detail-value"><?= e($case['sales_name'] ?: '-') ?></span>
         </div>
         <div class="detail-item">
+            <span class="detail-label">是否已完工</span>
+            <span class="detail-value"><?= !empty($case['is_completed']) ? '<span class="badge badge-success">已完工</span>' : '<span class="badge badge-secondary">未完工</span>' ?></span>
+        </div>
+        <div class="detail-item">
             <span class="detail-label">完工日期</span>
             <span class="detail-value"><?= e($case['completion_date'] ?: '-') ?></span>
         </div>
