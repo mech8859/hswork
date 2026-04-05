@@ -156,7 +156,10 @@ class ReportModel
                    COALESCE(c.deposit_amount, 0) AS deposit_amount,
                    COALESCE(c.balance_amount, 0) AS balance_amount,
                    COALESCE(c.completion_amount, 0) AS completion_amount,
-                   COALESCE(c.total_collected, 0) AS total_collected
+                   COALESCE(c.total_collected, 0) AS total_collected,
+                   c.completion_date,
+                   c.case_number,
+                   c.customer_name
             FROM cases c
             JOIN branches b ON c.branch_id = b.id
             LEFT JOIN users u ON c.sales_id = u.id
@@ -372,6 +375,80 @@ class ReportModel
 
         $result['sales_receipt'] = $salesReceipt;
         $result['sales_receipt_count'] = $salesReceiptCount;
+
+        // 十五、案件進度交叉分析
+        $progressTargets = array(
+            'tracking'          => '待追蹤',
+            'awaiting_dispatch' => '待安排查修',
+            'incomplete'        => '未完工',
+            'closed'            => '已完工結案',
+            'unpaid'            => '完工未收款',
+        );
+        $progressCross = array();
+        foreach ($progressTargets as $pKey => $pLabel) {
+            $progressCross[$pKey] = array(
+                'label' => $pLabel,
+                'total' => 0,
+                'has_quote' => 0,
+                'is_completed' => 0,
+                'is_closed_deal' => 0,
+                'has_completion_date' => 0,
+                'has_deal_amount' => 0,
+                'no_deal_amount' => 0,
+                'no_balance' => 0,
+                'cases_total' => array(),
+                'cases_has_quote' => array(),
+                'cases_is_completed' => array(),
+                'cases_is_closed_deal' => array(),
+                'cases_has_completion_date' => array(),
+                'cases_has_deal_amount' => array(),
+                'cases_no_deal_amount' => array(),
+                'cases_no_balance' => array(),
+            );
+        }
+        foreach ($rows as $r) {
+            $pg = isset($r['status']) ? $r['status'] : '';
+            if (!isset($progressCross[$pg])) continue;
+            $caseInfo = array(
+                'id' => $r['id'],
+                'case_number' => isset($r['case_number']) ? $r['case_number'] : '',
+                'customer_name' => isset($r['customer_name']) ? $r['customer_name'] : '',
+                'quote_amount' => (float)$r['quote_amount'],
+                'deal_amount' => (float)$r['deal_amount'],
+                'total_amount' => (float)$r['total_amount'],
+                'balance_amount' => (float)$r['balance_amount'],
+                'sub_status' => $r['sub_status'],
+                'completion_date' => isset($r['completion_date']) ? $r['completion_date'] : '',
+            );
+            $progressCross[$pg]['total']++;
+            $progressCross[$pg]['cases_total'][] = $caseInfo;
+            if ($r['quote_amount'] > 0) {
+                $progressCross[$pg]['has_quote']++;
+                $progressCross[$pg]['cases_has_quote'][] = $caseInfo;
+            }
+            if (!empty($r['completion_date'])) {
+                $progressCross[$pg]['is_completed']++;
+                $progressCross[$pg]['cases_is_completed'][] = $caseInfo;
+                $progressCross[$pg]['has_completion_date']++;
+                $progressCross[$pg]['cases_has_completion_date'][] = $caseInfo;
+            }
+            if (in_array($r['sub_status'], $closedStatuses)) {
+                $progressCross[$pg]['is_closed_deal']++;
+                $progressCross[$pg]['cases_is_closed_deal'][] = $caseInfo;
+            }
+            if ($r['deal_amount'] > 0) {
+                $progressCross[$pg]['has_deal_amount']++;
+                $progressCross[$pg]['cases_has_deal_amount'][] = $caseInfo;
+            } else {
+                $progressCross[$pg]['no_deal_amount']++;
+                $progressCross[$pg]['cases_no_deal_amount'][] = $caseInfo;
+            }
+            if ($r['balance_amount'] <= 0) {
+                $progressCross[$pg]['no_balance']++;
+                $progressCross[$pg]['cases_no_balance'][] = $caseInfo;
+            }
+        }
+        $result['progress_cross'] = $progressCross;
 
         return $result;
     }
@@ -637,28 +714,104 @@ class ReportModel
             if (!isset($dailyNet[$d]['pay'][$bn])) $dailyNet[$d]['pay'][$bn] = 0;
             $dailyNet[$d]['pay'][$bn] += (float)$r['branch_amount'];
         }
-        // 銀行每日餘額
+        // 銀行每日餘額：每帳戶取當日最後一筆餘額，無交易則沿用前日
         $stmt = $this->db->prepare("
-            SELECT transaction_date, SUM(balance) AS total_balance
-            FROM (
-                SELECT transaction_date, bank_account, balance
-                FROM bank_transactions
-                WHERE transaction_date BETWEEN ? AND ?
-                ORDER BY transaction_date, id
-            ) sub
-            GROUP BY transaction_date
+            SELECT bank_account, transaction_date, balance, id
+            FROM bank_transactions
+            WHERE transaction_date BETWEEN ? AND ?
+            ORDER BY bank_account, transaction_date, id
         ");
         $stmt->execute(array($yearStart, $yearEnd));
-        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $d = $r['transaction_date'];
-            if (isset($dailyNet[$d])) {
-                $dailyNet[$d]['bank'] = (float)$r['total_balance'];
+        $bankDailyRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 取得年初前各帳戶最新餘額作為期初
+        $stmtInit = $this->db->prepare("
+            SELECT bank_account, balance FROM bank_transactions
+            WHERE transaction_date < ?
+            ORDER BY bank_account, transaction_date DESC, id DESC
+        ");
+        $stmtInit->execute(array($yearStart));
+        $acctBalance = array();
+        while ($ri = $stmtInit->fetch(PDO::FETCH_ASSOC)) {
+            if (!isset($acctBalance[$ri['bank_account']])) {
+                $acctBalance[$ri['bank_account']] = (float)$ri['balance'];
             }
+        }
+
+        // 每帳戶每日最後一筆餘額
+        $acctDayBal = array(); // [account][date] = balance
+        foreach ($bankDailyRaw as $r) {
+            $acctDayBal[$r['bank_account']][$r['transaction_date']] = (float)$r['balance'];
+        }
+
+        // 收集所有有收付或銀行交易的日期
+        $allDates = array_keys($dailyNet);
+        foreach ($acctDayBal as $acct => $dates) {
+            foreach (array_keys($dates) as $d) {
+                if (!in_array($d, $allDates)) $allDates[] = $d;
+            }
+        }
+        sort($allDates);
+
+        // 逐日計算所有帳戶餘額合計
+        foreach ($allDates as $d) {
+            // 更新各帳戶當日餘額
+            foreach ($acctDayBal as $acct => $dates) {
+                if (isset($dates[$d])) {
+                    $acctBalance[$acct] = $dates[$d];
+                }
+            }
+            $dayBankTotal = 0;
+            foreach ($acctBalance as $bal) {
+                $dayBankTotal += $bal;
+            }
+            if (!isset($dailyNet[$d])) {
+                $dailyNet[$d] = array('recv' => array(), 'pay' => array(), 'bank' => null, 'weekly_fund' => null);
+            }
+            $dailyNet[$d]['bank'] = $dayBankTotal;
         }
         ksort($dailyNet);
 
         $recvCount = count($recvRows);
         $payCount = count($payRows);
+
+        // ── 付款主分類月別分析 ──
+        $stmt = $this->db->prepare("
+            SELECT main_category, payment_date, total_amount
+            FROM payments_out
+            WHERE payment_date BETWEEN ? AND ?
+              AND main_category IS NOT NULL AND main_category != ''
+            ORDER BY payment_date
+        ");
+        $stmt->execute(array($yearStart, $yearEnd));
+        $catRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $payCategoryMonthly = array(); // [category][month] = amount
+        foreach ($catRows as $r) {
+            $cat = $r['main_category'];
+            $m = substr($r['payment_date'], 0, 7);
+            if (!isset($payCategoryMonthly[$cat])) $payCategoryMonthly[$cat] = array();
+            if (!isset($payCategoryMonthly[$cat][$m])) $payCategoryMonthly[$cat][$m] = 0;
+            $payCategoryMonthly[$cat][$m] += (float)$r['total_amount'];
+        }
+
+        // ── 付款廠商月別分析 ──
+        $stmt = $this->db->prepare("
+            SELECT vendor_name, payment_date, total_amount
+            FROM payments_out
+            WHERE payment_date BETWEEN ? AND ?
+              AND vendor_name IS NOT NULL AND vendor_name != ''
+            ORDER BY payment_date
+        ");
+        $stmt->execute(array($yearStart, $yearEnd));
+        $vendorRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $payVendorMonthly = array(); // [vendor][month] = amount
+        foreach ($vendorRows as $r) {
+            $v = $r['vendor_name'];
+            $m = substr($r['payment_date'], 0, 7);
+            if (!isset($payVendorMonthly[$v])) $payVendorMonthly[$v] = array();
+            if (!isset($payVendorMonthly[$v][$m])) $payVendorMonthly[$v][$m] = 0;
+            $payVendorMonthly[$v][$m] += (float)$r['total_amount'];
+        }
 
         return array(
             'year'           => $year,
@@ -682,6 +835,8 @@ class ReportModel
             'cash_monthly'   => $cashMonthly,
             'daily_net'      => $dailyNet,
             'branches'       => $branches,
+            'pay_category_monthly' => $payCategoryMonthly,
+            'pay_vendor_monthly'   => $payVendorMonthly,
         );
     }
 

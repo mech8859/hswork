@@ -2,6 +2,7 @@
 $months = isset($analysis['months']) ? $analysis['months'] : array();
 $nm = count($months);
 $branches = array('潭子分公司','員林分公司','清水分公司','東區電子鎖','清水電子鎖','中區專案部','中區管理處');
+$currentMonthPrefix = $analysis['year'] . '-' . date('m');
 
 // Helper: pivot row total
 function pivotRowTotal2($data, $months) {
@@ -445,10 +446,112 @@ function pivotRowTotal2($data, $months) {
 </div>
 <?php endif; ?>
 
+<!-- 六之一、每日帳務核對表 -->
+<?php if (!empty($analysis['daily_net'])): ?>
+<?php
+// 準備每日核對資料：前日銀行餘額 + 當日收款 - 當日付款 = 預期餘額，與實際銀行餘額比對
+$dailyCheck = $analysis['daily_net'];
+ksort($dailyCheck);
+$prevBank = null;
+$checkRows = array();
+foreach ($dailyCheck as $date => $dd) {
+    $dRecv = isset($dd['recv']) ? $dd['recv'] : array();
+    $dPay  = isset($dd['pay']) ? $dd['pay'] : array();
+    $dayRecv = 0;
+    foreach ($dRecv as $v) $dayRecv += $v;
+    $dayPay = 0;
+    foreach ($dPay as $v) $dayPay += $v;
+    $dayNet = $dayRecv - $dayPay;
+    $actualBank = isset($dd['bank']) ? $dd['bank'] : null;
+    $expected = null;
+    $diff = null;
+    if ($prevBank !== null) {
+        $expected = $prevBank + $dayRecv - $dayPay;
+        if ($actualBank !== null) {
+            $diff = $actualBank - $expected;
+        }
+    }
+    $checkRows[] = array(
+        'date' => $date,
+        'recv' => $dayRecv,
+        'pay'  => $dayPay,
+        'net'  => $dayNet,
+        'prev_bank' => $prevBank,
+        'expected' => $expected,
+        'actual' => $actualBank,
+        'diff' => $diff,
+    );
+    if ($actualBank !== null) {
+        $prevBank = $actualBank;
+    }
+}
+?>
+<div class="card">
+    <div class="card-header analysis-header d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px;">
+        <span>六之一、每日帳務核對表</span>
+        <div class="d-flex gap-1 align-center">
+            <select id="checkMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <option value="">全年</option>
+                <?php for ($m = 1; $m <= 12; $m++):
+                    $mv = $analysis['year'] . '-' . str_pad($m, 2, '0', STR_PAD_LEFT);
+                ?>
+                <option value="<?= $mv ?>" <?= $mv === $currentMonthPrefix ? 'selected' : '' ?>><?= $m ?>月</option>
+                <?php endfor; ?>
+            </select>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table" id="checkTable">
+            <thead><tr>
+                <th>日期</th>
+                <th>前日銀行餘額</th>
+                <th>當日收款(入帳)</th>
+                <th>當日付款</th>
+                <th>收支淨額</th>
+                <th>預期餘額</th>
+                <th>實際銀行餘額</th>
+                <th>差額</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($checkRows as $cr): ?>
+                <tr class="<?= ($cr['diff'] !== null && $cr['diff'] != 0) ? ($cr['diff'] > 0 ? 'check-warn-pos' : 'check-warn-neg') : '' ?>">
+                    <td style="text-align:left;"><?= e($cr['date']) ?></td>
+                    <td><?= $cr['prev_bank'] !== null ? number_format($cr['prev_bank']) : '-' ?></td>
+                    <td class="text-green"><?= $cr['recv'] > 0 ? number_format($cr['recv']) : '-' ?></td>
+                    <td class="text-red"><?= $cr['pay'] > 0 ? number_format($cr['pay']) : '-' ?></td>
+                    <td class="<?= $cr['net'] < 0 ? 'text-red' : ($cr['net'] > 0 ? 'text-green' : '') ?>"><?= $cr['net'] != 0 ? number_format($cr['net']) : '-' ?></td>
+                    <td><?= $cr['expected'] !== null ? number_format($cr['expected']) : '-' ?></td>
+                    <td><?= $cr['actual'] !== null ? number_format($cr['actual']) : '-' ?></td>
+                    <td class="<?= ($cr['diff'] !== null && $cr['diff'] != 0) ? ($cr['diff'] < 0 ? 'text-red' : 'text-green') : '' ?>" style="font-weight:700;">
+                        <?= $cr['diff'] !== null ? ($cr['diff'] != 0 ? number_format($cr['diff']) : '0') : '-' ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:8px 16px;font-size:.75rem;color:#888;">
+        * 預期餘額 = 前日銀行餘額 + 當日收款 - 當日付款　｜　差額 = 實際銀行餘額 - 預期餘額　｜　差額不為 0 表示有其他異動（手續費、內部轉帳等）
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- 七、每日收支差額總表 -->
 <?php if (!empty($analysis['daily_net'])): ?>
 <div class="card">
-    <div class="card-header analysis-header">七、每日收支差額總表</div>
+    <div class="card-header analysis-header d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px;">
+        <span>七、每日收支差額總表</span>
+        <div class="d-flex gap-1 align-center">
+            <select id="dailyMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <option value="">全年</option>
+                <?php for ($m = 1; $m <= 12; $m++):
+                    $mv = $analysis['year'] . '-' . str_pad($m, 2, '0', STR_PAD_LEFT);
+                ?>
+                <option value="<?= $mv ?>" <?= $mv === $currentMonthPrefix ? 'selected' : '' ?>><?= $m ?>月</option>
+                <?php endfor; ?>
+            </select>
+        </div>
+    </div>
     <div class="table-responsive">
         <table class="table table-sm analysis-table">
             <thead><tr>
@@ -504,6 +607,161 @@ function pivotRowTotal2($data, $months) {
                     <td><?= $dayWF > 0 ? number_format($dayWF) : '' ?></td>
                 </tr>
                 <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 八、付款主分類分析 -->
+<?php if (!empty($analysis['pay_category_monthly'])): ?>
+<?php
+$payCatData = $analysis['pay_category_monthly'];
+// 彙整所有月份
+$catMonthSet = array();
+foreach ($payCatData as $cat => $mArr) {
+    foreach (array_keys($mArr) as $m) $catMonthSet[$m] = true;
+}
+$catMonths = array_keys($catMonthSet);
+sort($catMonths);
+?>
+<div class="card">
+    <div class="card-header analysis-header d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px;">
+        <span>八、付款主分類分析</span>
+        <div class="d-flex gap-1 align-center">
+            <select id="catMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <?php foreach ($catMonths as $cm): ?>
+                <option value="<?= $cm ?>" <?= $cm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($cm,5,2) ?>月</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table" id="catTable">
+            <thead><tr>
+                <th style="text-align:left;">主分類</th>
+                <th>金額</th>
+                <th>比例</th>
+                <th>比例圖</th>
+            </tr></thead>
+            <tbody>
+            <?php
+            // 預設顯示當月，JS 會切換
+            foreach ($catMonths as $cm):
+                // 該月各分類金額
+                $catList = array();
+                $monthTotal = 0;
+                foreach ($payCatData as $cat => $mArr) {
+                    $amt = isset($mArr[$cm]) ? $mArr[$cm] : 0;
+                    if ($amt > 0) {
+                        $catList[] = array('name' => $cat, 'amount' => $amt);
+                        $monthTotal += $amt;
+                    }
+                }
+                usort($catList, function($a, $b) { return $b['amount'] - $a['amount']; });
+                foreach ($catList as $cl):
+                    $pct = $monthTotal > 0 ? round($cl['amount'] / $monthTotal * 100, 1) : 0;
+            ?>
+                <tr data-month="<?= $cm ?>">
+                    <td style="text-align:left;"><?= e($cl['name']) ?></td>
+                    <td><?= number_format($cl['amount']) ?></td>
+                    <td><?= $pct ?>%</td>
+                    <td style="text-align:left;"><div style="background:#4472C4;height:16px;width:<?= min($pct, 100) ?>%;border-radius:3px;"></div></td>
+                </tr>
+            <?php endforeach; ?>
+                <tr data-month="<?= $cm ?>" class="row-total">
+                    <td style="text-align:left;">合計</td>
+                    <td><?= number_format($monthTotal) ?></td>
+                    <td>100%</td>
+                    <td></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 九、付款廠商 Top 15 分析 -->
+<?php if (!empty($analysis['pay_vendor_monthly'])): ?>
+<?php
+$payVendorData = $analysis['pay_vendor_monthly'];
+$vendorMonthSet = array();
+foreach ($payVendorData as $v => $mArr) {
+    foreach (array_keys($mArr) as $m) $vendorMonthSet[$m] = true;
+}
+$vendorMonths = array_keys($vendorMonthSet);
+sort($vendorMonths);
+?>
+<div class="card">
+    <div class="card-header analysis-header d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px;">
+        <span>九、付款廠商 Top 15 分析</span>
+        <div class="d-flex gap-1 align-center">
+            <select id="vendorMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <?php foreach ($vendorMonths as $vm): ?>
+                <option value="<?= $vm ?>" <?= $vm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($vm,5,2) ?>月</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table" id="vendorTable">
+            <thead><tr>
+                <th style="text-align:left;">排名</th>
+                <th style="text-align:left;">廠商名稱</th>
+                <th>金額</th>
+                <th>比例</th>
+                <th>比例圖</th>
+            </tr></thead>
+            <tbody>
+            <?php
+            foreach ($vendorMonths as $vm):
+                $vendorList = array();
+                $vendorMonthTotal = 0;
+                foreach ($payVendorData as $v => $mArr) {
+                    $amt = isset($mArr[$vm]) ? $mArr[$vm] : 0;
+                    if ($amt > 0) {
+                        $vendorList[] = array('name' => $v, 'amount' => $amt);
+                        $vendorMonthTotal += $amt;
+                    }
+                }
+                usort($vendorList, function($a, $b) { return $b['amount'] - $a['amount']; });
+                // 取前15，但比例用全部廠商總額算
+                $top15 = array_slice($vendorList, 0, 15);
+                $rank = 0;
+                foreach ($top15 as $vl):
+                    $rank++;
+                    $pct = $vendorMonthTotal > 0 ? round($vl['amount'] / $vendorMonthTotal * 100, 1) : 0;
+            ?>
+                <tr data-month="<?= $vm ?>">
+                    <td style="text-align:left;"><?= $rank ?></td>
+                    <td style="text-align:left;"><?= e($vl['name']) ?></td>
+                    <td><?= number_format($vl['amount']) ?></td>
+                    <td><?= $pct ?>%</td>
+                    <td style="text-align:left;"><div style="background:#ED7D31;height:16px;width:<?= min($pct * 2, 100) ?>%;border-radius:3px;"></div></td>
+                </tr>
+            <?php endforeach; ?>
+                <?php
+                $top15Total = 0;
+                foreach ($top15 as $vl) $top15Total += $vl['amount'];
+                $otherTotal = $vendorMonthTotal - $top15Total;
+                $otherPct = $vendorMonthTotal > 0 ? round($otherTotal / $vendorMonthTotal * 100, 1) : 0;
+                ?>
+                <tr data-month="<?= $vm ?>" style="color:#888;">
+                    <td></td>
+                    <td style="text-align:left;">其他廠商</td>
+                    <td><?= number_format($otherTotal) ?></td>
+                    <td><?= $otherPct ?>%</td>
+                    <td></td>
+                </tr>
+                <tr data-month="<?= $vm ?>" class="row-total">
+                    <td></td>
+                    <td style="text-align:left;">合計（全部廠商）</td>
+                    <td><?= number_format($vendorMonthTotal) ?></td>
+                    <td>100%</td>
+                    <td></td>
+                </tr>
+            <?php endforeach; ?>
             </tbody>
         </table>
     </div>
@@ -573,6 +831,8 @@ function pivotRowTotal2($data, $months) {
 /* Text colors */
 .text-red { color: #C00000 !important; font-weight: 600; }
 .text-green { color: #375623 !important; font-weight: 600; }
+.check-warn-neg td { background: #FCE4D6 !important; }
+.check-warn-pos td { background: #E2EFDA !important; }
 
 /* Reuse analysis styles from case_analysis */
 .analysis-summary { font-size: .85rem; color: var(--gray-500); display: flex; gap: 16px; flex-wrap: wrap; }
@@ -613,3 +873,59 @@ function pivotRowTotal2($data, $months) {
     }
 }
 </style>
+
+<script>
+(function(){
+    // 日期前綴篩選（六之一、七）
+    function bindDateFilter(selectId) {
+        var sel = document.getElementById(selectId);
+        if (!sel) return;
+        sel.addEventListener('change', function(){
+            var prefix = this.value;
+            var table = this.closest('.card').querySelector('.analysis-table');
+            if (!table) return;
+            var rows = table.querySelectorAll('tbody tr');
+            for (var i = 0; i < rows.length; i++) {
+                var dateCell = rows[i].cells[0];
+                if (!dateCell) continue;
+                var dateText = dateCell.textContent.trim();
+                if (!prefix || dateText.indexOf(prefix) === 0) {
+                    rows[i].style.display = '';
+                } else {
+                    rows[i].style.display = 'none';
+                }
+            }
+        });
+    }
+    // data-month 屬性篩選（八、九）
+    function bindDataMonthFilter(selectId) {
+        var sel = document.getElementById(selectId);
+        if (!sel) return;
+        sel.addEventListener('change', function(){
+            var val = this.value;
+            var table = this.closest('.card').querySelector('.analysis-table');
+            if (!table) return;
+            var rows = table.querySelectorAll('tbody tr[data-month]');
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].style.display = (rows[i].getAttribute('data-month') === val) ? '' : 'none';
+            }
+        });
+    }
+
+    bindDateFilter('checkMonthFilter');
+    bindDateFilter('dailyMonthFilter');
+    bindDataMonthFilter('catMonthFilter');
+    bindDataMonthFilter('vendorMonthFilter');
+
+    // 頁面載入時自動觸發篩選（預設當月）
+    var ids = ['checkMonthFilter','dailyMonthFilter','catMonthFilter','vendorMonthFilter'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el && el.value) {
+            var e = document.createEvent('HTMLEvents');
+            e.initEvent('change', true, false);
+            el.dispatchEvent(e);
+        }
+    }
+})();
+</script>

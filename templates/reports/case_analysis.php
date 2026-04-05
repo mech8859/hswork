@@ -783,6 +783,58 @@ $grandClosed = array_sum($typeTotalsClosed);
 </div>
 <?php endif; ?>
 
+<!-- 十五、案件進度交叉分析 -->
+<?php if (!empty($analysis['progress_cross'])): ?>
+<div class="card">
+    <div class="card-header analysis-header">十五、案件進度狀態交叉分析</div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>進度</th>
+                <th>筆數</th>
+                <th>有報價金額</th>
+                <th>已完工</th>
+                <th>已成交</th>
+                <th>有完工日期</th>
+                <th>有成交金額</th>
+                <th>無成交金額</th>
+                <th>無尾款</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($analysis['progress_cross'] as $pKey => $pc):
+                if ($pc['total'] == 0) continue;
+            ?>
+                <tr>
+                    <td style="text-align:left;font-weight:600;"><?= e($pc['label']) ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_total','<?= e($pc['label']) ?> - 全部')"><?= $pc['total'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_has_quote','<?= e($pc['label']) ?> - 有報價金額')"><?= $pc['has_quote'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_is_completed','<?= e($pc['label']) ?> - 已完工')"><?= $pc['is_completed'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_is_closed_deal','<?= e($pc['label']) ?> - 已成交')"><?= $pc['is_closed_deal'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_has_completion_date','<?= e($pc['label']) ?> - 有完工日期')"><?= $pc['has_completion_date'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_has_deal_amount','<?= e($pc['label']) ?> - 有成交金額')"><?= $pc['has_deal_amount'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_no_deal_amount','<?= e($pc['label']) ?> - 無成交金額')"><?= $pc['no_deal_amount'] ?></td>
+                    <td class="drillable" onclick="showProgressCases('<?= $pKey ?>','cases_no_balance','<?= e($pc['label']) ?> - 無尾款')"><?= $pc['no_balance'] ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:8px 16px;font-size:.75rem;color:#888;">* 點擊數字可查看該批案件明細</div>
+</div>
+<!-- 進度交叉分析明細 -->
+<div id="progressDrillPanel" style="display:none">
+    <div class="card" style="margin-top:-8px;border-top:3px solid var(--primary);background:#fafbff">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #e0e0e0">
+            <strong id="progressDrillTitle" style="font-size:.9rem;color:var(--primary)">明細</strong>
+            <button class="btn btn-sm" style="padding:2px 10px;font-size:1.1rem;line-height:1;background:none;color:#999" onclick="document.getElementById('progressDrillPanel').style.display='none'">&times;</button>
+        </div>
+        <div style="padding:8px 12px;overflow-x:auto">
+            <div id="progressDrillResult"></div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php endif; ?>
 
 <!-- 鑽取明細（內嵌在卡片下方）-->
@@ -821,6 +873,44 @@ td.drillable:hover { background: #e3f2fd !important; text-decoration: underline;
 
 <script>
 var drillYear = <?= json_encode($analysis['year']) ?>;
+
+// 十五、進度交叉分析資料
+var progressCrossData = <?= json_encode(isset($analysis['progress_cross']) ? $analysis['progress_cross'] : array()) ?>;
+
+function showProgressCases(progressKey, caseKey, title) {
+    var panel = document.getElementById('progressDrillPanel');
+    var titleEl = document.getElementById('progressDrillTitle');
+    var resultEl = document.getElementById('progressDrillResult');
+    if (!panel) return;
+    titleEl.textContent = title;
+    var data = progressCrossData[progressKey];
+    if (!data || !data[caseKey] || data[caseKey].length === 0) {
+        resultEl.innerHTML = '<p style="color:#999;text-align:center;padding:16px">無資料</p>';
+        panel.style.display = '';
+        panel.scrollIntoView({behavior:'smooth', block:'start'});
+        return;
+    }
+    var cases = data[caseKey];
+    var html = '<table class="table table-sm" style="font-size:.8rem;"><thead><tr>';
+    html += '<th>案件編號</th><th>客戶名稱</th><th>報價金額</th><th>成交金額</th><th>尾款</th><th>狀態</th><th>完工日期</th>';
+    html += '</tr></thead><tbody>';
+    for (var i = 0; i < cases.length; i++) {
+        var c = cases[i];
+        html += '<tr>';
+        html += '<td><a href="/cases.php?action=view&id=' + c.id + '" target="_blank" style="color:var(--primary);text-decoration:underline;">' + escHtml(c.case_number || '-') + '</a></td>';
+        html += '<td>' + escHtml(c.customer_name || '-') + '</td>';
+        html += '<td style="text-align:right">' + (c.quote_amount > 0 ? Number(c.quote_amount).toLocaleString() : '-') + '</td>';
+        html += '<td style="text-align:right">' + (c.deal_amount > 0 ? Number(c.deal_amount).toLocaleString() : '-') + '</td>';
+        html += '<td style="text-align:right">' + (c.balance_amount > 0 ? Number(c.balance_amount).toLocaleString() : '-') + '</td>';
+        html += '<td>' + escHtml(c.sub_status || '-') + '</td>';
+        html += '<td>' + escHtml(c.completion_date || '-') + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    resultEl.innerHTML = html;
+    panel.style.display = '';
+    panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
 
 function drillDown(type, month, salesName, label, statusVal) {
     var inline = document.getElementById('drillInline');
