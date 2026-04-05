@@ -84,6 +84,132 @@ $newEntry = 0; $newClosed = 0;
     </div>
 </div>
 
+<!-- 一之二、未完工與完工未收款 未收餘額月份統計 -->
+<?php
+$wipDb = Database::getInstance();
+$wipYear = $analysis['year'];
+$wipBranches = implode(',', array_map('intval', $branchIds));
+
+// 未完工：依成交月份統計未收餘額（用 balance_amount，不限年份）
+$wipMonthly = array();
+$unpaidMonthly = array();
+foreach ($months as $m) {
+    $wipMonthly[$m] = array('cnt' => 0, 'balance' => 0);
+    $unpaidMonthly[$m] = array('cnt' => 0, 'balance' => 0);
+}
+// 去年以前的歸入「以前」
+$wipBefore = array('cnt' => 0, 'balance' => 0);
+$unpaidBefore = array('cnt' => 0, 'balance' => 0);
+
+$wipMStmt = $wipDb->query("
+    SELECT DATE_FORMAT(deal_date, '%Y-%m') as ym, COUNT(*) as cnt,
+           COALESCE(SUM(balance_amount), 0) as balance
+    FROM cases WHERE status = 'incomplete' AND branch_id IN ({$wipBranches})
+    AND deal_date IS NOT NULL
+    GROUP BY ym
+");
+foreach ($wipMStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    if (isset($wipMonthly[$r['ym']])) {
+        $wipMonthly[$r['ym']] = array('cnt' => (int)$r['cnt'], 'balance' => (int)$r['balance']);
+    } elseif ($r['ym'] < $months[0]) {
+        $wipBefore['cnt'] += (int)$r['cnt'];
+        $wipBefore['balance'] += (int)$r['balance'];
+    }
+}
+
+$unpaidMStmt = $wipDb->query("
+    SELECT DATE_FORMAT(deal_date, '%Y-%m') as ym, COUNT(*) as cnt,
+           COALESCE(SUM(balance_amount), 0) as balance
+    FROM cases WHERE status = 'unpaid' AND branch_id IN ({$wipBranches})
+    AND deal_date IS NOT NULL
+    GROUP BY ym
+");
+foreach ($unpaidMStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    if (isset($unpaidMonthly[$r['ym']])) {
+        $unpaidMonthly[$r['ym']] = array('cnt' => (int)$r['cnt'], 'balance' => (int)$r['balance']);
+    } elseif ($r['ym'] < $months[0]) {
+        $unpaidBefore['cnt'] += (int)$r['cnt'];
+        $unpaidBefore['balance'] += (int)$r['balance'];
+    }
+}
+
+// 無成交日期的
+$wipNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(balance_amount), 0) as balance FROM cases WHERE status = 'incomplete' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
+$unpaidNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(balance_amount), 0) as balance FROM cases WHERE status = 'unpaid' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
+?>
+<div class="card">
+    <div class="card-header analysis-header">未完工 與 完工未收款 未收餘額</div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <?php
+            // 當前月份（還沒到的月份不顯示）
+            $currentMonth = date('Y-m');
+            ?>
+            <thead><tr>
+                <th>統計項目</th>
+                <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+            </tr></thead>
+            <tbody>
+                <?php
+                // 未完工累加
+                $wipAcc = $wipBefore['balance'] + (int)$wipNoDate['balance'];
+                $wipFinal = $wipAcc;
+                ?>
+                <tr>
+                    <td style="font-weight:600">未完工</td>
+                    <?php foreach ($months as $m):
+                        $wipAcc += $wipMonthly[$m]['balance'];
+                        if ($m <= $currentMonth):
+                            $wipFinal = $wipAcc;
+                    ?>
+                    <td style="<?= $wipAcc > 0 ? 'color:#e53935' : '' ?>"><?= $wipAcc != 0 ? number_format($wipAcc) : '0' ?></td>
+                    <?php else: ?>
+                    <td></td>
+                    <?php endif; endforeach; ?>
+                    <td class="col-total" style="color:#e53935;font-weight:600">$<?= number_format($wipFinal) ?></td>
+                </tr>
+                <?php
+                // 完工未收款累加
+                $unpaidAcc = $unpaidBefore['balance'] + (int)$unpaidNoDate['balance'];
+                $unpaidFinal = $unpaidAcc;
+                ?>
+                <tr>
+                    <td style="font-weight:600">完工未收款</td>
+                    <?php foreach ($months as $m):
+                        $unpaidAcc += $unpaidMonthly[$m]['balance'];
+                        if ($m <= $currentMonth):
+                            $unpaidFinal = $unpaidAcc;
+                    ?>
+                    <td style="<?= $unpaidAcc > 0 ? 'color:#e53935' : '' ?>"><?= $unpaidAcc != 0 ? number_format($unpaidAcc) : '0' ?></td>
+                    <?php else: ?>
+                    <td></td>
+                    <?php endif; endforeach; ?>
+                    <td class="col-total" style="color:#e53935;font-weight:600">$<?= number_format($unpaidFinal) ?></td>
+                </tr>
+                <?php
+                // 合計累加
+                $totalAcc = $wipBefore['balance'] + $unpaidBefore['balance'] + (int)$wipNoDate['balance'] + (int)$unpaidNoDate['balance'];
+                $totalFinal = $totalAcc;
+                ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <?php foreach ($months as $m):
+                        $totalAcc += $wipMonthly[$m]['balance'] + $unpaidMonthly[$m]['balance'];
+                        if ($m <= $currentMonth):
+                            $totalFinal = $totalAcc;
+                    ?>
+                    <td style="color:#e53935;font-weight:600"><?= $totalAcc != 0 ? number_format($totalAcc) : '0' ?></td>
+                    <?php else: ?>
+                    <td></td>
+                    <?php endif; endforeach; ?>
+                    <td class="col-total" style="color:#e53935;font-weight:600">$<?= number_format($totalFinal) ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 二、各案別 各月數量統計 -->
 <?php
 $allTypes = array_merge(array('new_install'), $otherTypes);

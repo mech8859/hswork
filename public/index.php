@@ -38,6 +38,24 @@ $currentPage = 'dashboard';
 $user = Auth::user();
 $db = Database::getInstance();
 $branchIds = Auth::getAccessibleBranchIds();
+
+// 每日自動備份到 Google Drive（boss 登入觸發，每天最多一次）
+if ($user['role'] === 'boss') {
+    $backupLock = __DIR__ . '/../data/backup_last_date.txt';
+    $today = date('Y-m-d');
+    $lastDate = file_exists($backupLock) ? trim(file_get_contents($backupLock)) : '';
+    if ($lastDate !== $today) {
+        file_put_contents($backupLock, $today);
+        // 非同步觸發備份（不等待完成）
+        $backupUrl = 'https://hswork.com.tw/cron_backup.php?key=hswork_backup_2026_secret';
+        $ch = curl_init($backupUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+}
 $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
 
 // 統計資料
