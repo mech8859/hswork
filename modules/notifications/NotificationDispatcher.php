@@ -46,25 +46,16 @@ class NotificationDispatcher
                 : null;
             $recordId = isset($record['id']) ? $record['id'] : null;
 
-            if ($rule['notify_type'] === 'role') {
-                $ids = $notifModel->sendToRole(
-                    $rule['notify_target'],
-                    $branchId,
-                    $type,
-                    $title,
-                    $message,
-                    $link,
-                    $module,
-                    $recordId,
-                    $actorId
-                );
-                $sentIds = array_merge($sentIds, $ids);
-            } elseif ($rule['notify_type'] === 'field') {
-                $fieldName = $rule['notify_target'];
-                $targetUserId = isset($record[$fieldName]) ? (int)$record[$fieldName] : 0;
-                if ($targetUserId > 0 && $targetUserId != $actorId) {
-                    $id = $notifModel->send(
-                        $targetUserId,
+            // 支援多目標（逗號分隔）
+            $targets = explode(',', $rule['notify_target']);
+            foreach ($targets as $target) {
+                $target = trim($target);
+                if (empty($target)) continue;
+
+                if ($rule['notify_type'] === 'role') {
+                    $ids = $notifModel->sendToRole(
+                        $target,
+                        $branchId,
                         $type,
                         $title,
                         $message,
@@ -73,7 +64,22 @@ class NotificationDispatcher
                         $recordId,
                         $actorId
                     );
-                    $sentIds[] = $id;
+                    $sentIds = array_merge($sentIds, $ids);
+                } elseif ($rule['notify_type'] === 'field') {
+                    $targetUserId = isset($record[$target]) ? (int)$record[$target] : 0;
+                    if ($targetUserId > 0 && $targetUserId != $actorId) {
+                        $id = $notifModel->send(
+                            $targetUserId,
+                            $type,
+                            $title,
+                            $message,
+                            $link,
+                            $module,
+                            $recordId,
+                            $actorId
+                        );
+                        $sentIds[] = $id;
+                    }
                 }
             }
         }

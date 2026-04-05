@@ -20,6 +20,20 @@ foreach ($registry as $mv) {
         }
     }
 }
+
+// 條件值 key=>label map（所有模組合併）
+$condValueLabels = array();
+foreach ($registry as $mv) {
+    if (!empty($mv['condition_fields'])) {
+        foreach ($mv['condition_fields'] as $cf) {
+            if (!empty($cf['values']) && !is_int(key($cf['values']))) {
+                foreach ($cf['values'] as $vk => $vl) {
+                    $condValueLabels[$vk] = $vl;
+                }
+            }
+        }
+    }
+}
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>通知設定</h2>
@@ -81,12 +95,14 @@ foreach ($registry as $mv) {
                 </select>
             </div>
             <div class="form-group">
-                <label>通知對象 <span class="text-danger">*</span></label>
-                <select name="notify_target" id="addNotifyTarget" class="form-control" required>
+                <label>通知對象 <span class="text-danger">*</span>（可多選）</label>
+                <div id="addNotifyTarget" class="notify-target-checkboxes" style="border:1px solid #ddd;border-radius:6px;padding:8px;max-height:160px;overflow-y:auto">
                     <?php foreach ($roles as $r): ?>
-                    <option value="<?= e($r['role_key']) ?>"><?= e($r['role_label']) ?></option>
+                    <label style="display:block;padding:3px 0;font-size:.85rem;cursor:pointer">
+                        <input type="checkbox" name="notify_target[]" value="<?= e($r['role_key']) ?>"> <?= e($r['role_label']) ?>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
         </div>
         <div class="form-grid-2 mb-1">
@@ -150,17 +166,25 @@ foreach ($registry as $mv) {
                 <td><?= e(isset($eventLabels[$rule['event']]) ? $eventLabels[$rule['event']] : $rule['event']) ?></td>
                 <td>
                     <?php if ($rule['condition_field']): ?>
-                        <code><?= e($rule['condition_field']) ?></code> = <strong><?= e($rule['condition_value']) ?></strong>
+                        <?php $cvLabel = isset($condValueLabels[$rule['condition_value']]) ? $condValueLabels[$rule['condition_value']] : $rule['condition_value']; ?>
+                        <code><?= e($rule['condition_field']) ?></code> = <strong><?= e($cvLabel) ?></strong>
                     <?php else: ?>
                         <span class="text-muted">--</span>
                     <?php endif; ?>
                 </td>
                 <td>
-                    <?php if ($rule['notify_type'] === 'role'): ?>
-                        <span class="badge badge-primary"><?= e(isset($roleMap[$rule['notify_target']]) ? $roleMap[$rule['notify_target']] : $rule['notify_target']) ?></span>
+                    <?php
+                    $targets = explode(',', $rule['notify_target']);
+                    foreach ($targets as $t):
+                        $t = trim($t);
+                        if (!$t) continue;
+                        if ($rule['notify_type'] === 'role'):
+                    ?>
+                        <span class="badge badge-primary" style="margin:1px"><?= e(isset($roleMap[$t]) ? $roleMap[$t] : $t) ?></span>
                     <?php else: ?>
-                        <span class="badge badge-warning"><?= e(isset($allFieldLabels[$rule['notify_target']]) ? $allFieldLabels[$rule['notify_target']] : $rule['notify_target']) ?></span>
+                        <span class="badge badge-warning" style="margin:1px"><?= e(isset($allFieldLabels[$t]) ? $allFieldLabels[$t] : $t) ?></span>
                     <?php endif; ?>
+                    <?php endforeach; ?>
                 </td>
                 <td><?= $rule['branch_scope'] === 'same' ? '同分公司' : '全部' ?></td>
                 <td title="<?= e($rule['message_template']) ?>"><?= e($rule['title_template']) ?></td>
@@ -192,9 +216,8 @@ foreach ($registry as $mv) {
 </div>
 
 <!-- 編輯 Modal -->
-<div id="editModal" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="closeEditModal()"></div>
-    <div class="modal-content" style="max-width:700px">
+<div id="editModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:flex-start;padding-top:5vh" onclick="if(event.target===this)closeEditModal()">
+    <div style="width:90%;max-width:800px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:85vh;overflow-y:auto;padding:24px">
         <div class="modal-header">
             <h3>編輯通知規則</h3>
             <button class="modal-close" onclick="closeEditModal()">&times;</button>
@@ -239,8 +262,8 @@ foreach ($registry as $mv) {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>通知對象</label>
-                        <select name="notify_target" id="editNotifyTarget" class="form-control" required></select>
+                        <label>通知對象（可多選）</label>
+                        <div id="editNotifyTarget" class="notify-target-checkboxes" style="border:1px solid #ddd;border-radius:6px;padding:8px;max-height:160px;overflow-y:auto"></div>
                     </div>
                 </div>
                 <div class="form-grid-2 mb-1">
@@ -329,40 +352,50 @@ function onCondFieldChange(sel, prefix) {
     cvSel.innerHTML = '<option value="">--</option>';
     if (field && registry[mod] && registry[mod].condition_fields && registry[mod].condition_fields[field]) {
         var vals = registry[mod].condition_fields[field].values;
-        for (var i = 0; i < vals.length; i++) {
-            var o = document.createElement('option');
-            o.value = vals[i];
-            o.textContent = vals[i];
-            cvSel.appendChild(o);
+        if (Array.isArray(vals)) {
+            for (var i = 0; i < vals.length; i++) {
+                var o = document.createElement('option');
+                o.value = vals[i];
+                o.textContent = vals[i];
+                cvSel.appendChild(o);
+            }
+        } else {
+            var keys = Object.keys(vals);
+            for (var i = 0; i < keys.length; i++) {
+                var o = document.createElement('option');
+                o.value = keys[i];
+                o.textContent = vals[keys[i]];
+                cvSel.appendChild(o);
+            }
         }
     }
 }
 
 function onNotifyTypeChange(sel, prefix) {
-    var type = sel.value;
-    var targetSel = document.getElementById(prefix + 'NotifyTarget');
-    targetSel.innerHTML = '';
+    var type = sel ? sel.value : document.getElementById(prefix + 'NotifyType').value;
+    var container = document.getElementById(prefix + 'NotifyTarget');
+    var formName = (prefix === 'edit') ? 'edit_notify_target[]' : 'notify_target[]';
+    container.innerHTML = '';
     if (type === 'role') {
         for (var i = 0; i < allRoles.length; i++) {
-            var o = document.createElement('option');
-            o.value = allRoles[i].role_key;
-            o.textContent = allRoles[i].role_label;
-            targetSel.appendChild(o);
+            var label = document.createElement('label');
+            label.style = 'display:block;padding:3px 0;font-size:.85rem;cursor:pointer';
+            label.innerHTML = '<input type="checkbox" name="' + formName + '" value="' + allRoles[i].role_key + '"> ' + allRoles[i].role_label;
+            container.appendChild(label);
         }
     } else {
         var mod = document.getElementById(prefix + 'Module').value;
         var fields = (registry[mod] && registry[mod].record_fields) ? registry[mod].record_fields : {};
+        var hasFields = false;
         for (var fk in fields) {
-            var o = document.createElement('option');
-            o.value = fk;
-            o.textContent = fields[fk];
-            targetSel.appendChild(o);
+            hasFields = true;
+            var label = document.createElement('label');
+            label.style = 'display:block;padding:3px 0;font-size:.85rem;cursor:pointer';
+            label.innerHTML = '<input type="checkbox" name="' + formName + '" value="' + fk + '"> ' + fields[fk];
+            container.appendChild(label);
         }
-        if (targetSel.options.length === 0) {
-            var o = document.createElement('option');
-            o.value = '';
-            o.textContent = '此模組無可用欄位';
-            targetSel.appendChild(o);
+        if (!hasFields) {
+            container.innerHTML = '<span style="color:#999;font-size:.85rem">此模組無可用欄位</span>';
         }
     }
 }
@@ -400,10 +433,15 @@ function editRule(id) {
         document.getElementById('editCondValue').value = rule.condition_value || '';
     }
 
-    // 設定通知對象
+    // 設定通知對象（支援多選）
     document.getElementById('editNotifyType').value = rule.notify_type;
-    onNotifyTypeChange(document.getElementById('editNotifyType'), 'edit');
-    document.getElementById('editNotifyTarget').value = rule.notify_target;
+    onNotifyTypeChange(null, 'edit');
+    // 勾選已選的目標（逗號分隔）
+    var targets = (rule.notify_target || '').split(',');
+    var checkboxes = document.querySelectorAll('#editNotifyTarget input[type="checkbox"]');
+    for (var c = 0; c < checkboxes.length; c++) {
+        checkboxes[c].checked = targets.indexOf(checkboxes[c].value) !== -1;
+    }
 
     document.getElementById('editBranchScope').value = rule.branch_scope;
     document.getElementById('editSortOrder').value = rule.sort_order || 0;
@@ -423,7 +461,15 @@ function saveEdit(e) {
     var form = document.getElementById('editForm');
     var fd = new FormData(form);
     var body = [];
-    fd.forEach(function(v, k) { body.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); });
+    // 收集多選通知對象
+    var targets = [];
+    var cbs = document.querySelectorAll('#editNotifyTarget input[type="checkbox"]:checked');
+    for (var i = 0; i < cbs.length; i++) targets.push(cbs[i].value);
+    fd.forEach(function(v, k) {
+        if (k === 'edit_notify_target[]') return; // 跳過，用下面的合併值
+        body.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+    });
+    body.push('notify_target=' + encodeURIComponent(targets.join(',')));
 
     fetch('/notification_settings.php?action=update', {
         method: 'POST',

@@ -152,7 +152,11 @@ class NotificationSettingsModel
                     'status_changed' => '狀態變更',
                 ),
                 'condition_fields' => array(
-                    'status' => array('label' => '狀態', 'values' => array('pending', 'incomplete', 'closed', 'lost')),
+                    'status' => array('label' => '狀態', 'values' => array(
+                        'tracking' => '待追蹤', 'incomplete' => '未完工', 'unpaid' => '完工未收款',
+                        'closed' => '已完工結案', 'lost' => '未成交', 'awaiting_dispatch' => '待安排派工查修',
+                        'customer_cancel' => '客戶取消', 'breach' => '毀約',
+                    )),
                 ),
                 'record_fields' => array('sales_id' => '承辦業務'),
             ),
@@ -184,7 +188,7 @@ class NotificationSettingsModel
                     'status_changed' => '狀態變更',
                 ),
                 'condition_fields' => array(
-                    'status' => array('label' => '狀態', 'values' => array('pending', 'approved', 'rejected')),
+                    'status' => array('label' => '狀態', 'values' => array('pending' => '待審核', 'approved' => '已核准', 'rejected' => '已駁回')),
                 ),
                 'record_fields' => array('user_id' => '請假人'),
             ),
@@ -207,7 +211,7 @@ class NotificationSettingsModel
                     'status_changed' => '狀態變更',
                 ),
                 'condition_fields' => array(
-                    'status' => array('label' => '狀態', 'values' => array('draft', 'sent', 'confirmed', 'cancelled')),
+                    'status' => array('label' => '狀態', 'values' => array('draft' => '草稿', 'sent' => '已送出', 'confirmed' => '已確認', 'cancelled' => '已取消')),
                 ),
                 'record_fields' => array('sales_id' => '承辦業務'),
             ),
