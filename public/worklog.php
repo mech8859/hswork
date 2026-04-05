@@ -466,6 +466,24 @@ switch ($action) {
             }
         }
 
+        // 若無出庫單材料，從案件預估材料預填
+        $estimateMaterials = array();
+        if (empty($stockOutMaterials) && !empty($soCaseId) && $soCaseId > 0) {
+            try {
+                $estStmt = Database::getInstance()->prepare('
+                    SELECT cme.product_id, cme.material_name AS product_name,
+                           cme.model_number AS model, cme.unit, cme.estimated_qty AS quantity, 0 AS unit_price
+                    FROM case_material_estimates cme
+                    WHERE cme.case_id = ?
+                    ORDER BY cme.sort_order, cme.id
+                ');
+                $estStmt->execute(array($soCaseId));
+                $estimateMaterials = $estStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {
+                $estimateMaterials = array();
+            }
+        }
+
         $pageTitle = '施工回報';
         $currentPage = 'worklog';
         require __DIR__ . '/../templates/layouts/header.php';

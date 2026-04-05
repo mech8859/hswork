@@ -89,6 +89,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
     <a href="#sec-attach" class="sec-link">附件管理<?= $canEdit['attach'] ? '' : ' 🔒' ?></a>
     <a href="#sec-worklog" class="sec-link">施工回報 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= count($worklogTimeline) ?></span></a>
     <a href="#sec-readiness" class="sec-link">排工驗證</a>
+    <a href="#sec-materials" class="sec-link">預計材料 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= count($case['material_estimates'] ?? array()) ?></span></a>
     <a href="#sec-site" class="sec-link">現場環境<?= $canEdit['site'] ? '' : ' 🔒' ?></a>
     <a href="#sec-skills" class="sec-link">所需技能<?= $canEdit['skills'] ? '' : ' 🔒' ?></a>
 </div>
@@ -936,6 +937,91 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         <?php endif; ?>
     </div>
 
+    <!-- 預計使用線材與配件 -->
+    <?php if ($case): ?>
+    <div class="card" id="sec-materials">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>預計使用線材與配件</span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addEstMaterial()">+ 新增材料</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table est-table" style="font-size:.9rem">
+                <thead><tr>
+                    <th style="min-width:220px">品名</th>
+                    <th style="width:150px">型號</th>
+                    <th style="width:70px">單位</th>
+                    <th style="width:90px">預估數量</th>
+                    <th style="width:40px"></th>
+                </tr></thead>
+                <tbody id="estMaterialsContainer">
+                <?php
+                $estMaterials = $case['material_estimates'] ?: array();
+                $estIdx = 0;
+                foreach ($estMaterials as $em):
+                ?>
+                <tr class="est-material-row" data-idx="<?= $estIdx ?>">
+                    <td style="position:relative">
+                        <input type="text" name="est_materials[<?= $estIdx ?>][material_name]" class="form-control est-name-input"
+                               value="<?= e($em['material_name']) ?>" placeholder="搜尋產品..."
+                               autocomplete="off" oninput="searchEstProduct(this, <?= $estIdx ?>)">
+                        <input type="hidden" name="est_materials[<?= $estIdx ?>][product_id]" value="<?= e($em['product_id'] ?: '') ?>">
+                        <div class="est-suggestions" id="est-sug-<?= $estIdx ?>"></div>
+                    </td>
+                    <td><input type="text" name="est_materials[<?= $estIdx ?>][model_number]" class="form-control" value="<?= e($em['model_number'] ?: '') ?>" placeholder="型號"></td>
+                    <td><input type="text" name="est_materials[<?= $estIdx ?>][unit]" class="form-control" value="<?= e($em['unit'] ?: '') ?>" placeholder="單位"></td>
+                    <td><input type="number" name="est_materials[<?= $estIdx ?>][estimated_qty]" class="form-control" value="<?= e($em['estimated_qty'] ?: '') ?>" min="0" step="0.1"></td>
+                    <td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest('tr').remove()">✕</button></td>
+                </tr>
+                <?php $estIdx++; endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <?php
+        // 比對：預估 vs 實際用量
+        $actualUsage = array();
+        if (!empty($worklogTimeline)) {
+            foreach ($worklogTimeline as $wl) {
+                if (!empty($wl['materials'])) {
+                    foreach ($wl['materials'] as $m) {
+                        $key = !empty($m['product_id']) ? 'p_' . $m['product_id'] : 'n_' . $m['material_name'];
+                        if (!isset($actualUsage[$key])) {
+                            $actualUsage[$key] = array('name' => $m['material_name'], 'product_id' => isset($m['product_id']) ? $m['product_id'] : null, 'unit' => isset($m['unit']) ? $m['unit'] : '', 'total_used' => 0);
+                        }
+                        $actualUsage[$key]['total_used'] += (float)(isset($m['used_qty']) ? $m['used_qty'] : 0);
+                    }
+                }
+            }
+        }
+        if (!empty($estMaterials) && !empty($actualUsage)):
+        ?>
+        <div style="margin-top:12px;border-top:1px solid #e0e0e0;padding-top:12px">
+            <strong style="font-size:.9rem">預估 vs 實際用量</strong>
+            <table class="est-compare-table">
+                <thead><tr><th>品名</th><th>型號</th><th>單位</th><th class="text-right">預估</th><th class="text-right">實際</th><th class="text-right">差異</th></tr></thead>
+                <tbody>
+                <?php foreach ($estMaterials as $em):
+                    $key = !empty($em['product_id']) ? 'p_' . $em['product_id'] : 'n_' . $em['material_name'];
+                    $actual = isset($actualUsage[$key]) ? $actualUsage[$key]['total_used'] : 0;
+                    $diff = $actual - (float)$em['estimated_qty'];
+                    $diffClass = $diff > 0 ? 'est-over' : ($diff < 0 ? 'est-under' : '');
+                ?>
+                <tr>
+                    <td><?= e($em['material_name']) ?></td>
+                    <td><?= e($em['model_number'] ?: '-') ?></td>
+                    <td><?= e($em['unit'] ?: '-') ?></td>
+                    <td class="text-right"><?= $em['estimated_qty'] ?></td>
+                    <td class="text-right"><?= $actual ?: '-' ?></td>
+                    <td class="text-right <?= $diffClass ?>"><?= $actual ? ($diff > 0 ? '+' : '') . $diff : '-' ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- 附件管理 -->
     <?php if ($case):
         $attachTypes = CaseModel::attachTypeOptions();
@@ -1407,7 +1493,7 @@ var CASE_DATA = {
 };
 </script>
 <script src="/js/tw_districts.js"></script>
-<script src="/js/cases-form.js?v=20260405e"></script>
+<script src="/js/cases-form.js?v=20260405g"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">

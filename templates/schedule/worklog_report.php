@@ -192,6 +192,24 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
             );
         }
     }
+    // 從案件預估材料預填（無出庫單時）
+    if (empty($materials) && !empty($estimateMaterials)) {
+        $materials = array();
+        foreach ($estimateMaterials as $em) {
+            $materials[] = array(
+                'material_type' => 'equipment',
+                'product_id' => $em['product_id'] ?: '',
+                'material_name' => $em['product_name'] ?: '',
+                'unit' => $em['unit'] ?: '',
+                'shipped_qty' => $em['quantity'] ?: 0,
+                'used_qty' => '',
+                'returned_qty' => '',
+                'unit_cost' => '',
+                'material_note' => '',
+                '_from_estimate' => true,
+            );
+        }
+    }
     if (empty($materials)) {
         $materials = array(array('material_type'=>'equipment','product_id'=>'','material_name'=>'','unit'=>'','shipped_qty'=>'','used_qty'=>'','returned_qty'=>'','unit_cost'=>'','material_note'=>''));
     }

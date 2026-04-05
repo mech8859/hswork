@@ -48,6 +48,9 @@ switch ($action) {
             if (!empty($_POST['required_skills'])) {
                 $model->saveRequiredSkills($caseId, $_POST['required_skills']);
             }
+            if (isset($_POST['est_materials'])) {
+                $model->saveMaterialEstimates($caseId, $_POST['est_materials']);
+            }
             Session::flash('success', '案件已新增');
             redirect('/cases.php?action=view&id=' . $caseId);
         }
@@ -90,6 +93,9 @@ switch ($action) {
             }
             if (isset($_POST['required_skills'])) {
                 $model->saveRequiredSkills($id, $_POST['required_skills']);
+            }
+            if (isset($_POST['est_materials'])) {
+                $model->saveMaterialEstimates($id, $_POST['est_materials']);
             }
             Session::flash('success', '案件已更新');
             redirect('/cases.php?action=view&id=' . $id);
@@ -146,6 +152,55 @@ switch ($action) {
         }
         redirect('/cases.php');
         break;
+
+    // ---- AJAX: 取得預估材料 ----
+    case 'get_material_estimates':
+        header('Content-Type: application/json');
+        $caseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
+        echo json_encode(array('success' => true, 'data' => $model->getMaterialEstimates($caseId)));
+        exit;
+
+    // ---- AJAX: 搜尋產品（線材&配件）----
+    case 'search_products':
+        header('Content-Type: application/json');
+        $keyword = isset($_GET['q']) ? trim($_GET['q']) : '';
+        if (mb_strlen($keyword) < 1) { echo json_encode(array()); exit; }
+        $db = Database::getInstance();
+        $like = '%' . $keyword . '%';
+        // 限定分類：線材&相關配件、五金配件及其所有子分類
+        $catIds = array();
+        $parentNames = array('線材&相關配件', '五金配件');
+        foreach ($parentNames as $pn) {
+            $pStmt = $db->prepare("SELECT id FROM product_categories WHERE name = ?");
+            $pStmt->execute(array($pn));
+            $parentId = $pStmt->fetchColumn();
+            if ($parentId) {
+                $catIds[] = (int)$parentId;
+                $childStmt = $db->prepare("SELECT id FROM product_categories WHERE parent_id = ?");
+                $childStmt->execute(array($parentId));
+                while ($cid = $childStmt->fetchColumn()) {
+                    $catIds[] = (int)$cid;
+                    // 第三層
+                    $grandStmt = $db->prepare("SELECT id FROM product_categories WHERE parent_id = ?");
+                    $grandStmt->execute(array($cid));
+                    while ($gid = $grandStmt->fetchColumn()) {
+                        $catIds[] = (int)$gid;
+                    }
+                }
+            }
+        }
+        if (empty($catIds)) {
+            // fallback: 搜全部
+            $stmt = $db->prepare("SELECT id, name, model AS model_number, unit, price FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ? OR brand LIKE ?) ORDER BY name LIMIT 15");
+            $stmt->execute(array($like, $like, $like));
+        } else {
+            $placeholders = implode(',', array_fill(0, count($catIds), '?'));
+            $params = array_merge(array($like, $like, $like), $catIds);
+            $stmt = $db->prepare("SELECT id, name, model AS model_number, unit, price FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ? OR brand LIKE ?) AND category_id IN ({$placeholders}) ORDER BY name LIMIT 15");
+            $stmt->execute($params);
+        }
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        exit;
 
     // ---- AJAX: 取得帳款交易 ----
     case 'get_payment':

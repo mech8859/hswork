@@ -659,16 +659,16 @@ $grandClosed = array_sum($typeTotalsClosed);
 
 <?php endif; ?>
 
-<!-- 鑽取明細 Modal -->
-<div id="drillModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeDrillModal()">
-    <div class="modal-content" id="drillModalContent" style="max-width:900px;max-height:80vh;position:relative">
-        <div class="modal-header" id="drillModalHeader" style="cursor:move;user-select:none">
-            <h3 id="drillModalTitle">明細</h3>
-            <button class="modal-close" onclick="closeDrillModal()">&times;</button>
+<!-- 鑽取明細（內嵌在卡片下方）-->
+<div id="drillInline" style="display:none">
+    <div class="card" style="margin-top:-8px;border-top:3px solid var(--primary);background:#fafbff">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #e0e0e0">
+            <strong id="drillInlineTitle" style="font-size:.9rem;color:var(--primary)">明細</strong>
+            <button class="btn btn-sm" style="padding:2px 10px;font-size:1.1rem;line-height:1;background:none;color:#999" onclick="closeDrillInline()">&times;</button>
         </div>
-        <div class="modal-body" style="overflow-y:auto;max-height:60vh">
-            <div id="drillLoading" style="text-align:center;padding:20px;display:none">載入中...</div>
-            <div id="drillResult"></div>
+        <div style="padding:8px 12px;overflow-x:auto">
+            <div id="drillInlineLoading" style="text-align:center;padding:16px;display:none">載入中...</div>
+            <div id="drillInlineResult"></div>
         </div>
     </div>
 </div>
@@ -697,17 +697,25 @@ td.drillable:hover { background: #e3f2fd !important; text-decoration: underline;
 var drillYear = <?= json_encode($analysis['year']) ?>;
 
 function drillDown(type, month, salesName, label, statusVal) {
-    var modal = document.getElementById('drillModal');
-    var title = document.getElementById('drillModalTitle');
-    var loading = document.getElementById('drillLoading');
-    var result = document.getElementById('drillResult');
-    var mc = document.getElementById('drillModalContent');
-    mc.style.transform = '';
+    var inline = document.getElementById('drillInline');
+    var title = document.getElementById('drillInlineTitle');
+    var loading = document.getElementById('drillInlineLoading');
+    var result = document.getElementById('drillInlineResult');
+
+    // 找到點擊的 td 所在的 card
+    var clickedTd = event.target.closest('td');
+    var parentCard = clickedTd ? clickedTd.closest('.card') : null;
 
     title.textContent = label;
     loading.style.display = '';
     result.innerHTML = '';
-    modal.style.display = 'flex';
+
+    // 將 drillInline 插入到該 card 下方
+    if (parentCard && parentCard.parentNode) {
+        parentCard.parentNode.insertBefore(inline, parentCard.nextSibling);
+    }
+    inline.style.display = '';
+    inline.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     var url = '/reports.php?action=drill_down&year=' + drillYear + '&type=' + encodeURIComponent(type);
     if (month) url += '&month=' + encodeURIComponent(month);
@@ -723,6 +731,7 @@ function drillDown(type, month, salesName, label, statusVal) {
             var cases = data.cases || [];
             if (cases.length === 0) {
                 result.innerHTML = '<p class="text-muted text-center">無明細資料</p>';
+                inline.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 return;
             }
             var isReceipt = (type === 'receipt');
@@ -751,6 +760,7 @@ function drillDown(type, month, salesName, label, statusVal) {
             html += '</tbody><tfoot><tr><td colspan="' + (isReceipt ? 4 : 5) + '" style="text-align:right;font-weight:bold">合計 (' + cases.length + '筆)</td>';
             html += '<td style="text-align:right;font-weight:bold;color:var(--primary)">$' + totalAmt.toLocaleString() + '</td><td></td></tr></tfoot></table>';
             result.innerHTML = html;
+            inline.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (e) {
             result.innerHTML = '<p class="text-danger">載入失敗</p>';
         }
@@ -762,10 +772,10 @@ function drillDown(type, month, salesName, label, statusVal) {
     xhr.send();
 }
 
-function closeDrillModal() {
-    document.getElementById('drillModal').style.display = 'none';
-    var mc = document.getElementById('drillModalContent');
-    mc.style.transform = '';
+function closeDrillInline() {
+    var inline = document.getElementById('drillInline');
+    inline.style.display = 'none';
+    inline.querySelector('#drillInlineResult').innerHTML = '';
 }
 
 function escHtml(s) {

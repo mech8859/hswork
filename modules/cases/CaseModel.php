@@ -206,6 +206,21 @@ class CaseModel
             $case['support_branches'] = array();
         }
 
+        // 預計使用線材與配件
+        try {
+            $stmt = $this->db->prepare('
+                SELECT cme.*, p.name AS product_display_name, p.model AS product_model
+                FROM case_material_estimates cme
+                LEFT JOIN products p ON cme.product_id = p.id
+                WHERE cme.case_id = ?
+                ORDER BY cme.sort_order, cme.id
+            ');
+            $stmt->execute([$id]);
+            $case['material_estimates'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['material_estimates'] = array();
+        }
+
         return $case;
     }
 
@@ -609,6 +624,55 @@ class CaseModel
     public function getAllSkills(): array
     {
         return $this->db->query('SELECT * FROM skills WHERE is_active = 1 ORDER BY category, name')->fetchAll();
+    }
+
+    /**
+     * 儲存案件預估材料（delete-then-insert）
+     */
+    public function saveMaterialEstimates($caseId, array $estimates)
+    {
+        $this->db->prepare('DELETE FROM case_material_estimates WHERE case_id = ?')
+                 ->execute(array($caseId));
+
+        if (empty($estimates)) return;
+
+        $stmt = $this->db->prepare('
+            INSERT INTO case_material_estimates
+            (case_id, product_id, material_name, model_number, unit, estimated_qty, note, sort_order, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ');
+        $sortOrder = 0;
+        foreach ($estimates as $est) {
+            $name = isset($est['material_name']) ? trim($est['material_name']) : '';
+            if ($name === '') continue;
+            $stmt->execute(array(
+                $caseId,
+                !empty($est['product_id']) ? (int)$est['product_id'] : null,
+                $name,
+                isset($est['model_number']) ? trim($est['model_number']) : null,
+                isset($est['unit']) ? trim($est['unit']) : null,
+                isset($est['estimated_qty']) ? (float)$est['estimated_qty'] : 0,
+                isset($est['note']) ? trim($est['note']) : null,
+                $sortOrder++,
+                Auth::id()
+            ));
+        }
+    }
+
+    /**
+     * 取得案件預估材料
+     */
+    public function getMaterialEstimates($caseId)
+    {
+        $stmt = $this->db->prepare('
+            SELECT cme.*, p.name AS product_display_name
+            FROM case_material_estimates cme
+            LEFT JOIN products p ON cme.product_id = p.id
+            WHERE cme.case_id = ?
+            ORDER BY cme.sort_order, cme.id
+        ');
+        $stmt->execute(array($caseId));
+        return $stmt->fetchAll();
     }
 
     /**

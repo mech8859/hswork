@@ -250,6 +250,28 @@ if ($hasFinancial):
 </div>
 <?php endif; ?>
 
+<!-- 預計使用線材與配件 -->
+<?php if (!empty($case['material_estimates'])): ?>
+<div class="card">
+    <div class="card-header">預計使用線材與配件</div>
+    <div class="table-responsive">
+        <table class="table" style="font-size:.9rem">
+            <thead><tr><th>品名</th><th>型號</th><th>單位</th><th class="text-right">預估數量</th></tr></thead>
+            <tbody>
+            <?php foreach ($case['material_estimates'] as $em): ?>
+            <tr>
+                <td><?= e($em['material_name']) ?></td>
+                <td><?= e($em['model_number'] ?: '-') ?></td>
+                <td><?= e($em['unit'] ?: '-') ?></td>
+                <td class="text-right"><?= $em['estimated_qty'] ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- 現場環境 -->
 <?php if (!empty($case['site_conditions'])): ?>
 <?php $sc = $case['site_conditions']; ?>

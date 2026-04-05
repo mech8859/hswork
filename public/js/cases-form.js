@@ -818,3 +818,78 @@ function updatePlannedTime() {
     var m = document.querySelector('select[name="planned_start_min"]').value;
     document.getElementById('plannedStartTime').value = (h && m) ? h + ':' + m : '';
 }
+
+// ===== 預計使用線材與配件 =====
+var estMatIndex = document.querySelectorAll('.est-material-row').length;
+var estSearchTimer = null;
+
+function addEstMaterial() {
+    var idx = estMatIndex++;
+    var html = '<tr class="est-material-row" data-idx="' + idx + '">' +
+        '<td style="position:relative">' +
+        '<input type="text" name="est_materials[' + idx + '][material_name]" class="form-control est-name-input" placeholder="搜尋產品..." autocomplete="off" oninput="searchEstProduct(this,' + idx + ')">' +
+        '<input type="hidden" name="est_materials[' + idx + '][product_id]" value="">' +
+        '<div class="est-suggestions" id="est-sug-' + idx + '"></div>' +
+        '</td>' +
+        '<td><input type="text" name="est_materials[' + idx + '][model_number]" class="form-control" placeholder="型號"></td>' +
+        '<td><input type="text" name="est_materials[' + idx + '][unit]" class="form-control" placeholder="單位"></td>' +
+        '<td><input type="number" name="est_materials[' + idx + '][estimated_qty]" class="form-control" min="0" step="0.1"></td>' +
+        '<td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest(\'tr\').remove()">✕</button></td>' +
+        '</tr>';
+    var container = document.getElementById('estMaterialsContainer');
+    if (container) container.insertAdjacentHTML('beforeend', html);
+}
+
+function searchEstProduct(input, idx) {
+    clearTimeout(estSearchTimer);
+    var q = input.value.trim();
+    var sugDiv = document.getElementById('est-sug-' + idx);
+    if (!sugDiv) return;
+    if (q.length < 1) { sugDiv.innerHTML = ''; sugDiv.style.display = 'none'; return; }
+    estSearchTimer = setTimeout(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/cases.php?action=search_products&q=' + encodeURIComponent(q));
+        xhr.onload = function() {
+            try {
+                var products = JSON.parse(xhr.responseText);
+                if (!products.length) { sugDiv.innerHTML = '<div class="est-sug-item" style="color:#999">無搜尋結果</div>'; sugDiv.style.display = 'block'; return; }
+                var html = '';
+                for (var i = 0; i < products.length; i++) {
+                    var p = products[i];
+                    html += '<div class="est-sug-item" onclick="selectEstProduct(' + idx + ',' + p.id + ',\'' + escHtml(p.name) + '\',\'' + escHtml(p.model_number || '') + '\',\'' + escHtml(p.unit || '') + '\')">';
+                    html += '<strong>' + escHtml(p.name) + '</strong>';
+                    if (p.model_number) html += ' <span style="color:#888">(' + escHtml(p.model_number) + ')</span>';
+                    if (p.unit) html += ' <span style="color:#666;font-size:.8rem">' + escHtml(p.unit) + '</span>';
+                    html += '</div>';
+                }
+                sugDiv.innerHTML = html;
+                sugDiv.style.display = 'block';
+            } catch(e) { sugDiv.innerHTML = ''; sugDiv.style.display = 'none'; }
+        };
+        xhr.send();
+    }, 300);
+}
+
+function selectEstProduct(idx, productId, name, model, unit) {
+    var row = document.querySelector('tr.est-material-row[data-idx="' + idx + '"], .est-material-row[data-idx="' + idx + '"]');
+    if (!row) return;
+    row.querySelector('input[name*="[material_name]"]').value = name;
+    row.querySelector('input[name*="[product_id]"]').value = productId;
+    row.querySelector('input[name*="[model_number]"]').value = model;
+    row.querySelector('input[name*="[unit]"]').value = unit;
+    var sugDiv = document.getElementById('est-sug-' + idx);
+    if (sugDiv) { sugDiv.innerHTML = ''; sugDiv.style.display = 'none'; }
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// 點擊其他地方關閉建議列表
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.est-name-input') && !e.target.closest('.est-suggestions')) {
+        var allSug = document.querySelectorAll('.est-suggestions');
+        for (var i = 0; i < allSug.length; i++) { allSug[i].style.display = 'none'; }
+    }
+});
