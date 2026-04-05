@@ -20,7 +20,7 @@ $currentStage = $caseModel->syncStage($case['id']);
     </div>
     <div class="d-flex gap-1 flex-wrap">
         <a href="/business_tracking.php?action=edit&id=<?= $case['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
-        <a href="/business_tracking.php" class="btn btn-outline btn-sm">返回</a>
+        <?= back_button('/business_tracking.php') ?>
     </div>
 </div>
 

@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>入庫 / 出庫</h2>
-    <a href="/inventory.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/inventory.php') ?>
 </div>
 
 <div class="card" style="max-width:600px">

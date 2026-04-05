@@ -1,7 +1,7 @@
 <?php $isEdit = !empty($item); ?>
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯工程項次' : '新增工程項次' ?></h2>
-    <a href="/engineering_items.php" class="btn btn-outline">返回列表</a>
+    <?= back_button('/engineering_items.php') ?>
 </div>
 <form method="POST">
     <?= csrf_field() ?>

@@ -26,7 +26,7 @@ function grViewStatusBadge($status) {
         <?php if ($record['status'] !== '已確認' && $record['status'] !== '已取消'): ?>
         <a href="/goods_receipts.php?action=confirm&id=<?= $record['id'] ?>" class="btn btn-sm" style="background:#2e7d32;color:#fff" onclick="return confirm('確認進貨？確認後將自動建立入庫單並更新庫存。')">確認進貨</a>
         <?php endif; ?>
-        <a href="/goods_receipts.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/goods_receipts.php') ?>
     </div>
 </div>
 

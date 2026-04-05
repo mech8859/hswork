@@ -1,7 +1,7 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>產品分類管理</h2>
     <div class="d-flex gap-1">
-        <a href="/products.php" class="btn btn-outline btn-sm">返回產品目錄</a>
+        <?= back_button('/products.php') ?>
         <button type="button" class="btn btn-primary btn-sm" onclick="openCatModal()">+ 新增分類</button>
     </div>
 </div>

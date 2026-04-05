@@ -13,7 +13,7 @@ $canManage = Auth::hasPermission('staff.manage');
         <?php if ($canManage): ?>
         <a href="/vehicles.php?action=edit&id=<?= $vehicle['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <?php endif; ?>
-        <a href="/vehicles.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/vehicles.php') ?>
     </div>
 </div>
 

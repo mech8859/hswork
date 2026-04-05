@@ -14,7 +14,7 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0 && (empty($
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>現金明細 - <?= e(!empty($record['entry_number']) ? $record['entry_number'] : '檢視') ?></h2>
-    <a href="/cash_details.php" class="btn btn-outline btn-sm">&larr; 返回列表</a>
+    <?= back_button('/cash_details.php') ?>
 </div>
 
 <div class="card">
@@ -78,7 +78,7 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0 && (empty($
                class="btn btn-danger btn-sm"
                onclick="return confirm('確定要刪除此筆現金明細記錄嗎？此操作無法復原。')">刪除</a>
             <?php endif; ?>
-            <a href="/cash_details.php" class="btn btn-outline btn-sm">返回</a>
+            <?= back_button('/cash_details.php') ?>
         </div>
     </form>
 </div>

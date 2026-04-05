@@ -1,7 +1,7 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>點工出勤登錄</h2>
     <div class="d-flex gap-1">
-        <a href="/inter_branch.php" class="btn btn-outline btn-sm">返回點工費</a>
+        <?= back_button('/inter_branch.php') ?>
         <a href="/inter_branch.php?action=attendance_settle_page" class="btn btn-outline btn-sm">出勤結算</a>
     </div>
 </div>

@@ -42,7 +42,7 @@
            onclick="return confirm('確定<?= $user['is_active'] ? '停用' : '啟用' ?>此帳號?')"><?= $user['is_active'] ? '停用帳號' : '啟用帳號' ?></a>
         <?php endif; ?>
         <?php endif; ?>
-        <a href="/staff.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/staff.php') ?>
     </div>
 </div>
 

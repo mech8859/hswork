@@ -5,7 +5,7 @@ $isEdit = !empty($case);
 ?>
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯案件' : '新增進件' ?></h2>
-    <a href="/business_tracking.php" class="btn btn-outline btn-sm">返回</a>
+    <?= back_button('/business_tracking.php') ?>
 </div>
 
 <form method="POST" action="/business_tracking.php?action=<?= $isEdit ? 'edit&id='.$case['id'] : 'create' ?>">

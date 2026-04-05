@@ -8,7 +8,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
 </style>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>新增出庫單</h2>
-    <a href="/stock_outs.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/stock_outs.php') ?>
 </div>
 
 <form method="POST" action="/stock_outs.php?action=create" id="soForm">

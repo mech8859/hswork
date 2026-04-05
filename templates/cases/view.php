@@ -29,7 +29,7 @@
         <button type="button" class="btn btn-sm" style="background:#6366f1;color:#fff" onclick="openSupportModal()">支援</button>
         <?php endif; ?>
         <a href="/cases.php?action=edit&id=<?= $case['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
-        <a href="/cases.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/cases.php') ?>
     </div>
 </div>
 

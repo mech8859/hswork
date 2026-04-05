@@ -27,7 +27,7 @@
         ?>
         <span class="badge <?= $statusClass ?>" style="font-size:.85rem"><?= e($stocktake['status']) ?></span>
         <button type="button" class="btn btn-outline btn-sm no-print" onclick="window.print()">列印</button>
-        <a href="/inventory.php?action=stocktake_list" class="btn btn-outline btn-sm no-print">返回列表</a>
+        <?= back_button('/inventory.php') ?>
     </div>
 </div>
 

@@ -18,7 +18,7 @@
         <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeletePayment(<?= $record['id'] ?>, '<?= e($record['payment_number']) ?>')">刪除</button>
         <?php endif; ?>
-        <a href="/payments_out.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/payments_out.php') ?>
     </div>
 </div>
 

@@ -2,7 +2,7 @@
     <h2><?= e($contactName) ?> — 交易紀錄</h2>
     <div class="d-flex gap-1">
         <a href="/transactions.php?action=create&contact_name=<?= urlencode($contactName) ?>&target_type=<?= urlencode($contactRecords[0]['target_type']) ?>" class="btn btn-primary btn-sm">+ 新增交易</a>
-        <a href="/transactions.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/transactions.php') ?>
     </div>
 </div>
 

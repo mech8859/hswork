@@ -1,7 +1,7 @@
 <?php $isEdit = !empty($account); ?>
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯科目' : '新增科目' ?></h2>
-    <a href="/chart_of_accounts.php" class="btn btn-outline">返回列表</a>
+    <?= back_button('/chart_of_accounts.php') ?>
 </div>
 
 <form method="POST">

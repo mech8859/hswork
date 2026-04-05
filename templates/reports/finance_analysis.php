@@ -21,7 +21,7 @@ function pivotRowTotal2($data, $months) {
             <option value="<?= $y ?>" <?= $analysis['year'] == $y ? 'selected' : '' ?>><?= ($y - 1911) ?>年 (<?= $y ?>)</option>
             <?php endfor; ?>
         </select>
-        <a href="/reports.php" class="btn btn-outline btn-sm">返回報表</a>
+        <?= back_button('/reports.php') ?>
     </form>
 </div>
 

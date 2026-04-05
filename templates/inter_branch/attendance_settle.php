@@ -8,7 +8,7 @@ if ($settledCount > 0): ?>
     <h2>點工出勤結算</h2>
     <div class="d-flex gap-1">
         <a href="/inter_branch.php?action=attendance" class="btn btn-outline btn-sm">出勤登錄</a>
-        <a href="/inter_branch.php" class="btn btn-outline btn-sm">返回點工費</a>
+        <?= back_button('/inter_branch.php') ?>
     </div>
 </div>
 

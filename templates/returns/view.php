@@ -38,7 +38,7 @@ function viewReturnTypeBadge($type) {
         <a href="/returns.php?action=edit&id=<?= $record['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <a href="/returns.php?action=delete&id=<?= $record['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('確定要刪除此退貨單？')">刪除</a>
         <?php endif; ?>
-        <a href="/returns.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/returns.php') ?>
     </div>
 </div>
 

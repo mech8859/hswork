@@ -52,7 +52,7 @@ $canConfirmItems = $isPending || $isPartial;
         <a href="/stock_ins.php?action=create_from_return&stock_out_id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('確認將餘料建立入庫單？')">餘料入庫</a>
         <?php endif; ?>
         <button type="button" class="btn btn-outline btn-sm no-print" onclick="window.print()">列印</button>
-        <a href="/stock_outs.php" class="btn btn-outline btn-sm no-print">返回列表</a>
+        <?= back_button('/stock_outs.php') ?>
     </div>
 </div>
 

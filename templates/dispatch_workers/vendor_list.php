@@ -7,7 +7,7 @@
         <a href="/dispatch_workers.php?type=vendor&action=create" class="btn btn-primary">+ 新增廠商</a>
     </div>
 </div>
-<div class="mb-2"><a href="/staff.php" class="btn btn-outline" style="font-size:.85rem">← 返回人員管理</a></div>
+<div class="mb-2"><?= back_button('/staff.php') ?></div>
 
 <div class="card">
     <div class="table-responsive">

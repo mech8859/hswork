@@ -5,7 +5,7 @@ $isCopy = isset($prefillEntry) && !$entry;
 ?>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1><?= $entry ? '編輯傳票 - ' . e($entry['voucher_number']) : ($isCopy ? '複製傳票' : '新增傳票') ?></h1>
-    <a href="/accounting.php?action=journals" class="btn btn-secondary">返回列表</a>
+    <?= back_button('/accounting.php') ?>
 </div>
 
 <form method="post" id="journalForm" enctype="multipart/form-data" action="/accounting.php?action=<?= $entry ? 'journal_edit&id=' . $entry['id'] : 'journal_create' ?>"

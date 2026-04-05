@@ -41,6 +41,57 @@ function verify_csrf(): bool
 }
 
 /**
+ * 返回按鈕：自動偵測來源頁面，返回原處
+ * @param string $defaultUrl 預設返回網址（無來源時的 fallback）
+ * @param string $defaultLabel 預設按鈕文字
+ * @param string $class 按鈕 CSS class
+ * @return string HTML
+ */
+function back_button($defaultUrl, $defaultLabel = '返回列表', $class = 'btn btn-outline btn-sm')
+{
+    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+    $from = isset($_GET['from']) ? $_GET['from'] : '';
+    $backUrl = $defaultUrl;
+    $backLabel = $defaultLabel;
+
+    // 優先用 GET 參數
+    if ($from !== '') {
+        $backUrl = $from;
+        // 根據 URL 判斷標籤
+        if (strpos($from, 'reports.php') !== false) {
+            $backLabel = '返回報表';
+        } elseif (strpos($from, 'schedule.php') !== false) {
+            $backLabel = '返回排工';
+        }
+    } elseif ($referer !== '' && strpos($referer, $_SERVER['HTTP_HOST']) !== false) {
+        // Referer 是同站的，用 referer
+        $path = parse_url($referer, PHP_URL_PATH);
+        $query = parse_url($referer, PHP_URL_QUERY);
+        $backUrl = $path . ($query ? '?' . $query : '');
+        // 不是同模組的才改標籤
+        $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        if (basename($path) !== basename($currentPath)) {
+            if (strpos($path, 'reports.php') !== false) {
+                $backLabel = '返回報表';
+            } elseif (strpos($path, 'schedule.php') !== false) {
+                $backLabel = '返回排工';
+            } elseif (strpos($path, 'index.php') !== false || $path === '/') {
+                $backLabel = '返回首頁';
+            }
+        }
+    }
+
+    // 如果是從別的頁面用 target="_blank" 開的，關閉分頁即可回到原頁
+    $isNewTab = ($referer !== '' && strpos($referer, $_SERVER['HTTP_HOST']) !== false
+                 && basename(parse_url($referer, PHP_URL_PATH)) !== basename(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)));
+
+    if ($isNewTab) {
+        return '<a href="' . e($backUrl) . '" class="' . e($class) . '" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">' . e($backLabel) . '</a>';
+    }
+    return '<a href="' . e($backUrl) . '" class="' . e($class) . '">' . e($backLabel) . '</a>';
+}
+
+/**
  * 重導向
  */
 function redirect(string $url): void

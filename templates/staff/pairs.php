@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>人員配對表</h2>
-    <a href="/staff.php" class="btn btn-outline btn-sm">返回人員列表</a>
+    <?= back_button('/staff.php') ?>
 </div>
 
 <!-- 新增/編輯配對 -->

@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>可上工日期登錄</h2>
-    <a href="/dispatch_workers.php" class="btn btn-outline btn-sm">返回點工列表</a>
+    <?= back_button('/dispatch_workers.php') ?>
 </div>
 
 <!-- 選擇人員 + 新增 -->

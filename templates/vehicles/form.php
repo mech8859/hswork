@@ -5,7 +5,7 @@ $typeLabels = VehicleModel::typeLabels();
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2><?= $isEdit ? '編輯車輛' : '新增車輛' ?></h2>
-    <a href="/vehicles.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/vehicles.php') ?>
 </div>
 
 <form method="post" action="/vehicles.php?action=<?= $isEdit ? 'edit&id=' . $vehicle['id'] : 'create' ?>">

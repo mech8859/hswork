@@ -52,15 +52,7 @@
         <?php if ($case && Auth::canEditSection('delete')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteCase(<?= $case['id'] ?>, '<?= e($case['case_number']) ?>')">刪除</button>
         <?php endif; ?>
-        <?php
-        $fromPage = isset($_GET['from']) ? $_GET['from'] : '';
-        $backUrl = '/cases.php';
-        $backLabel = '返回列表';
-        if ($fromPage === 'engineering') { $backUrl = '/engineering_tracking.php'; $backLabel = '返回工程追蹤'; }
-        elseif ($fromPage === 'business') { $backUrl = '/business_tracking.php'; $backLabel = '返回業務追蹤'; }
-        elseif ($fromPage === 'schedule') { $backUrl = '/schedule.php'; $backLabel = '返回行事曆'; }
-        ?>
-        <a href="<?= $backUrl ?>" class="btn btn-outline btn-sm"><?= $backLabel ?></a>
+        <?= back_button('/cases.php') ?>
     </div>
 </div>
 

@@ -1,7 +1,7 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>倉庫管理</h2>
     <div class="d-flex gap-1">
-        <a href="/inventory.php" class="btn btn-outline btn-sm">返回庫存列表</a>
+        <?= back_button('/inventory.php') ?>
         <button type="button" class="btn btn-primary btn-sm" onclick="openWhModal()">+ 新增倉庫</button>
     </div>
 </div>

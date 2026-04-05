@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>月結確認</h2>
-    <a href="/inter_branch.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/inter_branch.php') ?>
 </div>
 
 <!-- 月份選擇 -->

@@ -7,7 +7,7 @@ foreach ($unremitted as $u) {
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2><?= e($branchName) ?> — 未繳回帳務</h2>
-    <a href="/remittance.php" class="btn btn-outline btn-sm">返回總覽</a>
+    <?= back_button('/remittance.php') ?>
 </div>
 
 <!-- 未繳回金額 -->

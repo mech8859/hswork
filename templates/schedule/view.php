@@ -89,7 +89,7 @@ $canJoin = $isEngineerUser && !$isInSchedule && !in_array($schedule['status'], a
         <a href="/schedule.php?action=delete&id=<?= $schedule['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>"
            class="btn btn-danger btn-sm" onclick="return confirm('確定刪除此排工?')">刪除</a>
         <?php endif; ?>
-        <a href="/schedule.php" class="btn btn-outline btn-sm">返回行事曆</a>
+        <?= back_button('/schedule.php') ?>
     </div>
 </div>
 

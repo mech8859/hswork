@@ -10,7 +10,7 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>零用金 - <?= e(!empty($record['entry_number']) ? $record['entry_number'] : '檢視') ?></h2>
-    <a href="/petty_cash.php" class="btn btn-outline btn-sm">&larr; 返回列表</a>
+    <?= back_button('/petty_cash.php') ?>
 </div>
 
 <div class="card">
@@ -90,7 +90,7 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
                class="btn btn-danger btn-sm"
                onclick="return confirm('確定要刪除此筆零用金記錄嗎？此操作無法復原。')">刪除</a>
             <?php endif; ?>
-            <a href="/petty_cash.php" class="btn btn-outline btn-sm">返回</a>
+            <?= back_button('/petty_cash.php') ?>
         </div>
     </form>
 </div>

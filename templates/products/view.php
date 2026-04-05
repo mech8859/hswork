@@ -4,7 +4,7 @@
         <?php if (Auth::hasPermission('products.manage') || in_array(Auth::user()['role'], array('boss','manager'))): ?>
         <a href="/products.php?action=edit&id=<?= $product['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <?php endif; ?>
-        <a href="/products.php" class="btn btn-outline btn-sm">返回產品目錄</a>
+        <?= back_button('/products.php') ?>
     </div>
 </div>
 

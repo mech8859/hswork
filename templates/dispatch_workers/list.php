@@ -10,7 +10,7 @@
 </div>
 
 <div class="d-flex gap-1 mb-2" style="align-items:center">
-    <a href="/staff.php" class="btn btn-outline" style="font-size:.85rem">← 返回人員管理</a>
+    <?= back_button('/staff.php') ?>
     <form method="GET" class="d-flex gap-1" style="flex:1;justify-content:flex-end">
         <input type="hidden" name="type" value="<?= e($type) ?>">
         <input type="text" name="keyword" class="form-control" style="max-width:250px" placeholder="搜尋姓名/電話..." value="<?= e($_GET['keyword'] ?? '') ?>">

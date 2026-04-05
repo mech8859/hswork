@@ -1,7 +1,7 @@
 <?php $isEdit = !empty($vendor); ?>
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯廠商' : '新增廠商' ?></h2>
-    <a href="/dispatch_workers.php?type=vendor" class="btn btn-outline">返回列表</a>
+    <?= back_button('/dispatch_workers.php') ?>
 </div>
 
 <form method="POST">

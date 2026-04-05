@@ -5,7 +5,7 @@ $bankOptions = FinanceModel::bankAccountOptions();
 
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯銀行交易' : '新增銀行交易' ?></h2>
-    <a href="/bank_transactions.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/bank_transactions.php') ?>
 </div>
 
 <form method="POST" action="/bank_transactions.php?action=store" id="bankTxForm">

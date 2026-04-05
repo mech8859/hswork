@@ -18,7 +18,7 @@
                class="btn btn-primary btn-sm" onclick="return confirm('確定標記為已請款?')">標記已請款</a>
             <?php endif; ?>
         <?php endif; ?>
-        <a href="/repairs.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/repairs.php') ?>
     </div>
 </div>
 

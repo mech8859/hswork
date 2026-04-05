@@ -217,7 +217,7 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
     </div>
     <?php else: ?>
     <div class="mt-2">
-        <a href="/sales_invoices.php" class="btn btn-outline">返回列表</a>
+        <?= back_button('/sales_invoices.php') ?>
     </div>
     <?php endif; ?>
 </form>

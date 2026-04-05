@@ -35,7 +35,7 @@ $isLocked = $isEdit && in_array($reqStatus, array('簽核中', '已核准', '簽
         <button type="button" class="btn btn-sm" style="background:#2196F3;color:#fff"
            onclick="if(confirm('確定送出簽核？')){document.getElementById('submit_after_save').value='1';document.getElementById('reqForm').submit();}">送簽核</button>
         <?php endif; ?>
-        <a href="/requisitions.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/requisitions.php') ?>
     </div>
 </div>
 
@@ -341,7 +341,7 @@ function rejectRequisition() {
     </div>
     <?php else: ?>
     <div class="mt-2">
-        <a href="/requisitions.php" class="btn btn-outline">返回列表</a>
+        <?= back_button('/requisitions.php') ?>
     </div>
     <?php endif; ?>
 </form>

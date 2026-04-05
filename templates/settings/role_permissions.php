@@ -93,7 +93,7 @@ $reportLabels = isset($appConfig['report_labels']) ? $appConfig['report_labels']
         <h2>角色預設權限 - <?= e($role['role_label']) ?></h2>
         <code><?= e($role['role_key']) ?></code>
     </div>
-    <a href="/dropdown_options.php?tab=roles" class="btn btn-outline btn-sm">返回角色列表</a>
+    <?= back_button('/dropdown_options.php') ?>
 </div>
 
 <?php if ($role['role_key'] === 'boss'): ?>

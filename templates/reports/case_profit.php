@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>案件利潤分析</h2>
-    <a href="/reports.php" class="btn btn-outline btn-sm">返回報表</a>
+    <?= back_button('/reports.php') ?>
 </div>
 
 <div class="card">

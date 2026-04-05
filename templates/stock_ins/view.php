@@ -23,7 +23,7 @@ function siViewStatusBadge($status) {
         <?php if ($record['status'] === '待確認'): ?>
         <a href="/stock_ins.php?action=confirm&id=<?= $record['id'] ?>" class="btn btn-sm" style="background:#2e7d32;color:#fff" onclick="return confirm('確認入庫？確認後將更新庫存數量。')">確認入庫</a>
         <?php endif; ?>
-        <a href="/stock_ins.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/stock_ins.php') ?>
     </div>
 </div>
 

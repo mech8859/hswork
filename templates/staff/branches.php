@@ -2,7 +2,7 @@
     <h2>分公司管理</h2>
     <div class="d-flex gap-1">
         <button type="button" class="btn btn-primary btn-sm" onclick="showBranchForm()">+ 新增分公司</button>
-        <a href="/staff.php" class="btn btn-outline btn-sm">返回人員管理</a>
+        <?= back_button('/staff.php') ?>
     </div>
 </div>
 

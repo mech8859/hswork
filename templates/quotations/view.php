@@ -75,7 +75,7 @@ foreach ($approvalStatus['flows'] as $af) {
         <?php endif; endforeach; ?>
         <?php endif; ?>
 
-        <a href="/quotations.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/quotations.php') ?>
     </div>
 </div>
 

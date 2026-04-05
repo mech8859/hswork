@@ -19,7 +19,7 @@
             <?php endif; ?>
         <?php endif; ?>
 
-        <a href="/delivery_orders.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/delivery_orders.php') ?>
     </div>
 </div>
 

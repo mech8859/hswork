@@ -3,7 +3,7 @@
     <div class="d-flex gap-1">
         <a href="/dispatch_workers.php?action=skills&id=<?= $worker['id'] ?>" class="btn btn-outline btn-sm">技能設定</a>
         <a href="/dispatch_workers.php?action=edit&id=<?= $worker['id'] ?>" class="btn btn-outline btn-sm">返回人員資料</a>
-        <a href="/dispatch_workers.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/dispatch_workers.php') ?>
     </div>
 </div>
 

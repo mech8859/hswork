@@ -19,7 +19,7 @@
         <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="if(confirm('確定刪除？'))document.getElementById('deleteForm').submit()">刪除</button>
         <?php endif; ?>
-        <a href="/payables.php" class="btn btn-outline btn-sm">返回列表</a>
+        <?= back_button('/payables.php') ?>
     </div>
 </div>
 <?php if ($isEdit): ?>

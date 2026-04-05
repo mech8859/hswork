@@ -1,6 +1,6 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>批次匯入銀行明細</h2>
-    <a href="/bank_transactions.php" class="btn btn-outline btn-sm">返回列表</a>
+    <?= back_button('/bank_transactions.php') ?>
 </div>
 
 <div class="card">
