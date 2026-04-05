@@ -105,6 +105,31 @@ switch ($action) {
         json_response(array('error' => '缺少參數'));
         break;
 
+    // ============ 子分類管理（付款單分類）============
+    case 'get_sub_options':
+        header('Content-Type: application/json');
+        $parentId = isset($_GET['parent_id']) ? (int)$_GET['parent_id'] : 0;
+        if ($parentId) {
+            echo json_encode(array('success' => true, 'data' => $model->getSubOptions($parentId)));
+        } else {
+            echo json_encode(array('success' => false, 'error' => '缺少 parent_id'));
+        }
+        exit;
+
+    case 'add_sub_option':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            json_response(array('error' => '方法不允許'), 405);
+        }
+        $category = isset($_POST['category']) ? $_POST['category'] : '';
+        $parentId = isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : 0;
+        $label = isset($_POST['label']) ? trim($_POST['label']) : '';
+        if ($category && $parentId && $label) {
+            $newId = $model->addSubOption($category, $parentId, $label);
+            json_response(array('success' => true, 'id' => $newId));
+        }
+        json_response(array('error' => '缺少參數'));
+        break;
+
     // ============ 角色管理 ============
     case 'add_role':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -158,32 +158,22 @@ class FinanceModel
      */
     public static function mainCategoryOptions()
     {
-        return array(
-            '銀行借款',
-            '辦公設備',
-            '資產設備/辦公設備',
-            '電子鎖相關支出',
-            '其他費用',
-            '非公司帳款',
-            '員工福利與娛樂費用',
-            '外包與工班費用',
-            '權利金與特殊費用',
-            '廣告與行銷費用',
-            '員工借支',
-            '稅捐與專業費用',
-            '交際費',
-            '房租／水電／管理費',
-            '設備／工具／維修費用',
-            '勞健保與保險',
-            '薪資與獎金',
-            '文具／辦公／日常用品',
-            '餐飲與聚餐費',
-            '郵務／運輸／手續費',
-            '設備器材',
-            '設備器材廠商',
-            '車輛相關支出',
-            '系統/軟體費用',
+        $fallback = array(
+            '銀行借款', '辦公設備', '資產設備/辦公設備', '電子鎖相關支出',
+            '其他費用', '非公司帳款', '員工福利與娛樂費用', '外包與工班費用',
+            '權利金與特殊費用', '廣告與行銷費用', '員工借支', '稅捐與專業費用',
+            '交際費', '房租／水電／管理費', '設備／工具／維修費用', '勞健保與保險',
+            '薪資與獎金', '文具／辦公／日常用品', '餐飲與聚餐費', '郵務／運輸／手續費',
+            '設備器材', '設備器材廠商', '車輛相關支出', '系統/軟體費用',
         );
+        try {
+            $db = \Database::getInstance();
+            $stmt = $db->prepare("SELECT label FROM dropdown_options WHERE category = 'payment_main_category' AND parent_id IS NULL AND is_active = 1 ORDER BY sort_order, id");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            if (!empty($rows)) return $rows;
+        } catch (\Exception $e) {}
+        return $fallback;
     }
 
     /**
@@ -191,7 +181,7 @@ class FinanceModel
      */
     public static function subCategoryMap()
     {
-        return array(
+        $fallback = array(
             '銀行借款' => array('本金加利息(還款)', '利息'),
             '辦公設備' => array('電腦軟體', '電腦設備'),
             '電子鎖相關支出' => array('電子鎖材料費', '電子鎖安裝費', '電子鎖維修費', '電子鎖更換費', '電子鎖耗材', '電子鎖硬件成本', '電子鎖設備備品', '電子鎖專案成本', '電子鎖其他支出'),
@@ -217,6 +207,35 @@ class FinanceModel
             '車輛相關支出' => array('租賃保證金', '汽車租賃', '罰單', '修理', '保養', 'ETC', '停車費', '加油卡儲值', '現金加油'),
             '系統/軟體費用' => array('系統費用', '資訊服務費'),
         );
+        try {
+            $db = \Database::getInstance();
+            // 取所有主分類 id => label
+            $mainStmt = $db->prepare("SELECT id, label FROM dropdown_options WHERE category = 'payment_main_category' AND parent_id IS NULL AND is_active = 1 ORDER BY sort_order, id");
+            $mainStmt->execute();
+            $mains = $mainStmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (empty($mains)) return $fallback;
+
+            // 取所有子分類
+            $subStmt = $db->prepare("SELECT parent_id, label FROM dropdown_options WHERE category = 'payment_main_category' AND parent_id IS NOT NULL AND is_active = 1 ORDER BY sort_order, id");
+            $subStmt->execute();
+            $subs = $subStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 依 parent_id 分組
+            $subsByParent = array();
+            foreach ($subs as $s) {
+                $pid = $s['parent_id'];
+                if (!isset($subsByParent[$pid])) $subsByParent[$pid] = array();
+                $subsByParent[$pid][] = $s['label'];
+            }
+
+            // 組成 mainLabel => [subLabels]
+            $result = array();
+            foreach ($mains as $m) {
+                $result[$m['label']] = isset($subsByParent[$m['id']]) ? $subsByParent[$m['id']] : array();
+            }
+            return $result;
+        } catch (\Exception $e) {}
+        return $fallback;
     }
 
     // ============================================================

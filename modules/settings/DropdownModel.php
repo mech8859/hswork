@@ -29,11 +29,54 @@ class DropdownModel
      */
     public function getAllOptions($category)
     {
-        $stmt = $this->db->prepare(
-            'SELECT * FROM dropdown_options WHERE category = ? ORDER BY sort_order, label'
-        );
+        if ($category === 'payment_main_category') {
+            // 只取主分類（parent_id IS NULL）
+            $stmt = $this->db->prepare(
+                'SELECT * FROM dropdown_options WHERE category = ? AND parent_id IS NULL ORDER BY sort_order, id'
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM dropdown_options WHERE category = ? ORDER BY sort_order, label'
+            );
+        }
         $stmt->execute(array($category));
         return $stmt->fetchAll();
+    }
+
+    /**
+     * 取得某主分類的子分類
+     */
+    public function getSubOptions($parentId)
+    {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM dropdown_options WHERE parent_id = ? ORDER BY sort_order, id'
+        );
+        $stmt->execute(array($parentId));
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * 新增子分類
+     */
+    public function addSubOption($category, $parentId, $label)
+    {
+        $maxSort = $this->db->prepare("SELECT COALESCE(MAX(sort_order),0)+1 FROM dropdown_options WHERE parent_id = ?");
+        $maxSort->execute(array($parentId));
+        $nextSort = $maxSort->fetchColumn();
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO dropdown_options (category, parent_id, label, sort_order, is_active) VALUES (?, ?, ?, ?, 1)'
+        );
+        $stmt->execute(array($category, $parentId, $label, $nextSort));
+        return $this->db->lastInsertId();
+    }
+
+    /**
+     * 是否為層級分類
+     */
+    public function isHierarchical($category)
+    {
+        return $category === 'payment_main_category';
     }
 
     /**
@@ -42,14 +85,15 @@ class DropdownModel
     public function getCategories()
     {
         return array(
-            'customer_demand' => '客戶需求',
-            'system_type'     => '系統別',
-            'deposit_method'  => '訂金支付方式',
-            'case_type'       => '案別',
-            'case_progress'   => '案件進度',
-            'case_status'     => '狀態',
-            'case_company'    => '進件公司',
-            'case_source'     => '案件來源',
+            'customer_demand'       => '客戶需求',
+            'system_type'           => '系統別',
+            'deposit_method'        => '訂金支付方式',
+            'case_type'             => '案別',
+            'case_progress'         => '案件進度',
+            'case_status'           => '狀態',
+            'case_company'          => '進件公司',
+            'case_source'           => '案件來源',
+            'payment_main_category' => '付款單分類',
         );
     }
 
