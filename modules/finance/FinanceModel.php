@@ -1097,8 +1097,8 @@ class FinanceModel
     public function createBankTransaction($data)
     {
         $stmt = $this->db->prepare("INSERT INTO bank_transactions
-            (bank_account, transaction_date, summary, debit_amount, credit_amount, balance, description, remark)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            (bank_account, transaction_date, summary, debit_amount, credit_amount, balance, description, remark, upload_no, remittance_code, counterparty_account, memo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute(array(
             $data['bank_account'],
             $data['transaction_date'],
@@ -1108,6 +1108,10 @@ class FinanceModel
             isset($data['balance']) ? $data['balance'] : 0,
             isset($data['description']) ? $data['description'] : '',
             isset($data['remark']) ? $data['remark'] : '',
+            isset($data['upload_no']) ? ($data['upload_no'] ?: null) : null,
+            isset($data['remittance_code']) ? ($data['remittance_code'] ?: null) : null,
+            isset($data['counterparty_account']) ? ($data['counterparty_account'] ?: null) : null,
+            isset($data['memo']) ? ($data['memo'] ?: null) : null,
         ));
         return $this->db->lastInsertId();
     }
@@ -1120,7 +1124,8 @@ class FinanceModel
         $stmt = $this->db->prepare("UPDATE bank_transactions SET
             bank_account = ?, transaction_date = ?, summary = ?,
             debit_amount = ?, credit_amount = ?, balance = ?,
-            description = ?, remark = ?
+            description = ?, remark = ?,
+            upload_no = ?, remittance_code = ?, counterparty_account = ?, memo = ?
             WHERE id = ?");
         $stmt->execute(array(
             $data['bank_account'],
@@ -1131,6 +1136,10 @@ class FinanceModel
             isset($data['balance']) ? $data['balance'] : 0,
             isset($data['description']) ? $data['description'] : '',
             isset($data['remark']) ? $data['remark'] : '',
+            isset($data['upload_no']) ? ($data['upload_no'] ?: null) : null,
+            isset($data['remittance_code']) ? ($data['remittance_code'] ?: null) : null,
+            isset($data['counterparty_account']) ? ($data['counterparty_account'] ?: null) : null,
+            isset($data['memo']) ? ($data['memo'] ?: null) : null,
             $id,
         ));
     }

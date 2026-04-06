@@ -213,12 +213,16 @@ function generate_doc_number($module, $forDate = null)
 {
     $db = Database::getInstance();
 
+    // 別名映射
+    $aliasMap = array('payments_out' => 'payments');
+    $seqModule = isset($aliasMap[$module]) ? $aliasMap[$module] : $module;
+
     // 取得設定（使用 FOR UPDATE 鎖定避免併發）
     $ownTransaction = !$db->inTransaction();
     if ($ownTransaction) $db->beginTransaction();
     try {
         $stmt = $db->prepare("SELECT * FROM number_sequences WHERE module = ? FOR UPDATE");
-        $stmt->execute(array($module));
+        $stmt->execute(array($seqModule));
         $seq = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$seq) {
@@ -255,6 +259,11 @@ function generate_doc_number($module, $forDate = null)
             'requisitions' => array('requisitions', 'req_number'),
             'stock_outs' => array('stock_outs', 'so_number'),
             'stock_ins' => array('stock_ins', 'si_number'),
+            'receivables' => array('receivables', 'invoice_number'),
+            'receipts' => array('receipts', 'receipt_number'),
+            'payables' => array('payables', 'payable_number'),
+            'payments' => array('payments_out', 'payment_number'),
+            'payments_out' => array('payments_out', 'payment_number'),
         );
         if (isset($tableMap[$module])) {
             $tableName = $tableMap[$module][0];
@@ -329,9 +338,13 @@ function preview_doc_number($prefix, $dateFormat, $sep, $digits)
  */
 function peek_next_doc_number($module, $forDate = null)
 {
+    // 別名映射
+    $aliasMap = array('payments_out' => 'payments');
+    $seqModule = isset($aliasMap[$module]) ? $aliasMap[$module] : $module;
+
     $db = Database::getInstance();
     $stmt = $db->prepare("SELECT * FROM number_sequences WHERE module = ?");
-    $stmt->execute(array($module));
+    $stmt->execute(array($seqModule));
     $seq = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$seq) return '';
 
@@ -349,6 +362,13 @@ function peek_next_doc_number($module, $forDate = null)
         'journal_entries' => array('journal_entries', 'voucher_number'),
         'purchase_orders' => array('purchase_orders', 'po_number'),
         'requisitions' => array('requisitions', 'req_number'),
+        'stock_outs' => array('stock_outs', 'so_number'),
+        'stock_ins' => array('stock_ins', 'si_number'),
+        'receivables' => array('receivables', 'invoice_number'),
+        'receipts' => array('receipts', 'receipt_number'),
+        'payables' => array('payables', 'payable_number'),
+        'payments' => array('payments_out', 'payment_number'),
+        'payments_out' => array('payments_out', 'payment_number'),
     );
     $lpParts = array();
     if ($prefix !== '') $lpParts[] = $prefix;

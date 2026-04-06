@@ -82,6 +82,10 @@ switch ($action) {
             'balance'        => isset($_POST['balance']) ? (int)str_replace(',', '', $_POST['balance']) : 0,
             'description'    => isset($_POST['description']) ? trim($_POST['description']) : '',
             'remark'         => isset($_POST['remark']) ? trim($_POST['remark']) : '',
+            'upload_no'      => isset($_POST['upload_no']) ? trim($_POST['upload_no']) : '',
+            'remittance_code'=> isset($_POST['remittance_code']) ? trim($_POST['remittance_code']) : '',
+            'counterparty_account' => isset($_POST['counterparty_account']) ? trim($_POST['counterparty_account']) : '',
+            'memo'           => isset($_POST['memo']) ? trim($_POST['memo']) : '',
         );
 
         $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;

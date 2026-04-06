@@ -164,6 +164,13 @@ class BusinessCalendarModel
             $data['result'] ?: null,
             $id
         ));
+
+        // 備註回寫到案件的 sales_note
+        $caseId = !empty($data['case_id']) ? (int)$data['case_id'] : 0;
+        if ($caseId > 0 && array_key_exists('note', $data)) {
+            $this->db->prepare("UPDATE cases SET sales_note = ? WHERE id = ?")
+                ->execute(array($data['note'] ?: null, $caseId));
+        }
     }
 
     /**

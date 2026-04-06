@@ -241,7 +241,10 @@ switch ($action) {
         $warehouses = $model->getWarehouses();
         try {
             $stDb = Database::getInstance();
-            $staffList = $stDb->query("SELECT id, name FROM users WHERE is_active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $userBranchId = Auth::user()['branch_id'];
+            $staffList = $stDb->prepare("SELECT u.id, u.name, u.role, b.name AS branch_name FROM users u LEFT JOIN branches b ON u.branch_id = b.id WHERE u.is_active = 1 AND (u.role IN ('warehouse','purchaser') OR (u.role = 'admin_staff' AND u.branch_id = ?)) ORDER BY FIELD(u.role,'warehouse','purchaser','admin_staff'), u.name");
+            $staffList->execute(array($userBranchId));
+            $staffList = $staffList->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $stEx) {
             $staffList = array();
         }

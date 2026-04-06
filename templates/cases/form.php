@@ -343,6 +343,10 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             <label>備註</label>
             <textarea name="notes" class="form-control" rows="2"><?= e($case['notes'] ?? '') ?></textarea>
         </div>
+        <div class="form-group">
+            <label>業務備註 <small class="text-muted">（與業務行事曆雙向同步）</small></label>
+            <textarea name="sales_note" class="form-control" rows="2"><?= e($case['sales_note'] ?? '') ?></textarea>
+        </div>
 
         <!-- 登記人 -->
         <div class="form-row">

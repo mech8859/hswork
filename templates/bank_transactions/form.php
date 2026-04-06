@@ -68,6 +68,28 @@ $bankOptions = FinanceModel::bankAccountOptions();
                        value="<?= e($isEdit && !empty($record['remark']) ? $record['remark'] : '') ?>">
             </div>
         </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>上傳編號</label>
+                <input type="text" name="upload_no" class="form-control" placeholder="上傳編號"
+                       value="<?= e($isEdit && !empty($record['upload_no']) ? $record['upload_no'] : '') ?>">
+            </div>
+            <div class="form-group">
+                <label>存匯代號</label>
+                <input type="text" name="remittance_code" class="form-control" placeholder="存匯代號"
+                       value="<?= e($isEdit && !empty($record['remittance_code']) ? $record['remittance_code'] : '') ?>">
+            </div>
+            <div class="form-group">
+                <label>對方帳號</label>
+                <input type="text" name="counterparty_account" class="form-control" placeholder="對方帳號"
+                       value="<?= e($isEdit && !empty($record['counterparty_account']) ? $record['counterparty_account'] : '') ?>">
+            </div>
+            <div class="form-group">
+                <label>註記</label>
+                <input type="text" name="memo" class="form-control" placeholder="註記"
+                       value="<?= e($isEdit && !empty($record['memo']) ? $record['memo'] : '') ?>">
+            </div>
+        </div>
     </div>
 
     <div class="d-flex justify-between mt-2">

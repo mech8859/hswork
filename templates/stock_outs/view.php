@@ -26,7 +26,14 @@ $creatorName = isset($record['creator_name']) ? $record['creator_name'] : (isset
 $confirmedName = isset($record['confirmed_by_name']) ? $record['confirmed_by_name'] : '-';
 $isPending = ($record['status'] === 'pending' || $record['status'] === '待確認');
 $isPartial = ($record['status'] === '部分出庫');
-$canConfirmItems = $isPending || $isPartial;
+$items = isset($record['items']) ? $record['items'] : array();
+$hasUnconfirmed = false;
+if (!empty($items)) {
+    foreach ($items as $chkItem) {
+        if (empty($chkItem['is_confirmed'])) { $hasUnconfirmed = true; break; }
+    }
+}
+$canConfirmItems = ($isPending || $isPartial) && $hasUnconfirmed;
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -50,6 +57,12 @@ $canConfirmItems = $isPending || $isPartial;
         <?php endif; ?>
         <?php if ($canManage && !$isPending && !empty($record['has_return_material'])): ?>
         <a href="/stock_ins.php?action=create_from_return&stock_out_id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('確認將餘料建立入庫單？')">餘料入庫</a>
+        <?php endif; ?>
+        <?php
+        $allConfirmed = !$hasUnconfirmed && !empty($items);
+        $isCancelled = ($record['status'] === '已取消');
+        if ($canManage && $allConfirmed && !$isCancelled): ?>
+        <button type="button" id="btnManualReturn" class="btn btn-sm" style="background:#7B1FA2;color:#fff" onclick="enterReturnMode()">手動餘料入庫</button>
         <?php endif; ?>
         <button type="button" class="btn btn-outline btn-sm no-print" onclick="window.print()">列印</button>
         <?= back_button('/stock_outs.php') ?>
@@ -147,9 +160,6 @@ $canConfirmItems = $isPending || $isPartial;
 <!-- 出庫明細 -->
 <div class="card">
     <div class="card-header">出庫明細</div>
-    <?php
-    $items = isset($record['items']) ? $record['items'] : array();
-    ?>
     <?php if (empty($items)): ?>
         <p class="text-muted text-center mt-2">無明細</p>
     <?php else: ?>
@@ -175,7 +185,9 @@ $canConfirmItems = $isPending || $isPartial;
         <table class="table" id="soItemsTable">
             <thead><tr>
                 <?php if ($canManage && $canConfirmItems): ?><th class="print-hide-col" style="width:35px"><input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)"></th><?php endif; ?>
+                <th class="return-col" style="width:35px;display:none"><input type="checkbox" id="returnCheckAll" onchange="toggleReturnCheckAll(this)"></th>
                 <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">出庫數量</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:60px">狀態</th>
+                <th class="return-col" style="width:80px;display:none">入庫數量</th>
             </tr></thead>
             <tbody>
                 <?php $totalCost = 0; ?>
@@ -196,6 +208,7 @@ $canConfirmItems = $isPending || $isPartial;
                     $hasStock = ($itemStock >= $requestQty && $itemStock > 0);
                 ?>
                 <tr<?= $isSpare ? ' style="background:#fff8e1"' : '' ?>>
+                    <td class="return-col" style="display:none"><?php if (!empty($item['is_confirmed'])): ?><input type="checkbox" class="return-check" value="<?= (int)$item['id'] ?>" data-max="<?= $qty ?>" data-product="<?= e($productName) ?>"><?php endif; ?></td>
                     <?php if ($canManage && $canConfirmItems): ?>
                     <td class="print-hide-col"><?php if (empty($item['is_confirmed']) && $hasStock): ?><input type="checkbox" class="item-check" value="<?= (int)$item['id'] ?>" data-qty="<?= $qty ?>"><?php endif; ?></td>
                     <?php endif; ?>
@@ -238,6 +251,7 @@ $canConfirmItems = $isPending || $isPartial;
                         <button type="button" class="btn btn-danger btn-sm" onclick="removeSpare(<?= (int)$item['id'] ?>)" title="移除備品" style="padding:2px 6px;font-size:.75rem;margin-left:4px">&times;</button>
                         <?php endif; ?>
                     </td>
+                    <td class="return-col" style="display:none"><?php if (!empty($item['is_confirmed'])): ?><input type="number" class="form-control return-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;text-align:right;padding:2px 6px;font-size:.85rem" min="0" max="<?= $qty ?>" value="0"><?php endif; ?></td>
                 </tr>
                 <?php $totalCost += $subtotal; ?>
                 <?php endforeach; ?>
@@ -539,6 +553,97 @@ $canConfirmItems = $isPending || $isPartial;
     </script>
     <?php endif; ?>
 </div>
+
+<?php if ($canManage && $allConfirmed && !$isCancelled): ?>
+<div id="returnBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#7B1FA2;color:#fff;padding:12px 24px;z-index:100;display:none;align-items:center;justify-content:space-between;box-shadow:0 -2px 8px rgba(0,0,0,.2)">
+    <span id="returnInfo">已選 0 項</span>
+    <div>
+        <button type="button" class="btn btn-sm" style="background:#fff;color:#7B1FA2;font-weight:600" onclick="confirmManualReturn()">確認退料入庫</button>
+        <button type="button" class="btn btn-sm" style="background:transparent;color:#fff;border:1px solid #fff;margin-left:8px" onclick="exitReturnMode()">取消</button>
+    </div>
+</div>
+<script>
+var returnModeActive = false;
+function enterReturnMode() {
+    returnModeActive = true;
+    var cols = document.querySelectorAll('.return-col');
+    for (var i = 0; i < cols.length; i++) cols[i].style.display = '';
+    document.getElementById('returnBar').style.display = 'flex';
+    document.getElementById('btnManualReturn').style.display = 'none';
+    updateReturnInfo();
+}
+function exitReturnMode() {
+    returnModeActive = false;
+    var cols = document.querySelectorAll('.return-col');
+    for (var i = 0; i < cols.length; i++) cols[i].style.display = 'none';
+    document.getElementById('returnBar').style.display = 'none';
+    document.getElementById('btnManualReturn').style.display = '';
+    // reset checkboxes and qty
+    var checks = document.querySelectorAll('.return-check');
+    for (var j = 0; j < checks.length; j++) checks[j].checked = false;
+    var qtys = document.querySelectorAll('.return-qty');
+    for (var k = 0; k < qtys.length; k++) qtys[k].value = 0;
+}
+function toggleReturnCheckAll(el) {
+    var checks = document.querySelectorAll('.return-check');
+    for (var i = 0; i < checks.length; i++) {
+        checks[i].checked = el.checked;
+        if (el.checked) {
+            var qtyInput = document.querySelector('.return-qty[data-item-id="' + checks[i].value + '"]');
+            if (qtyInput && qtyInput.value == 0) qtyInput.value = 1;
+        }
+    }
+    updateReturnInfo();
+}
+function updateReturnInfo() {
+    var checks = document.querySelectorAll('.return-check:checked');
+    document.getElementById('returnInfo').textContent = '已選 ' + checks.length + ' 項';
+}
+// 勾選時自動帶入數量 1
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('return-check')) {
+        var qtyInput = document.querySelector('.return-qty[data-item-id="' + e.target.value + '"]');
+        if (e.target.checked && qtyInput && qtyInput.value == 0) qtyInput.value = 1;
+        if (!e.target.checked && qtyInput) qtyInput.value = 0;
+        updateReturnInfo();
+    }
+});
+function confirmManualReturn() {
+    var checks = document.querySelectorAll('.return-check:checked');
+    if (checks.length === 0) { alert('請先勾選要退回的品項'); return; }
+    var hasQty = false;
+    for (var i = 0; i < checks.length; i++) {
+        var qtyInput = document.querySelector('.return-qty[data-item-id="' + checks[i].value + '"]');
+        var q = qtyInput ? parseInt(qtyInput.value) : 0;
+        var max = parseInt(checks[i].dataset.max);
+        if (q <= 0) { alert('品項「' + checks[i].dataset.product + '」入庫數量必須大於 0'); return; }
+        if (q > max) { alert('品項「' + checks[i].dataset.product + '」入庫數量不可超過出庫數量 ' + max); return; }
+        hasQty = true;
+    }
+    if (!hasQty) return;
+    if (!confirm('確認將 ' + checks.length + ' 項餘料建立入庫單？')) return;
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/stock_outs.php?action=manual_return&id=<?= $record['id'] ?>';
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden'; csrf.name = 'csrf_token'; csrf.value = '<?= e(Session::getCsrfToken()) ?>';
+    form.appendChild(csrf);
+    for (var j = 0; j < checks.length; j++) {
+        var itemId = checks[j].value;
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'item_ids[]'; inp.value = itemId;
+        form.appendChild(inp);
+        var qInput = document.querySelector('.return-qty[data-item-id="' + itemId + '"]');
+        var qInp = document.createElement('input');
+        qInp.type = 'hidden'; qInp.name = 'return_qtys[' + itemId + ']'; qInp.value = qInput ? qInput.value : 0;
+        form.appendChild(qInp);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+<?php endif; ?>
 
 <style>
 .form-row { display: flex; flex-wrap: wrap; gap: 12px; }

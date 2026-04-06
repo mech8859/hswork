@@ -44,21 +44,39 @@ class CaseModel
             $params[] = $filters['sub_status'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (c.title LIKE ? OR c.case_number LIKE ? OR c.address LIKE ? OR c.customer_name LIKE ? OR u.real_name LIKE ?)';
-            $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
-            $params[] = $kw;
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwRaw = $filters['keyword'];
+            $kwClean = str_replace(array('-', ' '), '', $kwRaw);
+            // $開頭 = 搜尋帳款金額
+            if (preg_match('/^\$(\d[\d,]*)$/', $kwRaw, $m)) {
+                $amt = (int)str_replace(',', '', $m[1]);
+                $where .= ' AND c.id IN (SELECT case_id FROM case_payments WHERE amount = ?)';
+                $params[] = $amt;
+            } else {
+                $where .= ' AND (c.title LIKE ? OR c.case_number LIKE ? OR c.address LIKE ? OR c.customer_name LIKE ? OR u.real_name LIKE ? OR REPLACE(REPLACE(c.customer_phone,"-","")," ","") LIKE ? OR REPLACE(REPLACE(c.customer_mobile,"-","")," ","") LIKE ? OR c.id IN (SELECT case_id FROM case_payments WHERE note LIKE ?))';
+                $kw = '%' . $kwRaw . '%';
+                $kwPhone = '%' . $kwClean . '%';
+                $params[] = $kw;
+                $params[] = $kw;
+                $params[] = $kw;
+                $params[] = $kw;
+                $params[] = $kw;
+                $params[] = $kwPhone;
+                $params[] = $kwPhone;
+                $params[] = $kw;
+            }
         }
         if (!empty($filters['branch_id'])) {
             $where .= ' AND c.branch_id = ?';
             $params[] = $filters['branch_id'];
         }
         if (!empty($filters['sales_id'])) {
-            $where .= ' AND c.sales_id = ?';
-            $params[] = $filters['sales_id'];
+            $sids = is_array($filters['sales_id']) ? $filters['sales_id'] : explode(',', $filters['sales_id']);
+            $sids = array_filter(array_map('intval', $sids));
+            if ($sids) {
+                $sph = implode(',', array_fill(0, count($sids), '?'));
+                $where .= " AND c.sales_id IN ($sph)";
+                $params = array_merge($params, $sids);
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND c.created_at >= ?';
@@ -385,7 +403,8 @@ class CaseModel
                 repair_report_date = ?, repair_fault_reason = ?, repair_by_sales = ?, repair_equipment = ?,
                 repair_staff = ?, repair_helper = ?, repair_result = ?, repair_description = ?,
                 repair_original_case = ?, repair_original_complete_date = ?, repair_original_warranty_date = ?,
-                repair_is_charged = ?, repair_no_charge_reason = ?
+                repair_is_charged = ?, repair_no_charge_reason = ?,
+                sales_note = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -466,6 +485,7 @@ class CaseModel
             !empty($data['repair_original_warranty_date']) ? $data['repair_original_warranty_date'] : null,
             !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
             !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
+            !empty($data['sales_note']) ? $data['sales_note'] : null,
             $id,
         ]);
 
@@ -474,6 +494,12 @@ class CaseModel
 
         // 同步更新 stage
         $this->syncStage($id);
+
+        // 業務備註同步到業務行事曆
+        if (array_key_exists('sales_note', $data)) {
+            $this->db->prepare("UPDATE business_calendar SET note = ? WHERE case_id = ? AND note IS NOT NULL")
+                ->execute(array(!empty($data['sales_note']) ? $data['sales_note'] : null, $id));
+        }
 
         // 場勘日期同步到業務行事曆
         if (!empty($data['survey_date'])) {

@@ -22,8 +22,14 @@
             <label>盤點人 <span class="text-danger">*</span></label>
             <select name="stocktaker_id" class="form-control" required>
                 <option value="">請選擇</option>
-                <?php foreach ($staffList as $s): ?>
-                <option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option>
+                <?php
+                $roleLabels = array('warehouse' => '倉管', 'purchaser' => '採購', 'admin_staff' => '行政');
+                foreach ($staffList as $s):
+                    $label = $s['name'];
+                    if (!empty($s['branch_name'])) $label .= ' - ' . $s['branch_name'];
+                    if (!empty($roleLabels[$s['role']])) $label .= '（' . $roleLabels[$s['role']] . '）';
+                ?>
+                <option value="<?= $s['id'] ?>"><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

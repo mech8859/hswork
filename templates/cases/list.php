@@ -85,12 +85,58 @@ $subStatusOptions = CaseModel::subStatusOptions();
         if (!empty($filters['date_from'])) $baseQS4['date_from'] = $filters['date_from'];
         if (!empty($filters['date_to'])) $baseQS4['date_to'] = $filters['date_to'];
         ?>
-        <select class="pill-select" onchange="if(this.value){var qs=<?= htmlspecialchars(json_encode((object)$baseQS4), ENT_QUOTES) ?>;qs.sales_id=this.value;location.href='/cases.php?'+new URLSearchParams(qs).toString();}else{location.href='/cases.php?'+new URLSearchParams(<?= htmlspecialchars(json_encode((object)$baseQS4), ENT_QUOTES) ?>).toString();}">
-            <option value="">全部</option>
-            <?php foreach ($salesUsers as $su): ?>
-            <option value="<?= $su['id'] ?>" <?= $filters['sales_id'] == $su['id'] ? 'selected' : '' ?>><?= e($su['real_name']) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <?php
+        $selectedSales = array_filter(explode(',', $filters['sales_id']));
+        $salesLabel = empty($selectedSales) ? '全部' : count($selectedSales) . '人';
+        ?>
+        <div class="sales-multi-wrap" style="position:relative;display:inline-block">
+            <button type="button" class="pill-select" onclick="toggleSalesDropdown()" id="salesDropBtn" style="cursor:pointer;min-width:80px;text-align:left">
+                <?= e($salesLabel) ?> ▾
+            </button>
+            <div id="salesDropdown" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;max-height:320px;overflow-y:auto;padding:4px 0">
+                <div style="padding:4px 10px;border-bottom:1px solid #eee">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;font-weight:600;margin:0">
+                        <input type="checkbox" id="salesCheckAll" onchange="toggleSalesAll(this)"> 全選/取消
+                    </label>
+                </div>
+                <?php foreach ($salesUsers as $su): ?>
+                <div style="padding:3px 10px">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;margin:0;white-space:nowrap">
+                        <input type="checkbox" class="sales-check" value="<?= $su['id'] ?>" <?= in_array($su['id'], $selectedSales) ? 'checked' : '' ?>> <?= e($su['real_name']) ?>
+                    </label>
+                </div>
+                <?php endforeach; ?>
+                <div style="padding:6px 10px;border-top:1px solid #eee;display:flex;gap:6px">
+                    <button type="button" class="btn btn-primary btn-sm" style="flex:1;font-size:.8rem" onclick="applySalesFilter()">套用</button>
+                    <button type="button" class="btn btn-outline btn-sm" style="flex:1;font-size:.8rem" onclick="clearSalesFilter()">清除</button>
+                </div>
+            </div>
+        </div>
+        <script>
+        function toggleSalesDropdown() {
+            var dd = document.getElementById('salesDropdown');
+            dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.sales-multi-wrap')) document.getElementById('salesDropdown').style.display = 'none';
+        });
+        function toggleSalesAll(el) {
+            var checks = document.querySelectorAll('.sales-check');
+            for (var i = 0; i < checks.length; i++) checks[i].checked = el.checked;
+        }
+        function applySalesFilter() {
+            var checks = document.querySelectorAll('.sales-check:checked');
+            var ids = [];
+            for (var i = 0; i < checks.length; i++) ids.push(checks[i].value);
+            var qs = <?= json_encode((object)$baseQS4, JSON_UNESCAPED_UNICODE) ?>;
+            if (ids.length > 0) qs.sales_id = ids.join(',');
+            location.href = '/cases.php?' + new URLSearchParams(qs).toString();
+        }
+        function clearSalesFilter() {
+            var qs = <?= json_encode((object)$baseQS4, JSON_UNESCAPED_UNICODE) ?>;
+            location.href = '/cases.php?' + new URLSearchParams(qs).toString();
+        }
+        </script>
     </div>
 </div>
 
@@ -109,7 +155,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
             </div>
             <?php endif; ?>
             <div class="form-group" style="flex:2">
-                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword']) ?>" placeholder="搜尋案件名稱/編號/地址/客戶/業務..." autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword']) ?>" placeholder="案件/地址/客戶/電話/業務，$金額搜帳款" autocomplete="off">
             </div>
             <div class="form-group">
                 <input type="date" name="date_from" class="form-control" value="<?= e(isset($filters['date_from']) ? $filters['date_from'] : '') ?>" placeholder="起始日期" title="進件日期起">
@@ -195,6 +241,16 @@ $subStatusOptions = CaseModel::subStatusOptions();
                         <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['customer_name'] ?: $row['title'] ?: '') ?></a>
                         <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.65em">黑名單</span><?php endif; ?>
                         <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.65em">未成交</span><?php endif; ?>
+                        <?php if (!empty($filters['keyword'])):
+                            $details = array();
+                            if (!empty($row['address'])) $details[] = $row['address'];
+                            $phones = array();
+                            if (!empty($row['customer_phone'])) $phones[] = $row['customer_phone'];
+                            if (!empty($row['customer_mobile'])) $phones[] = $row['customer_mobile'];
+                            if ($phones) $details[] = implode(' / ', $phones);
+                            if ($details): ?>
+                        <div style="font-size:.75rem;color:#888;margin-top:2px;line-height:1.3"><?= e(implode(' | ', $details)) ?></div>
+                        <?php endif; endif; ?>
                     </td>
                     <td><?= e($row['branch_name'] ?: '') ?></td>
                     <td><?= e(CaseModel::typeLabel($row['case_type'] ?: '')) ?></td>
@@ -228,7 +284,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
 </div>
 
 <style>
-.filter-pills { display: flex; flex-direction: column; gap: 8px; }
+.filter-pills { display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 10; }
 .pill-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pill-label { font-size: .8rem; color: var(--gray-500); font-weight: 600; min-width: 32px; }
 .pill {

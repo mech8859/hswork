@@ -177,6 +177,84 @@ switch ($action) {
         redirect('/stock_outs.php?action=view&id=' . $id);
         break;
 
+    // ---- 手動餘料入庫 ----
+    case 'manual_return':
+        if (!$canManage) { Session::flash('error', '無權限'); redirect('/stock_outs.php'); }
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_POST['item_ids'])) {
+            Session::flash('error', '無效請求'); redirect('/stock_outs.php?action=view&id=' . $id);
+        }
+        if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/stock_outs.php?action=view&id=' . $id); }
+
+        $so = $model->getStockOut($id);
+        if (!$so) { Session::flash('error', '出庫單不存在'); redirect('/stock_outs.php'); }
+
+        $returnQtys = isset($_POST['return_qtys']) ? $_POST['return_qtys'] : array();
+        $db = Database::getInstance();
+
+        // 取出庫單明細
+        $soItems = $model->getStockOutItems($id);
+        $itemMap = array();
+        foreach ($soItems as $si) { $itemMap[(int)$si['id']] = $si; }
+
+        // 組入庫單明細
+        $siItems = array();
+        foreach ($_POST['item_ids'] as $itemId) {
+            $itemId = (int)$itemId;
+            if (!isset($itemMap[$itemId])) continue;
+            $item = $itemMap[$itemId];
+            $qty = isset($returnQtys[$itemId]) ? (int)$returnQtys[$itemId] : 0;
+            $maxQty = (int)(isset($item['quantity']) ? $item['quantity'] : 0);
+            if ($qty <= 0 || $qty > $maxQty) continue;
+
+            $siItems[] = array(
+                'product_id' => !empty($item['product_id']) ? $item['product_id'] : null,
+                'model'      => isset($item['model']) ? $item['model'] : (isset($item['product_model']) ? $item['product_model'] : ''),
+                'product_name' => isset($item['product_name']) ? $item['product_name'] : (isset($item['db_product_name']) ? $item['db_product_name'] : ''),
+                'spec'       => isset($item['spec']) ? $item['spec'] : '',
+                'unit'       => isset($item['unit']) ? $item['unit'] : '',
+                'quantity'   => $qty,
+                'unit_price' => isset($item['unit_cost']) ? $item['unit_cost'] : (isset($item['unit_price']) ? $item['unit_price'] : 0),
+                'note'       => '',
+            );
+        }
+
+        if (empty($siItems)) {
+            Session::flash('error', '沒有有效的退料品項');
+            redirect('/stock_outs.php?action=view&id=' . $id);
+        }
+
+        // 建立入庫單
+        $branchName = '';
+        if (!empty($so['branch_id'])) {
+            $bn = $db->prepare("SELECT name FROM branches WHERE id = ?");
+            $bn->execute(array($so['branch_id']));
+            $branchName = $bn->fetchColumn() ?: '';
+        }
+
+        $siData = array(
+            'si_date'       => date('Y-m-d'),
+            'warehouse_id'  => $so['warehouse_id'],
+            'branch_id'     => !empty($so['branch_id']) ? $so['branch_id'] : null,
+            'branch_name'   => $branchName,
+            'source_type'   => 'manual_return',
+            'source_id'     => $id,
+            'source_number' => $so['so_number'],
+            'note'          => '手動餘料入庫，來源出庫單 ' . $so['so_number'],
+            'items'         => $siItems,
+        );
+
+        try {
+            $siId = $model->createStockIn($siData);
+            AuditLog::log('stock_ins', 'create', $siId, '手動餘料入庫，來源出庫單 ' . $so['so_number']);
+            Session::flash('success', '入庫單已建立，請確認入庫');
+            redirect('/stock_ins.php?action=view&id=' . $siId);
+        } catch (Exception $e) {
+            Session::flash('error', '建立入庫單失敗：' . $e->getMessage());
+            redirect('/stock_outs.php?action=view&id=' . $id);
+        }
+        break;
+
     // ---- 新增備品 AJAX ----
     case 'ajax_add_spare':
         if (!$canManage) { header('Content-Type: application/json'); echo json_encode(array('error' => '無權限')); break; }
