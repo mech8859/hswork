@@ -177,6 +177,44 @@ switch ($action) {
         redirect('/stock_outs.php?action=view&id=' . $id);
         break;
 
+    // ---- 預扣庫存 ----
+    case 'reserve':
+        if (!$canManage) { Session::flash('error', '無權限'); redirect('/stock_outs.php'); }
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        if (verify_csrf()) {
+            try {
+                if ($model->reserveStockOut($id, Auth::id())) {
+                    AuditLog::log('stock_outs', 'reserve', $id, '預扣庫存');
+                    Session::flash('success', '庫存已預扣（已備貨）');
+                } else {
+                    Session::flash('error', '預扣失敗（狀態不符）');
+                }
+            } catch (Exception $e) {
+                Session::flash('error', '預扣失敗：' . $e->getMessage());
+            }
+        }
+        redirect('/stock_outs.php?action=view&id=' . $id);
+        break;
+
+    // ---- 取消預扣 ----
+    case 'cancel_reserve':
+        if (!$canManage) { Session::flash('error', '無權限'); redirect('/stock_outs.php'); }
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        if (verify_csrf()) {
+            try {
+                if ($model->cancelReserve($id, Auth::id())) {
+                    AuditLog::log('stock_outs', 'cancel_reserve', $id, '取消預扣');
+                    Session::flash('success', '已取消預扣，庫存已恢復');
+                } else {
+                    Session::flash('error', '取消預扣失敗（狀態不符）');
+                }
+            } catch (Exception $e) {
+                Session::flash('error', '取消預扣失敗：' . $e->getMessage());
+            }
+        }
+        redirect('/stock_outs.php?action=view&id=' . $id);
+        break;
+
     // ---- 手動餘料入庫 ----
     case 'manual_return':
         if (!$canManage) { Session::flash('error', '無權限'); redirect('/stock_outs.php'); }

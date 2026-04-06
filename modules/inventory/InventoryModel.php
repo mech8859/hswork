@@ -321,6 +321,63 @@ class InventoryModel
     }
 
     /**
+     * 預扣庫存：available_qty 減少, reserved_qty 增加（不動 stock_qty）
+     */
+    public function reserveStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET available_qty = available_qty - ?, reserved_qty = reserved_qty + ?
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'reserve', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, -$qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
+     * 取消預扣：available_qty 增加, reserved_qty 減少
+     */
+    public function unreserveStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET available_qty = available_qty + ?, reserved_qty = GREATEST(reserved_qty - ?, 0)
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'unreserve', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, $qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
+     * 預扣轉出庫：reserved_qty 減少, stock_qty 減少（available_qty 不動，因為已在預扣時扣過）
+     */
+    public function confirmReservedStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET stock_qty = stock_qty - ?, reserved_qty = GREATEST(reserved_qty - ?, 0)
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'case_out', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, -$qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
      * 更新安全庫存量
      */
     public function updateMinQty($inventoryId, $minQty)

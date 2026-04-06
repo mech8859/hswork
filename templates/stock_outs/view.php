@@ -26,6 +26,7 @@ $creatorName = isset($record['creator_name']) ? $record['creator_name'] : (isset
 $confirmedName = isset($record['confirmed_by_name']) ? $record['confirmed_by_name'] : '-';
 $isPending = ($record['status'] === 'pending' || $record['status'] === '待確認');
 $isPartial = ($record['status'] === '部分出庫');
+$isReserved = ($record['status'] === '已備貨');
 $items = isset($record['items']) ? $record['items'] : array();
 $hasUnconfirmed = false;
 if (!empty($items)) {
@@ -33,7 +34,7 @@ if (!empty($items)) {
         if (empty($chkItem['is_confirmed'])) { $hasUnconfirmed = true; break; }
     }
 }
-$canConfirmItems = ($isPending || $isPartial) && $hasUnconfirmed;
+$canConfirmItems = ($isPending || $isPartial || $isReserved) && $hasUnconfirmed;
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -51,6 +52,12 @@ $canConfirmItems = ($isPending || $isPartial) && $hasUnconfirmed;
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1 flex-wrap">
+        <?php if ($canManage && $isPending && $hasUnconfirmed): ?>
+        <a href="/stock_outs.php?action=reserve&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="return confirm('確認預扣庫存？將從可用庫存扣除並標記為已備貨。')">預扣庫存</a>
+        <?php endif; ?>
+        <?php if ($canManage && $isReserved): ?>
+        <a href="/stock_outs.php?action=cancel_reserve&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-outline btn-sm" style="color:#1565c0;border-color:#1565c0" onclick="return confirm('確認取消預扣？庫存將恢復為可用。')">取消預扣</a>
+        <?php endif; ?>
         <?php if ($canManage && $canConfirmItems): ?>
         <button type="button" class="btn btn-sm" style="background:var(--success);color:#fff" onclick="confirmCheckedItems()">確認勾選出庫</button>
         <a href="/stock_outs.php?action=cancel&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="return confirm('確定取消此出庫單？已出庫品項紀錄將保留。')">取消出庫</a>
