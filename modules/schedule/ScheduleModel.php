@@ -413,13 +413,19 @@ class ScheduleModel
         $targetHours = (float)$caseStmt2->fetchColumn();
         if ($targetHours <= 0) $targetHours = self::DEFAULT_ESTIMATED_HOURS;
 
+        // 取得當日請假人員
+        $leaveStmt = $this->db->prepare("SELECT user_id FROM leaves WHERE status = 'approved' AND start_date <= ? AND end_date >= ?");
+        $leaveStmt->execute(array($date, $date));
+        $onLeaveIds = array_column($leaveStmt->fetchAll(PDO::FETCH_ASSOC), 'user_id');
+
         // 為每位工程師計算資訊
         foreach ($engineers as &$eng) {
             $usedH = isset($hoursMap[$eng['id']]) ? $hoursMap[$eng['id']] : 0;
             $remainH = self::DAILY_HOURS_CAPACITY - $usedH;
             $eng['hours_used'] = $usedH;
             $eng['remaining_hours'] = $remainH;
-            $eng['is_busy'] = ($remainH < $targetHours);
+            $eng['is_on_leave'] = in_array($eng['id'], $onLeaveIds);
+            $eng['is_busy'] = $eng['is_on_leave'] || ($remainH < $targetHours);
 
             // 技能符合度
             $eng['skill_match'] = true;

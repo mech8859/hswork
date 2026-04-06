@@ -56,7 +56,7 @@ switch ($action) {
         // 請假資料（行事曆上顯示休假人員）
         require_once __DIR__ . '/../modules/leaves/LeaveModel.php';
         $leaveModel = new LeaveModel();
-        $leavesByDate = $leaveModel->getCalendarData(sprintf('%04d-%02d', $year, $month), $branchIds);
+        $leavesByDate = $leaveModel->getCalendarData(sprintf('%04d-%02d', $year, $month), $branchIds, array('engineer','eng_manager','eng_deputy'));
 
         // 排工日設定（每日是否開放、容量限制）
         $daySettings = $model->getDaySettings($startDate, $endDate);

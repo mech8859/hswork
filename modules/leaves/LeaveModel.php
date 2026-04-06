@@ -164,13 +164,19 @@ class LeaveModel
     /**
      * 取得整月行事曆資料 (某月每日的請假人員)
      */
-    public function getCalendarData($yearMonth, array $branchIds)
+    public function getCalendarData($yearMonth, array $branchIds, $roleFilter = null)
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
         $startDate = $yearMonth . '-01';
         $endDate = date('Y-m-t', strtotime($startDate));
 
+        $roleWhere = '';
         $params = array_merge(array($endDate, $startDate), $branchIds);
+        if ($roleFilter && is_array($roleFilter)) {
+            $rph = implode(',', array_fill(0, count($roleFilter), '?'));
+            $roleWhere = " AND u.role IN ($rph)";
+            $params = array_merge($params, $roleFilter);
+        }
         $stmt = $this->db->prepare("
             SELECT l.*, u.real_name, u.branch_id
             FROM leaves l
@@ -178,7 +184,7 @@ class LeaveModel
             WHERE l.start_date <= ? AND l.end_date >= ?
               AND u.branch_id IN ($ph)
               AND l.status IN ('approved','pending')
-              AND u.role IN ('engineer','eng_manager','eng_deputy')
+              {$roleWhere}
             ORDER BY u.real_name
         ");
         $stmt->execute($params);

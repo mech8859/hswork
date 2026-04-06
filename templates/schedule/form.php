@@ -106,7 +106,7 @@ if ($isEdit) {
             <span>工程師指派</span>
             <span class="text-muted" style="font-size:.8rem" id="engineerCount">已選 0 人</span>
         </div>
-        <p class="text-muted mb-1" style="font-size:.85rem">綠色=技能符合，灰色=當日已滿，黃色=當日有排工但仍有餘量</p>
+        <p class="text-muted mb-1" style="font-size:.85rem">綠色=技能符合，灰色=已滿/休假，黃色=有排工但仍有餘量</p>
 
         <div id="engineerList">
             <?php if (!empty($engineers)): ?>
@@ -127,7 +127,9 @@ if ($isEdit) {
                     <?php if ($eng['skill_match']): ?>
                         <span class="badge badge-success">技能符合</span>
                     <?php endif; ?>
-                    <?php if ($eng['is_busy']): ?>
+                    <?php if (!empty($eng['is_on_leave'])): ?>
+                        <span class="badge" style="background:#e53935;color:#fff">休假</span>
+                    <?php elseif ($eng['is_busy']): ?>
                         <span class="badge" style="background:#e53935;color:#fff">已滿(<?= isset($eng['hours_used']) ? $eng['hours_used'] : 0 ?>h)</span>
                     <?php elseif (isset($eng['hours_used']) && $eng['hours_used'] > 0): ?>
                         <span class="badge badge-warning">已排<?= $eng['hours_used'] ?>h / 剩<?= $eng['remaining_hours'] ?>h</span>
@@ -264,7 +266,9 @@ function reloadSuggestions() {
             html += '<span>' + eng.real_name + ' <span class="text-muted" style="font-size:.8rem">(' + eng.branch_name + ')</span></span>';
             html += '</label>';
             if (eng.skill_match) html += '<span class="badge badge-success">技能符合</span>';
-            if (eng.is_busy) {
+            if (eng.is_on_leave) {
+                html += '<span class="badge" style="background:#e53935;color:#fff">休假</span>';
+            } else if (eng.is_busy) {
                 html += '<span class="badge" style="background:#e53935;color:#fff">已滿(' + usedH + 'h)</span>';
             } else if (usedH > 0) {
                 html += '<span class="badge badge-warning">已排' + usedH + 'h / 剩' + eng.remaining_hours + 'h</span>';
