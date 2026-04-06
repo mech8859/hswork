@@ -186,7 +186,7 @@ switch ($action) {
         }
         if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/stock_outs.php?action=view&id=' . $id); }
 
-        $so = $model->getStockOut($id);
+        $so = $model->getStockOutById($id);
         if (!$so) { Session::flash('error', '出庫單不存在'); redirect('/stock_outs.php'); }
 
         $returnQtys = isset($_POST['return_qtys']) ? $_POST['return_qtys'] : array();
@@ -242,6 +242,7 @@ switch ($action) {
             'source_number' => $so['so_number'],
             'note'          => '手動餘料入庫，來源出庫單 ' . $so['so_number'],
             'items'         => $siItems,
+            'created_by'    => Auth::id(),
         );
 
         try {

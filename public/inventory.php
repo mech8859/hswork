@@ -229,7 +229,7 @@ switch ($action) {
             // 儲存盤點人
             if ($stocktakerId && $id) {
                 $db = Database::getInstance();
-                $stName = $db->prepare("SELECT name FROM users WHERE id = ?");
+                $stName = $db->prepare("SELECT real_name FROM users WHERE id = ?");
                 $stName->execute(array($stocktakerId));
                 $stNameVal = $stName->fetchColumn();
                 $db->prepare("UPDATE stocktakes SET stocktaker_id = ?, stocktaker_name = ? WHERE id = ?")
@@ -241,9 +241,7 @@ switch ($action) {
         $warehouses = $model->getWarehouses();
         try {
             $stDb = Database::getInstance();
-            $userBranchId = Auth::user()['branch_id'];
-            $staffList = $stDb->prepare("SELECT u.id, u.name, u.role, b.name AS branch_name FROM users u LEFT JOIN branches b ON u.branch_id = b.id WHERE u.is_active = 1 AND (u.role IN ('warehouse','purchaser') OR (u.role = 'admin_staff' AND u.branch_id = ?)) ORDER BY FIELD(u.role,'warehouse','purchaser','admin_staff'), u.name");
-            $staffList->execute(array($userBranchId));
+            $staffList = $stDb->query("SELECT u.id, u.real_name AS name, u.role, b.name AS branch_name FROM users u LEFT JOIN branches b ON u.branch_id = b.id WHERE u.is_active = 1 AND u.role IN ('warehouse','purchaser','admin_staff','accountant','boss','manager') ORDER BY FIELD(u.role,'warehouse','purchaser','admin_staff','accountant','manager','boss'), u.real_name");
             $staffList = $staffList->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $stEx) {
             $staffList = array();

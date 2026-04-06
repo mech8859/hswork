@@ -4,6 +4,11 @@
  */
 class ScheduleModel
 {
+    /** 每日工作容量（小時） */
+    const DAILY_HOURS_CAPACITY = 10;
+    /** 預設預估工時（estimated_hours 為空時） */
+    const DEFAULT_ESTIMATED_HOURS = 4;
+
     /** @var PDO */
     private $db;
 
@@ -379,18 +384,35 @@ class ScheduleModel
         $engStmt->execute($branchIds);
         $engineers = $engStmt->fetchAll();
 
-        // 取得當日已排工的人員
-        $busyStmt = $this->db->prepare('
-            SELECT se.user_id FROM schedule_engineers se
+        // 取得當日已排工人員的工時
+        $defaultH = self::DEFAULT_ESTIMATED_HOURS;
+        $busyStmt = $this->db->prepare("
+            SELECT se.user_id, SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultH})) AS hours_used
+            FROM schedule_engineers se
             JOIN schedules s ON se.schedule_id = s.id
-            WHERE s.schedule_date = ? AND s.status != ?
-        ');
-        $busyStmt->execute([$date, 'cancelled']);
-        $busyIds = array_column($busyStmt->fetchAll(), 'user_id');
+            JOIN cases c ON s.case_id = c.id
+            WHERE s.schedule_date = ? AND s.status != 'cancelled'
+            GROUP BY se.user_id
+        ");
+        $busyStmt->execute(array($date));
+        $hoursMap = array();
+        foreach ($busyStmt->fetchAll() as $row) {
+            $hoursMap[$row['user_id']] = (float)$row['hours_used'];
+        }
+
+        // 取得目標案件工時
+        $caseStmt2 = $this->db->prepare('SELECT estimated_hours FROM cases WHERE id = ?');
+        $caseStmt2->execute(array($caseId));
+        $targetHours = (float)$caseStmt2->fetchColumn();
+        if ($targetHours <= 0) $targetHours = self::DEFAULT_ESTIMATED_HOURS;
 
         // 為每位工程師計算資訊
         foreach ($engineers as &$eng) {
-            $eng['is_busy'] = in_array($eng['id'], $busyIds);
+            $usedH = isset($hoursMap[$eng['id']]) ? $hoursMap[$eng['id']] : 0;
+            $remainH = self::DAILY_HOURS_CAPACITY - $usedH;
+            $eng['hours_used'] = $usedH;
+            $eng['remaining_hours'] = $remainH;
+            $eng['is_busy'] = ($remainH < $targetHours);
 
             // 技能符合度
             $eng['skill_match'] = true;
@@ -604,6 +626,12 @@ class ScheduleModel
         $maxEng = (int)($case['max_engineers'] ?: 4);
         $visitNumber = (int)($case['current_visit'] ?: 1);
 
+        // 案件預估工時
+        $caseHours = (float)($case['estimated_hours'] ?: 0);
+        if ($caseHours <= 0) {
+            $caseHours = self::DEFAULT_ESTIMATED_HOURS;
+        }
+
         // 2. 載入所需技能
         $reqStmt = $this->db->prepare('
             SELECT crs.skill_id, crs.min_proficiency, s.name AS skill_name
@@ -682,17 +710,21 @@ class ScheduleModel
         $startDate = date('Y-m-d', strtotime('+1 day'));
         $endDate = date('Y-m-d', strtotime('+' . $days . ' days'));
 
-        // 已排工人員 (by date)
+        // 已排工人員工時 (by date) — 用 estimated_hours 計算每人每日已用時數
+        $defaultHours = self::DEFAULT_ESTIMATED_HOURS;
         $busyStmt = $this->db->prepare("
-            SELECT s.schedule_date, se.user_id
+            SELECT s.schedule_date, se.user_id,
+                   SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultHours})) AS hours_used
             FROM schedule_engineers se
             JOIN schedules s ON se.schedule_id = s.id
+            JOIN cases c ON s.case_id = c.id
             WHERE s.schedule_date BETWEEN ? AND ? AND s.status != 'cancelled'
+            GROUP BY s.schedule_date, se.user_id
         ");
         $busyStmt->execute([$startDate, $endDate]);
-        $busyByDate = [];
+        $hoursByDate = array();
         foreach ($busyStmt->fetchAll() as $row) {
-            $busyByDate[$row['schedule_date']][] = $row['user_id'];
+            $hoursByDate[$row['schedule_date']][$row['user_id']] = (float)$row['hours_used'];
         }
 
         // 已排車輛 (by date)
@@ -753,14 +785,18 @@ class ScheduleModel
                 }
             }
 
-            // 該日已排工人員
-            $busyToday = isset($busyByDate[$date]) ? $busyByDate[$date] : [];
+            // 該日工時使用情況
+            $hoursToday = isset($hoursByDate[$date]) ? $hoursByDate[$date] : array();
 
-            // 篩選可用工程師
+            // 篩選可用工程師（依剩餘工時）
             $available = [];
             foreach ($allEngineers as $eng) {
                 if (in_array($eng['id'], $onLeave)) continue;
-                if (in_array($eng['id'], $busyToday)) continue;
+                $usedHours = isset($hoursToday[$eng['id']]) ? $hoursToday[$eng['id']] : 0;
+                $remainingHours = self::DAILY_HOURS_CAPACITY - $usedHours;
+                if ($remainingHours < $caseHours) continue;
+                $eng['hours_used_today'] = $usedHours;
+                $eng['remaining_hours'] = $remainingHours;
                 $available[] = $eng;
             }
 
@@ -829,6 +865,15 @@ class ScheduleModel
                     $leadId = $team[0]['id'];
                 }
 
+                // 團隊工時資訊
+                $teamHours = array();
+                foreach ($team as $eng) {
+                    $teamHours[$eng['id']] = array(
+                        'hours_used' => isset($eng['hours_used_today']) ? $eng['hours_used_today'] : 0,
+                        'remaining'  => isset($eng['remaining_hours']) ? $eng['remaining_hours'] : self::DAILY_HOURS_CAPACITY,
+                    );
+                }
+
                 $allCandidates[] = [
                     'date'           => $date,
                     'date_label'     => date('m/d', strtotime($date)) . ' (' . $this->weekdayLabel($dow) . ')',
@@ -841,6 +886,8 @@ class ScheduleModel
                     'visit_number'   => $visitNumber,
                     'score'          => $score['total'],
                     'breakdown'      => $score['breakdown'],
+                    'case_hours'     => $caseHours,
+                    'team_hours'     => $teamHours,
                 ];
             }
         }
@@ -1205,13 +1252,18 @@ class ScheduleModel
             $breakdown['pair'] = round($avg / 5 * 20);
         }
 
-        // ---- 週工作量 (15) ----
+        // ---- 週工作量 + 日利用率 (15) ----
         $loadSum = 0;
+        $dailyUsedSum = 0;
         foreach ($team as $eng) {
             $loadSum += isset($weeklyLoad[$eng['id']]) ? $weeklyLoad[$eng['id']] : 0;
+            $dailyUsedSum += isset($eng['hours_used_today']) ? $eng['hours_used_today'] : 0;
         }
         $avgLoad = count($team) > 0 ? $loadSum / count($team) : 0;
-        $breakdown['load'] = round(max(0, (1 - $avgLoad / 5)) * 15);
+        $avgDailyUsed = count($team) > 0 ? $dailyUsedSum / count($team) : 0;
+        $weekScore = round(max(0, (1 - $avgLoad / 5)) * 10);
+        $dailyScore = round(max(0, (1 - $avgDailyUsed / self::DAILY_HOURS_CAPACITY)) * 5);
+        $breakdown['load'] = $weekScore + $dailyScore;
 
         // ---- 車輛適配 (10) ----
         if ($vehicle) {

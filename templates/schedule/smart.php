@@ -104,13 +104,20 @@
                 <span class="rec-icon">📅</span>
                 <span><?= e($rec['date_label']) ?><?= $rec['is_weekend'] ? ' <span class="badge badge-warning">週六</span>' : '' ?></span>
             </div>
+            <div class="rec-item">
+                <span class="rec-icon">⏱</span>
+                <span>預估 <?= isset($rec['case_hours']) ? $rec['case_hours'] : '-' ?> 小時</span>
+            </div>
         </div>
         <div class="rec-row">
             <div class="rec-item">
                 <span class="rec-icon">👷</span>
                 <span>
-                    <?php foreach ($rec['engineers'] as $i => $eng): ?>
-                        <?= e($eng['real_name']) ?><?= $eng['id'] == $rec['lead_id'] ? '<span class="text-primary">(主)</span>' : '' ?><?= $i < count($rec['engineers']) - 1 ? '、' : '' ?>
+                    <?php foreach ($rec['engineers'] as $i => $eng):
+                        $thInfo = isset($rec['team_hours'][$eng['id']]) ? $rec['team_hours'][$eng['id']] : null;
+                        $hasUsed = $thInfo && $thInfo['hours_used'] > 0;
+                    ?>
+                        <?= e($eng['real_name']) ?><?= $eng['id'] == $rec['lead_id'] ? '<span class="text-primary">(主)</span>' : '' ?><?php if ($hasUsed): ?><span style="font-size:.7rem;color:#e65100;margin-left:2px">[已排<?= $thInfo['hours_used'] ?>h]</span><?php endif; ?><?= $i < count($rec['engineers']) - 1 ? '、' : '' ?>
                     <?php endforeach; ?>
                     <span class="text-muted">(<?= count($rec['engineers']) ?>人)</span>
                 </span>

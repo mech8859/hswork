@@ -23,7 +23,7 @@
             <select name="stocktaker_id" class="form-control" required>
                 <option value="">請選擇</option>
                 <?php
-                $roleLabels = array('warehouse' => '倉管', 'purchaser' => '採購', 'admin_staff' => '行政');
+                $roleLabels = array('warehouse' => '倉管', 'purchaser' => '採購', 'admin_staff' => '行政', 'accountant' => '會計', 'manager' => '主管', 'boss' => '管理者');
                 foreach ($staffList as $s):
                     $label = $s['name'];
                     if (!empty($s['branch_name'])) $label .= ' - ' . $s['branch_name'];

@@ -85,7 +85,7 @@ if ($isEdit) {
             <span>工程師指派</span>
             <span class="text-muted" style="font-size:.8rem" id="engineerCount">已選 0 人</span>
         </div>
-        <p class="text-muted mb-1" style="font-size:.85rem">綠色=技能符合，灰色=當日已排工</p>
+        <p class="text-muted mb-1" style="font-size:.85rem">綠色=技能符合，灰色=當日已滿，黃色=當日有排工但仍有餘量</p>
 
         <div id="engineerList">
             <?php if (!empty($engineers)): ?>
@@ -105,7 +105,9 @@ if ($isEdit) {
                         <span class="badge badge-success">技能符合</span>
                     <?php endif; ?>
                     <?php if ($eng['is_busy']): ?>
-                        <span class="badge badge-warning">已排工</span>
+                        <span class="badge" style="background:#e53935;color:#fff">已滿</span>
+                    <?php elseif (isset($eng['hours_used']) && $eng['hours_used'] > 0): ?>
+                        <span class="badge badge-warning">已排<?= $eng['hours_used'] ?>h / 剩<?= $eng['remaining_hours'] ?>h</span>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
