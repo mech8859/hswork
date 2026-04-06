@@ -7,6 +7,15 @@ $model = new CaseModel();
 $action = $_GET['action'] ?? 'list';
 $branchIds = Auth::getAccessibleBranchIds();
 
+// 帳款交易合計回寫 total_collected
+function updateTotalCollected($caseId) {
+    $db = Database::getInstance();
+    $stmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
+    $stmt->execute(array($caseId));
+    $total = (int)$stmt->fetchColumn();
+    $db->prepare("UPDATE cases SET total_collected = ? WHERE id = ?")->execute(array($total, $caseId));
+}
+
 switch ($action) {
     // ---- 案件清單 ----
     case 'list':
@@ -247,6 +256,7 @@ switch ($action) {
                 Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($imgPaths), $newId));
             }
         }
+        updateTotalCollected($caseId);
         echo json_encode(array('success' => true));
         break;
 
@@ -275,6 +285,7 @@ switch ($action) {
             }
             Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($existing), $pid));
         }
+        updateTotalCollected((int)$pay['case_id']);
         echo json_encode(array('success' => true));
         break;
 
@@ -287,7 +298,11 @@ switch ($action) {
             break;
         }
         $pid = (int)($_POST['payment_id'] ?? 0);
+        $delStmt = Database::getInstance()->prepare('SELECT case_id FROM case_payments WHERE id = ?');
+        $delStmt->execute(array($pid));
+        $delCaseId = (int)$delStmt->fetchColumn();
         Database::getInstance()->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
+        if ($delCaseId) updateTotalCollected($delCaseId);
         echo json_encode(array('success' => true));
         break;
 

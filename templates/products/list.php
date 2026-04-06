@@ -222,7 +222,26 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
     <?php $qs = $_GET; $qs['page'] = $currentP + 1; ?>
     <a href="/products.php?<?= http_build_query($qs) ?>" class="btn btn-sm btn-outline">&raquo;</a>
     <?php endif; ?>
+    <span style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;font-size:.85rem">
+        前往
+        <input type="number" id="goPageInput" min="1" max="<?= $lastPage ?>" value="<?= $currentP ?>"
+               style="width:60px;padding:3px 6px;border:1px solid var(--gray-300);border-radius:4px;text-align:center;font-size:.85rem"
+               onkeydown="if(event.key==='Enter'){goToPage();}">
+        / <?= $lastPage ?> 頁
+        <button type="button" class="btn btn-sm btn-outline" onclick="goToPage()" style="padding:3px 8px">Go</button>
+    </span>
 </div>
+<script>
+function goToPage() {
+    var input = document.getElementById('goPageInput');
+    var p = parseInt(input.value);
+    if (isNaN(p) || p < 1) p = 1;
+    if (p > <?= $lastPage ?>) p = <?= $lastPage ?>;
+    var qs = new URLSearchParams(window.location.search);
+    qs.set('page', p);
+    window.location.href = '/products.php?' + qs.toString();
+}
+</script>
 <?php endif; ?>
 <?php endif; ?>
 

@@ -172,6 +172,13 @@ class Auth
                     // 如果有指定權限（非 false/off），加入該權限
                     if ($value !== false && $value !== 'off' && is_string($value)) {
                         $permissions[] = $value;
+                        // manage 自動包含 view
+                        if (substr($value, -7) === '.manage') {
+                            $viewPerm = substr($value, 0, -7) . '.view';
+                            if (!in_array($viewPerm, $permissions)) {
+                                $permissions[] = $viewPerm;
+                            }
+                        }
                     }
                     // 相容舊格式：true 表示不覆蓋（保留角色預設）
                     if ($value === true) {
@@ -342,7 +349,15 @@ class Auth
     public static function hasPermission(string $permission): bool
     {
         $permissions = Session::get('permissions', []);
-        return in_array('all', $permissions) || in_array($permission, $permissions);
+        if (in_array('all', $permissions) || in_array($permission, $permissions)) {
+            return true;
+        }
+        // .view 可被 .manage 滿足
+        if (substr($permission, -5) === '.view') {
+            $managePerm = substr($permission, 0, -5) . '.manage';
+            return in_array($managePerm, $permissions);
+        }
+        return false;
     }
 
     /**
