@@ -298,15 +298,34 @@ function saveWorklog() {
         if (wlSelectedFiles[i]) photoFiles.push(wlSelectedFiles[i]);
     }
 
-    compressImages(photoFiles).then(function(compressed) {
+    // 顯示 loading 提示
+    var saveBtn = document.querySelector('[onclick*="saveWorklog"]');
+    var origText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) { saveBtn.textContent = photoFiles.length > 0 ? '壓縮照片中...' : '儲存中...'; saveBtn.disabled = true; }
+
+    var doSend = function(compressed) {
         for (var j = 0; j < compressed.length; j++) {
             fd.append('photos[]', compressed[j]);
         }
+        if (saveBtn) saveBtn.textContent = '上傳中...';
         var xhr = new XMLHttpRequest();
         xhr.open('POST', '/cases.php?action=add_worklog');
-        xhr.onload = function() { location.reload(); };
+        xhr.onload = function() {
+            if (saveBtn) { saveBtn.textContent = '完成！'; }
+            location.reload();
+        };
+        xhr.onerror = function() {
+            alert('上傳失敗，請重試');
+            if (saveBtn) { saveBtn.textContent = origText; saveBtn.disabled = false; }
+        };
         xhr.send(fd);
-    });
+    };
+
+    if (photoFiles.length > 0) {
+        compressImages(photoFiles).then(doSend);
+    } else {
+        doSend([]);
+    }
 }
 
 function deleteWorklog(id) {
@@ -715,18 +734,36 @@ function saveWorklogEdit() {
     fd.append('equipment_used', document.getElementById('wd_equipment').value);
     fd.append('cable_used', document.getElementById('wd_cable').value);
     var files = document.getElementById('wd_photos').files;
-    for (var i = 0; i < files.length; i++) {
-        fd.append('photos[]', files[i]);
-    }
+    var photoFiles = Array.prototype.slice.call(files);
 
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/cases.php?action=edit_worklog');
-    xhr.onload = function() {
-        var res = JSON.parse(xhr.responseText);
-        if (res.success) { location.reload(); }
-        else { alert(res.error || '儲存失敗'); }
+    var saveBtn = document.querySelector('[onclick*="saveWorklogEdit"]');
+    var origText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) { saveBtn.textContent = photoFiles.length > 0 ? '壓縮照片中...' : '儲存中...'; saveBtn.disabled = true; }
+
+    var doSend = function(compressed) {
+        for (var j = 0; j < compressed.length; j++) {
+            fd.append('photos[]', compressed[j]);
+        }
+        if (saveBtn) saveBtn.textContent = '上傳中...';
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/cases.php?action=edit_worklog');
+        xhr.onload = function() {
+            var res = JSON.parse(xhr.responseText);
+            if (res.success) { location.reload(); }
+            else { alert(res.error || '儲存失敗'); if (saveBtn) { saveBtn.textContent = origText; saveBtn.disabled = false; } }
+        };
+        xhr.onerror = function() {
+            alert('上傳失敗，請重試');
+            if (saveBtn) { saveBtn.textContent = origText; saveBtn.disabled = false; }
+        };
+        xhr.send(fd);
     };
-    xhr.send(fd);
+
+    if (photoFiles.length > 0) {
+        compressImages(photoFiles).then(doSend);
+    } else {
+        doSend([]);
+    }
 }
 
 // 施工區域 - 縣市鄉鎮連動

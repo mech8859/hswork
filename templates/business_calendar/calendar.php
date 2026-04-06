@@ -251,7 +251,7 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
             <?php if (!empty($dayLeaves)): ?>
             <div class="bc-leave-bar">
                 <?php foreach ($dayLeaves as $lv): ?>
-                <span class="bc-leave-tag"><?= e($lv['real_name']) ?> <?= e($lv['leave_type_label']) ?></span>
+                <span class="bc-leave-tag"><?= e($lv['real_name']) ?> <?= e(isset($lv['leave_type_label']) ? $lv['leave_type_label'] : (isset($lv['leave_type']) ? $lv['leave_type'] : '')) ?></span>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>

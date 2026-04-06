@@ -178,6 +178,7 @@ class LeaveModel
             WHERE l.start_date <= ? AND l.end_date >= ?
               AND u.branch_id IN ($ph)
               AND l.status IN ('approved','pending')
+              AND u.role IN ('engineer','eng_manager','eng_deputy')
             ORDER BY u.real_name
         ");
         $stmt->execute($params);
