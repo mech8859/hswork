@@ -185,6 +185,7 @@ switch ($action) {
                 'source_id'     => $soId,
                 'source_number' => $so['so_number'],
                 'warehouse_id'  => $so['warehouse_id'],
+                'customer_name' => !empty($so['customer_name']) ? $so['customer_name'] : null,
                 'note'          => '餘料入庫，來源出庫單 ' . $so['so_number'],
                 'total_qty'     => $totalQty,
                 'created_by'    => $userId,

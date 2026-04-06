@@ -133,6 +133,10 @@ $canConfirmItems = ($isPending || $isPartial) && $hasUnconfirmed;
             </div>
         </div>
         <div class="form-group">
+            <label>客戶名稱</label>
+            <div class="form-static"><?= e(!empty($record['customer_name']) ? $record['customer_name'] : '-') ?></div>
+        </div>
+        <div class="form-group">
             <label>建立者</label>
             <div class="form-static"><?= e($creatorName) ?><?php if (!empty($record['created_at'])): ?><br><small class="text-muted"><?= e($record['created_at']) ?></small><?php endif; ?></div>
         </div>

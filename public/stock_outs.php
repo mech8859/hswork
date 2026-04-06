@@ -237,6 +237,7 @@ switch ($action) {
             'warehouse_id'  => $so['warehouse_id'],
             'branch_id'     => !empty($so['branch_id']) ? $so['branch_id'] : null,
             'branch_name'   => $branchName,
+            'customer_name' => !empty($so['customer_name']) ? $so['customer_name'] : null,
             'source_type'   => 'manual_return',
             'source_id'     => $id,
             'source_number' => $so['so_number'],
