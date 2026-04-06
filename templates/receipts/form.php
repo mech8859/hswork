@@ -107,7 +107,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>發票類別</label>
+                <label>帳款類別</label>
                 <select name="invoice_category" class="form-control">
                     <option value="">請選擇</option>
                     <?php foreach (FinanceModel::invoiceCategoryOptions() as $val => $label): ?>

@@ -788,6 +788,64 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
     </div>
     <?php endif; ?>
 
+    <!-- 請款流程 -->
+    <?php if ($case): ?>
+    <div class="card" id="sec-billing-flow">
+        <div class="card-header d-flex justify-between align-center">
+            <span>請款流程</span>
+            <?php if ($canEdit['finance'] ?? false): ?>
+            <button type="button" class="btn btn-primary btn-sm" onclick="addBillingItem()">+ 新增</button>
+            <?php endif; ?>
+        </div>
+        <?php $billingItems = isset($case['billing_items']) ? $case['billing_items'] : array(); ?>
+        <?php if (empty($billingItems)): ?>
+        <p class="text-muted text-center" style="padding:20px">尚未建立請款流程</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr>
+                    <th style="width:40px">#</th>
+                    <th>帳款類別</th>
+                    <th class="text-right">未稅</th>
+                    <th class="text-right">稅金</th>
+                    <th class="text-right">總金額</th>
+                    <th>含稅</th>
+                    <th>客戶通知可請款</th>
+                    <th>客戶通知已付款</th>
+                    <th>已請款</th>
+                    <th>發票號碼</th>
+                    <th>備註</th>
+                    <?php if ($canEdit['finance'] ?? false): ?><th style="width:60px">操作</th><?php endif; ?>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($billingItems as $bi): ?>
+                <tr>
+                    <td><?= (int)$bi['seq_no'] ?></td>
+                    <td><?= e($bi['payment_category']) ?></td>
+                    <td class="text-right"><?= $bi['amount_untaxed'] !== null ? '$' . number_format($bi['amount_untaxed']) : '-' ?></td>
+                    <td class="text-right"><?= $bi['tax_amount'] !== null ? '$' . number_format($bi['tax_amount']) : '-' ?></td>
+                    <td class="text-right" style="font-weight:600">$<?= number_format($bi['total_amount']) ?></td>
+                    <td><?= $bi['tax_included'] ? '含稅' : '未稅' ?></td>
+                    <td><?= $bi['customer_billable'] ? '<span style="color:#2e7d32">✓</span>' : '-' ?></td>
+                    <td><?= $bi['customer_paid'] ? '<span style="color:#2e7d32">✓</span>' : '-' ?><?= !empty($bi['customer_paid_info']) ? '<br><small class="text-muted">' . e($bi['customer_paid_info']) . '</small>' : '' ?></td>
+                    <td><?= $bi['is_billed'] ? '<span style="color:#1565c0">✓</span>' : '-' ?><?= !empty($bi['billed_info']) ? '<br><small class="text-muted">' . e($bi['billed_info']) . '</small>' : '' ?></td>
+                    <td><?= e($bi['invoice_number'] ?: '-') ?></td>
+                    <td><?= e($bi['note'] ?: '-') ?></td>
+                    <?php if ($canEdit['finance'] ?? false): ?>
+                    <td>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="editBillingItem(<?= htmlspecialchars(json_encode($bi), ENT_QUOTES) ?>)" style="font-size:.75rem">編輯</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteBillingItem(<?= (int)$bi['id'] ?>)" style="font-size:.75rem">刪除</button>
+                    </td>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- 請款資訊 -->
     <div class="card <?= ($canEdit['finance'] ?? false) ? '' : 'section-readonly' ?>" id="sec-billing-info">
         <div class="card-header">請款資訊</div>
@@ -1634,6 +1692,140 @@ var CASE_DATA = {
     </div>
 </div>
 
+<!-- 請款流程 Modal -->
+<div id="biModal" class="modal-overlay" style="display:none">
+    <div class="modal-content" id="biModalBox" style="max-width:700px;position:relative;cursor:default">
+        <div class="d-flex justify-between align-center mb-2" id="biModalHeader" style="cursor:move;user-select:none">
+            <h3 id="biModalTitle" style="margin:0">新增請款項目</h3>
+            <a href="javascript:void(0)" onclick="closeBiModal()" style="font-size:1.5rem;color:var(--gray-400)">&times;</a>
+        </div>
+        <form id="biForm" onsubmit="event.preventDefault();saveBillingItem()">
+            <input type="hidden" name="id" id="biId">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>帳款類別 *</label>
+                    <select name="payment_category" id="biCategory" class="form-control" required>
+                        <option value="">請選擇</option>
+                        <option value="訂金">訂金</option>
+                        <option value="第一期款">第一期款</option>
+                        <option value="第二期款">第二期款</option>
+                        <option value="第三期款">第三期款</option>
+                        <option value="尾款">尾款</option>
+                        <option value="保留款">保留款</option>
+                        <option value="全款">全款</option>
+                        <option value="退款">退款</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:0 0 100px">
+                    <label>含稅</label>
+                    <div style="padding-top:6px"><label><input type="checkbox" name="tax_included" id="biTaxIncluded" value="1"> 含稅</label></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>未稅金額</label><input type="text" name="amount_untaxed" id="biUntaxed" class="form-control" placeholder="0"></div>
+                <div class="form-group"><label>稅金</label><input type="text" name="tax_amount" id="biTax" class="form-control" placeholder="0"></div>
+                <div class="form-group"><label>總金額 *</label><input type="text" name="total_amount" id="biTotal" class="form-control" placeholder="0" required></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label><input type="checkbox" name="customer_billable" id="biBillable" value="1"> 客戶通知可請款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="customer_paid" id="biPaid" value="1"> 客戶通知已付款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="is_billed" id="biBilled" value="1"> 已請款</label></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>付款資訊</label><input type="text" name="customer_paid_info" id="biPaidInfo" class="form-control" placeholder="付款資訊說明"></div>
+                <div class="form-group"><label>請款資訊</label><input type="text" name="billed_info" id="biBilledInfo" class="form-control" placeholder="已請款資訊"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>發票號碼</label><input type="text" name="invoice_number" id="biInvoice" class="form-control" placeholder="發票號碼"></div>
+                <div class="form-group"><label>備註</label><input type="text" name="note" id="biNote" class="form-control" placeholder="備註"></div>
+            </div>
+            <div class="d-flex gap-1 mt-1">
+                <button type="submit" class="btn btn-primary">儲存</button>
+                <button type="button" class="btn btn-outline" onclick="closeBiModal()">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function addBillingItem() {
+    document.getElementById('biModalTitle').textContent = '新增請款項目';
+    document.getElementById('biForm').reset();
+    document.getElementById('biId').value = '';
+    document.getElementById('biModal').style.display = 'flex';
+}
+function editBillingItem(bi) {
+    document.getElementById('biModalTitle').textContent = '編輯請款項目';
+    document.getElementById('biId').value = bi.id;
+    document.getElementById('biCategory').value = bi.payment_category || '';
+    document.getElementById('biUntaxed').value = bi.amount_untaxed || '';
+    document.getElementById('biTax').value = bi.tax_amount || '';
+    document.getElementById('biTotal').value = bi.total_amount || '';
+    document.getElementById('biTaxIncluded').checked = bi.tax_included == 1;
+    document.getElementById('biBillable').checked = bi.customer_billable == 1;
+    document.getElementById('biPaid').checked = bi.customer_paid == 1;
+    document.getElementById('biPaidInfo').value = bi.customer_paid_info || '';
+    document.getElementById('biBilled').checked = bi.is_billed == 1;
+    document.getElementById('biBilledInfo').value = bi.billed_info || '';
+    document.getElementById('biInvoice').value = bi.invoice_number || '';
+    document.getElementById('biNote').value = bi.note || '';
+    document.getElementById('biModal').style.display = 'flex';
+}
+function closeBiModal() {
+    document.getElementById('biModal').style.display = 'none';
+    var box = document.getElementById('biModalBox');
+    box.style.transform = '';
+}
+// 拖曳功能
+(function() {
+    var header = document.getElementById('biModalHeader');
+    var box = document.getElementById('biModalBox');
+    var dx = 0, dy = 0, startX = 0, startY = 0, dragging = false;
+    header.addEventListener('mousedown', function(e) {
+        if (e.target.tagName === 'A') return;
+        dragging = true;
+        startX = e.clientX - dx;
+        startY = e.clientY - dy;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+    });
+    function onDrag(e) {
+        if (!dragging) return;
+        dx = e.clientX - startX;
+        dy = e.clientY - startY;
+        box.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    }
+    function stopDrag() {
+        dragging = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+    }
+})();
+function saveBillingItem() {
+    var fd = new FormData(document.getElementById('biForm'));
+    fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+    fd.append('case_id', '<?= (int)($case['id'] ?? 0) ?>');
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/cases.php?action=ajax_billing_item_save');
+    xhr.onload = function() {
+        var res = JSON.parse(xhr.responseText);
+        if (res.success) { location.reload(); }
+        else { alert(res.error || '儲存失敗'); }
+    };
+    xhr.send(fd);
+}
+function deleteBillingItem(biId) {
+    if (!confirm('確定刪除此請款項目？')) return;
+    var fd = new FormData();
+    fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+    fd.append('id', biId);
+    fd.append('case_id', '<?= (int)($case['id'] ?? 0) ?>');
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/cases.php?action=ajax_billing_item_delete');
+    xhr.onload = function() { location.reload(); };
+    xhr.send(fd);
+}
+</script>
+
 <?php return; /* 以下為舊程式碼，已搬移到外部檔案 */ ?>
 
 <script>
@@ -2167,6 +2359,59 @@ function saveNewCustomer() {
 
 // 帳務計算已移至 cases-form.js
 </script>
+<div id="biModal" class="modal-overlay" style="display:none">
+    <div class="modal-content" style="max-width:550px">
+        <div class="d-flex justify-between align-center mb-2">
+            <h3 id="biModalTitle" style="margin:0">新增請款項目</h3>
+            <a href="javascript:void(0)" onclick="closeBiModal()" style="font-size:1.5rem;color:var(--gray-400)">&times;</a>
+        </div>
+        <form id="biForm" onsubmit="event.preventDefault();saveBillingItem()">
+            <input type="hidden" name="id" id="biId">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>帳款類別 *</label>
+                    <select name="payment_category" id="biCategory" class="form-control" required>
+                        <option value="">請選擇</option>
+                        <option value="訂金">訂金</option>
+                        <option value="第一期款">第一期款</option>
+                        <option value="第二期款">第二期款</option>
+                        <option value="第三期款">第三期款</option>
+                        <option value="尾款">尾款</option>
+                        <option value="保留款">保留款</option>
+                        <option value="全款">全款</option>
+                        <option value="退款">退款</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:0 0 100px">
+                    <label>含稅</label>
+                    <div style="padding-top:6px"><label><input type="checkbox" name="tax_included" id="biTaxIncluded" value="1"> 含稅</label></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>未稅金額</label><input type="text" name="amount_untaxed" id="biUntaxed" class="form-control" placeholder="0"></div>
+                <div class="form-group"><label>稅金</label><input type="text" name="tax_amount" id="biTax" class="form-control" placeholder="0"></div>
+                <div class="form-group"><label>總金額 *</label><input type="text" name="total_amount" id="biTotal" class="form-control" placeholder="0" required></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label><input type="checkbox" name="customer_billable" id="biBillable" value="1"> 客戶通知可請款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="customer_paid" id="biPaid" value="1"> 客戶通知已付款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="is_billed" id="biBilled" value="1"> 已請款</label></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>付款資訊</label><input type="text" name="customer_paid_info" id="biPaidInfo" class="form-control" placeholder="付款資訊說明"></div>
+                <div class="form-group"><label>請款資訊</label><input type="text" name="billed_info" id="biBilledInfo" class="form-control" placeholder="已請款資訊"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>發票號碼</label><input type="text" name="invoice_number" id="biInvoice" class="form-control" placeholder="發票號碼"></div>
+                <div class="form-group"><label>備註</label><input type="text" name="note" id="biNote" class="form-control" placeholder="備註"></div>
+            </div>
+            <div class="d-flex gap-1 mt-1">
+                <button type="submit" class="btn btn-primary">儲存</button>
+                <button type="button" class="btn btn-outline" onclick="closeBiModal()">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">

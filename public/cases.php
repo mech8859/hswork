@@ -60,6 +60,12 @@ switch ($action) {
         $branches = $model->getAllBranches();
         $skills = $model->getAllSkills();
         $salesUsers = $model->getSalesUsers($branchIds);
+        require_once __DIR__ . '/../modules/settings/DropdownModel.php';
+        $ddModel = new DropdownModel();
+        $caseCompanyOptions = $ddModel->getOptions('case_company');
+        $caseSourceOptions = $ddModel->getOptions('case_source');
+        $customerDemandOptions = $ddModel->getOptions('customer_demand');
+        $systemTypeOptions = $ddModel->getOptions('system_type');
         $extraCss = array('/css/cases-form.css?v=20260403');
         $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:0,caseId:0};</script>';
@@ -106,6 +112,12 @@ switch ($action) {
         $branches = $model->getAllBranches();
         $skills = $model->getAllSkills();
         $salesUsers = $model->getSalesUsers($branchIds);
+        require_once __DIR__ . '/../modules/settings/DropdownModel.php';
+        $ddModel = new DropdownModel();
+        $caseCompanyOptions = $ddModel->getOptions('case_company');
+        $caseSourceOptions = $ddModel->getOptions('case_source');
+        $customerDemandOptions = $ddModel->getOptions('customer_demand');
+        $systemTypeOptions = $ddModel->getOptions('system_type');
         $extraCss = array('/css/cases-form.css?v=20260403');
         $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
@@ -442,6 +454,52 @@ switch ($action) {
             ->execute(array($customerNo, $name, $_POST['contact_person'] ?? '', $_POST['phone'] ?? '', $_POST['mobile'] ?? '', $_POST['address'] ?? '', $caseNumber ?: null, $caseDate ?: null, $sourceCompany ?: null, Auth::id()));
         $newId = (int)$db->lastInsertId();
         echo json_encode(array('success' => true, 'customer' => array('id' => $newId, 'customer_no' => $customerNo, 'name' => $name, 'phone' => $_POST['phone'] ?? '', 'mobile' => $_POST['mobile'] ?? '', 'site_address' => $_POST['address'] ?? '', 'contact_person' => $_POST['contact_person'] ?? '', 'contacts' => array())));
+        break;
+
+    // ---- AJAX: 請款流程 新增/編輯/刪除 ----
+    case 'ajax_billing_item_save':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $db = Database::getInstance();
+        $biId = (int)($_POST['id'] ?? 0);
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        if (!$caseId) { echo json_encode(array('success' => false, 'error' => '缺少案件ID')); break; }
+        $biData = array(
+            !empty($_POST['payment_category']) ? $_POST['payment_category'] : '',
+            !empty($_POST['amount_untaxed']) ? (int)str_replace(',', '', $_POST['amount_untaxed']) : null,
+            !empty($_POST['tax_amount']) ? (int)str_replace(',', '', $_POST['tax_amount']) : null,
+            !empty($_POST['total_amount']) ? (int)str_replace(',', '', $_POST['total_amount']) : 0,
+            !empty($_POST['tax_included']) ? 1 : 0,
+            !empty($_POST['customer_billable']) ? 1 : 0,
+            !empty($_POST['customer_paid']) ? 1 : 0,
+            !empty($_POST['customer_paid_info']) ? trim($_POST['customer_paid_info']) : null,
+            !empty($_POST['is_billed']) ? 1 : 0,
+            !empty($_POST['billed_info']) ? trim($_POST['billed_info']) : null,
+            !empty($_POST['invoice_number']) ? trim($_POST['invoice_number']) : null,
+            !empty($_POST['note']) ? trim($_POST['note']) : null,
+        );
+        if ($biId) {
+            $db->prepare("UPDATE case_billing_items SET payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=? WHERE id=? AND case_id=?")
+                ->execute(array_merge($biData, array($biId, $caseId)));
+        } else {
+            $maxSeq = $db->prepare("SELECT COALESCE(MAX(seq_no),0) FROM case_billing_items WHERE case_id=?");
+            $maxSeq->execute(array($caseId));
+            $seqNo = (int)$maxSeq->fetchColumn() + 1;
+            $db->prepare("INSERT INTO case_billing_items (case_id, seq_no, payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute(array_merge(array($caseId, $seqNo), $biData, array(Auth::id())));
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    case 'ajax_billing_item_delete':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $biId = (int)($_POST['id'] ?? 0);
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        if ($biId && $caseId) {
+            Database::getInstance()->prepare("DELETE FROM case_billing_items WHERE id=? AND case_id=?")->execute(array($biId, $caseId));
+        }
+        echo json_encode(array('success' => true));
         break;
 
     // ---- AJAX: 取得支援分公司 ----

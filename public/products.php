@@ -353,6 +353,31 @@ switch ($action) {
         echo json_encode($stmt->fetchAll());
         exit;
 
+    // ---- AJAX: 新增分類（JSON回傳）----
+    case 'ajax_category_create':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); exit; }
+        $catName = trim($_POST['name'] ?? '');
+        $catParent = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
+        if (!$catName) { echo json_encode(array('success' => false, 'error' => '名稱不可為空')); exit; }
+        // 檢查同層是否已存在
+        $db = Database::getInstance();
+        if ($catParent) {
+            $chk = $db->prepare("SELECT id FROM product_categories WHERE name = ? AND parent_id = ?");
+            $chk->execute(array($catName, $catParent));
+        } else {
+            $chk = $db->prepare("SELECT id FROM product_categories WHERE name = ? AND (parent_id IS NULL OR parent_id = 0)");
+            $chk->execute(array($catName));
+        }
+        $existing = $chk->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            echo json_encode(array('success' => true, 'id' => (int)$existing['id'], 'name' => $catName, 'existed' => true));
+        } else {
+            $newId = $model->createCategory($catName, $catParent);
+            echo json_encode(array('success' => true, 'id' => (int)$newId, 'name' => $catName, 'existed' => false));
+        }
+        exit;
+
     // ---- 刪除產品（僅限停用的）----
     case 'delete':
         if (!Auth::hasPermission('products.manage') && !in_array(Auth::user()['role'], array('boss','manager'))) {

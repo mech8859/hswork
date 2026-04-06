@@ -99,8 +99,8 @@
 
 <!-- Modal -->
 <div class="modal-overlay" id="catModal" style="display:none">
-    <div class="modal-content" style="max-width:450px">
-        <div class="d-flex justify-between align-center mb-2">
+    <div class="modal-content" id="catModalBox" style="max-width:500px;position:relative">
+        <div class="d-flex justify-between align-center mb-2" id="catModalHeader" style="cursor:move;user-select:none">
             <h3 id="catModalTitle">新增分類</h3>
             <a href="javascript:void(0)" onclick="closeCatModal()" style="font-size:1.5rem;color:var(--gray-400)">&times;</a>
         </div>
@@ -132,7 +132,10 @@
 
             <div class="form-group">
                 <label>細分類</label>
-                <input type="text" id="catLevel2Name" class="form-control" placeholder="輸入細分類名稱（選填）">
+                <select id="catLevel2" class="form-control" onchange="onLevel2Change()">
+                    <option value="">-- 選擇細分類 --</option>
+                </select>
+                <input type="text" id="catLevel2Name" class="form-control mt-1" style="display:none" placeholder="輸入新細分類名稱">
             </div>
 
             <input type="hidden" name="name" id="catName">
@@ -214,9 +217,32 @@ function onLevel0Change() {
 function onLevel1Change() {
     var val = document.getElementById('catLevel1').value;
     var newInput = document.getElementById('catLevel1New');
+    var level2 = document.getElementById('catLevel2');
+    var level2New = document.getElementById('catLevel2Name');
     newInput.style.display = (val === '__new__') ? 'block' : 'none';
     if (val === '__new__') newInput.focus();
-    document.getElementById('catLevel2Name').value = '';
+
+    // 填充細分類
+    level2.innerHTML = '<option value="">-- 選擇細分類 --</option><option value="__new__">+ 新增細分類</option>';
+    level2New.style.display = 'none';
+    level2New.value = '';
+
+    if (val && val !== '__new__') {
+        var subs = getCatsByParent(val);
+        for (var i = 0; i < subs.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = subs[i].id;
+            opt.textContent = subs[i].name;
+            level2.appendChild(opt);
+        }
+    }
+}
+
+function onLevel2Change() {
+    var val = document.getElementById('catLevel2').value;
+    var newInput = document.getElementById('catLevel2Name');
+    newInput.style.display = (val === '__new__') ? 'block' : 'none';
+    if (val === '__new__') newInput.focus();
 }
 
 function prepareSave() {
@@ -225,6 +251,7 @@ function prepareSave() {
     var l0New = document.getElementById('catLevel0New').value.trim();
     var l1 = document.getElementById('catLevel1').value;
     var l1New = document.getElementById('catLevel1New').value.trim();
+    var l2 = document.getElementById('catLevel2').value;
     var l2Name = document.getElementById('catLevel2Name').value.trim();
 
     // 判斷要儲存什麼
@@ -246,49 +273,31 @@ function prepareSave() {
     }
 
     // 新增模式：從最深的層級往上判斷
-    if (l2Name) {
+    if (l2 === '__new__' && l2Name) {
         // 新增細分類
         var parentId = l1;
         if (l1 === '__new__' && l1New) {
-            // 同時新增子分類 + 細分類：先 AJAX 建子分類，再建細分類
-            if (l0 === '__new__') {
-                alert('請先儲存主分類');
-                return false;
-            }
-            if (!l0) {
-                alert('請選擇主分類');
-                return false;
-            }
-            // AJAX 建子分類
+            // 同時新增子分類 + 細分類
+            if (l0 === '__new__') { alert('請先儲存主分類'); return false; }
+            if (!l0) { alert('請選擇主分類'); return false; }
+            // AJAX 建子分類（用 JSON endpoint）
             var fd = new FormData();
             fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
             fd.append('name', l1New);
             fd.append('parent_id', l0);
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/products.php?action=category_save', false); // 同步
+            xhr.open('POST', '/products.php?action=ajax_category_create', false);
             xhr.send(fd);
-            // 重新載入分類找到新建的子分類 ID
-            var xhr2 = new XMLHttpRequest();
-            xhr2.open('GET', '/products.php?action=ajax_subcategories&parent_id=' + l0, false);
-            xhr2.send();
-            var subs = JSON.parse(xhr2.responseText);
-            var newSubId = null;
-            for (var s = 0; s < subs.length; s++) {
-                if (subs[s].name === l1New) { newSubId = subs[s].id; break; }
-            }
-            if (!newSubId) {
-                alert('子分類建立失敗');
-                return false;
-            }
-            document.getElementById('catName').value = l2Name;
-            document.getElementById('catParent').value = newSubId;
-        } else if (!parentId || parentId === '__new__') {
+            var res = JSON.parse(xhr.responseText);
+            if (!res.success) { alert(res.error || '子分類建立失敗'); return false; }
+            parentId = res.id;
+        }
+        if (!parentId || parentId === '__new__') {
             alert('請選擇子分類');
             return false;
-        } else {
-            document.getElementById('catName').value = l2Name;
-            document.getElementById('catParent').value = parentId;
         }
+        document.getElementById('catName').value = l2Name;
+        document.getElementById('catParent').value = parentId;
     } else if (l1 === '__new__' && l1New) {
         // 新增子分類
         if (l0 === '__new__') {
@@ -324,7 +333,9 @@ function openCatModal(data) {
     document.getElementById('catLevel1').innerHTML = '<option value="">-- 選擇子分類 --</option><option value="__new__">+ 新增子分類</option>';
     document.getElementById('catLevel1New').value = '';
     document.getElementById('catLevel1New').style.display = 'none';
+    document.getElementById('catLevel2').innerHTML = '<option value="">-- 選擇細分類 --</option><option value="__new__">+ 新增細分類</option>';
     document.getElementById('catLevel2Name').value = '';
+    document.getElementById('catLevel2Name').style.display = 'none';
 
     if (data) {
         document.getElementById('catModalTitle').textContent = '編輯分類';
@@ -348,7 +359,6 @@ function openCatModal(data) {
             document.getElementById('catLevel1New').style.display = 'block';
         } else {
             // 編輯細分類
-            // 找到父層和祖父層
             var parentCat = null;
             for (var i = 0; i < allCats.length; i++) {
                 if (String(allCats[i].id) === String(data.parent_id)) {
@@ -360,8 +370,11 @@ function openCatModal(data) {
                 document.getElementById('catLevel0').value = parentCat.parent_id || '';
                 onLevel0Change();
                 document.getElementById('catLevel1').value = data.parent_id;
+                onLevel1Change();
             }
+            document.getElementById('catLevel2').value = '__new__';
             document.getElementById('catLevel2Name').value = data.name;
+            document.getElementById('catLevel2Name').style.display = 'block';
         }
     } else {
         document.getElementById('catModalTitle').textContent = '新增分類';
@@ -371,7 +384,33 @@ function openCatModal(data) {
 
 function closeCatModal() {
     document.getElementById('catModal').style.display = 'none';
+    document.getElementById('catModalBox').style.transform = '';
 }
+// 拖曳
+(function() {
+    var header = document.getElementById('catModalHeader');
+    var box = document.getElementById('catModalBox');
+    var dx = 0, dy = 0, startX = 0, startY = 0, dragging = false;
+    header.addEventListener('mousedown', function(e) {
+        if (e.target.tagName === 'A') return;
+        dragging = true;
+        startX = e.clientX - dx;
+        startY = e.clientY - dy;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+    });
+    function onDrag(e) {
+        if (!dragging) return;
+        dx = e.clientX - startX;
+        dy = e.clientY - startY;
+        box.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    }
+    function stopDrag() {
+        dragging = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+    }
+})();
 document.getElementById('catModal').addEventListener('click', function(e) {
     if (e.target === this) closeCatModal();
 });
