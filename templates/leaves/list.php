@@ -96,8 +96,8 @@
                     <td><?= e($lv['real_name']) ?></td>
                     <td><?= e($lv['branch_name']) ?></td>
                     <td><?= e(LeaveModel::leaveTypeLabel($lv['leave_type'])) ?></td>
-                    <td><?= e($lv['start_date']) ?></td>
-                    <td><?= e($lv['end_date']) ?></td>
+                    <td><?= e($lv['start_date']) ?><?= !empty($lv['start_time']) ? ' <small>' . e(substr($lv['start_time'], 0, 5)) . '</small>' : '' ?></td>
+                    <td><?= e($lv['end_date']) ?><?= !empty($lv['end_time']) ? ' <small>' . e(substr($lv['end_time'], 0, 5)) . '</small>' : '' ?></td>
                     <td class="text-center"><?= (int)$lv['days'] ?></td>
                     <td><?= e(mb_substr($lv['reason'] ?: '-', 0, 30)) ?></td>
                     <td>

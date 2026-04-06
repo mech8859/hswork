@@ -101,7 +101,7 @@ $currentStage = $caseModel->syncStage($case['id']);
     <div class="detail-grid">
         <div class="detail-item"><span class="detail-label">狀態</span><span class="detail-value"><?= e($case['sub_status'] ?: '-') ?></span></div>
         <?php if (!empty($case['survey_date'])): ?>
-        <div class="detail-item"><span class="detail-label">場勘日期</span><span class="detail-value"><?= e($case['survey_date']) ?></span></div>
+        <div class="detail-item"><span class="detail-label">場勘日期</span><span class="detail-value"><?= e($case['survey_date']) ?><?= !empty($case['survey_time']) ? ' ' . e(substr($case['survey_time'], 0, 5)) : '' ?></span></div>
         <?php endif; ?>
         <?php if (!empty($case['visit_method'])): ?>
         <div class="detail-item"><span class="detail-label">拜訪方式</span><span class="detail-value"><?= e($case['visit_method']) ?></span></div>

@@ -126,10 +126,13 @@ return [
 
     // 假別
     'leave_types' => [
-        'annual'   => '特休',
-        'personal' => '事假',
-        'sick'     => '病假',
-        'official' => '公假',
+        'annual'      => '特休',
+        'day_off'     => '排休',
+        'personal'    => '事假',
+        'sick'        => '病假',
+        'menstrual'   => '生理假',
+        'bereavement' => '喪假',
+        'official'    => '公假',
     ],
 
     // 證照到期預警天數

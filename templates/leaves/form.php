@@ -21,8 +21,11 @@
                 <label>假別 *</label>
                 <select name="leave_type" class="form-control" required>
                     <option value="annual">特休</option>
+                    <option value="day_off">排休</option>
                     <option value="personal">事假</option>
                     <option value="sick">病假</option>
+                    <option value="menstrual">生理假</option>
+                    <option value="bereavement">喪假</option>
                     <option value="official">公假</option>
                 </select>
             </div>
@@ -35,6 +38,16 @@
             <div class="form-group">
                 <label>結束日期 *</label>
                 <input type="date" max="2099-12-31" name="end_date" class="form-control" required value="<?= date('Y-m-d') ?>">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>開始時間 <small class="text-muted">（非整天假才填）</small></label>
+                <input type="time" name="start_time" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>結束時間</label>
+                <input type="time" name="end_time" class="form-control">
             </div>
         </div>
         <div class="form-group">

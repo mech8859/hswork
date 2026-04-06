@@ -396,7 +396,7 @@ class CaseModel
                 customer_break_time = ?, allow_night_work = ?, urgency = ?, is_large_project = ?,
                 branch_id = ?,
                 customer_id = ?, customer_name = ?, customer_category = ?, customer_phone = ?, customer_mobile = ?, contact_person = ?, contact_line_id = ?, customer_email = ?, construction_note = ?,
-                contact_address = ?, construction_area = ?, company = ?, case_source = ?, is_completed = ?, completion_date = ?, survey_date = ?, visit_method = ?,
+                contact_address = ?, construction_area = ?, company = ?, case_source = ?, is_completed = ?, completion_date = ?, survey_date = ?, survey_time = ?, visit_method = ?,
                 billing_title = ?, billing_tax_id = ?, billing_contact = ?,
                 billing_phone = ?, billing_mobile = ?, billing_address = ?, billing_email = ?,
                 billing_note = ?, updated_by = ?,
@@ -462,6 +462,7 @@ class CaseModel
             isset($data['is_completed']) ? (int)$data['is_completed'] : 0,
             !empty($data['completion_date']) ? $data['completion_date'] : null,
             !empty($data['survey_date']) ? $data['survey_date'] : null,
+            !empty($data['survey_time']) ? $data['survey_time'] : null,
             !empty($data['visit_method']) ? $data['visit_method'] : null,
             !empty($data['billing_title']) ? $data['billing_title'] : null,
             !empty($data['billing_tax_id']) ? $data['billing_tax_id'] : null,
@@ -471,7 +472,7 @@ class CaseModel
             !empty($data['billing_address']) ? $data['billing_address'] : null,
             !empty($data['billing_email']) ? $data['billing_email'] : null,
             !empty($data['billing_note']) ? $data['billing_note'] : null,
-            !empty($data['updated_by']) ? $data['updated_by'] : null,
+            !empty($data['updated_by']) ? $data['updated_by'] : Auth::id(),
             !empty($data['repair_report_date']) ? $data['repair_report_date'] : null,
             !empty($data['repair_fault_reason']) ? $data['repair_fault_reason'] : null,
             isset($data['repair_by_sales']) && $data['repair_by_sales'] !== '' ? $data['repair_by_sales'] : null,
@@ -532,14 +533,16 @@ class CaseModel
             $note .= ' (拜訪方式: ' . $c['visit_method'] . ')';
         }
 
+        $surveyTime = !empty($data['survey_time']) ? $data['survey_time'] : null;
+
         if ($existing) {
             // 更新既有事件
-            $upd = $this->db->prepare('UPDATE business_calendar SET event_date = ?, staff_id = ?, customer_name = ?, phone = ?, address = ?, note = ? WHERE id = ?');
-            $upd->execute(array($surveyDate, $staffId, $c['customer_name'], $phone, $c['address'], $note, $existing['id']));
+            $upd = $this->db->prepare('UPDATE business_calendar SET event_date = ?, staff_id = ?, customer_name = ?, phone = ?, address = ?, note = ?, start_time = ? WHERE id = ?');
+            $upd->execute(array($surveyDate, $staffId, $c['customer_name'], $phone, $c['address'], $note, $surveyTime, $existing['id']));
         } else {
             // 新建事件
-            $ins = $this->db->prepare("INSERT INTO business_calendar (event_date, staff_id, case_id, customer_name, activity_type, phone, address, note, status, created_by, created_at) VALUES (?, ?, ?, ?, 'survey', ?, ?, ?, 'planned', ?, NOW())");
-            $ins->execute(array($surveyDate, $staffId, $caseId, $c['customer_name'], $phone, $c['address'], $note, Auth::id() ?: 1));
+            $ins = $this->db->prepare("INSERT INTO business_calendar (event_date, staff_id, case_id, customer_name, activity_type, phone, address, note, start_time, status, created_by, created_at) VALUES (?, ?, ?, ?, 'survey', ?, ?, ?, ?, 'planned', ?, NOW())");
+            $ins->execute(array($surveyDate, $staffId, $caseId, $c['customer_name'], $phone, $c['address'], $note, $surveyTime, Auth::id() ?: 1));
         }
     }
 

@@ -44,8 +44,9 @@ switch ($action) {
             FROM leaves l
             JOIN users u ON l.user_id = u.id
             WHERE u.branch_id IN ($ph)
-              AND l.status = 'approved'
+              AND l.status IN ('approved','pending')
               AND l.start_date <= ? AND l.end_date >= ?
+              AND u.role IN ('engineer','eng_manager','eng_deputy')
         ");
         $leaveParams = $branchIds;
         $leaveParams[] = $endDate;
@@ -54,7 +55,7 @@ switch ($action) {
         $leaveData = $stmtLeave->fetchAll();
 
         // 假別對照
-        $leaveTypeLabels = array('annual' => '特休', 'personal' => '事假', 'sick' => '病假', 'official' => '公假');
+        $leaveTypeLabels = array('annual' => '特休', 'day_off' => '排休', 'personal' => '事假', 'sick' => '病假', 'menstrual' => '生理假', 'bereavement' => '喪假', 'official' => '公假');
 
         // 組成 date => [user_id => ['name'=>..., 'type'=>...]]
         $dateLeaves = array();
@@ -100,8 +101,9 @@ switch ($action) {
             FROM leaves l
             JOIN users u ON l.user_id = u.id
             WHERE u.branch_id IN ($ph)
-              AND l.status = 'approved'
+              AND l.status IN ('approved','pending')
               AND l.start_date <= ? AND l.end_date >= ?
+              AND u.role IN ('engineer','eng_manager','eng_deputy')
             ORDER BY u.real_name
         ");
         $p = $branchIds;

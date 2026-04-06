@@ -8,10 +8,13 @@ class LeaveModel
     private $db;
 
     private static $typeLabels = array(
-        'annual'   => '特休',
-        'personal' => '事假',
-        'sick'     => '病假',
-        'official' => '公假',
+        'annual'      => '特休',
+        'day_off'     => '排休',
+        'personal'    => '事假',
+        'sick'        => '病假',
+        'menstrual'   => '生理假',
+        'bereavement' => '喪假',
+        'official'    => '公假',
     );
 
     public function __construct()
@@ -91,14 +94,16 @@ class LeaveModel
     public function create(array $data)
     {
         $stmt = $this->db->prepare('
-            INSERT INTO leaves (user_id, leave_type, start_date, end_date, reason)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO leaves (user_id, leave_type, start_date, start_time, end_date, end_time, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute(array(
             $data['user_id'],
             $data['leave_type'],
             $data['start_date'],
+            !empty($data['start_time']) ? $data['start_time'] : null,
             $data['end_date'],
+            !empty($data['end_time']) ? $data['end_time'] : null,
             $data['reason'] ?: null,
         ));
         return (int)$this->db->lastInsertId();

@@ -8,7 +8,7 @@ $daysInMonth = (int)date('t', strtotime($yearMonth . '-01'));
 $today = date('Y-m-d');
 $dayNames = array('日','一','二','三','四','五','六');
 $typeColors = array('annual'=>'#4CAF50','personal'=>'#FF9800','sick'=>'#F44336','official'=>'#2196F3');
-$typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','official'=>'公假');
+$typeLabels = array('annual'=>'特休','day_off'=>'排休','personal'=>'事假','sick'=>'病假','menstrual'=>'生理假','bereavement'=>'喪假','official'=>'公假');
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -141,9 +141,12 @@ $typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','of
         <div class="form-group">
             <label>假別</label>
             <select id="modalLeaveType" class="form-control">
-                <option value="personal">事假</option>
                 <option value="annual">特休</option>
+                <option value="day_off">排休</option>
+                <option value="personal">事假</option>
                 <option value="sick">病假</option>
+                <option value="menstrual">生理假</option>
+                <option value="bereavement">喪假</option>
                 <option value="official">公假</option>
             </select>
         </div>
@@ -178,15 +181,15 @@ $typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','of
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--gray-200); border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
-.cal-header { background: var(--gray-100); text-align: center; padding: 8px 4px; font-weight: 600; font-size: .85rem; }
-.cal-cell { background: #fff; min-height: 100px; padding: 4px; position: relative; }
+.cal-header { background: var(--gray-100); text-align: center; padding: 10px 4px; font-weight: 600; font-size: .9rem; }
+.cal-cell { background: #fff; min-height: 130px; padding: 6px; position: relative; }
 .cal-empty { background: var(--gray-50); }
 .cal-today { background: #FFF8E1; }
 .cal-weekend { background: #FAFAFA; }
 .cal-today-card { border-left: 3px solid var(--primary); }
 
 .cal-day-header { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-.cal-day-num { font-weight: 600; font-size: .9rem; }
+.cal-day-num { font-weight: 600; font-size: 1rem; }
 .cal-leave-count { font-size: .7rem; color: var(--danger); font-weight: 600; }
 .cal-add-btn {
     margin-left: auto; width: 20px; height: 20px; border-radius: 50%;
@@ -197,8 +200,8 @@ $typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','of
 
 .cal-leave-list { display: flex; flex-direction: column; gap: 2px; }
 .cal-leave-item {
-    display: flex; align-items: center; gap: 4px; padding: 2px 4px;
-    background: var(--gray-50); border-radius: 3px; font-size: .75rem; position: relative;
+    display: flex; align-items: center; gap: 4px; padding: 3px 6px;
+    background: var(--gray-50); border-radius: 4px; font-size: .8rem; position: relative;
 }
 .cal-leave-name { font-weight: 500; }
 .cal-leave-type { font-size: .65rem; }

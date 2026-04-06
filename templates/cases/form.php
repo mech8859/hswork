@@ -293,6 +293,10 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <label>場勘日期</label>
                 <input type="date" name="survey_date" class="form-control" value="<?= e($case['survey_date'] ?? '') ?>">
             </div>
+            <div class="form-group" style="flex:0 0 130px">
+                <label>場勘時間</label>
+                <input type="time" name="survey_time" class="form-control" value="<?= e($case['survey_time'] ?? '') ?>">
+            </div>
             <div class="form-group">
                 <label>拜訪方式</label>
                 <select name="visit_method" class="form-control">

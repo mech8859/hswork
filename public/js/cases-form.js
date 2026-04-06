@@ -791,15 +791,17 @@ function saveWorklogEdit() {
         countySelect.appendChild(opt);
     }
 
-    // 解析現有值
+    // 解析現有值（處理台/臺差異）
     var currentVal = hiddenInput.value || '';
     var currentCounty = '';
     var currentDistrict = '';
     if (currentVal) {
+        // 正規化：台→臺
+        var normalizedVal = currentVal.replace(/台/g, '臺');
         for (var j = 0; j < sorted.length; j++) {
-            if (currentVal.indexOf(sorted[j]) === 0) {
+            if (normalizedVal.indexOf(sorted[j]) === 0) {
                 currentCounty = sorted[j];
-                currentDistrict = currentVal.substring(sorted[j].length);
+                currentDistrict = normalizedVal.substring(sorted[j].length);
                 break;
             }
         }

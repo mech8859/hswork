@@ -41,6 +41,8 @@ switch ($action) {
                 'leave_type' => $_POST['leave_type'],
                 'start_date' => $_POST['start_date'],
                 'end_date'   => $_POST['end_date'],
+                'start_time' => !empty($_POST['start_time']) ? $_POST['start_time'] : null,
+                'end_time'   => !empty($_POST['end_time']) ? $_POST['end_time'] : null,
                 'reason'     => $_POST['reason'] ?? '',
             );
 
