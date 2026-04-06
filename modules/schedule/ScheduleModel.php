@@ -28,6 +28,7 @@ class ScheduleModel
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
                    c.case_type, c.total_visits, c.max_engineers,
+                   c.planned_start_time AS case_designated_time,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name, b.code AS branch_code
             FROM schedules s
@@ -36,7 +37,7 @@ class ScheduleModel
             LEFT JOIN vehicles v ON s.vehicle_id = v.id
             WHERE c.branch_id IN ($ph)
               AND s.schedule_date BETWEEN ? AND ?
-            ORDER BY s.schedule_date ASC, s.created_at ASC
+            ORDER BY s.schedule_date ASC, COALESCE(s.designated_time, s.start_time, '23:59') ASC
         ");
         $stmt->execute($params);
         $schedules = $stmt->fetchAll();
@@ -134,18 +135,21 @@ class ScheduleModel
         $visitNumber = $this->calcNextVisitNumber($data['case_id']);
 
         $stmt = $this->db->prepare('
-            INSERT INTO schedules (case_id, schedule_date, vehicle_id, visit_number, status, note, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO schedules (case_id, schedule_date, start_time, end_time, designated_time, vehicle_id, visit_number, status, note, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
-        $stmt->execute([
+        $stmt->execute(array(
             $data['case_id'],
             $data['schedule_date'],
+            !empty($data['start_time']) ? $data['start_time'] : null,
+            !empty($data['end_time']) ? $data['end_time'] : null,
+            !empty($data['designated_time']) ? $data['designated_time'] : null,
             $data['vehicle_id'] ?: null,
             $visitNumber,
-            $data['status'] ?? 'planned',
-            $data['note'] ?? null,
+            $data['status'] ?: 'planned',
+            isset($data['note']) ? $data['note'] : null,
             Auth::id(),
-        ]);
+        ));
         $scheduleId = (int)$this->db->lastInsertId();
 
         // 指派工程師
@@ -171,16 +175,19 @@ class ScheduleModel
     public function update(int $id, array $data): void
     {
         $stmt = $this->db->prepare('
-            UPDATE schedules SET schedule_date = ?, vehicle_id = ?, status = ?, note = ?
+            UPDATE schedules SET schedule_date = ?, start_time = ?, end_time = ?, designated_time = ?, vehicle_id = ?, status = ?, note = ?
             WHERE id = ?
         ');
-        $stmt->execute([
+        $stmt->execute(array(
             $data['schedule_date'],
+            !empty($data['start_time']) ? $data['start_time'] : null,
+            !empty($data['end_time']) ? $data['end_time'] : null,
+            !empty($data['designated_time']) ? $data['designated_time'] : null,
             $data['vehicle_id'] ?: null,
-            $data['status'] ?? 'planned',
-            $data['note'] ?? null,
+            $data['status'] ?: 'planned',
+            isset($data['note']) ? $data['note'] : null,
             $id,
-        ]);
+        ));
 
         // 重新指派工程師
         if (isset($data['engineer_ids'])) {
@@ -471,6 +478,7 @@ class ScheduleModel
         $stmt = $this->db->prepare("
             SELECT c.id, c.case_number, c.title, c.address, c.difficulty,
                    c.total_visits, c.current_visit, c.max_engineers,
+                   c.planned_start_time, c.work_time_start, c.work_time_end,
                    b.name AS branch_name
             FROM cases c
             JOIN branches b ON c.branch_id = b.id

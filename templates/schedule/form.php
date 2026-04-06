@@ -29,6 +29,9 @@ if ($isEdit) {
                             data-max="<?= $c['max_engineers'] ?>"
                             data-visits="<?= $c['total_visits'] ?>"
                             data-current="<?= $c['current_visit'] ?>"
+                            data-designated-time="<?= e(!empty($c['planned_start_time']) ? $c['planned_start_time'] : '') ?>"
+                            data-work-start="<?= e(!empty($c['work_time_start']) ? $c['work_time_start'] : '') ?>"
+                            data-work-end="<?= e(!empty($c['work_time_end']) ? $c['work_time_end'] : '') ?>"
                             <?= ($schedule['case_id'] ?? $caseId ?? '') == $c['id'] ? 'selected' : '' ?>>
                         <?= e($c['case_number']) ?> - <?= e($c['title']) ?> (<?= e($c['branch_name']) ?>)
                     </option>
@@ -50,6 +53,24 @@ if ($isEdit) {
                     <option value="<?= $v ?>" <?= ($schedule['status'] ?? 'planned') === $v ? 'selected' : '' ?>><?= $l ?></option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>預計時間</label>
+                <input type="time" name="start_time" id="startTime" class="form-control"
+                       value="<?= e($schedule['start_time'] ?? '') ?>">
+            </div>
+            <div class="form-group">
+                <label>結束時間</label>
+                <input type="time" name="end_time" id="endTime" class="form-control"
+                       value="<?= e($schedule['end_time'] ?? '') ?>">
+            </div>
+            <div class="form-group">
+                <label>指定時間 <small class="text-muted">（案件自動帶入）</small></label>
+                <input type="time" name="designated_time" id="designatedTime" class="form-control"
+                       value="<?= e($schedule['designated_time'] ?? '') ?>"
+                       style="<?= !empty($schedule['designated_time']) ? 'background:#fff3e0;font-weight:600' : '' ?>">
             </div>
         </div>
         <div class="form-group">
@@ -93,9 +114,11 @@ if ($isEdit) {
                 <div class="engineer-option <?= $eng['is_busy'] ? 'engineer-busy' : '' ?> <?= $eng['skill_match'] ? 'engineer-match' : '' ?>">
                     <label class="checkbox-label">
                         <input type="checkbox" name="engineer_ids[]" value="<?= $eng['id'] ?>"
-                               onchange="updateCount()"
-                               <?= in_array($eng['id'], $currentEngineers) ? 'checked' : '' ?>
-                               <?= $eng['is_busy'] && !in_array($eng['id'], $currentEngineers) ? 'disabled' : '' ?>>
+                               onchange="updateCount();<?= $eng['is_busy'] ? 'warnOvertime(this,\'' . e($eng['real_name']) . '\',' . (isset($eng['hours_used']) ? $eng['hours_used'] : 0) . ')' : '' ?>"
+                               data-overtime="<?= $eng['is_busy'] ? '1' : '0' ?>"
+                               data-name="<?= e($eng['real_name']) ?>"
+                               data-used="<?= isset($eng['hours_used']) ? $eng['hours_used'] : 0 ?>"
+                               <?= in_array($eng['id'], $currentEngineers) ? 'checked' : '' ?>>
                         <span>
                             <?= e($eng['real_name']) ?>
                             <span class="text-muted" style="font-size:.8rem">(<?= e($eng['branch_name']) ?>)</span>
@@ -105,7 +128,7 @@ if ($isEdit) {
                         <span class="badge badge-success">技能符合</span>
                     <?php endif; ?>
                     <?php if ($eng['is_busy']): ?>
-                        <span class="badge" style="background:#e53935;color:#fff">已滿</span>
+                        <span class="badge" style="background:#e53935;color:#fff">已滿(<?= isset($eng['hours_used']) ? $eng['hours_used'] : 0 ?>h)</span>
                     <?php elseif (isset($eng['hours_used']) && $eng['hours_used'] > 0): ?>
                         <span class="badge badge-warning">已排<?= $eng['hours_used'] ?>h / 剩<?= $eng['remaining_hours'] ?>h</span>
                     <?php endif; ?>
@@ -192,6 +215,11 @@ function updateCount() {
     var checked = document.querySelectorAll('#engineerList input[type="checkbox"]:checked').length;
     document.getElementById('engineerCount').textContent = '已選 ' + checked + ' 人';
 }
+function warnOvertime(cb, name, usedHours) {
+    if (cb.checked) {
+        alert('⚠️ 注意：' + name + ' 當日已排工 ' + usedHours + ' 小時，已超過預估工作時數上限。\n\n如確認安排，請注意工作量分配。');
+    }
+}
 function updateDWCount() {
     var checked = document.querySelectorAll('#dwList input[type="checkbox"]:checked').length;
     document.getElementById('dwCount').textContent = '已選 ' + checked + ' 人';
@@ -202,6 +230,24 @@ function reloadSuggestions() {
     var date = document.getElementById('scheduleDate').value;
     if (!caseId || !date) return;
 
+    // 從案件帶入指定時間
+    var opt = document.getElementById('caseSelect').selectedOptions[0];
+    if (opt) {
+        var dt = opt.dataset.designatedTime || '';
+        var ws = opt.dataset.workStart || '';
+        var we = opt.dataset.workEnd || '';
+        var dtInput = document.getElementById('designatedTime');
+        if (dt && !dtInput.value) {
+            dtInput.value = dt.substring(0, 5);
+            dtInput.style.background = '#fff3e0';
+            dtInput.style.fontWeight = '600';
+        }
+        var stInput = document.getElementById('startTime');
+        var etInput = document.getElementById('endTime');
+        if (ws && !stInput.value) stInput.value = ws.substring(0, 5);
+        if (we && !etInput.value) etInput.value = we.substring(0, 5);
+    }
+
     // 透過 AJAX 載入推薦工程師
     fetch('/schedule.php?action=ajax_engineers&case_id=' + caseId + '&date=' + date, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -210,13 +256,19 @@ function reloadSuggestions() {
     .then(function(result) {
         var html = '';
         result.data.forEach(function(eng) {
+            var usedH = eng.hours_used || 0;
+            var overtimeAttr = eng.is_busy ? 'warnOvertime(this,\'' + eng.real_name.replace(/'/g, "\\'") + '\',' + usedH + ')' : '';
             html += '<div class="engineer-option ' + (eng.is_busy ? 'engineer-busy' : '') + ' ' + (eng.skill_match ? 'engineer-match' : '') + '">';
             html += '<label class="checkbox-label">';
-            html += '<input type="checkbox" name="engineer_ids[]" value="' + eng.id + '" onchange="updateCount()" ' + (eng.is_busy ? 'disabled' : '') + '>';
+            html += '<input type="checkbox" name="engineer_ids[]" value="' + eng.id + '" onchange="updateCount();' + overtimeAttr + '">';
             html += '<span>' + eng.real_name + ' <span class="text-muted" style="font-size:.8rem">(' + eng.branch_name + ')</span></span>';
             html += '</label>';
             if (eng.skill_match) html += '<span class="badge badge-success">技能符合</span>';
-            if (eng.is_busy) html += '<span class="badge badge-warning">已排工</span>';
+            if (eng.is_busy) {
+                html += '<span class="badge" style="background:#e53935;color:#fff">已滿(' + usedH + 'h)</span>';
+            } else if (usedH > 0) {
+                html += '<span class="badge badge-warning">已排' + usedH + 'h / 剩' + eng.remaining_hours + 'h</span>';
+            }
             html += '</div>';
         });
         document.getElementById('engineerList').innerHTML = html || '<p class="text-muted">無可用工程師</p>';
@@ -225,7 +277,7 @@ function reloadSuggestions() {
         // 更新主工程師下拉
         var leadHtml = '<option value="">不指定</option>';
         result.data.forEach(function(eng) {
-            if (!eng.is_busy) leadHtml += '<option value="' + eng.id + '">' + eng.real_name + '</option>';
+            leadHtml += '<option value="' + eng.id + '">' + eng.real_name + (eng.is_busy ? ' (已滿)' : '') + '</option>';
         });
         document.getElementById('leadSelect').innerHTML = leadHtml;
     });

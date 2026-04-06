@@ -233,7 +233,15 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                 $isMine = in_array($currentUserId, array_column($ds['engineers'], 'user_id'));
             ?>
             <a href="/schedule.php?action=view&id=<?= $ds['id'] ?>" class="cal-event cal-event-<?= $ds['status'] ?> <?= $isMine ? 'cal-event-mine' : '' ?>">
-                <div class="cal-event-title"><?= e(mb_substr($ds['case_title'], 0, 10)) ?></div>
+                <?php
+                $schedTime = '';
+                if (!empty($ds['designated_time'])) {
+                    $schedTime = substr($ds['designated_time'], 0, 5);
+                } elseif (!empty($ds['start_time'])) {
+                    $schedTime = substr($ds['start_time'], 0, 5);
+                }
+                ?>
+                <div class="cal-event-title"><?= e(mb_substr($ds['case_title'], 0, 10)) ?><?= $schedTime ? ' <span style="color:#e65100;font-size:.7rem">' . $schedTime . '</span>' : '' ?></div>
                 <div class="cal-event-info">
                     <?php if ($ds['plate_number']): ?><span><?= e($ds['plate_number']) ?></span><?php endif; ?>
                     <span><?= count($ds['engineers']) ?>人</span>
@@ -273,6 +281,9 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
     foreach ($daySchedules as $ds) {
         $engIds = array_column($ds['engineers'], 'user_id');
         $isMine = in_array($currentUserId, $engIds);
+        $scTime = '';
+        if (!empty($ds['designated_time'])) $scTime = substr($ds['designated_time'], 0, 5);
+        elseif (!empty($ds['start_time'])) $scTime = substr($ds['start_time'], 0, 5);
         $items[] = array(
             'id' => $ds['id'], 'title' => $ds['case_title'],
             'case_number' => isset($ds['case_number']) ? $ds['case_number'] : '',
@@ -283,6 +294,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             'visit' => $ds['total_visits'] > 1 ? $ds['visit_number'] . '/' . $ds['total_visits'] : '',
             'note' => $ds['note'] ?: '', 'isMine' => $isMine,
             'titleShort' => mb_substr($ds['case_title'], 0, 8),
+            'time' => $scTime,
         );
     }
     $leaves = array();
@@ -387,7 +399,7 @@ function openMobileDay(dateStr) {
         var s = items[i];
         var borderColor = s.status === 'completed' ? '#34a853' : (s.isMine ? 'var(--primary)' : 'var(--gray-300)');
         html += '<div class="mday-item" style="border-left-color:' + borderColor + '" onclick="location.href=\'/schedule.php?action=view&id=' + s.id + '\'">';
-        html += '<div class="mday-item-title">' + mEsc(s.title) + '</div>';
+        html += '<div class="mday-item-title">' + mEsc(s.title) + (s.time ? ' <span style="color:#e65100;font-size:.8rem;font-weight:600">' + s.time + '</span>' : '') + '</div>';
         html += '<div class="mday-item-meta">';
         if (s.engineers) html += '<span>&#x1F477; ' + mEsc(s.engineers) + '</span>';
         if (s.plate) html += '<span>&#x1F697; ' + mEsc(s.plate) + '</span>';
@@ -457,6 +469,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             'visit' => $ds['total_visits'] > 1 ? $ds['visit_number'] . '/' . $ds['total_visits'] : '',
             'note' => $ds['note'] ?: '',
             'isMine' => $isMine,
+            'time' => !empty($ds['designated_time']) ? substr($ds['designated_time'], 0, 5) : (!empty($ds['start_time']) ? substr($ds['start_time'], 0, 5) : ''),
         );
     }
     $leaves = array();

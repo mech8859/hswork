@@ -32,6 +32,8 @@
                     <option value="">全部</option>
                     <option value="goods_receipt" <?= (!empty($filters['source_type']) ? $filters['source_type'] : '') === 'goods_receipt' ? 'selected' : '' ?>>進貨單</option>
                     <option value="manual" <?= (!empty($filters['source_type']) ? $filters['source_type'] : '') === 'manual' ? 'selected' : '' ?>>手動入庫</option>
+                    <option value="return_material" <?= (!empty($filters['source_type']) ? $filters['source_type'] : '') === 'return_material' ? 'selected' : '' ?>>餘料入庫</option>
+                    <option value="manual_return" <?= (!empty($filters['source_type']) ? $filters['source_type'] : '') === 'manual_return' ? 'selected' : '' ?>>手動餘料入庫</option>
                 </select>
             </div>
             <div class="form-group">

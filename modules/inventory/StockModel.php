@@ -105,6 +105,7 @@ class StockModel
             'goods_receipt'   => '進貨單',
             'manual'          => '手動入庫',
             'return_material' => '餘料入庫',
+            'manual_return'   => '手動餘料入庫',
             'delivery_order'  => '出貨單',
             'case'            => '案件出庫',
         );

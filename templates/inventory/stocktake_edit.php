@@ -163,12 +163,12 @@
     <div class="d-flex gap-1 mt-2" style="flex-wrap:wrap">
         <button type="submit" class="btn btn-primary" onclick="document.getElementById('postAction').value='save'">儲存盤點</button>
         <button type="submit" class="btn btn-success" onclick="if(!confirm('確認提交盤點？')){event.preventDefault();return;}document.getElementById('postAction').value='complete'">提交簽核</button>
-        <form method="POST" action="/inventory.php?action=stocktake_cancel" style="display:inline" onsubmit="return confirm('確認取消此盤點？')">
-            <?= csrf_field() ?>
-            <input type="hidden" name="id" value="<?= e($stocktake['id']) ?>">
-            <button type="submit" class="btn btn-outline" style="color:var(--danger)">取消盤點</button>
-        </form>
+        <button type="button" class="btn btn-outline" style="color:var(--danger)" onclick="if(confirm('確認取消此盤點？')){document.getElementById('cancelForm').submit();}">取消盤點</button>
     </div>
+    </form>
+    <form id="cancelForm" method="POST" action="/inventory.php?action=stocktake_cancel" style="display:none">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= e($stocktake['id']) ?>">
     </form>
     <?php endif; ?>
 
