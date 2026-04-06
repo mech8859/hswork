@@ -30,6 +30,7 @@ class StockModel
     {
         return array(
             '待確認'   => '待出庫',
+            '已預扣'   => '已預扣',
             '已備貨'   => '已備貨',
             '部分出庫' => '部分出庫',
             '已確認'   => '已出庫',
@@ -50,12 +51,13 @@ class StockModel
     {
         $map = array(
             '待確認'   => '待出庫',
+            '已預扣'   => '已預扣',
             '已備貨'   => '已備貨',
             '部分出庫' => '部分出庫',
             '已確認'   => '已出庫',
             '已取消'   => '已取消',
             'pending'   => '待出庫',
-            'reserved'  => '已備貨',
+            'reserved'  => '已預扣',
             'confirmed' => '已出庫',
             'cancelled' => '已取消',
         );
@@ -66,11 +68,13 @@ class StockModel
     {
         $map = array(
             '待確認' => 'orange',
+            '已預扣' => 'blue',
             '已備貨' => 'purple',
             '已確認' => 'green',
             '部分出庫' => 'blue',
             '已取消' => 'gray',
             'pending'   => 'orange',
+            'reserved'  => 'blue',
             'confirmed' => 'green',
             'cancelled' => 'gray',
         );
@@ -599,20 +603,27 @@ class StockModel
         if (!$warehouseId) return false;
 
         $soNumber = !empty($record['so_number']) ? $record['so_number'] : (!empty($record['stockout_number']) ? $record['stockout_number'] : '');
+        $isPrepared = ($record['status'] === '已備貨');
+        $isReserved = ($record['status'] === '已預扣');
 
         $this->db->beginTransaction();
         try {
             foreach ($items as $item) {
-                if (!empty($item['is_confirmed'])) continue; // 已確認的跳過
+                if (!empty($item['is_confirmed'])) continue;
                 $productId = !empty($item['product_id']) ? $item['product_id'] : null;
                 $qty = !empty($item['quantity']) ? $item['quantity'] : 0;
                 if (!$productId || $qty <= 0) continue;
 
-                $invModel->adjustStock($productId, $warehouseId, -1 * abs($qty), 'case_out', 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                if ($isPrepared) {
+                    $invModel->confirmPreparedStock($productId, $warehouseId, abs($qty), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                } elseif ($isReserved) {
+                    $invModel->confirmReservedStock($productId, $warehouseId, abs($qty), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                } else {
+                    $invModel->adjustStock($productId, $warehouseId, -1 * abs($qty), 'case_out', 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                }
                 $this->db->prepare("UPDATE stock_out_items SET is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")->execute(array($item['id']));
             }
 
-            // 更新出庫單狀態
             $this->updateStockOutStatus($id, $userId);
             $this->db->commit();
             return true;
@@ -651,11 +662,15 @@ class StockModel
 
         require_once __DIR__ . '/InventoryModel.php';
         $invModel = new InventoryModel();
-        $isReserved = ($record['status'] === '已備貨');
+        $isPrepared = ($record['status'] === '已備貨');
+        $isReserved = ($record['status'] === '已預扣');
 
         $this->db->beginTransaction();
         try {
-            if ($isReserved) {
+            if ($isPrepared) {
+                // 已備貨：從 prepared_qty 轉出（stock_qty 減少，available_qty 不動）
+                $invModel->confirmPreparedStock($productId, $warehouseId, abs($qty), 'stock_out', $stockOutId, '出庫: ' . $soNumber . ' (數量:' . $qty . ')', $userId);
+            } elseif ($isReserved) {
                 // 已預扣：從 reserved_qty 轉出（stock_qty 減少，available_qty 不動）
                 $invModel->confirmReservedStock($productId, $warehouseId, abs($qty), 'stock_out', $stockOutId, '出庫: ' . $soNumber . ' (數量:' . $qty . ')', $userId);
             } else {
@@ -701,7 +716,7 @@ class StockModel
     }
 
     /**
-     * 預扣庫存：扣 available_qty + 加 reserved_qty，狀態改「已備貨」
+     * 預扣庫存：扣 available_qty + 加 reserved_qty，狀態改「已預扣」
      */
     public function reserveStockOut($id, $userId)
     {
@@ -727,6 +742,43 @@ class StockModel
                     $invModel->reserveStock($pid, $whId, $qty, 'stock_out', $id, '預扣: ' . $soNum, $userId);
                 }
             }
+            $this->db->prepare("UPDATE stock_outs SET status = '已預扣', updated_by = ? WHERE id = ?")
+                ->execute(array($userId, $id));
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * 確認備貨：reserved_qty → prepared_qty，狀態改「已備貨」
+     */
+    public function prepareStockOut($id, $userId)
+    {
+        $record = $this->getStockOutById($id);
+        if (!$record) return false;
+        if ($record['status'] !== '已預扣') return false;
+
+        $items = $this->getStockOutItems($id);
+        if (empty($items)) return false;
+
+        require_once __DIR__ . '/InventoryModel.php';
+        $invModel = new InventoryModel();
+        $whId = (int)$record['warehouse_id'];
+        $soNum = $record['so_number'];
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($items as $item) {
+                if (!empty($item['is_confirmed'])) continue;
+                $pid = !empty($item['product_id']) ? (int)$item['product_id'] : 0;
+                $qty = (int)(isset($item['quantity']) ? $item['quantity'] : 0);
+                if ($pid && $qty > 0) {
+                    $invModel->prepareStock($pid, $whId, $qty, 'stock_out', $id, '備貨: ' . $soNum, $userId);
+                }
+            }
             $this->db->prepare("UPDATE stock_outs SET status = '已備貨', updated_by = ? WHERE id = ?")
                 ->execute(array($userId, $id));
             $this->db->commit();
@@ -744,7 +796,7 @@ class StockModel
     {
         $record = $this->getStockOutById($id);
         if (!$record) return false;
-        if ($record['status'] !== '已備貨') return false;
+        if ($record['status'] !== '已預扣') return false;
 
         $items = $this->getStockOutItems($id);
         require_once __DIR__ . '/InventoryModel.php';

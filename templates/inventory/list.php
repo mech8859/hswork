@@ -136,6 +136,7 @@
                     <th class="text-right">可用</th>
                     <th class="text-right">庫存</th>
                     <th class="text-right">安全庫存</th>
+                    <th class="text-right">預扣</th>
                     <th class="text-right">已備貨</th>
                     <th class="text-right">借出</th>
                     <th class="text-right">展示</th>
@@ -176,6 +177,7 @@
                     <td class="text-right"><span style="color:<?= $isLow ? 'var(--danger)' : ((!empty($r['stock_qty']) && $r['stock_qty'] > 0) ? 'var(--success)' : 'var(--gray-400)') ?>;font-weight:<?= $isLow ? '700' : 'normal' ?>"><?= (int)(!empty($r['stock_qty']) ? $r['stock_qty'] : 0) ?></span></td>
                     <td class="text-right"><?= (int)(!empty($r['min_qty']) ? $r['min_qty'] : 0) ?></td>
                     <td class="text-right"><?= (int)(!empty($r['reserved_qty']) ? $r['reserved_qty'] : 0) ?></td>
+                    <td class="text-right"><?= (int)(!empty($r['prepared_qty']) ? $r['prepared_qty'] : 0) ?></td>
                     <td class="text-right"><?= (int)(!empty($r['loaned_qty']) ? $r['loaned_qty'] : 0) ?></td>
                     <td class="text-right"><?= (int)(!empty($r['display_qty']) ? $r['display_qty'] : 0) ?></td>
                     <td><a href="/inventory.php?action=view&product_id=<?= e($r['product_id']) ?>" class="btn btn-outline btn-sm">明細</a></td>

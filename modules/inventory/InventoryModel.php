@@ -28,6 +28,9 @@ class InventoryModel
             'adjust'       => '盤點調整',
             'return_in'    => '退貨入庫',
             'case_out'     => '案件出庫',
+            'reserve'      => '預扣庫存',
+            'unreserve'    => '取消預扣',
+            'prepare'      => '備貨確認',
         );
     }
 
@@ -365,6 +368,44 @@ class InventoryModel
     {
         $this->db->prepare("
             UPDATE inventory SET stock_qty = stock_qty - ?, reserved_qty = GREATEST(reserved_qty - ?, 0)
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'case_out', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, -$qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
+     * 確認備貨：reserved_qty → prepared_qty（預扣轉備貨，不動 available_qty 和 stock_qty）
+     */
+    public function prepareStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET reserved_qty = GREATEST(reserved_qty - ?, 0), prepared_qty = prepared_qty + ?
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'prepare', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, $qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
+     * 已備貨轉出庫：prepared_qty 減少, stock_qty 減少（available_qty 不動）
+     */
+    public function confirmPreparedStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET stock_qty = stock_qty - ?, prepared_qty = GREATEST(prepared_qty - ?, 0)
             WHERE product_id = ? AND warehouse_id = ?
         ")->execute(array($qty, $qty, $productId, $warehouseId));
 

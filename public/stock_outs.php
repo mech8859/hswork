@@ -185,12 +185,31 @@ switch ($action) {
             try {
                 if ($model->reserveStockOut($id, Auth::id())) {
                     AuditLog::log('stock_outs', 'reserve', $id, '預扣庫存');
-                    Session::flash('success', '庫存已預扣（已備貨）');
+                    Session::flash('success', '庫存已預扣');
                 } else {
                     Session::flash('error', '預扣失敗（狀態不符）');
                 }
             } catch (Exception $e) {
                 Session::flash('error', '預扣失敗：' . $e->getMessage());
+            }
+        }
+        redirect('/stock_outs.php?action=view&id=' . $id);
+        break;
+
+    // ---- 確認備貨 ----
+    case 'prepare':
+        if (!$canManage) { Session::flash('error', '無權限'); redirect('/stock_outs.php'); }
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        if (verify_csrf()) {
+            try {
+                if ($model->prepareStockOut($id, Auth::id())) {
+                    AuditLog::log('stock_outs', 'prepare', $id, '確認備貨');
+                    Session::flash('success', '已確認備貨');
+                } else {
+                    Session::flash('error', '備貨失敗（狀態不符，需先預扣）');
+                }
+            } catch (Exception $e) {
+                Session::flash('error', '備貨失敗：' . $e->getMessage());
             }
         }
         redirect('/stock_outs.php?action=view&id=' . $id);
