@@ -245,6 +245,57 @@ class WorklogModel
         if ($isCompleted) {
             $this->markCaseCompletedPending($worklogId);
         }
+
+        // 同步到案件的 case_work_logs（案件管理主表）
+        $this->syncToCaseWorkLog($worklogId);
+    }
+
+    /**
+     * 同步 work_logs 到 case_work_logs
+     */
+    private function syncToCaseWorkLog($worklogId)
+    {
+        try {
+            // 取得 work_log + schedule + case 資訊
+            $stmt = $this->db->prepare("
+                SELECT wl.*, s.case_id, s.schedule_date, u.real_name
+                FROM work_logs wl
+                JOIN schedules s ON wl.schedule_id = s.id
+                LEFT JOIN users u ON wl.user_id = u.id
+                WHERE wl.id = ?
+            ");
+            $stmt->execute(array($worklogId));
+            $wl = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$wl || empty($wl['case_id'])) return;
+
+            // 取得照片
+            $photoStmt = $this->db->prepare("SELECT file_path FROM worklog_photos WHERE work_log_id = ? ORDER BY id");
+            $photoStmt->execute(array($worklogId));
+            $photos = $photoStmt->fetchAll(PDO::FETCH_COLUMN);
+            $photoJson = !empty($photos) ? json_encode($photos) : null;
+
+            // 組合施工內容
+            $content = '';
+            if (!empty($wl['work_description'])) $content .= $wl['work_description'];
+            if (!empty($wl['issues'])) $content .= ($content ? "\n問題：" : '問題：') . $wl['issues'];
+
+            // 檢查是否已有同步紀錄（用 source_worklog_id 對應）
+            $existStmt = $this->db->prepare("SELECT id FROM case_work_logs WHERE case_id = ? AND source_worklog_id = ?");
+            $existStmt->execute(array($wl['case_id'], $worklogId));
+            $existId = $existStmt->fetchColumn();
+
+            if ($existId) {
+                // 更新
+                $this->db->prepare("UPDATE case_work_logs SET work_date = ?, work_content = ?, equipment_used = ?, arrival_time = ?, departure_time = ?, photo_paths = ? WHERE id = ?")
+                    ->execute(array($wl['schedule_date'], $content, $wl['issues'], $wl['arrival_time'], $wl['departure_time'], $photoJson, $existId));
+            } else {
+                // 新增
+                $this->db->prepare("INSERT INTO case_work_logs (case_id, work_date, work_content, equipment_used, arrival_time, departure_time, photo_paths, source_worklog_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
+                    ->execute(array($wl['case_id'], $wl['schedule_date'], $content, $wl['issues'], $wl['arrival_time'], $wl['departure_time'], $photoJson, $worklogId, $wl['user_id']));
+            }
+        } catch (Exception $e) {
+            error_log('syncToCaseWorkLog error: ' . $e->getMessage());
+        }
     }
 
     /**
