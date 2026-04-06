@@ -445,8 +445,8 @@ class ApprovalModel
     {
         $stmt = $this->db->query("
             SELECT id, real_name, role FROM users
-            WHERE is_active = 1 AND role IN ('boss','sales_manager','eng_manager','eng_deputy','admin_staff')
-            ORDER BY FIELD(role,'boss','sales_manager','eng_manager','eng_deputy','admin_staff'), real_name
+            WHERE is_active = 1 AND role IN ('boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant')
+            ORDER BY FIELD(role,'boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant'), real_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

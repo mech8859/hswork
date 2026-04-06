@@ -105,7 +105,8 @@
                             <option value="sales_manager">業務經理</option>
                             <option value="eng_manager">工程主管</option>
                             <option value="eng_deputy">工程副主管</option>
-                            <option value="admin_staff">行政人員(會計)</option>
+                            <option value="admin_staff">行政人員</option>
+                            <option value="accountant">會計人員</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -213,7 +214,8 @@
                                         <option value="sales_manager" <?= $rule['approver_role'] === 'sales_manager' ? 'selected' : '' ?>>業務經理</option>
                                         <option value="eng_manager" <?= $rule['approver_role'] === 'eng_manager' ? 'selected' : '' ?>>工程主管</option>
                                         <option value="eng_deputy" <?= $rule['approver_role'] === 'eng_deputy' ? 'selected' : '' ?>>工程副主管</option>
-                                        <option value="admin_staff" <?= $rule['approver_role'] === 'admin_staff' ? 'selected' : '' ?>>行政人員(會計)</option>
+                                        <option value="admin_staff" <?= $rule['approver_role'] === 'admin_staff' ? 'selected' : '' ?>>行政人員</option>
+                                        <option value="accountant" <?= $rule['approver_role'] === 'accountant' ? 'selected' : '' ?>>會計人員</option>
                                     </select>
                                 </div>
                                 <div class="form-group" id="edit-approver-id-group-<?= $rule['id'] ?>" <?= $rule['approver_role'] === 'auto_approve' ? 'style="display:none"' : '' ?>>
@@ -358,7 +360,8 @@ function addApprovalLevel() {
                     '<option value="sales_manager">業務經理</option>' +
                     '<option value="eng_manager">工程主管</option>' +
                     '<option value="eng_deputy">工程副主管</option>' +
-                    '<option value="admin_staff">行政人員(會計)</option>' +
+                    '<option value="admin_staff">行政人員</option>' +
+                    '<option value="accountant">會計人員</option>' +
                 '</select>' +
             '</div>' +
             '<div class="form-group">' +

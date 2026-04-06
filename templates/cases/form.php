@@ -197,11 +197,21 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             </div>
             <div class="form-group">
                 <label>案件進度</label>
+                <?php
+                $currentStatus = isset($case['status']) ? $case['status'] : 'tracking';
+                $isBoss = Session::getUser() && Session::getUser()['role'] === 'boss';
+                $approvalStatuses = array('closed', 'completed_pending');
+                ?>
                 <select name="status" class="form-control">
-                    <?php foreach (CaseModel::progressOptions() as $v => $l): ?>
-                    <option value="<?= $v ?>" <?= ($case['status'] ?? 'tracking') === $v ? 'selected' : '' ?>><?= e($l) ?></option>
+                    <?php foreach (CaseModel::progressOptions() as $v => $l):
+                        $isProtected = in_array($v, $approvalStatuses) && $v !== $currentStatus && !$isBoss;
+                    ?>
+                    <option value="<?= $v ?>" <?= $currentStatus === $v ? 'selected' : '' ?> <?= $isProtected ? 'disabled' : '' ?>><?= e($l) ?><?= $isProtected ? '（需簽核）' : '' ?></option>
                     <?php endforeach; ?>
                 </select>
+                <?php if (in_array($currentStatus, $approvalStatuses) && !$isBoss): ?>
+                <small class="text-muted">目前狀態需透過簽核流程變更</small>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>狀態</label>

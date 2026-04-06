@@ -7,13 +7,26 @@ $model = new CaseModel();
 $action = $_GET['action'] ?? 'list';
 $branchIds = Auth::getAccessibleBranchIds();
 
-// 帳款交易合計回寫 total_collected
+// 帳款交易合計回寫 total_collected + 訂金金額/方式
 function updateTotalCollected($caseId) {
     $db = Database::getInstance();
+    // 總收款
     $stmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
     $stmt->execute(array($caseId));
     $total = (int)$stmt->fetchColumn();
-    $db->prepare("UPDATE cases SET total_collected = ? WHERE id = ?")->execute(array($total, $caseId));
+    // 訂金（類別=訂金的合計 + 最新一筆的支付方式）
+    $depStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ? AND payment_type = '訂金'");
+    $depStmt->execute(array($caseId));
+    $depositAmount = (int)$depStmt->fetchColumn();
+    $depMethodStmt = $db->prepare("SELECT transaction_type FROM case_payments WHERE case_id = ? AND payment_type = '訂金' ORDER BY payment_date DESC, id DESC LIMIT 1");
+    $depMethodStmt->execute(array($caseId));
+    $depositMethod = $depMethodStmt->fetchColumn() ?: null;
+    // 訂金日期
+    $depDateStmt = $db->prepare("SELECT payment_date FROM case_payments WHERE case_id = ? AND payment_type = '訂金' ORDER BY payment_date DESC, id DESC LIMIT 1");
+    $depDateStmt->execute(array($caseId));
+    $depositDate = $depDateStmt->fetchColumn() ?: null;
+    $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ? WHERE id = ?")
+        ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $caseId));
 }
 
 switch ($action) {
@@ -100,7 +113,12 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/cases.php?action=edit&id=' . $id);
             }
-            $model->update($id, $_POST);
+            try {
+                $model->update($id, $_POST);
+            } catch (\RuntimeException $e) {
+                Session::flash('error', $e->getMessage());
+                redirect('/cases.php?action=edit&id=' . $id);
+            }
             $model->updateReadiness($id, $_POST);
             $model->updateSiteConditions($id, $_POST);
             if (isset($_POST['contacts'])) {

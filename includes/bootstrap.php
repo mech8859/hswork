@@ -29,6 +29,8 @@ $appConfig = require __DIR__ . '/../config/app.php';
 // 自動更新用戶活動狀態（每次頁面載入）
 if (Session::getUser() && php_sapi_name() !== 'cli') {
     AuditLog::updateActivity();
+    // 每次載入重新計算權限（改權限不需重新登入）
+    Auth::reloadPermissions();
 }
 
 // 每日自動備份檢查（boss 登入時觸發，背景執行）

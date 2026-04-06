@@ -712,6 +712,7 @@ class StockModel
         $items = $this->getStockOutItems($id);
         if (empty($items)) return false;
 
+        require_once __DIR__ . '/InventoryModel.php';
         $invModel = new InventoryModel();
         $whId = (int)$record['warehouse_id'];
         $soNum = $record['so_number'];
@@ -746,6 +747,7 @@ class StockModel
         if ($record['status'] !== '已備貨') return false;
 
         $items = $this->getStockOutItems($id);
+        require_once __DIR__ . '/InventoryModel.php';
         $invModel = new InventoryModel();
         $whId = (int)$record['warehouse_id'];
         $soNum = $record['so_number'];

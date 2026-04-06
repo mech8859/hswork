@@ -346,6 +346,154 @@ class Auth
     /**
      * 檢查是否有特定權限
      */
+    /**
+     * 重新載入當前用戶的權限（不需重新登入）
+     */
+    public static function reloadPermissions()
+    {
+        $user = Session::getUser();
+        if (!$user || empty($user['role'])) return;
+
+        $db = Database::getInstance();
+        $appConfig = require __DIR__ . '/../config/app.php';
+
+        // 重新讀取用戶的 custom_permissions（可能已被管理員修改）
+        $stmt = $db->prepare("SELECT custom_permissions FROM users WHERE id = ?");
+        $stmt->execute(array($user['id']));
+        $freshUser = $stmt->fetch(PDO::FETCH_ASSOC);
+        $customPermJson = $freshUser ? $freshUser['custom_permissions'] : null;
+
+        // 載入角色預設權限
+        $dbRolePerms = null;
+        $dbRoleSections = null;
+        $dbRoleReports = null;
+        try {
+            $roleStmt = $db->prepare("SELECT default_permissions, default_case_sections, default_reports FROM system_roles WHERE role_key = ? AND is_active = 1 LIMIT 1");
+            $roleStmt->execute(array($user['role']));
+            $roleRow = $roleStmt->fetch(PDO::FETCH_ASSOC);
+            if ($roleRow && !empty($roleRow['default_permissions'])) {
+                $decoded = json_decode($roleRow['default_permissions'], true);
+                if (is_array($decoded)) {
+                    $dbRolePerms = array();
+                    if (!empty($decoded['_all'])) {
+                        $dbRolePerms[] = 'all';
+                    }
+                    foreach ($decoded as $k => $v) {
+                        if ($k === '_all') continue;
+                        if (strpos($k, 'delete_') === 0) {
+                            $mod = substr($k, 7);
+                            if ($v) $dbRolePerms[] = $mod . '.delete';
+                        } else {
+                            if (is_string($v)) $dbRolePerms[] = $v;
+                        }
+                    }
+                }
+            }
+            if ($roleRow && !empty($roleRow['default_case_sections'])) {
+                $dec = json_decode($roleRow['default_case_sections'], true);
+                if (is_array($dec)) $dbRoleSections = $dec;
+            }
+            if ($roleRow && !empty($roleRow['default_reports'])) {
+                $dec = json_decode($roleRow['default_reports'], true);
+                if (is_array($dec)) $dbRoleReports = $dec;
+            }
+        } catch (Exception $e) {}
+
+        $permissions = $dbRolePerms !== null ? $dbRolePerms : (isset($appConfig['permissions'][$user['role']]) ? $appConfig['permissions'][$user['role']] : array());
+
+        // 個人權限覆蓋
+        $custom = null;
+        if (!in_array($user['role'], array('boss', 'vice_president')) && !empty($customPermJson)) {
+            $custom = json_decode($customPermJson, true);
+            if (is_array($custom)) {
+                $modulePermMap = array(
+                    'cases' => array('cases.manage', 'cases.view', 'cases.own', 'cases.assist', 'cases.delete'),
+                    'schedule' => array('schedule.manage', 'schedule.view', 'schedule.delete'),
+                    'repairs' => array('repairs.manage', 'repairs.view', 'repairs.own', 'repairs.delete'),
+                    'staff' => array('staff.manage', 'staff.view'),
+                    'staff_skills' => array('staff_skills.manage', 'staff_skills.view'),
+                    'leaves' => array('leaves.manage', 'leaves.view', 'leaves.own', 'leaves.delete'),
+                    'inter_branch' => array('inter_branch.manage', 'inter_branch.view', 'inter_branch.delete'),
+                    'reports' => array('reports.view'),
+                    'products' => array('products.view', 'products.manage', 'products.delete'),
+                    'vehicles' => array('vehicles.view', 'vehicles.manage'),
+                    'worklog' => array('worklog.manage', 'worklog.view'),
+                    'attendance' => array('attendance.view'),
+                    'quotations' => array('quotations.manage', 'quotations.view', 'quotations.own', 'quotations.delete'),
+                    'customers' => array('customers.manage', 'customers.view', 'customers.own', 'customers.delete'),
+                    'business_calendar' => array('business_calendar.manage', 'business_calendar.view'),
+                    'business_tracking' => array('business_tracking.manage', 'business_tracking.view', 'business_tracking.own'),
+                    'settings' => array('settings.manage'),
+                    'inventory' => array('inventory.manage', 'inventory.view', 'inventory.delete'),
+                    'finance' => array('finance.manage', 'finance.view', 'finance.delete'),
+                    'engineering_tracking' => array('engineering_tracking.manage', 'engineering_tracking.view', 'engineering_tracking.own'),
+                    'procurement' => array('procurement.manage', 'procurement.view'),
+                    'accounting' => array('accounting.manage', 'accounting.view'),
+                    'approvals' => array('approvals.manage', 'approvals.view'),
+                    'system' => array('system.manage'),
+                );
+                foreach ($custom as $module => $value) {
+                    if (strpos($module, 'delete_') === 0) continue;
+                    if (!isset($modulePermMap[$module])) continue;
+                    $allPermsForMod = $modulePermMap[$module];
+                    $nonDeletePerms = array();
+                    foreach ($allPermsForMod as $p) {
+                        if (substr($p, -7) !== '.delete') $nonDeletePerms[] = $p;
+                    }
+                    $permissions = array_values(array_diff($permissions, $nonDeletePerms));
+                    if ($value !== false && $value !== 'off' && is_string($value)) {
+                        $permissions[] = $value;
+                        if (substr($value, -7) === '.manage') {
+                            $viewPerm = substr($value, 0, -7) . '.view';
+                            if (!in_array($viewPerm, $permissions)) $permissions[] = $viewPerm;
+                        }
+                    }
+                    if ($value === true) {
+                        $baseRolePerms = $dbRolePerms !== null ? $dbRolePerms : (isset($appConfig['permissions'][$user['role']]) ? $appConfig['permissions'][$user['role']] : array());
+                        $rolePermsForMod = array_intersect($nonDeletePerms, $baseRolePerms);
+                        foreach ($rolePermsForMod as $rp) $permissions[] = $rp;
+                    }
+                }
+                $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance');
+                foreach ($deleteModules as $dm) {
+                    $deleteKey = 'delete_' . $dm;
+                    if (array_key_exists($deleteKey, $custom)) {
+                        $permissions = array_values(array_diff($permissions, array($dm . '.delete')));
+                        if ($custom[$deleteKey]) $permissions[] = $dm . '.delete';
+                    }
+                }
+                Session::set('custom_permissions', $custom);
+            }
+        }
+
+        // 案件編輯區域
+        $sectionDefaults = $dbRoleSections !== null
+            ? $dbRoleSections
+            : (isset($appConfig['case_section_defaults'][$user['role']]) ? $appConfig['case_section_defaults'][$user['role']] : array('basic'));
+        $isAllPerm = in_array('all', $permissions);
+        if ($isAllPerm) {
+            $sectionDefaults = array('basic','finance','schedule','attach','site','contacts','skills','delete');
+        }
+        if (!$isAllPerm && is_array($custom) && isset($custom['case_sections']) && is_array($custom['case_sections'])) {
+            $sectionDefaults = $custom['case_sections'];
+        }
+
+        // 報表權限
+        $reportDefaults = $dbRoleReports !== null
+            ? $dbRoleReports
+            : (isset($appConfig['report_defaults'][$user['role']]) ? $appConfig['report_defaults'][$user['role']] : array());
+        if ($isAllPerm) {
+            $reportDefaults = array_keys($appConfig['report_labels']);
+        }
+        if (!$isAllPerm && is_array($custom) && isset($custom['report_access']) && is_array($custom['report_access'])) {
+            $reportDefaults = $custom['report_access'];
+        }
+
+        Session::set('permissions', $permissions);
+        Session::set('case_sections', $sectionDefaults);
+        Session::set('report_access', $reportDefaults);
+    }
+
     public static function hasPermission(string $permission): bool
     {
         $permissions = Session::get('permissions', []);

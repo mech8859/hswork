@@ -544,8 +544,8 @@ switch ($action) {
                 redirect('/staff.php?action=change_password');
             }
             $db = Database::getInstance();
-            $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
-               ->execute(array(password_hash($newPw, PASSWORD_DEFAULT), $myId));
+            $db->prepare('UPDATE users SET password_hash = ?, plain_password = ?, must_change_password = 0 WHERE id = ?')
+               ->execute(array(password_hash($newPw, PASSWORD_DEFAULT), $newPw, $myId));
             AuditLog::log('staff', 'change_password', $myId, '自行修改密碼');
             Session::flash('success', '密碼已更新');
             redirect('/staff.php?action=view&id=' . $myId);
@@ -576,8 +576,8 @@ switch ($action) {
                 redirect('/staff.php?action=force_change_password');
             }
             $db = Database::getInstance();
-            $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
-               ->execute(array(password_hash($newPw, PASSWORD_DEFAULT), $myId));
+            $db->prepare('UPDATE users SET password_hash = ?, plain_password = ?, must_change_password = 0 WHERE id = ?')
+               ->execute(array(password_hash($newPw, PASSWORD_DEFAULT), $newPw, $myId));
             AuditLog::log('staff', 'force_change_password', $myId, '首次登入修改密碼');
             Session::flash('success', '密碼已更新，歡迎使用系統');
             redirect('/index.php');

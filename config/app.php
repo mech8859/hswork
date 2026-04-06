@@ -59,7 +59,7 @@ return [
         'admin_staff'       => ['cases.view', 'staff.view', 'schedule.view', 'payments.manage', 'leaves.view', 'inter_branch.manage', 'repairs.manage', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view', 'engineering_tracking.view', 'finance.manage', 'procurement.manage', 'inventory.manage', 'accounting.manage'],
         'accountant'        => ['cases.view', 'finance.manage', 'procurement.view', 'inventory.view', 'accounting.manage', 'reports.view'],
         'warehouse'         => ['inventory.manage', 'procurement.view', 'products.view'],
-        'purchaser'         => ['procurement.manage', 'procurement.view', 'inventory.view', 'products.view', 'approvals.view'],
+        'purchaser'         => ['procurement.manage', 'procurement.view', 'inventory.view', 'products.view', 'approvals.view', 'customers.view'],
         'hq'                => ['cases.view', 'staff.view', 'schedule.view', 'reports.view', 'leaves.view', 'inter_branch.view', 'repairs.view', 'quotations.view', 'customers.view', 'business_calendar.view', 'business_tracking.view', 'engineering_tracking.view', 'finance.view', 'procurement.view', 'inventory.view', 'products.view'],
     ],
 

@@ -365,6 +365,23 @@ class CaseModel
      */
     public function update(int $id, array $data): void
     {
+        // 完工狀態保護：closed / completed_pending 只能透過簽核流程變更
+        $protectedStatuses = array('closed', 'completed_pending');
+        $newStatus = isset($data['status']) ? $data['status'] : '';
+        if (in_array($newStatus, $protectedStatuses) && empty($data['_from_approval'])) {
+            $cur = $this->db->prepare("SELECT status FROM cases WHERE id = ?");
+            $cur->execute(array($id));
+            $curStatus = $cur->fetchColumn();
+            // 只有目前不是該狀態時才阻擋（已經是的就不擋）
+            if ($curStatus !== $newStatus) {
+                $user = Session::getUser();
+                if (!$user || $user['role'] !== 'boss') {
+                    $label = $newStatus === 'closed' ? '已完工結案' : '已完工待簽核';
+                    throw new \RuntimeException('「' . $label . '」需透過完工簽核流程變更，無法手動修改');
+                }
+            }
+        }
+
         // 指派業務時自動調整狀態：僅在 sub_status 為「未指派」時才改為「待聯絡」
         if (!empty($data['sales_id'])) {
             $chk = $this->db->prepare("SELECT sales_id, sub_status FROM cases WHERE id = ?");
