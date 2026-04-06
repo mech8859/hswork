@@ -104,7 +104,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             </div>
             <div class="form-group" style="flex:0 0 100px">
                 <label>客戶編號</label>
-                <input type="text" class="form-control" value="<?= e($case ? ($case['customer_no'] ?? '') : peek_next_doc_number('customers')) ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
+                <input type="text" id="customerNoDisplay" class="form-control" value="<?= e($case ? ($case['linked_customer_no'] ?? $case['customer_no'] ?? '') : '') ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
             </div>
             <div class="form-group" style="flex:1;min-width:160px;position:relative">
                 <label>客戶名稱</label>
@@ -112,7 +112,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <input type="text" name="customer_name" id="customerNameInput" class="form-control" value="<?= e($case['customer_name'] ?? '') ?>" placeholder="輸入客戶名稱搜尋..." autocomplete="off" onkeyup="onCustomerKeyup(event)">
                 <div id="customerDropdown" class="customer-dropdown" style="display:none"></div>
                 <?php if ($case && !empty($case['customer_id'])): ?>
-                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem">已關聯客戶 #<?= e($case['customer_id']) ?></small>
+                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"><a href="customers.php?action=view&id=<?= e($case['customer_id']) ?>" style="color:#007bff;text-decoration:underline;cursor:pointer">已關聯客戶 #<?= e($case['customer_id']) ?></a></small>
                 <?php endif; ?>
             </div>
             <div class="form-group" style="flex:0 0 160px">
@@ -2039,6 +2039,10 @@ function selectCustomer(c) {
     document.getElementById('customerNameInput').value = c.name;
     document.getElementById('customerDropdown').style.display = 'none';
 
+    // 更新客戶編號顯示
+    var noDisp = document.getElementById('customerNoDisplay');
+    if (noDisp && c.customer_no) noDisp.value = c.customer_no;
+
     // 帶入施工地址（如果為空）
     var addrInput = document.querySelector('input[name="address"]');
     if (addrInput && !addrInput.value && c.site_address) {
@@ -2099,7 +2103,8 @@ function selectCustomer(c) {
         inp.parentNode.appendChild(small);
         info = small;
     }
-    info.textContent = '已關聯客戶 ' + c.name + (c.customer_no ? ' (' + c.customer_no + ')' : '');
+    var label = '已關聯客戶 ' + c.name + (c.customer_no ? ' (' + c.customer_no + ')' : '');
+    info.innerHTML = '<a href="customers.php?action=view&id=' + c.id + '" style="color:#007bff;text-decoration:underline">' + label + '</a>';
 }
 
 // 點擊外面關閉下拉
@@ -2132,6 +2137,15 @@ function saveNewCustomer() {
     fd.append('phone', document.getElementById('modalPhone').value);
     fd.append('mobile', document.getElementById('modalMobile').value);
     fd.append('address', document.getElementById('modalAddress').value);
+
+    // 帶入案件資訊
+    var caseNoEl = document.querySelector('input[value^="<?= e($case ? substr($case['case_number'], 0, 4) : '2026') ?>"]');
+    fd.append('case_number', '<?= e($case['case_number'] ?? '') ?>');
+    fd.append('case_date', '<?= e($case ? substr($case['created_at'], 0, 10) : date('Y-m-d')) ?>');
+    var branchSelect = document.querySelector('select[name="branch_id"]');
+    if (branchSelect) {
+        fd.append('source_company', branchSelect.options[branchSelect.selectedIndex].text);
+    }
 
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '/cases.php?action=ajax_create_customer');

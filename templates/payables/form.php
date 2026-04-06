@@ -46,14 +46,15 @@
                 <input type="date" max="2099-12-31" name="create_date" class="form-control"
                        value="<?= e($isEdit && !empty($record['create_date']) ? $record['create_date'] : date('Y-m-d')) ?>" required>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="position:relative">
                 <label>廠商名稱 *</label>
-                <input type="text" name="vendor_name" class="form-control"
-                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" required>
+                <input type="text" name="vendor_name" id="vendorNameInput" class="form-control"
+                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" required autocomplete="off">
+                <div id="vendorDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-top:none;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
             </div>
             <div class="form-group">
                 <label>廠商編號</label>
-                <input type="text" name="vendor_code" class="form-control" value="<?= e($record['vendor_code'] ?? '') ?>">
+                <input type="text" name="vendor_code" id="vendorCodeInput" class="form-control" value="<?= e($record['vendor_code'] ?? '') ?>">
             </div>
         </div>
         <div class="form-row">
@@ -548,5 +549,71 @@ function updatePP() {
     var y = document.getElementById('ppYear').value;
     var m = document.getElementById('ppMonth').value;
     document.getElementById('ppValue').value = (y && m) ? y + '-' + m : '';
+}
+
+// ===== 廠商即時搜尋 =====
+(function() {
+    var input = document.getElementById('vendorNameInput');
+    var dropdown = document.getElementById('vendorDropdown');
+    var codeInput = document.getElementById('vendorCodeInput');
+    var timer = null;
+
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var q = this.value.trim();
+        if (q.length < 1) { dropdown.style.display = 'none'; return; }
+        timer = setTimeout(function() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/payables.php?action=ajax_search_vendor&q=' + encodeURIComponent(q));
+            xhr.onload = function() {
+                var list = JSON.parse(xhr.responseText);
+                if (!list.length) { dropdown.style.display = 'none'; return; }
+                var html = '';
+                for (var i = 0; i < list.length; i++) {
+                    var v = list[i];
+                    var label = v.name + (v.vendor_code ? ' (' + v.vendor_code + ')' : '');
+                    html += '<div class="vendor-item" data-idx="' + i + '" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.9rem" '
+                         + 'onclick=\'selectVendor(' + JSON.stringify(v).replace(/'/g, "&#39;") + ')\'>'
+                         + '<div style="font-weight:500">' + escVendorHtml(v.name) + '</div>'
+                         + '<div style="font-size:.78rem;color:#888">'
+                         + (v.vendor_code ? v.vendor_code + ' · ' : '')
+                         + (v.contact_person || '') + (v.phone ? ' ' + v.phone : '')
+                         + '</div></div>';
+                }
+                dropdown.innerHTML = html;
+                dropdown.style.display = 'block';
+            };
+            xhr.send();
+        }, 250);
+    });
+
+    // hover 效果
+    dropdown.addEventListener('mouseover', function(e) {
+        var item = e.target.closest('.vendor-item');
+        if (item) item.style.background = '#f0f7ff';
+    });
+    dropdown.addEventListener('mouseout', function(e) {
+        var item = e.target.closest('.vendor-item');
+        if (item) item.style.background = '';
+    });
+
+    // 點外面關閉
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#vendorNameInput') && !e.target.closest('#vendorDropdown')) {
+            dropdown.style.display = 'none';
+        }
+    });
+})();
+
+function selectVendor(v) {
+    document.getElementById('vendorNameInput').value = v.name;
+    document.getElementById('vendorCodeInput').value = v.vendor_code || '';
+    document.getElementById('vendorDropdown').style.display = 'none';
+}
+
+function escVendorHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
 }
 </script>

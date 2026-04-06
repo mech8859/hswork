@@ -435,8 +435,11 @@ switch ($action) {
         // Generate customer_no
         $maxNo = $db->query("SELECT MAX(CAST(SUBSTRING(customer_no, 3) AS UNSIGNED)) FROM customers WHERE customer_no LIKE 'A-%'")->fetchColumn();
         $customerNo = 'A-' . str_pad(($maxNo ?: 0) + 1, 6, '0', STR_PAD_LEFT);
-        $db->prepare('INSERT INTO customers (customer_no, name, contact_person, phone, mobile, site_address, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-            ->execute(array($customerNo, $name, $_POST['contact_person'] ?? '', $_POST['phone'] ?? '', $_POST['mobile'] ?? '', $_POST['address'] ?? '', Auth::id()));
+        $caseNumber = trim($_POST['case_number'] ?? '');
+        $caseDate = trim($_POST['case_date'] ?? '');
+        $sourceCompany = trim($_POST['source_company'] ?? '');
+        $db->prepare('INSERT INTO customers (customer_no, name, contact_person, phone, mobile, site_address, case_number, case_date, source_company, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute(array($customerNo, $name, $_POST['contact_person'] ?? '', $_POST['phone'] ?? '', $_POST['mobile'] ?? '', $_POST['address'] ?? '', $caseNumber ?: null, $caseDate ?: null, $sourceCompany ?: null, Auth::id()));
         $newId = (int)$db->lastInsertId();
         echo json_encode(array('success' => true, 'customer' => array('id' => $newId, 'customer_no' => $customerNo, 'name' => $name, 'phone' => $_POST['phone'] ?? '', 'mobile' => $_POST['mobile'] ?? '', 'site_address' => $_POST['address'] ?? '', 'contact_person' => $_POST['contact_person'] ?? '', 'contacts' => array())));
         break;

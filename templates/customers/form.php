@@ -60,6 +60,10 @@ $isEdit = !empty($customer);
                 <input type="text" name="case_number" class="form-control" value="<?= e($customer['case_number'] ?? '') ?>" readonly style="background:#f5f5f5;color:#666">
             </div>
             <div class="form-group" style="flex:0 0 120px">
+                <label>進件日期</label>
+                <input type="text" class="form-control" value="<?= e($customer['case_date'] ?? '') ?>" readonly style="background:#f5f5f5;color:#666">
+            </div>
+            <div class="form-group" style="flex:0 0 120px">
                 <label>進件分公司</label>
                 <input type="text" class="form-control" value="<?= e($customer['source_company'] ?? '') ?>" readonly style="background:#f5f5f5;color:#666">
             </div>

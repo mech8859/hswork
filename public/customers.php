@@ -86,6 +86,23 @@ switch ($action) {
 
         $canManage = Auth::hasPermission('customers.manage');
 
+        // 自動從關聯案件補進件資訊（case_number/case_date/source_company 為空時）
+        if (empty($customer['case_number'])) {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("SELECT c.case_number, DATE(c.created_at) as case_date, b.name as branch_name FROM cases c LEFT JOIN branches b ON c.branch_id = b.id WHERE c.customer_id = ? ORDER BY c.created_at ASC LIMIT 1");
+            $stmt->execute(array($id));
+            $lc = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($lc) {
+                $customer['case_number'] = $lc['case_number'];
+                $customer['case_date'] = $lc['case_date'];
+                if (empty($customer['source_company'])) {
+                    $customer['source_company'] = $lc['branch_name'];
+                }
+                // 回寫到客戶表
+                $db->prepare("UPDATE customers SET case_number = ?, case_date = ?, source_company = COALESCE(NULLIF(source_company,''), ?) WHERE id = ?")->execute(array($lc['case_number'], $lc['case_date'], $lc['branch_name'], $id));
+            }
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Auth::requirePermission('customers.manage');
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/customers.php?action=edit&id='.$id); }

@@ -85,7 +85,7 @@ switch ($action) {
         }
 
         $record = null;
-        $branches = $model->getBranches($branchIds);
+        $branches = $model->getBranches();
         $branchItems = array();
         $invoiceItems = array();
 
@@ -154,7 +154,7 @@ switch ($action) {
             redirect('/payables.php');
         }
 
-        $branches = $model->getBranches($branchIds);
+        $branches = $model->getBranches();
         $branchItems = $model->getPayableBranches($record['id']);
         $invoiceItems = $model->getPayableInvoices($record['id']);
         $record['purchase_details'] = $model->getPayablePurchaseDetails($record['id']);
@@ -180,6 +180,17 @@ switch ($action) {
             Session::flash('success', '應付帳款單已刪除');
         }
         redirect('/payables.php');
+        break;
+
+    // ---- AJAX: 廠商搜尋 ----
+    case 'ajax_search_vendor':
+        header('Content-Type: application/json');
+        $q = trim($_GET['q'] ?? '');
+        if (mb_strlen($q) < 1) { echo json_encode(array()); break; }
+        $like = '%' . $q . '%';
+        $stmt = Database::getInstance()->prepare("SELECT id, vendor_code, name, short_name, contact_person, phone FROM vendors WHERE is_active = 1 AND (name LIKE ? OR short_name LIKE ? OR vendor_code LIKE ?) ORDER BY name LIMIT 15");
+        $stmt->execute(array($like, $like, $like));
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
 
     default:

@@ -404,6 +404,10 @@ function selectCustomer(c) {
     document.getElementById('customerNameInput').value = c.name;
     document.getElementById('customerDropdown').style.display = 'none';
 
+    // 更新客戶編號顯示
+    var noDisp = document.getElementById('customerNoDisplay');
+    if (noDisp && c.customer_no) noDisp.value = c.customer_no;
+
     // 帶入施工地址（如果為空）
     var addrInput = document.querySelector('input[name="address"]');
     if (addrInput && !addrInput.value && c.site_address) {
@@ -464,7 +468,8 @@ function selectCustomer(c) {
         inp.parentNode.appendChild(small);
         info = small;
     }
-    info.textContent = '已關聯客戶 ' + c.name + (c.customer_no ? ' (' + c.customer_no + ')' : '');
+    var label = '已關聯客戶 ' + c.name + (c.customer_no ? ' (' + c.customer_no + ')' : '');
+    info.innerHTML = '<a href="customers.php?action=view&id=' + c.id + '" style="color:#007bff;text-decoration:underline">' + label + '</a>';
 }
 
 // 點擊外面關閉下拉
