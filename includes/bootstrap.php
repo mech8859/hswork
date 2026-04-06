@@ -42,14 +42,21 @@ if (Session::getUser() && php_sapi_name() !== 'cli') {
         if ($lastBackup !== date('Y-m-d')) {
             // 標記今天已觸發（避免重複）
             @file_put_contents($backupFlag, date('Y-m-d'));
-            // 背景觸發備份（不阻塞頁面載入）
-            $backupUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/cron_backup.php?key=hswork_backup_2026_secret';
-            $ch = curl_init($backupUrl);
+            $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+            // 背景觸發 DB 備份（不阻塞頁面載入）
+            $ch = curl_init($baseUrl . '/cron_backup.php?key=hswork_backup_2026_secret');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 1);
             curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
             @curl_exec($ch);
             curl_close($ch);
+            // 背景觸發客戶+案件 CSV 匯出到 Google Drive
+            $ch2 = curl_init($baseUrl . '/google_drive_export_data.php?type=all&key=hswork_backup_2026_secret');
+            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch2, CURLOPT_TIMEOUT, 1);
+            curl_setopt($ch2, CURLOPT_NOSIGNAL, 1);
+            @curl_exec($ch2);
+            curl_close($ch2);
         }
     }
 }
