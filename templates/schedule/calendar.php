@@ -628,7 +628,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
     color: #fff; transition: opacity .15s;
 }
 .cal-event:hover { opacity: .85; text-decoration: none; }
-.cal-event-planned { background: var(--primary); }
+.cal-event-planned { background: #e8eaed; color: #333; }
 .cal-event-confirmed { background: var(--info); }
 .cal-event-in_progress { background: var(--warning); color: #333; }
 .cal-event-completed { background: var(--success); }
