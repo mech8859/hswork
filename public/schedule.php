@@ -80,26 +80,30 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/schedule.php'); }
 
-            // 排工條件檢查：無訂金需簽核通過
+            // 排工條件檢查：無訂金 + 符合簽核規則 才需簽核通過
             $checkCaseId = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
             if ($checkCaseId > 0) {
                 $checkDb = Database::getInstance();
-                $checkStmt = $checkDb->prepare("SELECT deposit_amount, title FROM cases WHERE id = ?");
+                $checkStmt = $checkDb->prepare("SELECT deposit_amount FROM cases WHERE id = ?");
                 $checkStmt->execute(array($checkCaseId));
-                $checkCase = $checkStmt->fetch();
-                $depositAmt = $checkCase ? (float)$checkCase['deposit_amount'] : 0;
+                $depositAmt = (float)$checkStmt->fetchColumn();
 
                 if ($depositAmt <= 0) {
-                    // 無訂金 → 檢查是否有簽核通過
-                    $approvedStmt = $checkDb->prepare("SELECT COUNT(*) FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? AND status = 'approved'");
-                    $approvedStmt->execute(array($checkCaseId));
-                    $hasApproval = (int)$approvedStmt->fetchColumn();
-
-                    if ($hasApproval <= 0) {
-                        Session::flash('error', '此案件無訂金，需經簽核通過才能排工。請先提交無訂金排工簽核。');
-                        redirect('/schedule.php?action=create&case_id=' . $checkCaseId);
-                        break;
+                    // 無訂金 → 依規則判斷是否需簽核
+                    require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+                    $appModel = new ApprovalModel();
+                    $needsApproval = $appModel->checkNoDepositNeedsApproval($checkCaseId);
+                    if ($needsApproval) {
+                        // 檢查是否已有簽核通過
+                        $approvedStmt = $checkDb->prepare("SELECT COUNT(*) FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? AND status = 'approved'");
+                        $approvedStmt->execute(array($checkCaseId));
+                        if ((int)$approvedStmt->fetchColumn() <= 0) {
+                            Session::flash('error', '此案件無訂金且符合需簽核條件，請先申請無訂金排工簽核');
+                            redirect('/schedule.php?action=create&case_id=' . $checkCaseId);
+                            break;
+                        }
                     }
+                    // 不需簽核或已通過 → 放行
                 }
             }
 

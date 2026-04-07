@@ -215,6 +215,15 @@ class CaseModel
             $case['sales_invoices'] = array();
         }
 
+        // 無訂金排工簽核狀態（最新一筆）
+        try {
+            $stmt = $this->db->prepare("SELECT status FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$id]);
+            $case['no_deposit_approval_status'] = $stmt->fetchColumn() ?: null;
+        } catch (Exception $e) {
+            $case['no_deposit_approval_status'] = null;
+        }
+
         // 施工回報紀錄（手動/Ragic匯入）
         try {
             $stmt = $this->db->prepare('SELECT cwl.*, u.real_name as creator_name FROM case_work_logs cwl LEFT JOIN users u ON cwl.created_by = u.id WHERE cwl.case_id = ? ORDER BY cwl.work_date DESC');

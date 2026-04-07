@@ -41,6 +41,9 @@ switch ($action) {
         $record = $model->getStockOutById($id);
         if (!$record) { Session::flash('error', '出庫單不存在'); redirect('/stock_outs.php'); }
         $soNumber = isset($record['stockout_number']) ? $record['stockout_number'] : (isset($record['so_number']) ? $record['so_number'] : '');
+        // 載入餘料入庫資訊
+        $returnStockIns = $model->getReturnStockInsByStockOut($id);
+        $returnedQtyMap = $model->getReturnedQtyMap($id);
         $pageTitle = '出庫單 ' . $soNumber;
         $currentPage = 'stock_outs';
         require __DIR__ . '/../templates/layouts/header.php';

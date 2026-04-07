@@ -17,6 +17,7 @@ class ApprovalModel
         'overtime'         => '加班單',
         'case_completion'  => '案件 > 完工簽核',
         'case_payments'    => '案件 > 收款簽核',
+        'no_deposit_schedule' => '案件 > 無訂金排工簽核',
     );
 
     public function __construct()
@@ -68,11 +69,22 @@ class ApprovalModel
      */
     public function saveRule($data)
     {
+        // case_types 處理（陣列轉逗號字串）
+        $caseTypesStr = null;
+        if (!empty($data['case_types'])) {
+            if (is_array($data['case_types'])) {
+                $caseTypesStr = implode(',', $data['case_types']);
+            } else {
+                $caseTypesStr = $data['case_types'];
+            }
+        }
+
         if (!empty($data['id'])) {
             $stmt = $this->db->prepare("
                 UPDATE approval_rules SET
                     module = ?, rule_name = ?, min_amount = ?, max_amount = ?,
                     min_profit_rate = ?, condition_type = ?, product_ids = ?, product_category_id = ?,
+                    case_types = ?,
                     approver_role = ?, approver_id = ?,
                     level_order = ?, is_active = ?
                 WHERE id = ?
@@ -86,6 +98,7 @@ class ApprovalModel
                 $data['condition_type'] ?: 'amount',
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
+                $caseTypesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
                 $data['level_order'] ?: 1,
@@ -97,8 +110,8 @@ class ApprovalModel
             $stmt = $this->db->prepare("
                 INSERT INTO approval_rules (module, rule_name, min_amount, max_amount,
                     min_profit_rate, condition_type, product_ids, product_category_id,
-                    approver_role, approver_id, level_order, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    case_types, approver_role, approver_id, level_order, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute(array(
                 $data['module'],
@@ -109,6 +122,7 @@ class ApprovalModel
                 $data['condition_type'] ?: 'amount',
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
+                $caseTypesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
                 $data['level_order'] ?: 1,
@@ -475,6 +489,118 @@ class ApprovalModel
             'auto_approve' => '免簽核（自動通過）',
         );
         return isset($map[$role]) ? $map[$role] : $role;
+    }
+
+    // ===== 無訂金排工簽核 =====
+
+    /**
+     * 檢查案件是否需要無訂金排工簽核
+     * 邏輯：查 active 的 no_deposit_schedule 規則，逐條比對
+     * 符合任一規則 → 需簽核 (return true)
+     * 沒有規則或都不符合 → 不需簽核 (return false)
+     */
+    public function checkNoDepositNeedsApproval($caseId)
+    {
+        // 取案件資料
+        $stmt = $this->db->prepare("SELECT case_type, deal_amount, total_amount FROM cases WHERE id = ?");
+        $stmt->execute(array($caseId));
+        $c = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return false;
+
+        $caseType = isset($c['case_type']) ? $c['case_type'] : '';
+        // 優先用含稅總金額，若無則用成交金額
+        $amount = (float)(!empty($c['total_amount']) ? $c['total_amount'] : (!empty($c['deal_amount']) ? $c['deal_amount'] : 0));
+
+        // 查規則
+        $rStmt = $this->db->prepare("SELECT * FROM approval_rules WHERE module = 'no_deposit_schedule' AND is_active = 1");
+        $rStmt->execute();
+        $rules = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($rules)) return false;
+
+        foreach ($rules as $rule) {
+            // 案件類型比對
+            $ruleTypes = !empty($rule['case_types']) ? array_filter(explode(',', $rule['case_types'])) : array();
+            if (!empty($ruleTypes) && !in_array($caseType, $ruleTypes)) continue;
+
+            // 金額範圍比對
+            $min = (float)(isset($rule['min_amount']) ? $rule['min_amount'] : 0);
+            $max = isset($rule['max_amount']) && $rule['max_amount'] !== null ? (float)$rule['max_amount'] : null;
+            if ($amount < $min) continue;
+            if ($max !== null && $amount > $max) continue;
+
+            // 符合此規則 → 需簽核
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 送無訂金排工簽核
+     */
+    public function submitNoDepositSchedule($caseId, $submittedBy = null)
+    {
+        if (!$submittedBy) $submittedBy = Auth::id();
+
+        // 清除舊的 pending 記錄
+        $this->db->prepare("DELETE FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? AND status = 'pending'")
+            ->execute(array($caseId));
+
+        // 取案件資料以便匹配規則
+        $stmt = $this->db->prepare("SELECT case_type, deal_amount, total_amount FROM cases WHERE id = ?");
+        $stmt->execute(array($caseId));
+        $c = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return array('error' => 'case not found');
+
+        $caseType = isset($c['case_type']) ? $c['case_type'] : '';
+        $amount = (float)(!empty($c['total_amount']) ? $c['total_amount'] : (!empty($c['deal_amount']) ? $c['deal_amount'] : 0));
+
+        // 找出匹配的規則
+        $rStmt = $this->db->prepare("SELECT * FROM approval_rules WHERE module = 'no_deposit_schedule' AND is_active = 1 ORDER BY level_order, id");
+        $rStmt->execute();
+        $rules = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $matchedRule = null;
+        foreach ($rules as $rule) {
+            $ruleTypes = !empty($rule['case_types']) ? array_filter(explode(',', $rule['case_types'])) : array();
+            if (!empty($ruleTypes) && !in_array($caseType, $ruleTypes)) continue;
+            $min = (float)(isset($rule['min_amount']) ? $rule['min_amount'] : 0);
+            $max = isset($rule['max_amount']) && $rule['max_amount'] !== null ? (float)$rule['max_amount'] : null;
+            if ($amount < $min) continue;
+            if ($max !== null && $amount > $max) continue;
+            $matchedRule = $rule;
+            break;
+        }
+
+        if (!$matchedRule) return array('auto_approved' => true, 'reason' => '不符合任何規則，不需簽核');
+
+        // 找簽核人
+        $approverId = $matchedRule['approver_id'];
+        if (!$approverId && $matchedRule['approver_role']) {
+            $aStmt = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
+            $aStmt->execute(array($matchedRule['approver_role']));
+            $au = $aStmt->fetch(PDO::FETCH_ASSOC);
+            if ($au) $approverId = $au['id'];
+        }
+        if (!$approverId) return array('error' => '找不到對應簽核人');
+
+        $insStmt = $this->db->prepare("
+            INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
+            VALUES ('no_deposit_schedule', ?, ?, ?, ?, 'pending', ?)
+        ");
+        $insStmt->execute(array($caseId, $matchedRule['id'], (int)$matchedRule['level_order'] ?: 1, $approverId, $submittedBy));
+        return array('flow_id' => (int)$this->db->lastInsertId(), 'approver_id' => $approverId);
+    }
+
+    /**
+     * 取得案件無訂金排工簽核狀態
+     * @return string|null 'pending'|'approved'|'rejected'|null
+     */
+    public function getNoDepositApprovalStatus($caseId)
+    {
+        $stmt = $this->db->prepare("SELECT status FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute(array($caseId));
+        $s = $stmt->fetchColumn();
+        return $s ?: null;
     }
 
     // ===== 完工簽核專用流程 =====

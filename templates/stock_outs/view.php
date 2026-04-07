@@ -199,7 +199,7 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
             <thead><tr>
                 <?php if ($canManage && $canConfirmItems): ?><th class="print-hide-col" style="width:35px"><input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)"></th><?php endif; ?>
                 <th class="return-col" style="width:35px;display:none"><input type="checkbox" id="returnCheckAll" onchange="toggleReturnCheckAll(this)"></th>
-                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">出庫數量</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:60px">狀態</th>
+                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><?php if (!empty($returnedQtyMap)): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">出庫數量</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:60px">狀態</th>
                 <th class="return-col" style="width:80px;display:none">入庫數量</th>
             </tr></thead>
             <tbody>
@@ -239,6 +239,13 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     <td><?= e($unitDisplay) ?></td>
                     <td class="text-right" style="color:<?= $stockColor ?>"><?= $stockDisplay ?></td>
                     <td class="text-right"><?= $requestQty ?></td>
+                    <?php if (!empty($returnedQtyMap)):
+                        $itemReturned = isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
+                        $actualUsed = max(0, $qty - $itemReturned);
+                    ?>
+                    <td class="text-right" style="color:<?= $itemReturned > 0 ? '#e65100' : '#999' ?>"><?= $itemReturned > 0 ? $itemReturned : '-' ?></td>
+                    <td class="text-right" style="font-weight:600;color:<?= $actualUsed > 0 ? '#1565c0' : '#999' ?>"><?= $actualUsed > 0 ? $actualUsed : '0' ?></td>
+                    <?php endif; ?>
                     <?php if ($canConfirmItems): ?>
                     <td class="text-right print-hide-col">
                         <?php if (empty($item['is_confirmed']) && $hasStock): ?>
@@ -253,8 +260,15 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     <td class="text-right">$<?= number_format($unitCost) ?></td>
                     <td class="text-right">$<?= number_format($subtotal) ?></td>
                     <td>
-                        <?php if (!empty($item['is_confirmed'])): ?>
+                        <?php if (!empty($item['is_confirmed'])):
+                            $itmRet = !empty($returnedQtyMap) && isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
+                            if ($itmRet >= $qty && $qty > 0): ?>
+                        <span style="color:#e65100;font-weight:600;font-size:.75rem">已出庫｜全退</span>
+                        <?php elseif ($itmRet > 0): ?>
+                        <span style="color:#1976d2;font-weight:600;font-size:.75rem">已出庫｜部分退</span>
+                        <?php else: ?>
                         <span style="color:#1565c0;font-weight:600;font-size:.8rem">已出庫</span>
+                        <?php endif; ?>
                         <?php elseif (!$hasStock): ?>
                         <span style="color:#c62828;font-size:.75rem">庫存不足</span>
                         <?php else: ?>
@@ -274,6 +288,7 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     <?php
                     $colSpan = 7;
                     if ($canManage && $canConfirmItems) $colSpan++; // checkbox
+                    if (!empty($returnedQtyMap)) $colSpan += 2; // 已退回 + 實際使用
                     if ($canConfirmItems) $colSpan++; // 出庫數量
                     ?>
                     <td colspan="<?= $colSpan ?>" class="text-right"><strong>合計</strong></td>
@@ -282,6 +297,42 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     <?php if ($canManage && $isPending): ?><td></td><?php endif; ?>
                 </tr>
             </tfoot>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- 餘料入庫紀錄 -->
+    <?php if (!empty($returnStockIns)): ?>
+    <div style="padding:12px 16px;border-top:1px solid var(--gray-200);background:#fafafa">
+        <div style="font-weight:600;color:#7B1FA2;margin-bottom:8px;font-size:.9rem">📦 餘料入庫紀錄</div>
+        <table class="table" style="font-size:.85rem;margin:0;background:#fff">
+            <thead><tr>
+                <th style="width:160px">入庫單號</th>
+                <th style="width:110px">日期</th>
+                <th style="width:80px">狀態</th>
+                <th class="text-right" style="width:80px">品項數</th>
+                <th class="text-right" style="width:80px">總數量</th>
+                <th>備註</th>
+                <th style="width:60px">操作</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($returnStockIns as $ri):
+                $statusBg = '#fff';
+                if ($ri['status'] === '已確認') $statusBg = '#e8f5e9';
+                elseif ($ri['status'] === '已取消') $statusBg = '#fafafa';
+                else $statusBg = '#fff8e1';
+            ?>
+            <tr style="background:<?= $statusBg ?>">
+                <td style="color:var(--primary);font-weight:600"><?= e($ri['si_number']) ?></td>
+                <td><?= e($ri['si_date']) ?></td>
+                <td><span class="badge"><?= e($ri['status']) ?></span></td>
+                <td class="text-right"><?= (int)$ri['item_count'] ?></td>
+                <td class="text-right"><?= (int)$ri['total_qty'] ?></td>
+                <td style="color:#666;font-size:.78rem"><?= e($ri['note']) ?></td>
+                <td><a href="/stock_ins.php?action=view&id=<?= $ri['id'] ?>" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px">檢視</a></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
     <?php endif; ?>

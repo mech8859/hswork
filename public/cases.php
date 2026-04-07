@@ -251,6 +251,31 @@ switch ($action) {
         echo json_encode($data ? array('success' => true, 'data' => $data) : array('success' => false, 'error' => '找不到紀錄'));
         break;
 
+    // ---- 送出無訂金排工簽核 ----
+    case 'submit_no_deposit_approval':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/cases.php'); }
+        if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/cases.php'); }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        if ($caseId > 0) {
+            try {
+                require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+                $appModel = new ApprovalModel();
+                $result = $appModel->submitNoDepositSchedule($caseId, Auth::id());
+                if (!empty($result['auto_approved'])) {
+                    Session::flash('success', '此案件不需簽核，可直接排工');
+                } elseif (!empty($result['error'])) {
+                    Session::flash('error', '送簽失敗：' . $result['error']);
+                } else {
+                    Session::flash('success', '已送出無訂金排工簽核');
+                    AuditLog::log('cases', 'submit_no_deposit_approval', $caseId, '送出無訂金排工簽核');
+                }
+            } catch (Exception $e) {
+                Session::flash('error', '送簽失敗：' . $e->getMessage());
+            }
+        }
+        redirect('/cases.php?action=edit&id=' . $caseId);
+        break;
+
     // ---- AJAX: 新增帳款交易 ----
     case 'add_payment':
         header('Content-Type: application/json');

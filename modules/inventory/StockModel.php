@@ -451,6 +451,49 @@ class StockModel
         return $row;
     }
 
+    /**
+     * 取得從此出庫單建立的所有餘料入庫單
+     * @return array [{id, si_number, si_date, status, item_count, ...}, ...]
+     */
+    public function getReturnStockInsByStockOut($stockOutId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT si.id, si.si_number, si.si_date, si.status, si.note,
+                   (SELECT COUNT(*) FROM stock_in_items WHERE stock_in_id = si.id) AS item_count,
+                   (SELECT COALESCE(SUM(quantity),0) FROM stock_in_items WHERE stock_in_id = si.id) AS total_qty
+            FROM stock_ins si
+            WHERE si.source_type = 'manual_return' AND si.source_id = ?
+            ORDER BY si.si_date DESC, si.id DESC
+        ");
+        $stmt->execute(array($stockOutId));
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 統計每個 product_id 已退回的數量（從此出庫單衍生的入庫單）
+     * 排除已取消的入庫單
+     * @return array [product_id => total_returned_qty]
+     */
+    public function getReturnedQtyMap($stockOutId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT sii.product_id, COALESCE(SUM(sii.quantity),0) AS qty
+            FROM stock_in_items sii
+            JOIN stock_ins si ON sii.stock_in_id = si.id
+            WHERE si.source_type = 'manual_return'
+              AND si.source_id = ?
+              AND si.status != '已取消'
+              AND sii.product_id IS NOT NULL
+            GROUP BY sii.product_id
+        ");
+        $stmt->execute(array($stockOutId));
+        $map = array();
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[(int)$row['product_id']] = (int)$row['qty'];
+        }
+        return $map;
+    }
+
     public function getStockOutItems($stockOutId)
     {
         $stmt = $this->db->prepare("

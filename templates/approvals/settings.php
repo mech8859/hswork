@@ -16,6 +16,7 @@
                     <optgroup label="案件管理">
                         <option value="case_payments">收款簽核（案件 &gt; 帳款交易紀錄）</option>
                         <option value="case_completion">完工簽核（案件 &gt; 完工結案）</option>
+                        <option value="no_deposit_schedule">無訂金排工簽核（案件 &gt; 排工）</option>
                     </optgroup>
                     <optgroup label="業務相關">
                         <option value="quotations">報價單簽核</option>
@@ -85,6 +86,19 @@
         <!-- 完工簽核提示 -->
         <div id="condition-none" style="display:none; margin-bottom:12px;">
             <p class="text-muted">此模組無額外條件，所有案件完工皆需簽核。</p>
+        </div>
+        <!-- 無訂金排工：案件類型條件 -->
+        <div id="condition-case-types" style="display:none; margin-bottom:12px;">
+            <label style="font-weight:600;display:block;margin-bottom:6px">適用案件類型（至少勾一項，符合才需簽核）</label>
+            <div class="d-flex gap-2 flex-wrap">
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="new_install"> 新案</label>
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="addition"> 老客戶追加</label>
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="old_repair"> 舊客戶維修</label>
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="new_repair"> 新客戶維修</label>
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="maintenance"> 維護保養</label>
+                <label class="checkbox-label"><input type="checkbox" name="case_types[]" value="other"> 其他</label>
+            </div>
+            <p class="text-muted" style="font-size:.8rem;margin-top:4px">未勾選任何類型 = 所有類型都適用</p>
         </div>
         <div class="form-row align-center" style="margin-bottom:16px;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:bold;">
@@ -278,6 +292,8 @@ function onModuleChange(mod) {
     document.getElementById('condition-type-row').style.display = 'none';
     document.getElementById('condition-product').style.display = 'none';
     document.getElementById('condition-category').style.display = 'none';
+    var caseTypesRow = document.getElementById('condition-case-types');
+    if (caseTypesRow) caseTypesRow.style.display = 'none';
 
     if (mod === 'quotations') {
         lblMin.textContent = '最低金額';
@@ -311,6 +327,12 @@ function onModuleChange(mod) {
         profitGroup.style.display = 'none';
         noneRow.style.display = '';
         ruleInput.placeholder = '例：完工簽核 - 工程主管';
+    } else if (mod === 'no_deposit_schedule') {
+        lblMin.textContent = '最低金額';
+        lblMax.textContent = '最高金額（空=無上限）';
+        profitGroup.style.display = 'none';
+        if (caseTypesRow) caseTypesRow.style.display = '';
+        ruleInput.placeholder = '例：新案10萬以上需簽核';
     } else if (mod === 'case_payments') {
         lblMin.textContent = '最低金額';
         lblMax.textContent = '最高金額（空=無上限）';

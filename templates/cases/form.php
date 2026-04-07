@@ -893,6 +893,43 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             </div>
         </div>
 
+        <!-- 無訂金排工簽核 -->
+        <?php if ($case):
+            $noDepStatus = $case['no_deposit_approval_status'] ?? null;
+            $depAmt = (float)($case['deposit_amount'] ?? 0);
+            if ($depAmt <= 0):
+                // 檢查是否需要簽核
+                require_once __DIR__ . '/../../modules/approvals/ApprovalModel.php';
+                $_noDepApp = new ApprovalModel();
+                $_noDepNeeds = $_noDepApp->checkNoDepositNeedsApproval($case['id']);
+        ?>
+        <div style="margin:8px 0;padding:10px;background:#fff8e1;border:1px solid #ffc107;border-radius:6px">
+            <div class="d-flex justify-between align-center">
+                <div style="font-size:.88rem">
+                    <strong>⚠️ 無訂金排工簽核</strong>
+                    <?php if (!$_noDepNeeds): ?>
+                    <span style="color:#2e7d32;margin-left:8px">✓ 此案件不需簽核，可直接排工</span>
+                    <?php elseif ($noDepStatus === 'approved'): ?>
+                    <span style="color:#2e7d32;margin-left:8px">✓ 已核准，可以排工</span>
+                    <?php elseif ($noDepStatus === 'pending'): ?>
+                    <span style="color:#e65100;margin-left:8px">⏳ 簽核中</span>
+                    <?php elseif ($noDepStatus === 'rejected'): ?>
+                    <span style="color:#c62828;margin-left:8px">✗ 已退回，請重新申請</span>
+                    <?php else: ?>
+                    <span style="color:#666;margin-left:8px">無訂金且符合需簽核條件，請先申請</span>
+                    <?php endif; ?>
+                </div>
+                <?php if ($_noDepNeeds && $noDepStatus !== 'approved' && $noDepStatus !== 'pending'): ?>
+                <form method="POST" action="/cases.php?action=submit_no_deposit_approval" style="display:inline">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="case_id" value="<?= (int)$case['id'] ?>">
+                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('確認送出無訂金排工簽核？')">+ 申請無訂金排工簽核</button>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; endif; ?>
+
         <!-- 銷項發票 -->
         <?php if ($case): $caseSalesInvoices = $case['sales_invoices'] ?? array(); ?>
         <div style="margin:8px 0;padding:10px;background:#fafafa;border:1px solid var(--gray-200);border-radius:6px">
