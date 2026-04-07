@@ -59,35 +59,6 @@
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>進件編號</label>
-                <input type="text" name="case_number" class="form-control" value="<?= e($record['case_number'] ?? '') ?>" placeholder="例：2026-0028">
-            </div>
-            <div class="form-group">
-                <label>客戶編號</label>
-                <input type="text" name="customer_no" class="form-control" value="<?= e($record['customer_no'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>登記人</label>
-                <?php
-                $regName = '';
-                if ($isEdit) {
-                    if (!empty($record['registrar'])) {
-                        $regName = $record['registrar'];
-                    } elseif (!empty($record['created_by'])) {
-                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
-                        $cuStmt->execute(array($record['created_by']));
-                        $regName = $cuStmt->fetchColumn() ?: '';
-                    }
-                } else {
-                    $regName = Session::getUser()['real_name'] ?? '';
-                }
-                ?>
-                <input type="text" class="form-control" value="<?= e($regName) ?>" readonly style="background:#f5f5f5">
-                <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
                 <label>付款期間</label>
                 <?php
                 $ppYear = ''; $ppMonth = '';
@@ -114,9 +85,9 @@
                     <input type="hidden" name="payment_period" id="ppValue" value="<?= e($isEdit && !empty($record['payment_period']) ? $record['payment_period'] : '') ?>">
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="flex:0 0 180px">
                 <label>付款條件</label>
-                <input type="text" name="payment_terms" class="form-control" value="<?= e($record['payment_terms'] ?? '') ?>" placeholder="例：30天、月結30天" list="termsOptions">
+                <input type="text" name="payment_terms" class="form-control" value="<?= e($record['payment_terms'] ?? '') ?>" placeholder="例：30天" list="termsOptions">
                 <datalist id="termsOptions">
                     <option value="30天">
                     <option value="45天">
@@ -126,6 +97,25 @@
                     <option value="貨到付款">
                     <option value="預付">
                 </datalist>
+            </div>
+            <div class="form-group" style="flex:0 0 200px">
+                <label>登記人</label>
+                <?php
+                $regName = '';
+                if ($isEdit) {
+                    if (!empty($record['registrar'])) {
+                        $regName = $record['registrar'];
+                    } elseif (!empty($record['created_by'])) {
+                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                        $cuStmt->execute(array($record['created_by']));
+                        $regName = $cuStmt->fetchColumn() ?: '';
+                    }
+                } else {
+                    $regName = Session::getUser()['real_name'] ?? '';
+                }
+                ?>
+                <input type="text" class="form-control" value="<?= e($regName) ?>" readonly style="background:#f5f5f5">
+                <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
             </div>
         </div>
     </div>

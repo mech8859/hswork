@@ -8,7 +8,7 @@
         <div class="filter-row">
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="廠商名稱/付款單號">
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="廠商名稱/付款單號／$金額">
             </div>
             <div class="form-group">
                 <label>起始日期</label>

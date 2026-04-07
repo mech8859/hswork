@@ -296,9 +296,16 @@ class FinanceModel
             $params[] = $filters['status'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ?)';
-            $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            $kwRaw = trim($filters['keyword']);
+            if (preg_match('/^[\$＄]\s*([\d,]+(?:\.\d+)?)$/u', $kwRaw, $m)) {
+                $amt = (float)str_replace(',', '', $m[1]);
+                $where .= ' AND r.total_amount = ?';
+                $params[] = $amt;
+            } else {
+                $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ?)';
+                $kw = '%' . $kwRaw . '%';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND r.invoice_date >= ?';
@@ -502,9 +509,17 @@ class FinanceModel
             $params[] = $filters['status'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ?)';
-            $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            $kwRaw = trim($filters['keyword']);
+            // 以 $ 開頭 → 搜尋金額（total_amount = 數字）
+            if (preg_match('/^[\$＄]\s*([\d,]+(?:\.\d+)?)$/u', $kwRaw, $m)) {
+                $amt = (float)str_replace(',', '', $m[1]);
+                $where .= ' AND r.total_amount = ?';
+                $params[] = $amt;
+            } else {
+                $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ?)';
+                $kw = '%' . $kwRaw . '%';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND r.register_date >= ?';
@@ -673,9 +688,16 @@ class FinanceModel
         $params = array();
 
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (p.payable_number LIKE ? OR p.voucher_number LIKE ? OR p.vendor_name LIKE ?)';
-            $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            $kwRaw = trim($filters['keyword']);
+            if (preg_match('/^[\$＄]\s*([\d,]+(?:\.\d+)?)$/u', $kwRaw, $m)) {
+                $amt = (float)str_replace(',', '', $m[1]);
+                $where .= ' AND p.total_amount = ?';
+                $params[] = $amt;
+            } else {
+                $where .= ' AND (p.payable_number LIKE ? OR p.voucher_number LIKE ? OR p.vendor_name LIKE ?)';
+                $kw = '%' . $kwRaw . '%';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND p.create_date >= ?';
@@ -736,17 +758,17 @@ class FinanceModel
     public function createPayable($data)
     {
         $number = $this->generateNumber('AP', 'payables', 'payable_number');
+        // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
         $stmt = $this->db->prepare("
-            INSERT INTO payables (payable_number, create_date, vendor_name, case_number, customer_no, payment_period, payment_terms,
+            INSERT INTO payables (payable_number, create_date, vendor_name, vendor_code, payment_period, payment_terms,
                 subtotal, tax, total_amount, prepaid, payable_amount, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['case_number']) ? $data['case_number'] : null,
-            !empty($data['customer_no']) ? $data['customer_no'] : null,
+            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -764,17 +786,17 @@ class FinanceModel
 
     public function updatePayable($id, $data)
     {
+        // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
         $stmt = $this->db->prepare("
             UPDATE payables SET
-                create_date=?, vendor_name=?, case_number=?, customer_no=?, payment_period=?, payment_terms=?,
+                create_date=?, vendor_name=?, vendor_code=?, payment_period=?, payment_terms=?,
                 subtotal=?, tax=?, total_amount=?, prepaid=?, payable_amount=?, note=?, updated_by=?
             WHERE id=?
         ");
         $stmt->execute(array(
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['case_number']) ? $data['case_number'] : null,
-            !empty($data['customer_no']) ? $data['customer_no'] : null,
+            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -918,9 +940,16 @@ class FinanceModel
             $params[] = $filters['main_category'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (p.payment_number LIKE ? OR p.vendor_name LIKE ?)';
-            $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw; $params[] = $kw;
+            $kwRaw = trim($filters['keyword']);
+            if (preg_match('/^[\$＄]\s*([\d,]+(?:\.\d+)?)$/u', $kwRaw, $m)) {
+                $amt = (float)str_replace(',', '', $m[1]);
+                $where .= ' AND p.total_amount = ?';
+                $params[] = $amt;
+            } else {
+                $where .= ' AND (p.payment_number LIKE ? OR p.vendor_name LIKE ?)';
+                $kw = '%' . $kwRaw . '%';
+                $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND p.create_date >= ?';
@@ -986,11 +1015,12 @@ class FinanceModel
     public function createPaymentOut($data)
     {
         $number = $this->generateNumber('PO', 'payments_out', 'payment_number');
+        // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
         $stmt = $this->db->prepare("
-            INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, case_number, customer_no,
+            INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
                 payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
                 total_amount, main_category, sub_category, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
@@ -998,8 +1028,7 @@ class FinanceModel
             !empty($data['payment_date']) ? $data['payment_date'] : null,
             !empty($data['payable_id']) ? $data['payable_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['case_number']) ? $data['case_number'] : null,
-            !empty($data['customer_no']) ? $data['customer_no'] : null,
+            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
             !empty($data['payment_method']) ? $data['payment_method'] : null,
             !empty($data['payment_type']) ? $data['payment_type'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1020,9 +1049,10 @@ class FinanceModel
 
     public function updatePaymentOut($id, $data)
     {
+        // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
         $stmt = $this->db->prepare("
             UPDATE payments_out SET
-                create_date=?, payment_date=?, payable_id=?, vendor_name=?, case_number=?, customer_no=?,
+                create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
                 payment_method=?, payment_type=?, payment_terms=?, status=?,
                 subtotal=?, tax=?, remittance_fee=?, total_amount=?,
                 main_category=?, sub_category=?, note=?, updated_by=?
@@ -1033,8 +1063,7 @@ class FinanceModel
             !empty($data['payment_date']) ? $data['payment_date'] : null,
             !empty($data['payable_id']) ? $data['payable_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['case_number']) ? $data['case_number'] : null,
-            !empty($data['customer_no']) ? $data['customer_no'] : null,
+            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
             !empty($data['payment_method']) ? $data['payment_method'] : null,
             !empty($data['payment_type']) ? $data['payment_type'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,

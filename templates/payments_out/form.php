@@ -44,16 +44,6 @@
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>進件編號</label>
-                <input type="text" name="case_number" class="form-control" value="<?= e($record['case_number'] ?? '') ?>" placeholder="例：2026-0028">
-            </div>
-            <div class="form-group">
-                <label>客戶編號</label>
-                <input type="text" name="customer_no" class="form-control" value="<?= e($record['customer_no'] ?? '') ?>">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
                 <label>應付帳款單號</label>
                 <div style="position:relative">
                     <input type="text" id="payableSearch" class="form-control" value="<?= e(!empty($record['payable_id']) ? ($record['payable_number'] ?? '') : '') ?>" placeholder="輸入搜尋應付帳款..." autocomplete="off">

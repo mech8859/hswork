@@ -145,7 +145,11 @@
                 <select name="invoice_type" class="form-control">
                     <option value="">請選擇</option>
                     <?php
-                    $invoiceTypes = array('三聯式' => '三聯式', '二聯式' => '二聯式', '免用統一發票' => '免用統一發票');
+                    $invoiceTypes = array('三聯式' => '三聯式', '二聯式' => '二聯式', '電子發票' => '電子發票');
+                    // 既有資料相容：若已存舊值「免用統一發票」，仍顯示
+                    if (!empty($record['invoice_type']) && !isset($invoiceTypes[$record['invoice_type']])) {
+                        $invoiceTypes[$record['invoice_type']] = $record['invoice_type'];
+                    }
                     foreach ($invoiceTypes as $k => $v): ?>
                     <option value="<?= e($k) ?>" <?= (!empty($record['invoice_type']) && $record['invoice_type'] === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
                     <?php endforeach; ?>

@@ -18,7 +18,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" placeholder="收款單號/客戶名稱" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>">
+                <input type="text" name="keyword" class="form-control" placeholder="收款單號/客戶名稱／$金額" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>">
             </div>
             <div class="form-group">
                 <label>起始日期</label>

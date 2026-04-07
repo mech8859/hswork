@@ -37,7 +37,7 @@ $statusBadgeMap = array(
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="廠商名/單號" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="廠商名/單號／$金額" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>起始日期</label>
