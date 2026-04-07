@@ -56,6 +56,8 @@
                 <a href="/receipts.php?action=edit&id=<?= $row['id'] ?>"><strong><?= e($row['receipt_number']) ?></strong></a>
                 <?php if ($row['status'] === '待收款'): ?>
                     <span class="badge badge-info">待收款</span>
+                <?php elseif ($row['status'] === '拋轉待確認'): ?>
+                    <span class="badge badge-warning">拋轉待確認</span>
                 <?php elseif ($row['status'] === '已入帳'): ?>
                     <span class="badge badge-success">已入帳</span>
                 <?php elseif ($row['status'] === '退款'): ?>
@@ -102,6 +104,8 @@
                     <td>
                         <?php if ($row['status'] === '待收款'): ?>
                             <span class="badge badge-info">待收款</span>
+                        <?php elseif ($row['status'] === '拋轉待確認'): ?>
+                            <span class="badge badge-warning">拋轉待確認</span>
                         <?php elseif ($row['status'] === '已入帳'): ?>
                             <span class="badge badge-success">已入帳</span>
                         <?php elseif ($row['status'] === '退款'): ?>

@@ -753,7 +753,43 @@ class ReportModel
         }
         sort($allDates);
 
-        // 逐日計算所有帳戶餘額合計
+        // ── 計算零用金/備用金/現金每日累積餘額 ──
+        // 期初（年初前）累積
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(income_amount - expense_amount),0) FROM petty_cash WHERE COALESCE(expense_date, entry_date) < ?");
+        $stmt->execute(array($yearStart));
+        $pettyAcc = (float)$stmt->fetchColumn();
+
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(income_amount - expense_amount),0) FROM reserve_fund WHERE COALESCE(expense_date, entry_date) < ?");
+        $stmt->execute(array($yearStart));
+        $reserveAcc = (float)$stmt->fetchColumn();
+
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(income_amount - expense_amount),0) FROM cash_details WHERE COALESCE(transaction_date, register_date) < ?");
+        $stmt->execute(array($yearStart));
+        $cashAcc = (float)$stmt->fetchColumn();
+
+        // 當年每日變動
+        $pettyByDate = array();
+        $stmt = $this->db->prepare("SELECT COALESCE(expense_date, entry_date) AS d, SUM(income_amount - expense_amount) AS net FROM petty_cash WHERE COALESCE(expense_date, entry_date) BETWEEN ? AND ? GROUP BY d");
+        $stmt->execute(array($yearStart, $yearEnd));
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) { $pettyByDate[$r['d']] = (float)$r['net']; }
+
+        $reserveByDate = array();
+        $stmt = $this->db->prepare("SELECT COALESCE(expense_date, entry_date) AS d, SUM(income_amount - expense_amount) AS net FROM reserve_fund WHERE COALESCE(expense_date, entry_date) BETWEEN ? AND ? GROUP BY d");
+        $stmt->execute(array($yearStart, $yearEnd));
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) { $reserveByDate[$r['d']] = (float)$r['net']; }
+
+        $cashByDate = array();
+        $stmt = $this->db->prepare("SELECT COALESCE(transaction_date, register_date) AS d, SUM(income_amount - expense_amount) AS net FROM cash_details WHERE COALESCE(transaction_date, register_date) BETWEEN ? AND ? GROUP BY d");
+        $stmt->execute(array($yearStart, $yearEnd));
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) { $cashByDate[$r['d']] = (float)$r['net']; }
+
+        // 把零用金/備用金/現金的所有交易日期也加入 allDates（避免遺漏）
+        foreach (array_keys($pettyByDate) as $d) if (!in_array($d, $allDates)) $allDates[] = $d;
+        foreach (array_keys($reserveByDate) as $d) if (!in_array($d, $allDates)) $allDates[] = $d;
+        foreach (array_keys($cashByDate) as $d) if (!in_array($d, $allDates)) $allDates[] = $d;
+        sort($allDates);
+
+        // 逐日計算所有帳戶餘額合計 + 公司資金總和
         foreach ($allDates as $d) {
             // 更新各帳戶當日餘額
             foreach ($acctDayBal as $acct => $dates) {
@@ -765,10 +801,18 @@ class ReportModel
             foreach ($acctBalance as $bal) {
                 $dayBankTotal += $bal;
             }
+
+            // 累積零用金/備用金/現金
+            if (isset($pettyByDate[$d])) $pettyAcc += $pettyByDate[$d];
+            if (isset($reserveByDate[$d])) $reserveAcc += $reserveByDate[$d];
+            if (isset($cashByDate[$d])) $cashAcc += $cashByDate[$d];
+
             if (!isset($dailyNet[$d])) {
                 $dailyNet[$d] = array('recv' => array(), 'pay' => array(), 'bank' => null, 'weekly_fund' => null);
             }
             $dailyNet[$d]['bank'] = $dayBankTotal;
+            // 公司資金總和 = 銀行 + 週轉金(常數) + 零用金 + 備用金 + 現金
+            $dailyNet[$d]['total_fund'] = $dayBankTotal + $weeklyFund + $pettyAcc + $reserveAcc + $cashAcc;
         }
         ksort($dailyNet);
 

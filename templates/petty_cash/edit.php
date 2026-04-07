@@ -9,7 +9,15 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
 }
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
-    <h2>零用金 - <?= e(!empty($record['entry_number']) ? $record['entry_number'] : '檢視') ?></h2>
+    <div>
+        <h2 style="margin-bottom:2px">零用金 - <?= e(!empty($record['entry_number']) ? $record['entry_number'] : '檢視') ?></h2>
+        <?php if (!empty($record['updated_at'])): ?>
+        <small style="color:#888;font-size:.72rem">
+            最後修改：<?= e(substr($record['updated_at'], 0, 16)) ?>
+            <?php if (!empty($record['updater_name'])): ?> ｜ <?= e($record['updater_name']) ?><?php endif; ?>
+        </small>
+        <?php endif; ?>
+    </div>
     <?= back_button('/petty_cash.php') ?>
 </div>
 
@@ -33,7 +41,7 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
                 </select>
             </div>
             <div class="form-group">
-                <label>日期</label>
+                <label>收支日期</label>
                 <input type="date" max="2099-12-31" name="entry_date" class="form-control" value="<?= e(!empty($record['entry_date']) ? $record['entry_date'] : '') ?>" <?= $disabled ?>>
             </div>
             <div class="form-group">
@@ -68,6 +76,9 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
             <div class="form-group">
                 <label>登記人</label>
                 <input type="text" name="registrar" class="form-control" value="<?= e(!empty($record['registrar']) ? $record['registrar'] : '') ?>" <?= $disabled ?>>
+                <?php if (!empty($record['created_at'])): ?>
+                <small style="color:#888;font-size:.72rem">登記時間：<?= e(substr($record['created_at'], 0, 16)) ?></small>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>簽核狀態</label>

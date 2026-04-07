@@ -49,6 +49,8 @@ switch ($action) {
             $data = array(
                 'create_date'    => !empty($_POST['create_date']) ? $_POST['create_date'] : date('Y-m-d'),
                 'vendor_name'    => !empty($_POST['vendor_name']) ? $_POST['vendor_name'] : null,
+                'case_number'    => !empty($_POST['case_number']) ? $_POST['case_number'] : null,
+                'customer_no'    => !empty($_POST['customer_no']) ? $_POST['customer_no'] : null,
                 'payment_period' => !empty($_POST['payment_period']) ? $_POST['payment_period'] : null,
                 'payment_terms'  => !empty($_POST['payment_terms']) ? $_POST['payment_terms'] : null,
                 'subtotal'       => !empty($_POST['subtotal']) ? $_POST['subtotal'] : 0,
@@ -119,6 +121,8 @@ switch ($action) {
             $data = array(
                 'create_date'    => !empty($_POST['create_date']) ? $_POST['create_date'] : date('Y-m-d'),
                 'vendor_name'    => !empty($_POST['vendor_name']) ? $_POST['vendor_name'] : null,
+                'case_number'    => !empty($_POST['case_number']) ? $_POST['case_number'] : null,
+                'customer_no'    => !empty($_POST['customer_no']) ? $_POST['customer_no'] : null,
                 'payment_period' => !empty($_POST['payment_period']) ? $_POST['payment_period'] : null,
                 'payment_terms'  => !empty($_POST['payment_terms']) ? $_POST['payment_terms'] : null,
                 'subtotal'       => !empty($_POST['subtotal']) ? $_POST['subtotal'] : 0,

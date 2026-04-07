@@ -474,10 +474,10 @@ $isEdit = !empty($customer);
                 <div class="cust-atc-file <?= $isImg ? 'cust-atc-img' : '' ?>" <?php if ($isRepairSrc): ?>title="<?= e($f['repair_number']) ?> (<?= e($f['repair_date']) ?>)｜來自維修單模組"<?php endif; ?>>
                     <?php if ($isImg): ?>
                     <?php $fpath = ltrim($f['file_path'], '/'); ?>
-                    <img src="/<?= e($fpath) ?>" class="cust-atc-thumb" onclick="openCustLightbox('/<?= e($fpath) ?>')" alt="<?= e($f['file_name']) ?>"<?php if ($isRepairSrc): ?> style="border-color:var(--primary)"<?php endif; ?>>
+                    <img src="/<?= e($fpath) ?>" class="cust-atc-thumb hs-photo" onclick="hsOpenImage('/<?= e($fpath) ?>')" alt="<?= e($f['file_name']) ?>"<?php if ($isRepairSrc): ?> style="border-color:var(--primary)"<?php endif; ?>>
                     <?php else: ?>
                     <?php $fpath = ltrim($f['file_path'], '/'); ?>
-                    <a href="/<?= e($fpath) ?>" target="_blank" class="cust-atc-fname"><?= $isRepairSrc ? '' : '📄 ' ?><?= e($f['file_name']) ?></a>
+                    <a href="javascript:void(0)" onclick="hsOpenFile('/<?= e($fpath) ?>','<?= e($f['file_name']) ?>')" class="cust-atc-fname"><?= $isRepairSrc ? '' : '📄 ' ?><?= e($f['file_name']) ?></a>
                     <?php endif; ?>
                     <?php if ($canManage && !$isRepairSrc): ?>
                     <button type="button" class="cust-atc-del" onclick="deleteFile(<?= $f['id'] ?>)">✕</button>

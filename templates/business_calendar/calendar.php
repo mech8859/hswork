@@ -263,8 +263,9 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
                 $evColor = BusinessCalendarModel::activityColor($ev['activity_type']);
                 $evLabel = isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'];
             ?>
+            <?php $evTime = !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : ''; ?>
             <a href="/business_calendar.php?action=edit&id=<?= $ev['id'] ?>" class="bc-event" style="border-left:3px solid <?= e($evColor) ?>">
-                <div class="bc-event-title"><?= e(mb_substr($ev['customer_name'], 0, 8)) ?></div>
+                <div class="bc-event-title"><?= e(mb_substr($ev['customer_name'], 0, 8)) ?><?php if ($evTime): ?> <span style="color:#e65100;font-weight:600"><?= $evTime ?></span><?php endif; ?></div>
                 <div class="bc-event-staff"><?= e($ev['staff_name']) ?></div>
             </a>
             <?php endforeach; ?>
@@ -321,8 +322,9 @@ if ($currentStaff) $bcFP .= '&staff_id=' . urlencode($currentStaff);
             <?php $shown = 0; foreach ($dayEvents as $ev):
                 if ($shown >= 3) break; $shown++;
                 $evColor = BusinessCalendarModel::activityColor($ev['activity_type']);
+                $evT = !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : '';
             ?>
-            <div class="mg-bar" style="background:<?= e($evColor) ?>"><?= e(mb_substr($ev['customer_name'], 0, 5)) ?></div>
+            <div class="mg-bar" style="background:<?= e($evColor) ?>"><?php if ($evT): ?><?= $evT ?> <?php endif; ?><?= e(mb_substr($ev['customer_name'], 0, 5)) ?></div>
             <?php endforeach; ?>
             <?php if (count($dayEvents) > 3): ?>
             <div class="mg-more">+<?= count($dayEvents) - 3 ?></div>

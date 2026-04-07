@@ -298,5 +298,122 @@ function validateInvoiceNumber(el) {
     });
 })();
 </script>
+
+<!-- ===== 全站通用 Lightbox & 檔案 Modal（PWA 內部檢視）===== -->
+<div id="hsLightbox" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center;cursor:pointer">
+    <span id="hsLbClose" style="position:absolute;top:16px;right:16px;color:#fff;font-size:2.5rem;cursor:pointer;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);border-radius:50%;line-height:1;z-index:100000">&times;</span>
+    <span id="hsLbPrev" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);color:#fff;font-size:2.5rem;cursor:pointer;padding:16px 12px;background:rgba(0,0,0,.4);border-radius:8px;user-select:none;z-index:100000">&lsaquo;</span>
+    <span id="hsLbNext" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);color:#fff;font-size:2.5rem;cursor:pointer;padding:16px 12px;background:rgba(0,0,0,.4);border-radius:8px;user-select:none;z-index:100000">&rsaquo;</span>
+    <img id="hsLbImg" src="" alt="預覽" style="max-width:90%;max-height:90%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
+    <span id="hsLbCounter" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:.9rem;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;z-index:100000"></span>
+</div>
+<div id="hsFileModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:99999;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1a73e8;color:#fff;flex-shrink:0">
+        <span id="hsFileTitle" style="font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:12px"></span>
+        <div style="display:flex;gap:8px;align-items:center">
+            <a id="hsFileDownload" href="" download style="background:rgba(255,255,255,.2);color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-size:.85rem">下載</a>
+            <span onclick="hsCloseFile()" style="color:#fff;font-size:1.8rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;line-height:1">&times;</span>
+        </div>
+    </div>
+    <iframe id="hsFileFrame" src="" frameborder="0" style="flex:1;width:100%;border:0"></iframe>
+</div>
+<script>
+// ===== 全站通用 Lightbox / File Modal =====
+// 用法：
+//   <a onclick="hsOpenFile('/path/to/file.pdf','檔名.pdf')">檔名.pdf</a>
+//   <img onclick="hsOpenImage(this.src)"> 或 onclick="hsOpenImage('/path/to.jpg')"
+// 自動收集頁面上所有 .hs-photo 元素或同 group 圖片做切換
+(function() {
+    var images = [], idx = 0;
+
+    window.hsOpenImage = function(src, group) {
+        // 收集同類圖片：優先用 group 屬性，否則收所有 .hs-photo / [onclick*="hsOpenImage"]
+        images = [];
+        var sel = group ? '[data-hs-group="' + group + '"]' : '.hs-photo, img[onclick*="hsOpenImage"], a[onclick*="hsOpenImage"]';
+        document.querySelectorAll(sel).forEach(function(el) {
+            var s = '';
+            if (el.tagName === 'IMG') s = el.src;
+            var oc = el.getAttribute('onclick') || '';
+            var m = oc.match(/hsOpenImage\(['"]([^'"]+)['"]/);
+            if (m) s = m[1];
+            if (s && images.indexOf(s) === -1) images.push(s);
+        });
+        if (images.length === 0) images = [src];
+        idx = images.indexOf(src);
+        if (idx < 0) idx = 0;
+        showImage();
+        document.getElementById('hsLightbox').style.display = 'flex';
+    };
+    window.hsCloseImage = function() {
+        document.getElementById('hsLightbox').style.display = 'none';
+        document.getElementById('hsLbImg').src = '';
+    };
+    window.hsLbNav = function(dir) {
+        idx += dir;
+        if (idx < 0) idx = images.length - 1;
+        if (idx >= images.length) idx = 0;
+        showImage();
+    };
+    function showImage() {
+        document.getElementById('hsLbImg').src = images[idx];
+        var c = document.getElementById('hsLbCounter');
+        var p = document.getElementById('hsLbPrev'), n = document.getElementById('hsLbNext');
+        if (images.length > 1) {
+            c.textContent = (idx + 1) + ' / ' + images.length;
+            c.style.display = 'block';
+            p.style.display = 'flex';
+            n.style.display = 'flex';
+        } else {
+            c.style.display = 'none';
+            p.style.display = 'none';
+            n.style.display = 'none';
+        }
+    }
+
+    window.hsOpenFile = function(src, name) {
+        document.getElementById('hsFileTitle').textContent = name || '檔案';
+        document.getElementById('hsFileDownload').href = src;
+        document.getElementById('hsFileFrame').src = src;
+        document.getElementById('hsFileModal').style.display = 'flex';
+    };
+    window.hsCloseFile = function() {
+        document.getElementById('hsFileModal').style.display = 'none';
+        document.getElementById('hsFileFrame').src = '';
+    };
+
+    // 綁定關閉/切換按鈕
+    var lb = document.getElementById('hsLightbox');
+    lb.addEventListener('click', function(e) { if (e.target === lb) hsCloseImage(); });
+    document.getElementById('hsLbClose').addEventListener('click', function(e) { e.stopPropagation(); hsCloseImage(); });
+    document.getElementById('hsLbPrev').addEventListener('click', function(e) { e.stopPropagation(); hsLbNav(-1); });
+    document.getElementById('hsLbNext').addEventListener('click', function(e) { e.stopPropagation(); hsLbNav(1); });
+    document.getElementById('hsLbImg').addEventListener('click', function(e) { e.stopPropagation(); });
+
+    // 鍵盤
+    document.addEventListener('keydown', function(e) {
+        if (lb.style.display === 'flex') {
+            if (e.key === 'Escape') hsCloseImage();
+            if (e.key === 'ArrowLeft') hsLbNav(-1);
+            if (e.key === 'ArrowRight') hsLbNav(1);
+            return;
+        }
+        if (document.getElementById('hsFileModal').style.display === 'flex' && e.key === 'Escape') hsCloseFile();
+    });
+
+    // 觸控滑動
+    var sx = 0, sy = 0;
+    lb.addEventListener('touchstart', function(e) { sx = e.changedTouches[0].screenX; sy = e.changedTouches[0].screenY; }, {passive:true});
+    lb.addEventListener('touchend', function(e) {
+        var dx = e.changedTouches[0].screenX - sx;
+        var dy = e.changedTouches[0].screenY - sy;
+        if (Math.abs(dx) < 50 && Math.abs(dy) < 50) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) hsLbNav(-1); else hsLbNav(1);
+        } else {
+            hsCloseImage();
+        }
+    }, {passive:true});
+})();
+</script>
 </body>
 </html>

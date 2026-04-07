@@ -1123,9 +1123,9 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                     ?>
                     <div class="atc-file <?= $isImg ? 'atc-file-img' : '' ?>" id="att-<?= $att['id'] ?>">
                         <?php if ($isImg): ?>
-                        <img src="<?= e($att['file_path']) ?>" class="atc-thumb" onclick="openLightbox('<?= e($att['file_path']) ?>')" alt="<?= e($att['file_name']) ?>">
+                        <img src="<?= e($att['file_path']) ?>" class="atc-thumb hs-photo" onclick="hsOpenImage('<?= e($att['file_path']) ?>')" alt="<?= e($att['file_name']) ?>">
                         <?php else: ?>
-                        <a href="<?= e($att['file_path']) ?>" target="_blank" class="atc-filename">📄 <?= e($att['file_name']) ?></a>
+                        <a href="javascript:void(0)" onclick="hsOpenFile('<?= e($att['file_path']) ?>','<?= e($att['file_name']) ?>')" class="atc-filename">📄 <?= e($att['file_name']) ?></a>
                         <?php endif; ?>
                         <button type="button" class="atc-del" onclick="deleteAttachment(<?= $att['id'] ?>, '<?= $typeKey ?>')">✕</button>
                     </div>
@@ -1971,9 +1971,9 @@ function uploadFiles(input, fileType) {
                             var ext = res.file_name.split('.').pop().toLowerCase();
                             var html;
                             if (imgExts.indexOf(ext) !== -1) {
-                                html = '<div class="atc-file atc-file-img" id="att-' + res.id + '"><img src="' + res.file_path + '" class="atc-thumb" onclick="openLightbox(\'' + res.file_path + '\')" alt="' + res.file_name + '"><button type="button" class="atc-del" onclick="deleteAttachment(' + res.id + ',\'' + fileType + '\')">✕</button></div>';
+                                html = '<div class="atc-file atc-file-img" id="att-' + res.id + '"><img src="' + res.file_path + '" class="atc-thumb hs-photo" onclick="hsOpenImage(\'' + res.file_path + '\')" alt="' + res.file_name + '"><button type="button" class="atc-del" onclick="deleteAttachment(' + res.id + ',\'' + fileType + '\')">✕</button></div>';
                             } else {
-                                html = '<div class="atc-file" id="att-' + res.id + '"><a href="' + res.file_path + '" target="_blank" class="atc-filename">📄 ' + res.file_name + '</a><button type="button" class="atc-del" onclick="deleteAttachment(' + res.id + ',\'' + fileType + '\')">✕</button></div>';
+                                html = '<div class="atc-file" id="att-' + res.id + '"><a href="javascript:void(0)" onclick="hsOpenFile(\'' + res.file_path + '\',\'' + res.file_name + '\')" class="atc-filename">📄 ' + res.file_name + '</a><button type="button" class="atc-del" onclick="deleteAttachment(' + res.id + ',\'' + fileType + '\')">✕</button></div>';
                             }
                             document.getElementById('atc-files-' + fileType).insertAdjacentHTML('beforeend', html);
                             updateCount(fileType, 1);

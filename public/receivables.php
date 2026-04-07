@@ -50,6 +50,8 @@ switch ($action) {
             $postData = array(
                 'invoice_date'     => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
                 'case_id'          => !empty($_POST['case_id']) ? $_POST['case_id'] : null,
+                'case_number'      => !empty($_POST['case_number']) ? $_POST['case_number'] : null,
+                'customer_no'      => !empty($_POST['customer_no']) ? $_POST['customer_no'] : null,
                 'customer_name'    => !empty($_POST['customer_name']) ? $_POST['customer_name'] : null,
                 'branch_id'        => !empty($_POST['branch_id']) ? $_POST['branch_id'] : null,
                 'sales_id'         => !empty($_POST['sales_id']) ? $_POST['sales_id'] : null,
@@ -110,6 +112,8 @@ switch ($action) {
             $postData = array(
                 'invoice_date'     => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
                 'case_id'          => !empty($_POST['case_id']) ? $_POST['case_id'] : null,
+                'case_number'      => !empty($_POST['case_number']) ? $_POST['case_number'] : null,
+                'customer_no'      => !empty($_POST['customer_no']) ? $_POST['customer_no'] : null,
                 'customer_name'    => !empty($_POST['customer_name']) ? $_POST['customer_name'] : null,
                 'branch_id'        => !empty($_POST['branch_id']) ? $_POST['branch_id'] : null,
                 'sales_id'         => !empty($_POST['sales_id']) ? $_POST['sales_id'] : null,
@@ -163,7 +167,7 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/receivables.php');
             }
-            $id = (int)(!empty($_POST['id']) ? $_POST['id'] : 0);
+            $id = (int)(!empty($_POST['id']) ? $_POST['id'] : (!empty($_GET['id']) ? $_GET['id'] : 0));
             if ($id) {
                 AuditLog::log('receivables', 'delete', $id, '刪除請款單');
                 $model->deleteReceivable($id);

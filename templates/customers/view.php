@@ -206,9 +206,9 @@
                     ?>
                     <div class="cust-atc-file <?= $isImg ? 'cust-atc-img' : '' ?>">
                         <?php if ($isImg): ?>
-                        <img src="/<?= e($f['file_path']) ?>" class="cust-atc-thumb" onclick="openCustLightbox('/<?= e($f['file_path']) ?>')" alt="<?= e($f['file_name']) ?>">
+                        <img src="/<?= e($f['file_path']) ?>" class="cust-atc-thumb hs-photo" onclick="hsOpenImage('/<?= e($f['file_path']) ?>')" alt="<?= e($f['file_name']) ?>">
                         <?php else: ?>
-                        <a href="/<?= e($f['file_path']) ?>" target="_blank" class="cust-atc-fname">📄 <?= e($f['file_name']) ?></a>
+                        <a href="javascript:void(0)" onclick="hsOpenFile('/<?= e($f['file_path']) ?>','<?= e($f['file_name']) ?>')" class="cust-atc-fname">📄 <?= e($f['file_name']) ?></a>
                         <?php endif; ?>
                         <?php if ($canManage): ?>
                         <button type="button" class="cust-atc-del" onclick="if(confirm('確定刪除？'))location.href='/customers.php?action=delete_file&file_id=<?= $f['id'] ?>&customer_id=<?= $customer['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>'">✕</button>
@@ -228,9 +228,12 @@
     </div>
 
     <!-- Lightbox -->
-    <div class="cust-lightbox" id="custLightbox" onclick="closeCustLightbox()">
-        <span class="cust-lb-close">&times;</span>
-        <img id="custLbImg" src="" alt="預覽">
+    <div class="cust-lightbox" id="custLightbox" onclick="if(event.target===this)closeCustLightbox()">
+        <span class="cust-lb-close" onclick="closeCustLightbox()">&times;</span>
+        <span class="cust-lb-prev" onclick="event.stopPropagation();custLbNav(-1)">&lsaquo;</span>
+        <span class="cust-lb-next" onclick="event.stopPropagation();custLbNav(1)">&rsaquo;</span>
+        <img id="custLbImg" src="" alt="預覽" onclick="event.stopPropagation()">
+        <span class="cust-lb-counter" id="custLbCounter"></span>
     </div>
 </div>
 
@@ -253,15 +256,76 @@
 .cust-lightbox { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
 .cust-lightbox.active { display:flex; }
 .cust-lightbox img { max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
-.cust-lb-close { position:absolute; top:16px; right:24px; color:#fff; font-size:2rem; cursor:pointer; z-index:10000; }
+.cust-lb-close { position:absolute; top:16px; right:16px; color:#fff; font-size:2.5rem; cursor:pointer; z-index:10000; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.4); border-radius:50%; line-height:1; }
+.cust-lb-prev, .cust-lb-next { position:absolute; top:50%; transform:translateY(-50%); color:#fff; font-size:2.5rem; cursor:pointer; padding:16px 12px; z-index:10000; background:rgba(0,0,0,.4); border-radius:8px; user-select:none; }
+.cust-lb-prev { left:10px; } .cust-lb-next { right:10px; }
+.cust-lb-counter { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); color:#fff; font-size:.9rem; z-index:10000; background:rgba(0,0,0,.4); padding:4px 12px; border-radius:12px; }
 @media (max-width: 767px) { .cust-attach-grid { grid-template-columns:repeat(2, 1fr); } }
 @media (max-width: 480px) { .cust-attach-grid { grid-template-columns:1fr; } }
 </style>
 
 <script>
-function openCustLightbox(src) { var o=document.getElementById('custLightbox'); o.classList.add('active'); document.getElementById('custLbImg').src=src; }
+var custLbImages = [], custLbIndex = 0;
+function openCustLightbox(src) {
+    custLbImages = [];
+    document.querySelectorAll('.cust-atc-thumb').forEach(function(img) {
+        var oc = img.getAttribute('onclick') || '';
+        var m = oc.match(/openCustLightbox\(['"]([^'"]+)['"]/);
+        if (m && custLbImages.indexOf(m[1]) === -1) custLbImages.push(m[1]);
+    });
+    if (custLbImages.length === 0) custLbImages = [src];
+    custLbIndex = custLbImages.indexOf(src);
+    if (custLbIndex < 0) custLbIndex = 0;
+    showCustLbImage();
+    document.getElementById('custLightbox').classList.add('active');
+}
+function showCustLbImage() {
+    document.getElementById('custLbImg').src = custLbImages[custLbIndex];
+    var c = document.getElementById('custLbCounter');
+    if (custLbImages.length > 1) {
+        c.textContent = (custLbIndex + 1) + ' / ' + custLbImages.length;
+        c.style.display = 'block';
+        document.querySelector('.cust-lb-prev').style.display = 'block';
+        document.querySelector('.cust-lb-next').style.display = 'block';
+    } else {
+        c.style.display = 'none';
+        document.querySelector('.cust-lb-prev').style.display = 'none';
+        document.querySelector('.cust-lb-next').style.display = 'none';
+    }
+}
+function custLbNav(dir) {
+    custLbIndex += dir;
+    if (custLbIndex < 0) custLbIndex = custLbImages.length - 1;
+    if (custLbIndex >= custLbImages.length) custLbIndex = 0;
+    showCustLbImage();
+}
 function closeCustLightbox() { var o=document.getElementById('custLightbox'); o.classList.remove('active'); document.getElementById('custLbImg').src=''; }
-document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeCustLightbox(); });
+document.addEventListener('keydown', function(e) {
+    var o = document.getElementById('custLightbox');
+    if (!o || !o.classList.contains('active')) return;
+    if (e.key === 'Escape') closeCustLightbox();
+    if (e.key === 'ArrowLeft') custLbNav(-1);
+    if (e.key === 'ArrowRight') custLbNav(1);
+});
+// 觸控滑動
+(function() {
+    var sx=0, sy=0;
+    document.addEventListener('DOMContentLoaded', function() {
+        var o = document.getElementById('custLightbox');
+        if (!o) return;
+        o.addEventListener('touchstart', function(e) { sx = e.changedTouches[0].screenX; sy = e.changedTouches[0].screenY; }, {passive:true});
+        o.addEventListener('touchend', function(e) {
+            var dx = e.changedTouches[0].screenX - sx;
+            var dy = e.changedTouches[0].screenY - sy;
+            if (Math.abs(dx) < 50 && Math.abs(dy) < 50) return;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) custLbNav(-1); else custLbNav(1);
+            } else {
+                closeCustLightbox();
+            }
+        }, {passive:true});
+    });
+})();
 
 function uploadCustFiles(input, fileType) {
     if (!input.files.length) return;

@@ -196,9 +196,9 @@ foreach ($schAttachSections as $sec) { if (!empty($sec['files'])) { $schHasAnyFi
                     $fpath = ltrim($f['file_path'], '/');
                 ?>
                 <?php if ($isImg): ?>
-                <a href="/<?= e($fpath) ?>" target="_blank"><img src="/<?= e($fpath) ?>" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)" alt="<?= e($f['file_name']) ?>"></a>
+                <img src="/<?= e($fpath) ?>" class="sch-photo" onclick="openSchLightbox('/<?= e($fpath) ?>')" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);cursor:pointer" alt="<?= e($f['file_name']) ?>">
                 <?php else: ?>
-                <a href="/<?= e($fpath) ?>" target="_blank" style="font-size:.8rem;color:var(--primary);text-decoration:none">📄 <?= e($f['file_name']) ?></a>
+                <a href="javascript:void(0)" onclick="openSchFile('/<?= e($fpath) ?>','<?= e($f['file_name']) ?>')" style="font-size:.8rem;color:var(--primary);text-decoration:none">📄 <?= e($f['file_name']) ?></a>
                 <?php endif; ?>
                 <?php endforeach; ?>
             </div>
@@ -429,7 +429,7 @@ if (!is_array($conduits)) $conduits = array();
             <?php if (!empty($wl['photos'])): ?>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0">
                 <?php foreach ($wl['photos'] as $p): ?>
-                <a href="<?= e($p['file_path']) ?>" target="_blank"><img src="<?= e($p['file_path']) ?>" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200)"></a>
+                <img src="<?= e($p['file_path']) ?>" class="sch-photo" onclick="openSchLightbox('<?= e($p['file_path']) ?>')" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);cursor:pointer">
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
@@ -483,4 +483,115 @@ function joinSchedule(scheduleId) {
     xhr.onerror = function() { alert('網路錯誤'); btn.disabled = false; };
     xhr.send();
 }
+
+// ===== 行事曆檢視照片 lightbox =====
+var schLbImages = [], schLbIndex = 0;
+function openSchLightbox(src) {
+    schLbImages = [];
+    document.querySelectorAll('.sch-photo').forEach(function(img) {
+        var oc = img.getAttribute('onclick') || '';
+        var m = oc.match(/openSchLightbox\(['"]([^'"]+)['"]/);
+        if (m && schLbImages.indexOf(m[1]) === -1) schLbImages.push(m[1]);
+    });
+    if (schLbImages.length === 0) schLbImages = [src];
+    schLbIndex = schLbImages.indexOf(src);
+    if (schLbIndex < 0) schLbIndex = 0;
+    showSchLbImage();
+    document.getElementById('schLightbox').classList.add('active');
+}
+function showSchLbImage() {
+    document.getElementById('schLbImg').src = schLbImages[schLbIndex];
+    var c = document.getElementById('schLbCounter');
+    if (schLbImages.length > 1) {
+        c.textContent = (schLbIndex + 1) + ' / ' + schLbImages.length;
+        c.style.display = 'block';
+        document.querySelector('.sch-lb-prev').style.display = 'block';
+        document.querySelector('.sch-lb-next').style.display = 'block';
+    } else {
+        c.style.display = 'none';
+        document.querySelector('.sch-lb-prev').style.display = 'none';
+        document.querySelector('.sch-lb-next').style.display = 'none';
+    }
+}
+function schLbNav(dir) {
+    schLbIndex += dir;
+    if (schLbIndex < 0) schLbIndex = schLbImages.length - 1;
+    if (schLbIndex >= schLbImages.length) schLbIndex = 0;
+    showSchLbImage();
+}
+function closeSchLightbox() { document.getElementById('schLightbox').classList.remove('active'); document.getElementById('schLbImg').src=''; }
+function openSchFile(src, name) {
+    document.getElementById('schFileTitle').textContent = name || '檔案';
+    document.getElementById('schFileDownload').href = src;
+    document.getElementById('schFileFrame').src = src;
+    document.getElementById('schFileModal').classList.add('active');
+}
+function closeSchFile() {
+    document.getElementById('schFileModal').classList.remove('active');
+    document.getElementById('schFileFrame').src = '';
+}
+document.addEventListener('keydown', function(e) {
+    var lb = document.getElementById('schLightbox');
+    if (lb && lb.classList.contains('active')) {
+        if (e.key === 'Escape') closeSchLightbox();
+        if (e.key === 'ArrowLeft') schLbNav(-1);
+        if (e.key === 'ArrowRight') schLbNav(1);
+        return;
+    }
+    var fm = document.getElementById('schFileModal');
+    if (fm && fm.classList.contains('active') && e.key === 'Escape') closeSchFile();
+});
+(function() {
+    var sx=0, sy=0;
+    document.addEventListener('DOMContentLoaded', function() {
+        var o = document.getElementById('schLightbox');
+        if (!o) return;
+        o.addEventListener('touchstart', function(e) { sx=e.changedTouches[0].screenX; sy=e.changedTouches[0].screenY; }, {passive:true});
+        o.addEventListener('touchend', function(e) {
+            var dx = e.changedTouches[0].screenX - sx;
+            var dy = e.changedTouches[0].screenY - sy;
+            if (Math.abs(dx) < 50 && Math.abs(dy) < 50) return;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) schLbNav(-1); else schLbNav(1);
+            } else {
+                closeSchLightbox();
+            }
+        }, {passive:true});
+    });
+})();
 </script>
+
+<!-- 行事曆檢視 Lightbox -->
+<div class="sch-lightbox" id="schLightbox" onclick="if(event.target===this)closeSchLightbox()">
+    <span class="sch-lb-close" onclick="closeSchLightbox()">&times;</span>
+    <span class="sch-lb-prev" onclick="event.stopPropagation();schLbNav(-1)">&lsaquo;</span>
+    <span class="sch-lb-next" onclick="event.stopPropagation();schLbNav(1)">&rsaquo;</span>
+    <img id="schLbImg" src="" alt="預覽" onclick="event.stopPropagation()">
+    <span class="sch-lb-counter" id="schLbCounter"></span>
+</div>
+<div class="sch-file-modal" id="schFileModal">
+    <div class="sch-file-header">
+        <span id="schFileTitle"></span>
+        <div style="display:flex;gap:8px;align-items:center">
+            <a id="schFileDownload" href="" download class="sch-file-btn">下載</a>
+            <span class="sch-file-close" onclick="closeSchFile()">&times;</span>
+        </div>
+    </div>
+    <iframe id="schFileFrame" src="" frameborder="0"></iframe>
+</div>
+<style>
+.sch-lightbox { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+.sch-lightbox.active { display:flex; }
+.sch-lightbox img { max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+.sch-lb-close { position:absolute; top:16px; right:16px; color:#fff; font-size:2.5rem; cursor:pointer; z-index:10000; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.4); border-radius:50%; line-height:1; }
+.sch-lb-prev, .sch-lb-next { position:absolute; top:50%; transform:translateY(-50%); color:#fff; font-size:2.5rem; cursor:pointer; padding:16px 12px; z-index:10000; background:rgba(0,0,0,.4); border-radius:8px; user-select:none; }
+.sch-lb-prev { left:10px; } .sch-lb-next { right:10px; }
+.sch-lb-counter { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); color:#fff; font-size:.9rem; z-index:10000; background:rgba(0,0,0,.4); padding:4px 12px; border-radius:12px; }
+.sch-file-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#fff; z-index:9999; flex-direction:column; }
+.sch-file-modal.active { display:flex; }
+.sch-file-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#1a73e8; color:#fff; flex-shrink:0; }
+.sch-file-header span { font-weight:600; font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; margin-right:12px; }
+.sch-file-btn { background:rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:.85rem; }
+.sch-file-close { color:#fff; font-size:1.8rem; cursor:pointer; width:36px; height:36px; display:flex; align-items:center; justify-content:center; line-height:1; }
+.sch-file-modal iframe { flex:1; width:100%; border:0; }
+</style>

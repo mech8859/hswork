@@ -69,9 +69,47 @@ function lightboxNav(dir) {
 }
 function closeLightbox() { document.getElementById('lightboxOverlay').classList.remove('active'); document.getElementById('lightboxImg').src = ''; }
 document.addEventListener('keydown', function(e) {
+    var overlay = document.getElementById('lightboxOverlay');
+    if (!overlay || !overlay.classList.contains('active')) return;
     if (e.key === 'Escape') closeLightbox();
     if (e.key === 'ArrowLeft') lightboxNav(-1);
     if (e.key === 'ArrowRight') lightboxNav(1);
+});
+
+// 觸控滑動：左右切換照片，上下關閉
+(function() {
+    var touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+    document.addEventListener('DOMContentLoaded', function() {
+        var overlay = document.getElementById('lightboxOverlay');
+        if (!overlay) return;
+        overlay.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, {passive: true});
+        overlay.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            var dx = touchEndX - touchStartX;
+            var dy = touchEndY - touchStartY;
+            var absDx = Math.abs(dx);
+            var absDy = Math.abs(dy);
+            // 滑動距離夠（>50px）才算手勢
+            if (absDx < 50 && absDy < 50) return;
+            if (absDx > absDy) {
+                // 水平滑動：切換照片
+                if (dx > 0) lightboxNav(-1); // 右滑 → 上一張
+                else lightboxNav(1);          // 左滑 → 下一張
+            } else {
+                // 垂直滑動：關閉
+                closeLightbox();
+            }
+        }, {passive: true});
+    });
+})();
+// 瀏覽器返回鍵也關閉 lightbox
+window.addEventListener('popstate', function() {
+    var overlay = document.getElementById('lightboxOverlay');
+    if (overlay && overlay.classList.contains('active')) closeLightbox();
 });
 
 var contactIndex = CASE_DATA.contactCount;

@@ -20,7 +20,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>日期 <span style="color:red">*</span></label>
+                <label>收支日期 <span style="color:red">*</span></label>
                 <input type="date" max="2099-12-31" name="entry_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
             </div>
             <div class="form-group">
@@ -159,7 +159,7 @@
             <thead>
                 <tr>
                     <th>編號</th>
-                    <th>日期</th>
+                    <th>收支日期</th>
                     <th>收支別</th>
                     <th>有無發票</th>
                     <th class="text-right">支出金額</th>

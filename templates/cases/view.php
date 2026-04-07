@@ -240,14 +240,136 @@ if ($hasFinancial):
     <?php
     $typeLabels = array('drawing'=>'施工圖','quotation'=>'報價單','warranty'=>'保固書','wire_plan'=>'線材','site_photo'=>'現場照片','other'=>'其他');
     foreach ($case['attachments'] as $att):
+        $isImg = preg_match('/\.(jpg|jpeg|png|gif|webp|heic)$/i', $att['file_name']);
     ?>
     <div class="attachment-item">
         <span class="badge badge-info" style="font-size:.7rem"><?= e(isset($typeLabels[$att['file_type']]) ? $typeLabels[$att['file_type']] : $att['file_type']) ?></span>
-        <a href="<?= e($att['file_path']) ?>" target="_blank"><?= e($att['file_name']) ?></a>
+        <?php if ($isImg): ?>
+        <a href="javascript:void(0)" onclick="openCaseLightbox('<?= e($att['file_path']) ?>')"><?= e($att['file_name']) ?></a>
+        <?php else: ?>
+        <a href="javascript:void(0)" onclick="openFileModal('<?= e($att['file_path']) ?>','<?= e($att['file_name']) ?>')"><?= e($att['file_name']) ?></a>
+        <?php endif; ?>
         <span class="text-muted" style="font-size:.75rem"><?= e($att['uploader_name'] ?? '') ?></span>
     </div>
     <?php endforeach; ?>
 </div>
+
+<!-- Case View Lightbox -->
+<div class="case-lightbox" id="caseLightbox" onclick="if(event.target===this)closeCaseLightbox()">
+    <span class="case-lb-close" onclick="closeCaseLightbox()">&times;</span>
+    <span class="case-lb-prev" onclick="event.stopPropagation();caseLbNav(-1)">&lsaquo;</span>
+    <span class="case-lb-next" onclick="event.stopPropagation();caseLbNav(1)">&rsaquo;</span>
+    <img id="caseLbImg" src="" alt="預覽" onclick="event.stopPropagation()">
+    <span class="case-lb-counter" id="caseLbCounter"></span>
+</div>
+
+<!-- 檔案檢視 Modal（PDF 等非圖片）-->
+<div class="file-modal" id="fileModal">
+    <div class="file-modal-header">
+        <span id="fileModalTitle"></span>
+        <div class="file-modal-actions">
+            <a id="fileModalDownload" href="" download class="file-modal-btn">下載</a>
+            <span class="file-modal-close" onclick="closeFileModal()">&times;</span>
+        </div>
+    </div>
+    <iframe id="fileModalFrame" src="" frameborder="0"></iframe>
+</div>
+
+<style>
+.case-lightbox { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+.case-lightbox.active { display:flex; }
+.case-lightbox img { max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+.case-lb-close { position:absolute; top:16px; right:16px; color:#fff; font-size:2.5rem; cursor:pointer; z-index:10000; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.4); border-radius:50%; line-height:1; }
+.case-lb-prev, .case-lb-next { position:absolute; top:50%; transform:translateY(-50%); color:#fff; font-size:2.5rem; cursor:pointer; padding:16px 12px; z-index:10000; background:rgba(0,0,0,.4); border-radius:8px; user-select:none; }
+.case-lb-prev { left:10px; } .case-lb-next { right:10px; }
+.case-lb-counter { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); color:#fff; font-size:.9rem; z-index:10000; background:rgba(0,0,0,.4); padding:4px 12px; border-radius:12px; }
+
+.file-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#fff; z-index:9999; flex-direction:column; }
+.file-modal.active { display:flex; }
+.file-modal-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#1a73e8; color:#fff; flex-shrink:0; }
+.file-modal-header span { font-weight:600; font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; margin-right:12px; }
+.file-modal-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.file-modal-btn { background:rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:.85rem; }
+.file-modal-btn:hover { background:rgba(255,255,255,.3); color:#fff; }
+.file-modal-close { color:#fff; font-size:1.8rem; cursor:pointer; width:36px; height:36px; display:flex; align-items:center; justify-content:center; line-height:1; }
+.file-modal iframe { flex:1; width:100%; border:0; }
+</style>
+
+<script>
+var caseLbImages = [], caseLbIndex = 0;
+function openCaseLightbox(src) {
+    caseLbImages = [];
+    document.querySelectorAll('.attachment-item a[onclick*="openCaseLightbox"]').forEach(function(a) {
+        var m = (a.getAttribute('onclick') || '').match(/openCaseLightbox\(['"]([^'"]+)['"]/);
+        if (m && caseLbImages.indexOf(m[1]) === -1) caseLbImages.push(m[1]);
+    });
+    if (caseLbImages.length === 0) caseLbImages = [src];
+    caseLbIndex = caseLbImages.indexOf(src);
+    if (caseLbIndex < 0) caseLbIndex = 0;
+    showCaseLbImage();
+    document.getElementById('caseLightbox').classList.add('active');
+}
+function showCaseLbImage() {
+    document.getElementById('caseLbImg').src = caseLbImages[caseLbIndex];
+    var c = document.getElementById('caseLbCounter');
+    if (caseLbImages.length > 1) {
+        c.textContent = (caseLbIndex + 1) + ' / ' + caseLbImages.length;
+        c.style.display = 'block';
+        document.querySelector('.case-lb-prev').style.display = 'block';
+        document.querySelector('.case-lb-next').style.display = 'block';
+    } else {
+        c.style.display = 'none';
+        document.querySelector('.case-lb-prev').style.display = 'none';
+        document.querySelector('.case-lb-next').style.display = 'none';
+    }
+}
+function caseLbNav(dir) {
+    caseLbIndex += dir;
+    if (caseLbIndex < 0) caseLbIndex = caseLbImages.length - 1;
+    if (caseLbIndex >= caseLbImages.length) caseLbIndex = 0;
+    showCaseLbImage();
+}
+function closeCaseLightbox() { document.getElementById('caseLightbox').classList.remove('active'); document.getElementById('caseLbImg').src=''; }
+function openFileModal(src, name) {
+    document.getElementById('fileModalTitle').textContent = name || '檔案';
+    document.getElementById('fileModalDownload').href = src;
+    document.getElementById('fileModalFrame').src = src;
+    document.getElementById('fileModal').classList.add('active');
+}
+function closeFileModal() {
+    document.getElementById('fileModal').classList.remove('active');
+    document.getElementById('fileModalFrame').src = '';
+}
+document.addEventListener('keydown', function(e) {
+    var o = document.getElementById('caseLightbox');
+    if (o && o.classList.contains('active')) {
+        if (e.key === 'Escape') closeCaseLightbox();
+        if (e.key === 'ArrowLeft') caseLbNav(-1);
+        if (e.key === 'ArrowRight') caseLbNav(1);
+        return;
+    }
+    var fm = document.getElementById('fileModal');
+    if (fm && fm.classList.contains('active') && e.key === 'Escape') closeFileModal();
+});
+(function() {
+    var sx=0, sy=0;
+    document.addEventListener('DOMContentLoaded', function() {
+        var o = document.getElementById('caseLightbox');
+        if (!o) return;
+        o.addEventListener('touchstart', function(e) { sx=e.changedTouches[0].screenX; sy=e.changedTouches[0].screenY; }, {passive:true});
+        o.addEventListener('touchend', function(e) {
+            var dx = e.changedTouches[0].screenX - sx;
+            var dy = e.changedTouches[0].screenY - sy;
+            if (Math.abs(dx) < 50 && Math.abs(dy) < 50) return;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) caseLbNav(-1); else caseLbNav(1);
+            } else {
+                closeCaseLightbox();
+            }
+        }, {passive:true});
+    });
+})();
+</script>
 <?php endif; ?>
 
 <!-- 預計使用線材與配件 -->

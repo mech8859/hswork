@@ -121,6 +121,7 @@ class FinanceModel
             '預收待查' => '預收待查',
             '保留款' => '保留款',
             '待收款' => '待收款',
+            '拋轉待確認' => '拋轉待確認',
             '已入帳' => '已入帳',
             '退款' => '退款',
             '取消' => '取消',
@@ -359,15 +360,17 @@ class FinanceModel
     {
         $number = $this->generateNumber('AR', 'receivables', 'invoice_number');
         $stmt = $this->db->prepare("
-            INSERT INTO receivables (invoice_number, invoice_date, case_id, customer_name, branch_id, sales_id,
+            INSERT INTO receivables (invoice_number, invoice_date, case_id, case_number, customer_no, customer_name, branch_id, sales_id,
                 invoice_category, status, invoice_title, tax_id, phone, mobile, invoice_email, invoice_address,
                 payment_method, payment_terms, subtotal, note, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
             $data['invoice_date'],
             !empty($data['case_id']) ? $data['case_id'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['sales_id']) ? $data['sales_id'] : null,
@@ -393,7 +396,7 @@ class FinanceModel
     {
         $stmt = $this->db->prepare("
             UPDATE receivables SET
-                invoice_date=?, case_id=?, customer_name=?, branch_id=?, sales_id=?,
+                invoice_date=?, case_id=?, case_number=?, customer_no=?, customer_name=?, branch_id=?, sales_id=?,
                 invoice_category=?, status=?, invoice_title=?, tax_id=?, phone=?, mobile=?,
                 invoice_email=?, invoice_address=?, payment_method=?, payment_terms=?,
                 subtotal=?, note=?, updated_by=?
@@ -402,6 +405,8 @@ class FinanceModel
         $stmt->execute(array(
             $data['invoice_date'],
             !empty($data['case_id']) ? $data['case_id'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['sales_id']) ? $data['sales_id'] : null,
@@ -542,9 +547,9 @@ class FinanceModel
         $number = $this->generateNumber('RC', 'receipts', 'receipt_number');
         $stmt = $this->db->prepare("
             INSERT INTO receipts (receipt_number, voucher_number, billing_number, register_date, deposit_date, customer_name, receivable_id,
-                case_id, sales_id, branch_id, subtotal, tax, discount, total_amount, receipt_method,
+                case_id, case_number, customer_no, sales_id, branch_id, subtotal, tax, discount, total_amount, receipt_method,
                 invoice_category, status, bank_ref, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
@@ -555,6 +560,8 @@ class FinanceModel
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['receivable_id']) ? $data['receivable_id'] : null,
             !empty($data['case_id']) ? $data['case_id'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['sales_id']) ? $data['sales_id'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -577,7 +584,7 @@ class FinanceModel
     {
         $stmt = $this->db->prepare("
             UPDATE receipts SET
-                voucher_number=?, billing_number=?, register_date=?, deposit_date=?, customer_name=?, receivable_id=?, case_id=?,
+                voucher_number=?, billing_number=?, register_date=?, deposit_date=?, customer_name=?, receivable_id=?, case_id=?, case_number=?, customer_no=?,
                 sales_id=?, branch_id=?, subtotal=?, tax=?, discount=?, total_amount=?,
                 receipt_method=?, invoice_category=?, status=?, bank_ref=?, note=?, registrar=?, updated_by=?
             WHERE id=?
@@ -590,6 +597,8 @@ class FinanceModel
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['receivable_id']) ? $data['receivable_id'] : null,
             !empty($data['case_id']) ? $data['case_id'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['sales_id']) ? $data['sales_id'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -703,14 +712,16 @@ class FinanceModel
     {
         $number = $this->generateNumber('AP', 'payables', 'payable_number');
         $stmt = $this->db->prepare("
-            INSERT INTO payables (payable_number, create_date, vendor_name, payment_period, payment_terms,
+            INSERT INTO payables (payable_number, create_date, vendor_name, case_number, customer_no, payment_period, payment_terms,
                 subtotal, tax, total_amount, prepaid, payable_amount, note, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -729,13 +740,15 @@ class FinanceModel
     {
         $stmt = $this->db->prepare("
             UPDATE payables SET
-                create_date=?, vendor_name=?, payment_period=?, payment_terms=?,
+                create_date=?, vendor_name=?, case_number=?, customer_no=?, payment_period=?, payment_terms=?,
                 subtotal=?, tax=?, total_amount=?, prepaid=?, payable_amount=?, note=?, updated_by=?
             WHERE id=?
         ");
         $stmt->execute(array(
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -948,10 +961,10 @@ class FinanceModel
     {
         $number = $this->generateNumber('PO', 'payments_out', 'payment_number');
         $stmt = $this->db->prepare("
-            INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name,
+            INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, case_number, customer_no,
                 payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
                 total_amount, main_category, sub_category, note, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
@@ -959,6 +972,8 @@ class FinanceModel
             !empty($data['payment_date']) ? $data['payment_date'] : null,
             !empty($data['payable_id']) ? $data['payable_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['payment_method']) ? $data['payment_method'] : null,
             !empty($data['payment_type']) ? $data['payment_type'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -980,7 +995,7 @@ class FinanceModel
     {
         $stmt = $this->db->prepare("
             UPDATE payments_out SET
-                create_date=?, payment_date=?, payable_id=?, vendor_name=?,
+                create_date=?, payment_date=?, payable_id=?, vendor_name=?, case_number=?, customer_no=?,
                 payment_method=?, payment_type=?, payment_terms=?, status=?,
                 subtotal=?, tax=?, remittance_fee=?, total_amount=?,
                 main_category=?, sub_category=?, note=?, updated_by=?
@@ -991,6 +1006,8 @@ class FinanceModel
             !empty($data['payment_date']) ? $data['payment_date'] : null,
             !empty($data['payable_id']) ? $data['payable_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+            !empty($data['case_number']) ? $data['case_number'] : null,
+            !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['payment_method']) ? $data['payment_method'] : null,
             !empty($data['payment_type']) ? $data['payment_type'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1491,9 +1508,10 @@ class FinanceModel
     public function getPettyCashById($id)
     {
         $stmt = $this->db->prepare("
-            SELECT pc.*, b.name AS branch_name
+            SELECT pc.*, b.name AS branch_name, u.real_name AS updater_name
             FROM petty_cash pc
             LEFT JOIN branches b ON pc.branch_id = b.id
+            LEFT JOIN users u ON pc.updated_by = u.id
             WHERE pc.id = ?
         ");
         $stmt->execute(array($id));
@@ -1511,7 +1529,7 @@ class FinanceModel
             UPDATE petty_cash SET
                 entry_date = ?, type = ?, income_amount = ?, expense_amount = ?,
                 has_invoice = ?, invoice_info = ?, description = ?, branch_id = ?,
-                registrar = ?, approval_status = ?, updated_at = NOW()
+                registrar = ?, approval_status = ?, updated_at = NOW(), updated_by = ?
             WHERE id = ?
         ");
         $stmt->execute(array(
@@ -1525,6 +1543,7 @@ class FinanceModel
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['registrar']) ? $data['registrar'] : null,
             !empty($data['approval_status']) ? $data['approval_status'] : null,
+            Auth::id(),
             $id,
         ));
         return $stmt->rowCount();

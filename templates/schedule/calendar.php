@@ -323,7 +323,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
              data-date="<?= $dateStr ?>" onclick="openMobileDay('<?= $dateStr ?>')">
             <div class="mg-daynum"><?= $day ?></div>
             <?php
-            $showMax = 3;
+            $showMax = 2;
             $shown = 0;
             foreach ($daySchedules as $ds):
                 if ($shown >= $showMax) break;
@@ -337,7 +337,10 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             <div class="mg-more">+<?= count($daySchedules) - $showMax ?></div>
             <?php endif; ?>
             <?php if (!empty($dayLeaves)): ?>
-            <div class="mg-leave-dot" title="有人休假"></div>
+            <div class="mg-leave-dot" title="有人休假：<?= e(implode('、', array_column($dayLeaves, 'real_name'))) ?>"></div>
+            <?php endif; ?>
+            <?php if ($ds_info['isOpen'] && in_array($ds_info['status'], array('open','partial','full'))): ?>
+            <div class="mg-status-tag mg-status-<?= $ds_info['status'] ?>"><?= $ds_info['statusLabel'] ?></div>
             <?php endif; ?>
         </div>
         <?php endfor; ?>
@@ -665,7 +668,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 /* 手機版月曆格子 */
 .mg-grid { display:grid; grid-template-columns:repeat(7,1fr); background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; width:100%; }
 .mg-dow { font-size:.75rem; color:var(--gray-500); padding:8px 0; text-align:center; font-weight:600; border-bottom:1px solid var(--gray-100); }
-.mg-cell { min-height:88px; padding:3px; border-bottom:1px solid var(--gray-100); cursor:pointer; position:relative; background:#fff; }
+.mg-cell { min-height:96px; padding:3px 3px 16px; border-bottom:1px solid var(--gray-100); cursor:pointer; position:relative; background:#fff; }
 .mg-cell:active { background:var(--gray-50); }
 .mg-empty { background:var(--gray-50); min-height:88px; }
 .mg-today { background:#e8f0fe; }
@@ -677,7 +680,12 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 .mg-bar-mine { background:#1565c0; }
 .mg-bar-done { background:#34a853; }
 .mg-more { font-size:.62rem; color:var(--gray-400); padding:0 3px; }
-.mg-leave-dot { position:absolute; top:3px; right:3px; width:7px; height:7px; border-radius:50%; background:#e65100; }
+.mg-leave-dot { position:absolute; top:1px; right:2px; font-size:.65rem; line-height:1; }
+.mg-leave-dot::before { content:'🏖️'; }
+.mg-status-tag { position:absolute; bottom:1px; left:2px; right:2px; font-size:.55rem; padding:1px 3px; border-radius:3px; text-align:center; line-height:1.2; }
+.mg-status-open { background:#e8f5e9; color:#2e7d32; }
+.mg-status-partial { background:#fff8e1; color:#e65100; }
+.mg-status-full { background:#ffebee; color:#c62828; }
 
 /* 手機日期詳情 overlay */
 .mday-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.4); z-index:1000; display:flex; align-items:flex-end; justify-content:center; }

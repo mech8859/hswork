@@ -449,7 +449,8 @@ function pivotRowTotal2($data, $months) {
 <!-- 六之一、每日帳務核對表 -->
 <?php if (!empty($analysis['daily_net'])): ?>
 <?php
-// 準備每日核對資料：前日銀行餘額 + 當日收款 - 當日付款 = 預期餘額，與實際銀行餘額比對
+// 準備每日核對資料：前日資金總和 + 當日收款 - 當日付款 = 預期餘額，與實際資金總和比對
+// 「資金總和」= 銀行 + 週轉金 + 零用金 + 備用金 + 現金
 $dailyCheck = $analysis['daily_net'];
 ksort($dailyCheck);
 $prevBank = null;
@@ -462,7 +463,7 @@ foreach ($dailyCheck as $date => $dd) {
     $dayPay = 0;
     foreach ($dPay as $v) $dayPay += $v;
     $dayNet = $dayRecv - $dayPay;
-    $actualBank = isset($dd['bank']) ? $dd['bank'] : null;
+    $actualBank = isset($dd['total_fund']) ? $dd['total_fund'] : (isset($dd['bank']) ? $dd['bank'] : null);
     $expected = null;
     $diff = null;
     if ($prevBank !== null) {
@@ -504,12 +505,12 @@ foreach ($dailyCheck as $date => $dd) {
         <table class="table table-sm analysis-table" id="checkTable">
             <thead><tr>
                 <th>日期</th>
-                <th>前日銀行餘額</th>
+                <th>前日資金總和</th>
                 <th>當日收款(入帳)</th>
                 <th>當日付款</th>
                 <th>收支淨額</th>
                 <th>預期餘額</th>
-                <th>實際銀行餘額</th>
+                <th>實際資金總和</th>
                 <th>差額</th>
             </tr></thead>
             <tbody>
@@ -531,7 +532,7 @@ foreach ($dailyCheck as $date => $dd) {
         </table>
     </div>
     <div style="padding:8px 16px;font-size:.75rem;color:#888;">
-        * 預期餘額 = 前日銀行餘額 + 當日收款 - 當日付款　｜　差額 = 實際銀行餘額 - 預期餘額　｜　差額不為 0 表示有其他異動（手續費、內部轉帳等）
+        * 資金總和 = 銀行 + 週轉金 + 零用金 + 備用金 + 現金　｜　預期餘額 = 前日資金總和 + 當日收款 - 當日付款　｜　差額 = 實際資金總和 - 預期餘額　｜　差額不為 0 表示有其他異動（手續費、內部轉帳、零用金備用金支出等）
     </div>
 </div>
 <?php endif; ?>
