@@ -244,7 +244,50 @@ function toggleNoPhoto(checked) {
 }
 function togglePaymentForm() {
     var f = document.getElementById('payment-add-form');
-    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    var willOpen = f.style.display === 'none';
+    f.style.display = willOpen ? 'block' : 'none';
+    if (willOpen) {
+        // 開啟新增表單時重置稅額手動標記
+        payTaxManual = false;
+    }
+}
+
+// 新增表單：未稅金額變更 → 自動算 5% 稅 + 總金額
+var payTaxManual = false;
+function onPayUntaxedChange() {
+    var u = parseFloat(document.getElementById('pay_untaxed_amount').value) || 0;
+    if (!payTaxManual) {
+        document.getElementById('pay_tax_amount').value = Math.round(u * 0.05);
+    }
+    calcPayTotal();
+}
+function onPayTaxChange() {
+    payTaxManual = true; // 用戶手動改過稅額後不再自動算
+    calcPayTotal();
+}
+function calcPayTotal() {
+    var u = parseFloat(document.getElementById('pay_untaxed_amount').value) || 0;
+    var t = parseFloat(document.getElementById('pay_tax_amount').value) || 0;
+    document.getElementById('pay_amount').value = u + t;
+}
+
+// 編輯 modal：同樣邏輯
+var pdTaxManual = false;
+function onPdUntaxedChange() {
+    var u = parseFloat(document.getElementById('pd_untaxed_amount').value) || 0;
+    if (!pdTaxManual) {
+        document.getElementById('pd_tax_amount').value = Math.round(u * 0.05);
+    }
+    calcPdTotal();
+}
+function onPdTaxChange() {
+    pdTaxManual = true;
+    calcPdTotal();
+}
+function calcPdTotal() {
+    var u = parseFloat(document.getElementById('pd_untaxed_amount').value) || 0;
+    var t = parseFloat(document.getElementById('pd_tax_amount').value) || 0;
+    document.getElementById('pd_amount').value = u + t;
 }
 
 function saveCasePayment() {
@@ -259,6 +302,9 @@ function saveCasePayment() {
     fd.append('payment_type', document.getElementById('pay_type').value);
     fd.append('transaction_type', document.getElementById('pay_method').value);
     fd.append('amount', amount);
+    fd.append('untaxed_amount', document.getElementById('pay_untaxed_amount').value || 0);
+    fd.append('tax_amount', document.getElementById('pay_tax_amount').value || 0);
+    fd.append('receipt_number', document.getElementById('pay_receipt_number').value);
     fd.append('note', document.getElementById('pay_note').value);
     var img = document.getElementById('pay_image');
     for (var fi = 0; fi < img.files.length; fi++) {
@@ -267,7 +313,23 @@ function saveCasePayment() {
 
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '/cases.php?action=add_payment');
-    xhr.onload = function() { location.reload(); };
+    xhr.onload = function() {
+        if (xhr.status !== 200) {
+            alert('儲存失敗 HTTP ' + xhr.status + '\n\n' + xhr.responseText.substring(0, 500));
+            return;
+        }
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.success) {
+                location.reload();
+            } else {
+                alert('儲存失敗：' + (res.error || '未知錯誤'));
+            }
+        } catch (e) {
+            alert('回應解析失敗：\n' + xhr.responseText.substring(0, 500));
+        }
+    };
+    xhr.onerror = function() { alert('網路錯誤'); };
     xhr.send(fd);
 }
 
@@ -640,6 +702,13 @@ function openPaymentDetail(id) {
         document.getElementById('pd_id').value = d.id;
         document.getElementById('pd_date').value = d.payment_date || '';
         document.getElementById('pd_amount').value = d.amount || 0;
+        document.getElementById('pd_untaxed_amount').value = d.untaxed_amount || 0;
+        document.getElementById('pd_tax_amount').value = d.tax_amount || 0;
+        // 開啟編輯時，若舊資料已有稅額（不等於未稅*5%），視為手動值
+        var u0 = parseFloat(d.untaxed_amount) || 0;
+        var t0 = parseFloat(d.tax_amount) || 0;
+        pdTaxManual = (t0 > 0 && Math.abs(t0 - Math.round(u0 * 0.05)) > 1);
+        document.getElementById('pd_receipt_number').value = d.receipt_number || '';
         document.getElementById('pd_note').value = d.note || '';
 
         // Set selects
@@ -696,6 +765,9 @@ function savePaymentEdit() {
     fd.append('payment_type', document.getElementById('pd_type').value);
     fd.append('transaction_type', document.getElementById('pd_method').value);
     fd.append('amount', document.getElementById('pd_amount').value);
+    fd.append('untaxed_amount', document.getElementById('pd_untaxed_amount').value || 0);
+    fd.append('tax_amount', document.getElementById('pd_tax_amount').value || 0);
+    fd.append('receipt_number', document.getElementById('pd_receipt_number').value);
     fd.append('note', document.getElementById('pd_note').value);
     var imgFiles = document.getElementById('pd_image').files;
     for (var fi = 0; fi < imgFiles.length; fi++) {

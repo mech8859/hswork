@@ -727,9 +727,13 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                     <label>帳款類別</label>
                     <select id="pay_type" class="form-control">
                         <option value="訂金">訂金</option>
+                        <option value="第一期款">第一期款</option>
+                        <option value="第二期款">第二期款</option>
+                        <option value="第三期款">第三期款</option>
                         <option value="尾款">尾款</option>
+                        <option value="保留款">保留款</option>
                         <option value="全款">全款</option>
-                        <option value="其他">其他</option>
+                        <option value="退款">退款</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -742,8 +746,20 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>金額 *</label>
+                    <label>未稅金額</label>
+                    <input type="number" id="pay_untaxed_amount" class="form-control" placeholder="0" oninput="onPayUntaxedChange()">
+                </div>
+                <div class="form-group">
+                    <label>稅額（5% 自動）</label>
+                    <input type="number" id="pay_tax_amount" class="form-control" placeholder="0" oninput="onPayTaxChange()">
+                </div>
+                <div class="form-group">
+                    <label>總金額 *</label>
                     <input type="number" id="pay_amount" class="form-control" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>收款單號</label>
+                    <input type="text" id="pay_receipt_number" class="form-control" placeholder="S2-...">
                 </div>
             </div>
             <div class="form-row">
@@ -768,14 +784,17 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         <?php else: ?>
         <div class="table-responsive">
             <table class="table" style="font-size:.9rem">
-                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">金額</th><th>備註</th><th style="width:50px">憑證</th><?php if (Auth::canEditSection('finance')): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
+                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">未稅</th><th class="text-right" style="width:70px">稅額</th><th class="text-right" style="width:90px">總金額</th><th style="width:120px">收款單號</th><th>備註</th><th style="width:50px">憑證</th><?php if (Auth::canEditSection('finance')): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
                 <tbody>
-                    <?php $payTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; ?>
+                    <?php $payTotal = 0; $payUntaxedTotal = 0; $payTaxTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; $payUntaxedTotal += isset($cp['untaxed_amount']) ? $cp['untaxed_amount'] : 0; $payTaxTotal += isset($cp['tax_amount']) ? $cp['tax_amount'] : 0; ?>
                     <tr style="cursor:pointer" onclick="openPaymentDetail(<?= $cp['id'] ?>)">
                         <td><?= e($cp['payment_date']) ?></td>
                         <td><span class="badge"><?= e($cp['payment_type'] ?: '-') ?></span></td>
                         <td><?= e($cp['transaction_type'] ?: '-') ?></td>
+                        <td class="text-right"><?= !empty($cp['untaxed_amount']) ? '$' . number_format($cp['untaxed_amount']) : '-' ?></td>
+                        <td class="text-right"><?= !empty($cp['tax_amount']) ? '$' . number_format($cp['tax_amount']) : '-' ?></td>
                         <td class="text-right" style="font-weight:600">$<?= number_format($cp['amount']) ?></td>
+                        <td style="font-size:.8rem;color:var(--primary)"><?= e($cp['receipt_number'] ?: '-') ?></td>
                         <td style="white-space:pre-line"><?= e($cp['note'] ?: '-') ?></td>
                         <td><?php
                             $cpImages = array();
@@ -795,7 +814,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td colspan="3"></td></tr></tfoot>
+                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right">$<?= number_format($payUntaxedTotal) ?></td><td class="text-right">$<?= number_format($payTaxTotal) ?></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td colspan="4"></td></tr></tfoot>
             </table>
         </div>
         <?php endif; ?>
@@ -1620,10 +1639,13 @@ var CASE_DATA = {
                     <select id="pd_type" class="form-control">
                         <option value="">--</option>
                         <option value="訂金">訂金</option>
+                        <option value="第一期款">第一期款</option>
+                        <option value="第二期款">第二期款</option>
+                        <option value="第三期款">第三期款</option>
                         <option value="尾款">尾款</option>
+                        <option value="保留款">保留款</option>
                         <option value="全款">全款</option>
-                        <option value="balance">尾款</option>
-                        <option value="其他">其他</option>
+                        <option value="退款">退款</option>
                     </select>
                 </div>
             </div>
@@ -1640,8 +1662,22 @@ var CASE_DATA = {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>金額 *</label>
+                    <label>未稅金額</label>
+                    <input type="number" id="pd_untaxed_amount" class="form-control" oninput="onPdUntaxedChange()">
+                </div>
+                <div class="form-group">
+                    <label>稅額（5% 自動）</label>
+                    <input type="number" id="pd_tax_amount" class="form-control" oninput="onPdTaxChange()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>總金額 *</label>
                     <input type="number" id="pd_amount" class="form-control">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label>收款單號</label>
+                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-...">
                 </div>
             </div>
             <div class="form-group">
@@ -2486,10 +2522,13 @@ function saveNewCustomer() {
                     <select id="pd_type" class="form-control">
                         <option value="">--</option>
                         <option value="訂金">訂金</option>
+                        <option value="第一期款">第一期款</option>
+                        <option value="第二期款">第二期款</option>
+                        <option value="第三期款">第三期款</option>
                         <option value="尾款">尾款</option>
+                        <option value="保留款">保留款</option>
                         <option value="全款">全款</option>
-                        <option value="balance">尾款</option>
-                        <option value="其他">其他</option>
+                        <option value="退款">退款</option>
                     </select>
                 </div>
             </div>
@@ -2506,8 +2545,22 @@ function saveNewCustomer() {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>金額 *</label>
+                    <label>未稅金額</label>
+                    <input type="number" id="pd_untaxed_amount" class="form-control" oninput="onPdUntaxedChange()">
+                </div>
+                <div class="form-group">
+                    <label>稅額（5% 自動）</label>
+                    <input type="number" id="pd_tax_amount" class="form-control" oninput="onPdTaxChange()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>總金額 *</label>
                     <input type="number" id="pd_amount" class="form-control">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label>收款單號</label>
+                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-...">
                 </div>
             </div>
             <div class="form-group">

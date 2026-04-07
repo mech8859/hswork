@@ -255,10 +255,22 @@ switch ($action) {
     case 'add_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        try {
         $caseId = (int)($_POST['case_id'] ?? 0);
-        $stmt = Database::getInstance()->prepare('INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute(array($caseId, $_POST['payment_date'] ?? '', $_POST['payment_type'] ?? '', $_POST['transaction_type'] ?? '', (int)($_POST['amount'] ?? 0), $_POST['note'] ?? '', Auth::id()));
-        $newId = (int)Database::getInstance()->lastInsertId();
+        $payDate = $_POST['payment_date'] ?? '';
+        $payType = $_POST['payment_type'] ?? '';
+        $payMethod = $_POST['transaction_type'] ?? '';
+        $payAmount = (int)($_POST['amount'] ?? 0);
+        $payUntaxed = (int)($_POST['untaxed_amount'] ?? 0);
+        $payTax = (int)($_POST['tax_amount'] ?? 0);
+        $payNote = $_POST['note'] ?? '';
+        $payReceiptNo = $_POST['receipt_number'] ?? null;
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, untaxed_amount, tax_amount, receipt_number, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array($caseId, $payDate, $payType, $payMethod, $payAmount, $payUntaxed, $payTax, $payReceiptNo, $payNote, Auth::id()));
+        $newId = (int)$db->lastInsertId();
+
         // Handle images
         if (!empty($_FILES['images']['name'][0])) {
             $imgPaths = array();
@@ -271,24 +283,98 @@ switch ($action) {
                 $imgPaths[] = 'uploads/cases/' . $caseId . '/' . $fname;
             }
             if ($imgPaths) {
-                Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($imgPaths), $newId));
+                $db->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($imgPaths), $newId));
             }
         }
+
+        // 自動建立收款單（拋轉待確認）— 若使用者沒有手動填收款單號才建立
+        $generatedReceiptNo = null;
+        if (empty($payReceiptNo)) {
+            try {
+                $caseStmt = $db->prepare('SELECT case_number, customer_id, customer_no, customer_name, sales_id, branch_id FROM cases WHERE id = ?');
+                $caseStmt->execute(array($caseId));
+                $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
+                if ($caseRow) {
+                    require_once __DIR__ . '/../modules/finance/FinanceModel.php';
+                    $finModel = new FinanceModel();
+                    $receiptData = array(
+                        'register_date'    => $payDate,
+                        'deposit_date'     => $payDate,
+                        'customer_name'    => $caseRow['customer_name'],
+                        'case_id'          => $caseId,
+                        'case_number'      => $caseRow['case_number'],
+                        'customer_no'      => $caseRow['customer_no'],
+                        'sales_id'         => $caseRow['sales_id'],
+                        'branch_id'        => $caseRow['branch_id'],
+                        'receipt_method'   => $payMethod,
+                        'invoice_category' => $payType,
+                        'status'           => '拋轉待確認',
+                        'bank_ref'         => null,
+                        'subtotal'         => $payUntaxed,
+                        'tax'              => $payTax,
+                        'discount'         => 0,
+                        'total_amount'     => $payAmount,
+                        'note'             => '案件帳款自動產生 - ' . $payType . ($payNote ? ' / ' . $payNote : ''),
+                        'created_by'       => Auth::id(),
+                    );
+                    $receiptId = $finModel->createReceipt($receiptData);
+                    // 取得新建收款單的單號
+                    $rn = $db->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
+                    $rn->execute(array($receiptId));
+                    $generatedReceiptNo = $rn->fetchColumn();
+                    if ($generatedReceiptNo) {
+                        // 回寫至案件帳款交易
+                        $db->prepare('UPDATE case_payments SET receipt_number = ? WHERE id = ?')
+                           ->execute(array($generatedReceiptNo, $newId));
+                    }
+                }
+            } catch (Exception $e) {
+                // 收款單建立失敗不影響帳款交易，記錯誤
+                error_log('auto create receipt failed: ' . $e->getMessage());
+            }
+        }
+
         updateTotalCollected($caseId);
-        echo json_encode(array('success' => true));
+        echo json_encode(array('success' => true, 'receipt_number' => $generatedReceiptNo));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+        }
         break;
 
     // ---- AJAX: 編輯帳款交易 ----
     case 'edit_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        try {
         $pid = (int)($_POST['payment_id'] ?? 0);
-        $stmt = Database::getInstance()->prepare('SELECT * FROM case_payments WHERE id = ?');
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM case_payments WHERE id = ?');
         $stmt->execute(array($pid));
         $pay = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$pay) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
-        Database::getInstance()->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, note=? WHERE id=?')
-            ->execute(array($_POST['payment_date'] ?? '', $_POST['payment_type'] ?? '', $_POST['transaction_type'] ?? '', (int)($_POST['amount'] ?? 0), $_POST['note'] ?? '', $pid));
+
+        $newDate = $_POST['payment_date'] ?? '';
+        $newType = $_POST['payment_type'] ?? '';
+        $newMethod = $_POST['transaction_type'] ?? '';
+        $newAmount = (int)($_POST['amount'] ?? 0);
+        $newUntaxed = (int)($_POST['untaxed_amount'] ?? 0);
+        $newTax = (int)($_POST['tax_amount'] ?? 0);
+        $newReceiptNo = $_POST['receipt_number'] ?? null;
+        $newNote = $_POST['note'] ?? '';
+
+        $db->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, receipt_number=?, note=? WHERE id=?')
+            ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newReceiptNo, $newNote, $pid));
+
+        // 同步更新對應的收款單（若有 receipt_number）
+        if (!empty($newReceiptNo)) {
+            try {
+                $db->prepare("UPDATE receipts SET register_date=?, deposit_date=?, receipt_method=?, invoice_category=?, subtotal=?, tax=?, total_amount=?, note=CONCAT('案件帳款自動產生 - ', ?, ?) WHERE receipt_number=?")
+                   ->execute(array($newDate, $newDate, $newMethod, $newType, $newUntaxed, $newTax, $newAmount, $newType, $newNote ? ' / ' . $newNote : '', $newReceiptNo));
+            } catch (Exception $e) {
+                error_log('sync receipt failed: ' . $e->getMessage());
+            }
+        }
+
         // Handle new images
         if (!empty($_FILES['images']['name'][0])) {
             $existing = $pay['image_path'] ? json_decode($pay['image_path'], true) : array();
@@ -301,10 +387,13 @@ switch ($action) {
                 move_uploaded_file($tmp, $dir . '/' . $fname);
                 $existing[] = 'uploads/cases/' . $pay['case_id'] . '/' . $fname;
             }
-            Database::getInstance()->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($existing), $pid));
+            $db->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($existing), $pid));
         }
         updateTotalCollected((int)$pay['case_id']);
         echo json_encode(array('success' => true));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+        }
         break;
 
     // ---- AJAX: 刪除帳款交易 ----

@@ -133,6 +133,40 @@ switch ($action) {
             if (isset($_POST['items'])) {
                 $model->saveReceiptItems($id, $_POST['items']);
             }
+
+            // 同步更新對應的案件帳款交易（用 receipt_number 反查）
+            try {
+                $rnStmt = Database::getInstance()->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
+                $rnStmt->execute(array($id));
+                $rNum = $rnStmt->fetchColumn();
+                if ($rNum) {
+                    Database::getInstance()->prepare("UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=? WHERE receipt_number=?")
+                       ->execute(array(
+                           $data['register_date'],
+                           $data['invoice_category'],
+                           $data['receipt_method'],
+                           (int)$data['total_amount'],
+                           (int)$data['subtotal'],
+                           (int)$data['tax'],
+                           $rNum,
+                       ));
+                    // 同步後重算對應案件的總收款
+                    $caseStmt = Database::getInstance()->prepare('SELECT DISTINCT case_id FROM case_payments WHERE receipt_number = ?');
+                    $caseStmt->execute(array($rNum));
+                    foreach ($caseStmt->fetchAll(PDO::FETCH_COLUMN) as $cid) {
+                        if ($cid) {
+                            // 直接呼叫 case 模組的 updateTotalCollected
+                            $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0) FROM case_payments WHERE case_id = ?");
+                            $totalStmt->execute(array($cid));
+                            $cTotal = (int)$totalStmt->fetchColumn();
+                            Database::getInstance()->prepare("UPDATE cases SET total_collected = ? WHERE id = ?")->execute(array($cTotal, $cid));
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('sync case_payment from receipt failed: ' . $e->getMessage());
+            }
+
             AuditLog::log('receipts', 'update', $id, '更新收款單');
 
             // 通知分派：狀態變更時依規則通知
