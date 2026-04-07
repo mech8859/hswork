@@ -68,9 +68,21 @@
             </div>
             <div class="form-group">
                 <label>登記人</label>
-                <?php $regName = ($isEdit && !empty($record['registrar'])) ? $record['registrar'] : (Session::getUser()['real_name'] ?? ''); ?>
+                <?php
+                $regName = '';
+                if ($isEdit) {
+                    if (!empty($record['registrar'])) {
+                        $regName = $record['registrar'];
+                    } elseif (!empty($record['created_by'])) {
+                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                        $cuStmt->execute(array($record['created_by']));
+                        $regName = $cuStmt->fetchColumn() ?: '';
+                    }
+                } else {
+                    $regName = Session::getUser()['real_name'] ?? '';
+                }
+                ?>
                 <input type="text" class="form-control" value="<?= e($regName) ?>" readonly style="background:#f5f5f5">
-                <input type="hidden" name="registrar" value="<?= e($regName) ?>">
                 <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
             </div>
         </div>
@@ -131,7 +143,8 @@
             <div class="form-group">
                 <label>稅金 (5%)</label>
                 <input type="number" name="tax" id="fldTax" class="form-control" step="1" min="0"
-                       value="<?= $isEdit && !empty($record['tax']) ? (int)$record['tax'] : 0 ?>" readonly>
+                       value="<?= $isEdit && !empty($record['tax']) ? (int)$record['tax'] : 0 ?>"
+                       oninput="onTaxManual()" title="預設依未稅總額×5%自動帶入，可手動修改">
             </div>
             <div class="form-group">
                 <label>總計</label>
@@ -383,16 +396,27 @@
 
 <script>
 // ---- 金額自動計算 ----
+// 稅額預設依未稅總額×5%自動帶入；使用者手動修改後不再覆寫
+// 若已存檔的稅額與 subtotal*5% 不符，視為手動修改過
+var taxManualEdited = <?= ($isEdit && !empty($record['subtotal']) && isset($record['tax']) && (int)$record['tax'] !== (int)round((int)$record['subtotal'] * 0.05)) ? 'true' : 'false' ?>;
+function onTaxManual() {
+    taxManualEdited = true;
+    recalcTotal();
+}
 function calcAmounts() {
     var subtotal = parseInt(document.getElementById('fldSubtotal').value) || 0;
-    var tax = Math.round(subtotal * 0.05);
+    if (!taxManualEdited) {
+        document.getElementById('fldTax').value = Math.round(subtotal * 0.05);
+    }
+    recalcTotal();
+}
+function recalcTotal() {
+    var subtotal = parseInt(document.getElementById('fldSubtotal').value) || 0;
+    var tax = parseInt(document.getElementById('fldTax').value) || 0;
     var total = subtotal + tax;
     var prepaid = parseInt(document.getElementById('fldPrepaid').value) || 0;
-    var payable = total - prepaid;
-
-    document.getElementById('fldTax').value = tax;
     document.getElementById('fldTotal').value = total;
-    document.getElementById('fldPayable').value = payable;
+    document.getElementById('fldPayable').value = total - prepaid;
 }
 
 // ---- 分公司拆帳 動態列 ----

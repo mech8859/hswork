@@ -584,6 +584,62 @@ switch ($action) {
         echo json_encode($customers);
         break;
 
+    // ---- AJAX: 依統一編號查詢可關聯客戶與相同統編案件 ----
+    case 'ajax_lookup_by_tax_id':
+        header('Content-Type: application/json');
+        $taxId = trim($_GET['tax_id'] ?? '');
+        $excludeCaseId = (int)($_GET['exclude_case_id'] ?? 0);
+        if ($taxId === '') { echo json_encode(array('customers' => array(), 'cases' => array())); break; }
+        $db = Database::getInstance();
+        // 1) 客戶資料中統編相同者
+        $cs = $db->prepare("SELECT id, customer_no, name, phone, mobile, tax_id, site_address, contact_person, line_official, source_company, is_blacklisted, blacklist_reason FROM customers WHERE tax_id = ? ORDER BY customer_no LIMIT 30");
+        $cs->execute(array($taxId));
+        $customers = $cs->fetchAll(PDO::FETCH_ASSOC);
+        // 帶聯絡人（給 selectCustomer 使用）
+        foreach ($customers as &$c) {
+            $cts = $db->prepare('SELECT contact_name, phone, role FROM customer_contacts WHERE customer_id = ? LIMIT 5');
+            $cts->execute(array($c['id']));
+            $c['contacts'] = $cts->fetchAll(PDO::FETCH_ASSOC);
+        }
+        unset($c);
+        // 2) 其他案件中相同統編者（含其已關聯之客戶）
+        $sql = "SELECT c.id, c.case_number, c.title, c.customer_name, c.customer_id, c.billing_title, c.billing_tax_id,
+                       c.sub_status, c.status, c.created_at,
+                       cu.customer_no AS linked_customer_no, cu.name AS linked_customer_name
+                FROM cases c
+                LEFT JOIN customers cu ON c.customer_id = cu.id
+                WHERE c.billing_tax_id = ?";
+        $params = array($taxId);
+        if ($excludeCaseId > 0) { $sql .= " AND c.id <> ?"; $params[] = $excludeCaseId; }
+        $sql .= " ORDER BY c.created_at DESC LIMIT 50";
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        $cases = $st->fetchAll(PDO::FETCH_ASSOC);
+        // 補齊：案件中已關聯的客戶若不在 customers 清單則加入（例如客戶 tax_id 為空但案件 billing_tax_id 已填）
+        $known = array();
+        foreach ($customers as $cc) { $known[(int)$cc['id']] = true; }
+        $extraIds = array();
+        foreach ($cases as $kc) {
+            $cid = (int)($kc['customer_id'] ?? 0);
+            if ($cid > 0 && empty($known[$cid])) { $extraIds[$cid] = true; $known[$cid] = true; }
+        }
+        if (!empty($extraIds)) {
+            $idList = array_keys($extraIds);
+            $place = implode(',', array_fill(0, count($idList), '?'));
+            $eq = $db->prepare("SELECT id, customer_no, name, phone, mobile, tax_id, site_address, contact_person, line_official, source_company, is_blacklisted, blacklist_reason FROM customers WHERE id IN ($place)");
+            $eq->execute($idList);
+            $extras = $eq->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($extras as &$ec) {
+                $cts = $db->prepare('SELECT contact_name, phone, role FROM customer_contacts WHERE customer_id = ? LIMIT 5');
+                $cts->execute(array($ec['id']));
+                $ec['contacts'] = $cts->fetchAll(PDO::FETCH_ASSOC);
+            }
+            unset($ec);
+            $customers = array_merge($customers, $extras);
+        }
+        echo json_encode(array('customers' => $customers, 'cases' => $cases));
+        break;
+
     // ---- AJAX: 快速新增客戶 ----
     case 'ajax_create_customer':
         header('Content-Type: application/json');

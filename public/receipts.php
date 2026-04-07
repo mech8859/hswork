@@ -66,6 +66,7 @@ switch ($action) {
                 'discount'         => !empty($_POST['discount']) ? $_POST['discount'] : 0,
                 'total_amount'     => !empty($_POST['total_amount']) ? $_POST['total_amount'] : 0,
                 'note'             => !empty($_POST['note']) ? $_POST['note'] : null,
+                'registrar'        => Session::getUser()['real_name'] ?? null,
                 'created_by'       => $userId,
             );
             $receiptId = $model->createReceipt($data);

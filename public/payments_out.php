@@ -64,6 +64,7 @@ switch ($action) {
                 'remittance_fee' => !empty($_POST['remittance_fee']) ? $_POST['remittance_fee'] : 0,
                 'total_amount'   => !empty($_POST['total_amount']) ? $_POST['total_amount'] : 0,
                 'note'           => !empty($_POST['note']) ? $_POST['note'] : null,
+                'registrar'      => isset($user['real_name']) ? $user['real_name'] : null,
                 'created_by'     => $user['id'],
                 'updated_by'     => $user['id'],
             );

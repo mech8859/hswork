@@ -266,9 +266,21 @@ $paymentTermsOptions = FinanceModel::paymentTermsOptions();
             </div>
             <div class="form-group" style="flex:1">
                 <label>登記人</label>
-                <?php $regName = ($isEdit && !empty($record['registrar'])) ? $record['registrar'] : (Session::getUser()['real_name'] ?? ''); ?>
+                <?php
+                $regName = '';
+                if ($isEdit) {
+                    if (!empty($record['registrar'])) {
+                        $regName = $record['registrar'];
+                    } elseif (!empty($record['created_by'])) {
+                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                        $cuStmt->execute(array($record['created_by']));
+                        $regName = $cuStmt->fetchColumn() ?: '';
+                    }
+                } else {
+                    $regName = Session::getUser()['real_name'] ?? '';
+                }
+                ?>
                 <input type="text" class="form-control" value="<?= e($regName) ?>" readonly style="background:#f5f5f5">
-                <input type="hidden" name="registrar" value="<?= e($regName) ?>">
                 <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
             </div>
         </div>

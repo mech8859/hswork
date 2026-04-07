@@ -138,14 +138,19 @@
                 <label>登記人</label>
                 <?php
                 $registrarName = '';
-                if ($isEdit && !empty($record['registrar'])) {
-                    $registrarName = $record['registrar'];
+                if ($isEdit) {
+                    if (!empty($record['registrar'])) {
+                        $registrarName = $record['registrar'];
+                    } elseif (!empty($record['created_by'])) {
+                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                        $cuStmt->execute(array($record['created_by']));
+                        $registrarName = $cuStmt->fetchColumn() ?: '';
+                    }
                 } else {
                     $registrarName = Session::getUser()['real_name'] ?? '';
                 }
                 ?>
                 <input type="text" class="form-control" value="<?= e($registrarName) ?>" readonly style="background:#f5f5f5">
-                <input type="hidden" name="registrar" value="<?= e($registrarName) ?>">
                 <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
             </div>
         </div>

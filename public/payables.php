@@ -59,6 +59,7 @@ switch ($action) {
                 'prepaid'        => !empty($_POST['prepaid']) ? $_POST['prepaid'] : 0,
                 'payable_amount' => !empty($_POST['payable_amount']) ? $_POST['payable_amount'] : 0,
                 'note'           => !empty($_POST['note']) ? $_POST['note'] : null,
+                'registrar'      => Session::getUser()['real_name'] ?? null,
                 'created_by'     => $userId,
             );
 

@@ -115,14 +115,19 @@
                 <label>登記人</label>
                 <?php
                 $registrarName = '';
-                if ($isEdit && !empty($record['registrar'])) {
-                    $registrarName = $record['registrar'];
+                if ($isEdit) {
+                    if (!empty($record['registrar'])) {
+                        $registrarName = $record['registrar'];
+                    } elseif (!empty($record['created_by'])) {
+                        $cuStmt = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                        $cuStmt->execute(array($record['created_by']));
+                        $registrarName = $cuStmt->fetchColumn() ?: '';
+                    }
                 } else {
                     $registrarName = Session::getUser()['real_name'] ?? '';
                 }
                 ?>
                 <input type="text" class="form-control" value="<?= e($registrarName) ?>" readonly style="background:#f5f5f5">
-                <input type="hidden" name="registrar" value="<?= e($registrarName) ?>">
                 <small class="text-muted"><?= $isEdit && !empty($record['created_at']) ? date('Y/m/d H:i', strtotime($record['created_at'])) : date('Y/m/d H:i') ?></small>
             </div>
         </div>
@@ -160,7 +165,7 @@
             </div>
             <div class="form-group">
                 <label>稅額 (5%)</label>
-                <input type="number" name="tax" id="tax" class="form-control" value="<?= !empty($record['tax']) ? (int)$record['tax'] : 0 ?>" readonly>
+                <input type="number" name="tax" id="tax" class="form-control" value="<?= !empty($record['tax']) ? (int)$record['tax'] : 0 ?>" min="0" oninput="onTaxManual()" title="預設依小計×5%自動帶入，可手動修改">
             </div>
         </div>
         <div class="form-row">
@@ -304,11 +309,23 @@ function updateSubCategory() {
 updateSubCategory();
 
 // ---- 金額自動計算 ----
+// 稅額預設依小計×5%自動帶入；使用者手動修改後不再覆寫
+var taxManualEdited = <?= ($isEdit && !empty($record['subtotal']) && !empty($record['tax']) && (int)$record['tax'] !== (int)round((int)$record['subtotal'] * 0.05)) ? 'true' : 'false' ?>;
+function onTaxManual() {
+    taxManualEdited = true;
+    recalcTotal();
+}
 function calcAmounts() {
     var subtotal = parseInt(document.getElementById('subtotal').value) || 0;
+    if (!taxManualEdited) {
+        document.getElementById('tax').value = Math.round(subtotal * 0.05);
+    }
+    recalcTotal();
+}
+function recalcTotal() {
+    var subtotal = parseInt(document.getElementById('subtotal').value) || 0;
+    var tax = parseInt(document.getElementById('tax').value) || 0;
     var remittanceFee = parseInt(document.getElementById('remittanceFee').value) || 0;
-    var tax = Math.round(subtotal * 0.05);
-    document.getElementById('tax').value = tax;
     document.getElementById('totalAmount').value = subtotal + tax + remittanceFee;
 }
 calcAmounts();

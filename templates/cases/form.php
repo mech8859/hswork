@@ -113,6 +113,8 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <div id="customerDropdown" class="customer-dropdown" style="display:none"></div>
                 <?php if ($case && !empty($case['customer_id'])): ?>
                 <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"><a href="customers.php?action=view&id=<?= e($case['customer_id']) ?>" style="color:#007bff;text-decoration:underline;cursor:pointer">已關聯客戶 #<?= e($case['customer_id']) ?></a></small>
+                <?php else: ?>
+                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"></small>
                 <?php endif; ?>
             </div>
             <div class="form-group" style="flex:0 0 160px">
@@ -889,7 +891,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             </div>
             <div class="form-group">
                 <label>統一編號</label>
-                <input type="text" name="billing_tax_id" class="form-control" value="<?= e($case['billing_tax_id'] ?? '') ?>" placeholder="8碼統編">
+                <input type="text" name="billing_tax_id" id="billingTaxIdInput" class="form-control" value="<?= e($case['billing_tax_id'] ?? '') ?>" placeholder="8碼統編">
             </div>
         </div>
 
@@ -1649,7 +1651,7 @@ var CASE_DATA = {
 };
 </script>
 <script src="/js/tw_districts.js"></script>
-<script src="/js/cases-form.js?v=20260405g"></script>
+<script src="/js/cases-form.js?v=20260407a"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">
@@ -1685,6 +1687,22 @@ var CASE_DATA = {
         <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="closeNewCustomerModal()">取消</button>
             <button type="button" class="btn btn-primary" onclick="saveNewCustomer()">建立客戶</button>
+        </div>
+    </div>
+</div>
+
+<!-- 統編關聯客戶 Modal -->
+<div id="taxIdLinkModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeTaxIdLinkModal()">
+    <div class="modal-content" style="max-width:760px">
+        <div class="modal-header">
+            <h3 style="margin:0">設定關聯客戶（依統一編號）</h3>
+            <button type="button" onclick="closeTaxIdLinkModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="taxIdLinkBody" style="font-size:.88rem">載入中...</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeTaxIdLinkModal()">關閉</button>
         </div>
     </div>
 </div>
@@ -2430,6 +2448,180 @@ document.addEventListener('click', function(e) {
 });
 
 // 清除客戶關聯已整合到 onCustomerKeyup
+
+// ===== 統編關聯客戶建議 =====
+// 條件：案件尚未關聯客戶 (customer_id 為空)，且填有統一編號，
+// 而客戶資料中或其他案件已使用同一統編 → 在客戶名稱下方顯示「設定關聯客戶」提示。
+var taxIdLookupCache = { taxId: null, data: null };
+function checkTaxIdLink() {
+    var cidEl = document.getElementById('customerId');
+    var taxEl = document.getElementById('billingTaxIdInput');
+    var info = document.getElementById('customerInfo');
+    console.log('[taxlink] check', {cid: cidEl && cidEl.value, tax: taxEl && taxEl.value, hasInfo: !!info});
+    if (!cidEl || !taxEl) return;
+    // 確保有 customerInfo 容器；沒有就建立
+    if (!info) {
+        var nameInp = document.getElementById('customerNameInput');
+        if (nameInp && nameInp.parentNode) {
+            info = document.createElement('small');
+            info.id = 'customerInfo';
+            info.className = 'text-muted';
+            info.style.cssText = 'position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2';
+            nameInp.parentNode.appendChild(info);
+        } else {
+            return;
+        }
+    }
+    // 已有關聯客戶 → 不需要顯示建議（"0" 視為空）
+    var cidVal = (cidEl.value || '').trim();
+    if (cidVal && cidVal !== '0') return;
+    var taxId = (taxEl.value || '').trim();
+    if (!taxId) {
+        if (info.getAttribute('data-suggest') === '1') {
+            info.innerHTML = '';
+            info.removeAttribute('data-suggest');
+        }
+        return;
+    }
+    if (taxIdLookupCache.taxId === taxId && taxIdLookupCache.data) {
+        renderTaxIdSuggest(taxIdLookupCache.data);
+        return;
+    }
+    var caseId = '<?= $case ? (int)$case['id'] : 0 ?>';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/cases.php?action=ajax_lookup_by_tax_id&tax_id=' + encodeURIComponent(taxId) + '&exclude_case_id=' + caseId);
+    xhr.onload = function() {
+        console.log('[taxlink] ajax', xhr.status, xhr.responseText.substring(0, 200));
+        try {
+            var data = JSON.parse(xhr.responseText);
+            taxIdLookupCache = { taxId: taxId, data: data };
+            renderTaxIdSuggest(data);
+        } catch (e) { console.error('[taxlink] parse', e); }
+    };
+    xhr.onerror = function() { console.error('[taxlink] xhr error'); };
+    xhr.send();
+}
+function renderTaxIdSuggest(data) {
+    var info = document.getElementById('customerInfo');
+    if (!info) return;
+    var nCust = (data.customers || []).length;
+    var nCases = (data.cases || []).length;
+    if (nCust === 0 && nCases === 0) {
+        if (info.getAttribute('data-suggest') === '1') {
+            info.innerHTML = '';
+            info.removeAttribute('data-suggest');
+        }
+        return;
+    }
+    info.setAttribute('data-suggest', '1');
+    var label = '🔗 設定關聯客戶（找到 ' + nCust + ' 位相同統編客戶' + (nCases > 0 ? '，已用於 ' + nCases + ' 筆案件' : '') + '）';
+    info.innerHTML = '<a href="javascript:void(0)" onclick="openTaxIdLinkModal()" style="color:#e65100;text-decoration:underline;font-weight:600;cursor:pointer">' + label + '</a>';
+}
+function openTaxIdLinkModal() {
+    var data = taxIdLookupCache.data;
+    var body = document.getElementById('taxIdLinkBody');
+    if (!data) { body.textContent = '請先輸入統一編號'; }
+    else { body.innerHTML = buildTaxIdLinkHtml(data); }
+    document.getElementById('taxIdLinkModal').style.display = 'flex';
+}
+function closeTaxIdLinkModal() {
+    document.getElementById('taxIdLinkModal').style.display = 'none';
+}
+function buildTaxIdLinkHtml(data) {
+    var customers = data.customers || [];
+    var cases = data.cases || [];
+    // 統計每位客戶在相同統編案件中已被使用的次數
+    var caseCount = {};
+    var caseSamples = {};
+    var unlinkedCases = [];
+    for (var j = 0; j < cases.length; j++) {
+        var k = cases[j];
+        var cid = +k.customer_id;
+        if (cid > 0) {
+            caseCount[cid] = (caseCount[cid] || 0) + 1;
+            if (!caseSamples[cid]) caseSamples[cid] = [];
+            if (caseSamples[cid].length < 3) caseSamples[cid].push(k.case_number);
+        } else {
+            unlinkedCases.push(k);
+        }
+    }
+    var html = '';
+    if (customers.length === 0) {
+        html += '<div style="padding:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:.85rem">客戶資料中沒有此統編。請按「+ 新增客戶」建立。</div>';
+    } else {
+        html += '<div style="font-weight:600;margin-bottom:6px">找到 ' + customers.length + ' 位相同統編客戶，請選擇要關聯的客戶</div>';
+        html += '<div style="border:1px solid #e0e0e0;border-radius:6px;overflow:hidden">';
+        for (var i = 0; i < customers.length; i++) {
+            var c = customers[i];
+            var blacklist = c.is_blacklisted == 1 ? '<span style="background:#e53e3e;color:#fff;padding:1px 6px;border-radius:3px;font-size:.7em;margin-left:4px">⚠ 黑名單</span>' : '';
+            var cnt = caseCount[+c.id] || 0;
+            var caseBadge = cnt > 0
+                ? '<span style="background:#e3f2fd;color:#1565c0;padding:1px 8px;border-radius:10px;font-size:.72rem;margin-left:6px">已用於 ' + cnt + ' 筆案件' + (caseSamples[+c.id] ? '（' + caseSamples[+c.id].join('、') + (cnt > 3 ? '…' : '') + '）' : '') + '</span>'
+                : '<span style="background:#f5f5f5;color:#999;padding:1px 8px;border-radius:10px;font-size:.72rem;margin-left:6px">尚未用於其他案件</span>';
+            html += '<div style="padding:10px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div style="font-weight:600">' + escHtml(c.name) + blacklist + caseBadge + '</div>' +
+                    '<div style="font-size:.78rem;color:#888;margin-top:2px">' +
+                        (c.customer_no ? '客戶編號:' + escHtml(c.customer_no) + '　' : '') +
+                        (c.tax_id ? '統編:' + escHtml(c.tax_id) + '　' : '') +
+                        (c.phone ? '電話:' + escHtml(c.phone) + '　' : '') +
+                        (c.contact_person ? '聯絡人:' + escHtml(c.contact_person) : '') +
+                    '</div>' +
+                '</div>' +
+                '<button type="button" class="btn btn-primary btn-sm" style="white-space:nowrap;margin-left:10px" onclick=\'linkCustomerFromTaxId(' + JSON.stringify(c).replace(/'/g, "&#39;") + ')\'>關聯此客戶</button>' +
+            '</div>';
+        }
+        html += '</div>';
+    }
+    if (unlinkedCases.length > 0) {
+        html += '<div style="margin-top:12px;padding:8px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:.8rem;color:#666">另有 ' + unlinkedCases.length + ' 筆相同統編案件尚未關聯客戶：' +
+            unlinkedCases.slice(0, 5).map(function(x){ return escHtml(x.case_number); }).join('、') +
+            (unlinkedCases.length > 5 ? '…' : '') + '</div>';
+    }
+    return html;
+}
+// 只關聯客戶（設定 customer_id + 帶入客戶編號），不覆蓋案件其他欄位
+function linkCustomerOnly(c) {
+    if (!c || !c.id) return;
+    if (c.is_blacklisted == 1) {
+        var reason = c.blacklist_reason ? '\n原因：' + c.blacklist_reason : '';
+        if (!confirm('⚠️ 警告：此客戶已列入黑名單！' + reason + '\n\n確定要關聯此客戶嗎？')) return;
+    }
+    document.getElementById('customerId').value = c.id;
+    var noDisp = document.getElementById('customerNoDisplay');
+    if (noDisp) noDisp.value = c.customer_no || '';
+    var info = document.getElementById('customerInfo');
+    if (info) {
+        info.removeAttribute('data-suggest');
+        var label = '已關聯客戶 ' + (c.name || '') + (c.customer_no ? ' (' + c.customer_no + ')' : '');
+        info.innerHTML = '<a href="customers.php?action=view&id=' + c.id + '" style="color:#007bff;text-decoration:underline;cursor:pointer">' + label + '</a>';
+    }
+    closeTaxIdLinkModal();
+}
+function linkCustomerFromTaxId(c) { linkCustomerOnly(c); }
+function linkCustomerFromCase(customerId) {
+    if (!customerId) return;
+    var custs = (taxIdLookupCache.data && taxIdLookupCache.data.customers) || [];
+    for (var i = 0; i < custs.length; i++) {
+        if (+custs[i].id === +customerId) { linkCustomerOnly(custs[i]); return; }
+    }
+    alert('找不到對應客戶資料，請從上方客戶清單選擇');
+}
+// 載入時與統編變動時觸發
+function _initTaxIdLink() {
+    console.log('[taxlink] init');
+    checkTaxIdLink();
+    var taxEl = document.getElementById('billingTaxIdInput');
+    if (taxEl) {
+        taxEl.addEventListener('blur', checkTaxIdLink);
+        taxEl.addEventListener('change', checkTaxIdLink);
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initTaxIdLink);
+} else {
+    _initTaxIdLink();
+}
 
 // ===== 新增客戶 Modal =====
 function openNewCustomerModal() {
