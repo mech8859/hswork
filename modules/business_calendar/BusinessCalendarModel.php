@@ -32,6 +32,16 @@ class BusinessCalendarModel
             $where .= " AND bc.activity_type = ?";
             $params[] = $filters['activity_type'];
         }
+        // 限制可查看的分公司範圍（透過承辦業務的分公司）
+        if (isset($filters['branch_ids']) && is_array($filters['branch_ids'])) {
+            if (empty($filters['branch_ids'])) {
+                // 沒有任何可查看的分公司
+                return array();
+            }
+            $ph = implode(',', array_fill(0, count($filters['branch_ids']), '?'));
+            $where .= " AND u.branch_id IN ($ph)";
+            $params = array_merge($params, array_map('intval', $filters['branch_ids']));
+        }
 
         $sql = "SELECT bc.*, u.real_name as staff_name, u.branch_id
                 FROM business_calendar bc
@@ -83,6 +93,13 @@ class BusinessCalendarModel
             $kw = '%' . $filters['keyword'] . '%';
             $where .= " AND (bc.customer_name LIKE ? OR bc.address LIKE ? OR bc.note LIKE ?)";
             $params = array_merge($params, array($kw, $kw, $kw));
+        }
+        // 限制可查看的分公司範圍
+        if (isset($filters['branch_ids']) && is_array($filters['branch_ids'])) {
+            if (empty($filters['branch_ids'])) return array();
+            $ph = implode(',', array_fill(0, count($filters['branch_ids']), '?'));
+            $where .= " AND u.branch_id IN ($ph)";
+            $params = array_merge($params, array_map('intval', $filters['branch_ids']));
         }
 
         $sql = "SELECT bc.*, u.real_name as staff_name, u.branch_id

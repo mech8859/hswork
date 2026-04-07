@@ -199,9 +199,28 @@ switch ($action) {
         }
         break;
 
+    // ---- 刪除整筆客戶 ----
+    case 'delete':
+        Auth::requirePermission('customers.delete');
+        $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗');
+            redirect('/customers.php?action=view&id=' . $id);
+        }
+        try {
+            $model->deleteCustomer($id);
+            AuditLog::log('customers', 'delete', $id, '刪除客戶');
+            Session::flash('success', '客戶已刪除');
+            redirect('/customers.php');
+        } catch (RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            redirect('/customers.php?action=view&id=' . $id);
+        }
+        break;
+
     // ---- 刪除文件（AJAX）----
     case 'delete_file':
-        Auth::requirePermission('customers.manage');
+        Auth::requirePermission('customers.delete');
         if (!verify_csrf()) { json_response(array('success' => false, 'error' => '安全驗證失敗')); }
         $fileId = (int)($_POST['file_id'] ?? $_GET['file_id'] ?? 0);
         $model->deleteFile($fileId);
@@ -222,7 +241,7 @@ switch ($action) {
 
     // ---- 刪除成交紀錄（AJAX）----
     case 'delete_deal':
-        Auth::requirePermission('customers.manage');
+        Auth::requirePermission('customers.delete');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
             json_response(array('success' => false, 'error' => '安全驗證失敗'));
         }
@@ -245,7 +264,7 @@ switch ($action) {
 
     // ---- 刪除帳款交易（AJAX）----
     case 'delete_transaction':
-        Auth::requirePermission('customers.manage');
+        Auth::requirePermission('customers.delete');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
             json_response(array('success' => false, 'error' => '安全驗證失敗'));
         }

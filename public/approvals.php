@@ -47,7 +47,7 @@ switch ($action) {
                 $_POST['level_order'] = 1;
             }
             $model->saveRule($_POST);
-            // 處理額外層級
+            // 處理額外層級（多層簽核）
             if (!empty($_POST['extra_approver_role']) && is_array($_POST['extra_approver_role'])) {
                 $extraRoles = $_POST['extra_approver_role'];
                 $extraIds = isset($_POST['extra_approver_id']) ? $_POST['extra_approver_id'] : array();
@@ -56,6 +56,7 @@ switch ($action) {
                     if (!empty($extraRoles[$i]) || !empty($extraIds[$i])) {
                         $extraData = $_POST;
                         unset($extraData['id']);
+                        unset($extraData['extra_approver_ids']); // 額外層級不繼承「其他可簽核人」
                         $extraData['approver_role'] = $extraRoles[$i];
                         $extraData['approver_id'] = isset($extraIds[$i]) ? $extraIds[$i] : '';
                         $extraData['level_order'] = isset($extraOrders[$i]) ? $extraOrders[$i] : ($i + 2);
@@ -95,6 +96,14 @@ switch ($action) {
                     $caseStmt->execute(array($targetId));
                     $caseInfo = $caseStmt->fetch();
                     $caseTitleAppr = $caseInfo ? $caseInfo['title'] : '';
+
+                    // 多人擇一簽核：取消同 level 其他 pending（取得 flow level）
+                    $lvStmt = $db->prepare("SELECT level_order FROM approval_flows WHERE id = ?");
+                    $lvStmt->execute(array($flowId));
+                    $flowLevel = (int)$lvStmt->fetchColumn();
+                    if ($flowLevel > 0) {
+                        $model->cancelSiblingPendingFlows('case_completion', $targetId, $flowLevel, $flowId);
+                    }
 
                     // 完工簽核多關流程
                     $stillPending = $model->advanceCaseCompletion($targetId);

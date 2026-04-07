@@ -380,8 +380,8 @@ switch ($action) {
 
     // ---- 刪除產品（僅限停用的）----
     case 'delete':
-        if (!Auth::hasPermission('products.manage') && !in_array(Auth::user()['role'], array('boss','manager'))) {
-            Session::flash('error', '權限不足');
+        if (!Auth::hasPermission('products.delete')) {
+            Session::flash('error', '無刪除權限');
             redirect('/products.php');
         }
         if (!verify_csrf()) {

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../modules/business_calendar/BusinessCalendarModel.php'
 
 $model = new BusinessCalendarModel();
 $action = $_GET['action'] ?? 'calendar';
+$branchIds = Auth::getAccessibleBranchIds();
 
 switch ($action) {
     // ---- 行事曆檢視 ----
@@ -15,8 +16,9 @@ switch ($action) {
         if ($month > 12) { $month = 1; $year++; }
 
         $filters = array(
-            'staff_id' => $_GET['staff_id'] ?? '',
-            'region'   => $_GET['region'] ?? '',
+            'staff_id'   => $_GET['staff_id'] ?? '',
+            'region'     => $_GET['region'] ?? '',
+            'branch_ids' => $branchIds,
         );
 
         $events = $model->getMonthEvents($year, $month, $filters);
@@ -64,6 +66,7 @@ switch ($action) {
             'staff_id'   => $_GET['staff_id'] ?? '',
             'region'     => $_GET['region'] ?? '',
             'keyword'    => $_GET['keyword'] ?? '',
+            'branch_ids' => $branchIds,
         );
         $items = $model->getList($filters);
         $salespeople = $model->getSalespeople();
@@ -99,9 +102,18 @@ switch ($action) {
         $event = $model->getById($id);
         if (!$event) { Session::flash('error', '行程不存在'); redirect('/business_calendar.php'); }
 
-        // 只有建立者或管理者可編輯
-        if ($event['created_by'] != Auth::id() && !Auth::hasPermission('schedule.manage') && Auth::user()['role'] !== 'boss') {
-            Session::flash('error', '權限不足');
+        // 業務（role=sales 或 is_sales=1）只能編輯自己承辦（staff_id）的行程
+        // 非業務 + 有 business_calendar.manage 或 boss/manager → 可編輯所有
+        $cu = Auth::user();
+        $isSales = ($cu['role'] === 'sales') || !empty($cu['is_sales']);
+        $isOwn = ((int)$event['staff_id'] === (int)Auth::id()) || ((int)$event['created_by'] === (int)Auth::id());
+        if ($isSales) {
+            $canEdit = $isOwn;
+        } else {
+            $canEdit = Auth::hasPermission('business_calendar.manage') || in_array($cu['role'], array('boss', 'manager', 'vice_president')) || $isOwn;
+        }
+        if (!$canEdit) {
+            Session::flash('error', '權限不足，業務人員只能編輯自己承辦的行程');
             redirect('/business_calendar.php');
         }
 
@@ -125,9 +137,19 @@ switch ($action) {
         if (verify_csrf()) {
             $id = (int)$_GET['id'];
             $event = $model->getById($id);
-            if ($event && ($event['created_by'] == Auth::id() || Auth::hasPermission('schedule.manage') || Auth::user()['role'] === 'boss')) {
-                $model->delete($id);
-                Session::flash('success', '行程已刪除');
+            if ($event) {
+                $cu = Auth::user();
+                $isSales = ($cu['role'] === 'sales') || !empty($cu['is_sales']);
+                $isOwn = ((int)$event['staff_id'] === (int)Auth::id()) || ((int)$event['created_by'] === (int)Auth::id());
+                $canDel = $isSales
+                    ? $isOwn
+                    : ($isOwn || Auth::hasPermission('business_calendar.manage') || in_array($cu['role'], array('boss','manager','vice_president')));
+                if ($canDel) {
+                    $model->delete($id);
+                    Session::flash('success', '行程已刪除');
+                } else {
+                    Session::flash('error', '權限不足');
+                }
             }
         }
         redirect('/business_calendar.php');
@@ -141,6 +163,7 @@ switch ($action) {
             'end_date'   => $date,
             'staff_id'   => $_GET['staff_id'] ?? '',
             'region'     => $_GET['region'] ?? '',
+            'branch_ids' => $branchIds,
         );
         $items = $model->getList($filters);
         $salespeople = $model->getSalespeople();

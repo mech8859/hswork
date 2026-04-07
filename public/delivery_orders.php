@@ -161,7 +161,7 @@ switch ($action) {
         break;
 
     case 'delete':
-        if (!$canManage) { Session::flash('error', '無權限'); redirect('/delivery_orders.php'); }
+        if (!Auth::hasPermission('inventory.delete')) { Session::flash('error', '無刪除權限'); redirect('/delivery_orders.php'); }
         if (verify_csrf()) {
             $model->delete((int)(isset($_GET['id']) ? $_GET['id'] : 0));
             AuditLog::log('delivery_orders', 'delete', (int)(isset($_GET['id']) ? $_GET['id'] : 0), '');

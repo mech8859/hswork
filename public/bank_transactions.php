@@ -276,8 +276,8 @@ switch ($action) {
 
     // ---- 刪除 ----
     case 'delete':
-        if (!$isBoss) {
-            Session::flash('error', '無權限執行此操作');
+        if (!Auth::hasPermission('finance.delete')) {
+            Session::flash('error', '無刪除權限');
             redirect('/bank_transactions.php');
         }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/bank_transactions.php'); }

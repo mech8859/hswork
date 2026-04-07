@@ -138,6 +138,10 @@ switch ($action) {
         break;
 
     case 'delete':
+        if (!Auth::hasPermission('procurement.manage')) {
+            Session::flash('error', '無權限');
+            redirect('/requisitions.php');
+        }
         $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
         if ($id > 0) {
             $model->deleteRequisition($id);

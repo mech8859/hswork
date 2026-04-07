@@ -124,7 +124,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>或指定簽核人</label>
+                        <label>或指定簽核人 (主)</label>
                         <select name="approver_id" class="form-control">
                             <option value="">不指定人</option>
                             <?php foreach ($approvers as $ap): ?>
@@ -133,6 +133,17 @@
                         </select>
                     </div>
                     <input type="hidden" name="level_order" value="1">
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>其他可簽核人（任一簽核即過）</label>
+                        <select name="extra_approver_ids[]" class="form-control" multiple size="5" style="min-height:110px">
+                            <?php foreach ($approvers as $ap): ?>
+                            <option value="<?= $ap['id'] ?>"><?= e($ap['real_name']) ?> (<?= e(ApprovalModel::roleLabel($ap['role'])) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">按住 Ctrl/Cmd 複選；可不選</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -184,6 +195,17 @@
                         <?php else: ?>
                             -
                         <?php endif; ?>
+                        <?php if (!empty($rule['extra_approver_ids'])):
+                            $exIds = array_filter(array_map('intval', explode(',', $rule['extra_approver_ids'])));
+                            if (!empty($exIds)) {
+                                $ph = implode(',', array_fill(0, count($exIds), '?'));
+                                $exStmt = Database::getInstance()->prepare("SELECT real_name FROM users WHERE id IN ($ph)");
+                                $exStmt->execute($exIds);
+                                $exNames = $exStmt->fetchAll(PDO::FETCH_COLUMN);
+                                if ($exNames):
+                        ?>
+                            <div style="font-size:.75rem;color:#1565c0;margin-top:2px">+ <?= e(implode('、', $exNames)) ?>（任一即可）</div>
+                        <?php endif; } endif; ?>
                     </td>
                     <td><?= $rule['level_order'] ?></td>
                     <td><?= $rule['is_active'] ? '<span style="color:green">啟用</span>' : '<span style="color:#999">停用</span>' ?></td>
@@ -233,11 +255,20 @@
                                     </select>
                                 </div>
                                 <div class="form-group" id="edit-approver-id-group-<?= $rule['id'] ?>" <?= $rule['approver_role'] === 'auto_approve' ? 'style="display:none"' : '' ?>>
-                                    <label>或指定簽核人</label>
+                                    <label>或指定簽核人 (主)</label>
                                     <select name="approver_id" class="form-control">
                                         <option value="">不指定人</option>
                                         <?php foreach ($approvers as $ap): ?>
                                         <option value="<?= $ap['id'] ?>" <?= (string)$rule['approver_id'] === (string)$ap['id'] ? 'selected' : '' ?>><?= e($ap['real_name']) ?> (<?= e(ApprovalModel::roleLabel($ap['role'])) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php $ruleExtraIds = !empty($rule['extra_approver_ids']) ? array_map('intval', explode(',', $rule['extra_approver_ids'])) : array(); ?>
+                                <div class="form-group" style="flex:1;min-width:200px">
+                                    <label>其他可簽核人（任一即可）</label>
+                                    <select name="extra_approver_ids[]" class="form-control" multiple size="5" style="min-height:110px">
+                                        <?php foreach ($approvers as $ap): ?>
+                                        <option value="<?= $ap['id'] ?>" <?= in_array((int)$ap['id'], $ruleExtraIds) ? 'selected' : '' ?>><?= e($ap['real_name']) ?> (<?= e(ApprovalModel::roleLabel($ap['role'])) ?>)</option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>

@@ -147,6 +147,10 @@ switch ($action) {
 
     // ---- 刪除 ----
     case 'delete':
+        if (!Auth::hasPermission('finance.delete')) {
+            Session::flash('error', '無刪除權限');
+            redirect('/transactions.php');
+        }
         if (verify_csrf()) {
             $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
             $model->delete($id);

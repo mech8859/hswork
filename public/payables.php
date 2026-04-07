@@ -174,8 +174,8 @@ switch ($action) {
 
     // ---- 刪除應付帳款 ----
     case 'delete':
-        if (!$isBoss) {
-            Session::flash('error', '無權限執行此操作');
+        if (!Auth::hasPermission('finance.delete')) {
+            Session::flash('error', '無刪除權限');
             redirect('/payables.php');
         }
         $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);

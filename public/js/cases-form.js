@@ -138,10 +138,11 @@ function toggleSkillLevel(cb) {
     else { sel.style.display = 'none'; sel.value = '0'; }
 }
 function uploadFiles(input, fileType) {
-    var files = input.files;
-    if (!files.length) return;
+    if (!input.files.length) return;
+    doUploadAttachments(input.files, fileType, input.parentElement, function() { input.value = ''; });
+}
+function doUploadAttachments(files, fileType, addBtn, doneCb) {
     var csrfToken = document.querySelector('input[name="csrf_token"]').value;
-    var addBtn = input.parentElement;
     var origText = addBtn.querySelector('span').textContent;
     addBtn.querySelector('span').textContent = '壓縮中...';
     compressImages(Array.prototype.slice.call(files)).then(function(compressed) {
@@ -149,7 +150,7 @@ function uploadFiles(input, fileType) {
     addBtn.querySelector('span').textContent = '上傳中 0/' + total + '...';
     for (var i = 0; i < compressed.length; i++) {
         (function(file) {
-            if (file.size > 20 * 1024 * 1024) { alert(file.name + ' 超過 20MB'); uploaded++; if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; } return; }
+            if (file.size > 20 * 1024 * 1024) { alert(file.name + ' 超過 20MB'); uploaded++; if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); } return; }
             var fd = new FormData(); fd.append('file', file); fd.append('file_type', fileType); fd.append('csrf_token', csrfToken);
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/cases.php?action=upload_attachment&id=' + CASE_DATA.caseId);
@@ -172,15 +173,54 @@ function uploadFiles(input, fileType) {
                             updateCount(fileType, 1);
                         } else { alert(res.error || '上傳失敗'); }
                     } catch(e) { alert('上傳失敗'); }
+                } else {
+                    alert('上傳失敗 (HTTP ' + xhr.status + ')');
                 }
-                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; }
+                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); }
             };
-            xhr.onerror = function() { uploaded++; alert('網路錯誤'); if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; } };
+            xhr.onerror = function() { uploaded++; alert('網路錯誤'); if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); } };
             xhr.send(fd);
         })(compressed[i]);
     }
     });
 }
+
+// 拖曳上傳：bind 所有 .attach-type-card[data-file-type]
+(function() {
+    function bindCard(card) {
+        var fileType = card.getAttribute('data-file-type');
+        var addBtn = card.querySelector('.atc-add-btn');
+        if (!fileType || !addBtn) return;
+        ['dragenter','dragover'].forEach(function(ev){
+            card.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); card.classList.add('atc-drag-over'); });
+        });
+        card.addEventListener('dragleave', function(e) {
+            if (card.contains(e.relatedTarget)) return;
+            card.classList.remove('atc-drag-over');
+        });
+        card.addEventListener('drop', function(e) {
+            e.preventDefault(); e.stopPropagation();
+            card.classList.remove('atc-drag-over');
+            var files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) doUploadAttachments(files, fileType, addBtn);
+        });
+    }
+    function bindAll() {
+        document.querySelectorAll('.attach-type-card[data-file-type]').forEach(bindCard);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindAll);
+    } else {
+        bindAll();
+    }
+    // 防止整頁被瀏覽器當成檔案開啟
+    ['dragover','drop'].forEach(function(ev){
+        window.addEventListener(ev, function(e){
+            if (e.target.closest && e.target.closest('.attach-type-card')) return;
+            e.preventDefault();
+        });
+    });
+})();
 function updateCount(fileType, delta) {
     var el = document.getElementById('atc-count-' + fileType);
     if (el) el.textContent = parseInt(el.textContent || '0') + delta;
@@ -784,12 +824,46 @@ if (document.readyState === 'loading') {
     _initTaxIdLink();
 }
 
+// ===== 「+ 新增客戶」按鈕：只有狀態為成交時才顯示 =====
+var DEAL_STATUSES = ['已成交','跨月成交','現簽','電話報價成交'];
+function toggleNewCustomerBtn() {
+    var sel = document.getElementById('subStatusSelect');
+    var btn = document.getElementById('btnNewCustomer');
+    if (!sel || !btn) return;
+    btn.style.display = DEAL_STATUSES.indexOf(sel.value) !== -1 ? '' : 'none';
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', toggleNewCustomerBtn);
+} else {
+    toggleNewCustomerBtn();
+}
+
 // ===== 新增客戶 Modal =====
+function _val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function _setIfEmpty(id, val) { var el = document.getElementById(id); if (el && !el.value && val) el.value = val; }
 function openNewCustomerModal() {
-    var name = document.getElementById('customerNameInput').value;
-    document.getElementById('modalCustomerName').value = name;
+    // 從案件表單帶入資料
+    _setIfEmpty('modalCustomerName', _val('customerNameInput'));
+    _setIfEmpty('modalContactPerson', _val('contactPersonInput'));
+    _setIfEmpty('modalPhone', _val('customerPhoneInput'));
+    _setIfEmpty('modalMobile', _val('customerMobileInput'));
+    _setIfEmpty('modalLineId', _val('contactLineInput'));
+    var emailEl = document.querySelector('input[name="customer_email"]');
+    _setIfEmpty('modalEmail', emailEl ? emailEl.value : '');
+    var titleEl = document.querySelector('input[name="billing_title"]');
+    _setIfEmpty('modalInvoiceTitle', titleEl ? titleEl.value : '');
+    var taxEl = document.getElementById('billingTaxIdInput');
+    _setIfEmpty('modalTaxId', taxEl ? taxEl.value : '');
+    var addrEl = document.querySelector('input[name="address"]');
+    _setIfEmpty('modalAddress', addrEl ? addrEl.value : '');
+    // 承辦業務 select
+    var caseSales = document.querySelector('select[name="sales_id"]');
+    var modalSales = document.getElementById('modalSalesId');
+    if (caseSales && modalSales && !modalSales.value && caseSales.value) {
+        modalSales.value = caseSales.value;
+    }
     document.getElementById('newCustomerModal').style.display = 'flex';
-    if (!name) document.getElementById('modalCustomerName').focus();
+    if (!_val('modalCustomerName')) document.getElementById('modalCustomerName').focus();
 }
 function closeNewCustomerModal() {
     document.getElementById('newCustomerModal').style.display = 'none';
@@ -801,10 +875,15 @@ function saveNewCustomer() {
     var fd = new FormData();
     fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
     fd.append('name', name);
-    fd.append('contact_person', document.getElementById('modalContactPerson').value);
-    fd.append('phone', document.getElementById('modalPhone').value);
-    fd.append('mobile', document.getElementById('modalMobile').value);
-    fd.append('address', document.getElementById('modalAddress').value);
+    fd.append('contact_person', _val('modalContactPerson'));
+    fd.append('phone', _val('modalPhone'));
+    fd.append('mobile', _val('modalMobile'));
+    fd.append('line_id', _val('modalLineId'));
+    fd.append('email', _val('modalEmail'));
+    fd.append('invoice_title', _val('modalInvoiceTitle'));
+    fd.append('tax_id', _val('modalTaxId'));
+    fd.append('sales_id', _val('modalSalesId'));
+    fd.append('address', _val('modalAddress'));
 
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '/cases.php?action=ajax_create_customer');
@@ -812,7 +891,12 @@ function saveNewCustomer() {
         var res = JSON.parse(xhr.responseText);
         if (res.success) {
             closeNewCustomerModal();
-            selectCustomer(res.customer);
+            // 只關聯客戶，不覆蓋案件其他欄位
+            if (typeof linkCustomerOnly === 'function') {
+                linkCustomerOnly(res.customer);
+            } else {
+                selectCustomer(res.customer);
+            }
         } else {
             alert(res.error || '建立客戶失敗');
         }

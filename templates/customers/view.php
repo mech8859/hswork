@@ -16,6 +16,13 @@
         <?php if (Auth::hasPermission('customers.manage')): ?>
         <a href="/customers.php?action=edit&id=<?= $customer['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <?php endif; ?>
+        <?php if (Auth::hasPermission('customers.delete')): ?>
+        <form method="POST" action="/customers.php?action=delete" style="display:inline" onsubmit="return confirm('確定刪除此客戶？\n\n注意：必須無任何關聯資料（案件、報價、應收/付、收/付款、附件、成交、帳款交易等）才允許刪除。')">
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= $customer['id'] ?>">
+            <button type="submit" class="btn btn-danger btn-sm">刪除</button>
+        </form>
+        <?php endif; ?>
         <a href="javascript:history.back()" class="btn btn-outline btn-sm">返回</a>
     </div>
 </div>

@@ -127,7 +127,12 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 </select>
             </div>
             <div class="form-group" style="flex:0 0 auto">
-                <button type="button" class="btn btn-outline btn-sm" onclick="openNewCustomerModal()" style="white-space:nowrap">+ 新增客戶</button>
+                <?php
+                $dealStatuses = array('已成交','跨月成交','現簽','電話報價成交');
+                $curSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '';
+                $showNewBtn = in_array($curSubStatus, $dealStatuses, true);
+                ?>
+                <button type="button" id="btnNewCustomer" class="btn btn-outline btn-sm" onclick="openNewCustomerModal()" style="white-space:nowrap;<?= $showNewBtn ? '' : 'display:none' ?>">+ 新增客戶</button>
             </div>
         </div>
         <div class="form-row">
@@ -218,7 +223,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             <div class="form-group">
                 <label>狀態</label>
                 <?php $defaultSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '未指派'; ?>
-                <select name="sub_status" class="form-control">
+                <select name="sub_status" id="subStatusSelect" class="form-control" onchange="toggleNewCustomerBtn()">
                     <option value="">請選擇</option>
                     <?php foreach (CaseModel::subStatusOptions() as $v => $l): ?>
                     <option value="<?= $v ?>" <?= $defaultSubStatus === $v ? 'selected' : '' ?>><?= e($l) ?></option>
@@ -1201,7 +1206,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
         </div>
         <div class="attach-grid">
             <?php foreach ($attachTypes as $typeKey => $typeLabel): ?>
-            <div class="attach-type-card" id="atc-<?= $typeKey ?>">
+            <div class="attach-type-card" id="atc-<?= $typeKey ?>" data-file-type="<?= $typeKey ?>">
                 <div class="atc-header">
                     <span class="atc-title"><?= e($typeLabel) ?></span>
                     <span class="atc-count" id="atc-count-<?= $typeKey ?>"><?= count($groupedAtt[$typeKey]) ?></span>
@@ -1223,7 +1228,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 </div>
                 <label class="atc-add-btn">
                     <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="uploadFiles(this, '<?= $typeKey ?>')">
-                    <span>＋ 上傳<?= e($typeLabel) ?></span>
+                    <span>＋ 上傳<?= e($typeLabel) ?>（或拖曳檔案進來）</span>
                 </label>
                 <?php if ($typeKey === 'site_photo'): ?>
                 <label style="display:flex;align-items:center;gap:6px;padding:6px 0;font-size:.85rem;color:#e65100;cursor:pointer">
@@ -1651,33 +1656,64 @@ var CASE_DATA = {
 };
 </script>
 <script src="/js/tw_districts.js"></script>
-<script src="/js/cases-form.js?v=20260407a"></script>
+<script src="/js/cases-form.js?v=20260407d"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">
-    <div class="modal-content" style="max-width:500px">
+    <div class="modal-content" style="max-width:640px">
         <div class="modal-header">
             <h3 style="margin:0">快速新增客戶</h3>
             <button type="button" onclick="closeNewCustomerModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="form-group">
-                <label>客戶名稱 *</label>
-                <input type="text" id="modalCustomerName" class="form-control" required>
-            </div>
             <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>客戶名稱 *</label>
+                    <input type="text" id="modalCustomerName" class="form-control" required>
+                </div>
                 <div class="form-group">
                     <label>聯絡人</label>
                     <input type="text" id="modalContactPerson" class="form-control">
                 </div>
+            </div>
+            <div class="form-row">
                 <div class="form-group">
-                    <label>電話</label>
+                    <label>市話</label>
                     <input type="text" id="modalPhone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>手機</label>
+                    <input type="text" id="modalMobile" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>LINE ID</label>
+                    <input type="text" id="modalLineId" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="modalEmail" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>發票抬頭</label>
+                    <input type="text" id="modalInvoiceTitle" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>統一編號</label>
+                    <input type="text" id="modalTaxId" class="form-control" maxlength="8">
                 </div>
             </div>
             <div class="form-group">
-                <label>手機</label>
-                <input type="text" id="modalMobile" class="form-control">
+                <label>承辦業務</label>
+                <select id="modalSalesId" class="form-control">
+                    <option value="">請選擇</option>
+                    <?php foreach ($salesUsers as $u): ?>
+                    <option value="<?= $u['id'] ?>"><?= e($u['real_name']) ?><?= !empty($u['is_active']) ? '' : '(離職)' ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="form-group">
                 <label>地址</label>

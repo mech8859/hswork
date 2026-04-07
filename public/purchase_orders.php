@@ -255,6 +255,10 @@ switch ($action) {
         break;
 
     case 'delete':
+        if (!Auth::hasPermission('procurement.manage')) {
+            Session::flash('error', '無權限');
+            redirect('/purchase_orders.php');
+        }
         $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
         if ($id > 0) {
             $model->deletePurchaseOrder($id);

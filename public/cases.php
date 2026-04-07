@@ -61,6 +61,15 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/cases.php');
             }
+            // 必填欄位驗證
+            if (empty($_POST['branch_id'])) {
+                Session::flash('error', '請選擇所屬分公司');
+                redirect('/cases.php?action=create');
+            }
+            if (empty($_POST['title'])) {
+                Session::flash('error', '請填寫案件名稱');
+                redirect('/cases.php?action=create');
+            }
             $caseId = $model->create($_POST);
             $model->updateReadiness($caseId, $_POST);
             $model->updateSiteConditions($caseId, $_POST);
@@ -88,8 +97,8 @@ switch ($action) {
         $caseSourceOptions = $ddModel->getOptions('case_source');
         $customerDemandOptions = $ddModel->getOptions('customer_demand');
         $systemTypeOptions = $ddModel->getOptions('system_type');
-        $extraCss = array('/css/cases-form.css?v=20260403');
-        $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
+        $extraCss = array('/css/cases-form.css?v=20260407d');
+        $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:0,caseId:0};</script>';
 
         $pageTitle = '新增案件';
@@ -145,8 +154,8 @@ switch ($action) {
         $caseSourceOptions = $ddModel->getOptions('case_source');
         $customerDemandOptions = $ddModel->getOptions('customer_demand');
         $systemTypeOptions = $ddModel->getOptions('system_type');
-        $extraCss = array('/css/cases-form.css?v=20260403');
-        $extraJs = array('/js/cases-form.js?v=20260403', '/js/tw_districts.js');
+        $extraCss = array('/css/cases-form.css?v=20260407d');
+        $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
 
         $pageTitle = '編輯案件';
@@ -179,7 +188,7 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/cases.php');
             }
-            if (!Auth::canEditSection('delete')) {
+            if (!Auth::hasPermission('cases.delete')) {
                 Session::flash('error', '無刪除權限');
                 redirect('/cases.php');
             }
@@ -528,7 +537,7 @@ switch ($action) {
         $filePath = '/uploads/cases/' . $caseId . '/' . $fname;
         move_uploaded_file($_FILES['file']['tmp_name'], $dir . '/' . $fname);
         $attId = $model->saveAttachment($caseId, $fileType, $origName, $filePath);
-        if (function_exists('backup_to_drive')) { backup_to_drive($dir . '/' . $fname, 'cases/' . $caseId . '/' . $fname); }
+        if (function_exists('backup_to_drive')) { backup_to_drive($dir . '/' . $fname, 'cases', $caseId); }
         echo json_encode(array('success' => true, 'id' => $attId, 'file_name' => $origName, 'file_path' => $filePath));
         break;
 
@@ -653,10 +662,33 @@ switch ($action) {
         $caseNumber = trim($_POST['case_number'] ?? '');
         $caseDate = trim($_POST['case_date'] ?? '');
         $sourceCompany = trim($_POST['source_company'] ?? '');
-        $db->prepare('INSERT INTO customers (customer_no, name, contact_person, phone, mobile, site_address, case_number, case_date, source_company, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            ->execute(array($customerNo, $name, $_POST['contact_person'] ?? '', $_POST['phone'] ?? '', $_POST['mobile'] ?? '', $_POST['address'] ?? '', $caseNumber ?: null, $caseDate ?: null, $sourceCompany ?: null, Auth::id()));
+        $contactPerson = trim($_POST['contact_person'] ?? '');
+        $phone         = trim($_POST['phone'] ?? '');
+        $mobile        = trim($_POST['mobile'] ?? '');
+        $lineId        = trim($_POST['line_id'] ?? '');
+        $email         = trim($_POST['email'] ?? '');
+        $invoiceTitle  = trim($_POST['invoice_title'] ?? '');
+        $taxIdNew      = trim($_POST['tax_id'] ?? '');
+        $salesIdNew    = !empty($_POST['sales_id']) ? (int)$_POST['sales_id'] : null;
+        $address       = trim($_POST['address'] ?? '');
+        $db->prepare('INSERT INTO customers (customer_no, name, contact_person, phone, mobile, line_id, email, invoice_title, tax_id, sales_id, site_address, case_number, case_date, source_company, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute(array($customerNo, $name, $contactPerson, $phone, $mobile, $lineId ?: null, $email ?: null, $invoiceTitle ?: null, $taxIdNew ?: null, $salesIdNew, $address, $caseNumber ?: null, $caseDate ?: null, $sourceCompany ?: null, Auth::id()));
         $newId = (int)$db->lastInsertId();
-        echo json_encode(array('success' => true, 'customer' => array('id' => $newId, 'customer_no' => $customerNo, 'name' => $name, 'phone' => $_POST['phone'] ?? '', 'mobile' => $_POST['mobile'] ?? '', 'site_address' => $_POST['address'] ?? '', 'contact_person' => $_POST['contact_person'] ?? '', 'contacts' => array())));
+        echo json_encode(array('success' => true, 'customer' => array(
+            'id' => $newId,
+            'customer_no' => $customerNo,
+            'name' => $name,
+            'phone' => $phone,
+            'mobile' => $mobile,
+            'line_id' => $lineId,
+            'email' => $email,
+            'invoice_title' => $invoiceTitle,
+            'tax_id' => $taxIdNew,
+            'sales_id' => $salesIdNew,
+            'site_address' => $address,
+            'contact_person' => $contactPerson,
+            'contacts' => array(),
+        )));
         break;
 
     // ---- AJAX: 請款流程 新增/編輯/刪除 ----

@@ -567,4 +567,64 @@ class CustomerModel
     {
         $this->db->prepare("DELETE FROM customer_transactions WHERE id = ?")->execute(array($transactionId));
     }
+
+    /**
+     * 取得客戶在各模組的關聯筆數
+     * 任一非零都應封鎖刪除
+     */
+    public function getCustomerReferences($customerId)
+    {
+        $cust = $this->db->prepare("SELECT id, customer_no FROM customers WHERE id = ?");
+        $cust->execute(array($customerId));
+        $row = $cust->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $cno = $row['customer_no'];
+
+        $count = function($sql, $params) {
+            $st = $this->db->prepare($sql);
+            $st->execute($params);
+            return (int)$st->fetchColumn();
+        };
+
+        $refs = array(
+            '案件 (cases)'         => $count("SELECT COUNT(*) FROM cases WHERE customer_id = ?", array($customerId)),
+            '業務行事曆'           => $count("SELECT COUNT(*) FROM business_calendar WHERE customer_id = ?", array($customerId)),
+            '報價單'               => $count("SELECT COUNT(*) FROM quotations WHERE customer_id = ?", array($customerId)),
+            '出庫單'               => $count("SELECT COUNT(*) FROM stock_outs WHERE customer_id = ?", array($customerId)),
+            '附件 (files)'         => $count("SELECT COUNT(*) FROM customer_files WHERE customer_id = ?", array($customerId)),
+            '成交紀錄 (deals)'     => $count("SELECT COUNT(*) FROM customer_deals WHERE customer_id = ?", array($customerId)),
+            '帳款交易'             => $count("SELECT COUNT(*) FROM customer_transactions WHERE customer_id = ?", array($customerId)),
+        );
+        // customer_no 欄位的引用（無 FK，逐表查）
+        if (!empty($cno)) {
+            $refs['案件 (case_no)']    = $count("SELECT COUNT(*) FROM cases WHERE customer_no = ?", array($cno));
+            $refs['應收帳款 (AR)']     = $count("SELECT COUNT(*) FROM receivables WHERE customer_no = ?", array($cno));
+            $refs['收款單']            = $count("SELECT COUNT(*) FROM receipts WHERE customer_no = ?", array($cno));
+            $refs['應付帳款 (AP)']     = $count("SELECT COUNT(*) FROM payables WHERE customer_no = ?", array($cno));
+            $refs['付款單']            = $count("SELECT COUNT(*) FROM payments_out WHERE customer_no = ?", array($cno));
+        }
+        return $refs;
+    }
+
+    /**
+     * 刪除客戶（僅允許無任何關聯資料時）
+     * @throws RuntimeException 若有關聯
+     */
+    public function deleteCustomer($customerId)
+    {
+        $refs = $this->getCustomerReferences($customerId);
+        if ($refs === null) {
+            throw new RuntimeException('客戶不存在');
+        }
+        $blocking = array();
+        foreach ($refs as $label => $cnt) {
+            if ($cnt > 0) $blocking[] = $label . ' ' . $cnt . ' 筆';
+        }
+        if (!empty($blocking)) {
+            throw new RuntimeException('客戶尚有關聯資料，無法刪除：' . implode('、', $blocking));
+        }
+        // 連帶刪除聯絡人（contacts 是內部資料，FK CASCADE 會自動處理）
+        $this->db->prepare("DELETE FROM customers WHERE id = ?")->execute(array($customerId));
+        return true;
+    }
 }

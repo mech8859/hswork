@@ -79,13 +79,26 @@ class ApprovalModel
             }
         }
 
+        // extra_approver_ids 處理（陣列轉逗號字串、過濾空值與主簽核人本身）
+        $extraIdsStr = null;
+        if (!empty($data['extra_approver_ids'])) {
+            $arr = is_array($data['extra_approver_ids']) ? $data['extra_approver_ids'] : explode(',', $data['extra_approver_ids']);
+            $mainId = !empty($data['approver_id']) ? (int)$data['approver_id'] : 0;
+            $clean = array();
+            foreach ($arr as $v) {
+                $v = (int)$v;
+                if ($v > 0 && $v !== $mainId && !in_array($v, $clean)) $clean[] = $v;
+            }
+            if (!empty($clean)) $extraIdsStr = implode(',', $clean);
+        }
+
         if (!empty($data['id'])) {
             $stmt = $this->db->prepare("
                 UPDATE approval_rules SET
                     module = ?, rule_name = ?, min_amount = ?, max_amount = ?,
                     min_profit_rate = ?, condition_type = ?, product_ids = ?, product_category_id = ?,
                     case_types = ?,
-                    approver_role = ?, approver_id = ?,
+                    approver_role = ?, approver_id = ?, extra_approver_ids = ?,
                     level_order = ?, is_active = ?
                 WHERE id = ?
             ");
@@ -101,6 +114,7 @@ class ApprovalModel
                 $caseTypesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
+                $extraIdsStr,
                 $data['level_order'] ?: 1,
                 isset($data['is_active']) ? $data['is_active'] : 1,
                 $data['id'],
@@ -110,8 +124,8 @@ class ApprovalModel
             $stmt = $this->db->prepare("
                 INSERT INTO approval_rules (module, rule_name, min_amount, max_amount,
                     min_profit_rate, condition_type, product_ids, product_category_id,
-                    case_types, approver_role, approver_id, level_order, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    case_types, approver_role, approver_id, extra_approver_ids, level_order, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute(array(
                 $data['module'],
@@ -125,11 +139,51 @@ class ApprovalModel
                 $caseTypesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
+                $extraIdsStr,
                 $data['level_order'] ?: 1,
                 isset($data['is_active']) ? $data['is_active'] : 1,
             ));
             return (int)$this->db->lastInsertId();
         }
+    }
+
+    /**
+     * 解析規則的所有可簽核人 id（主簽核人 + extra_approver_ids，不含 role 解析）
+     */
+    private function resolveRuleApproverIds($rule)
+    {
+        $ids = array();
+        if (!empty($rule['approver_id'])) $ids[] = (int)$rule['approver_id'];
+        if (!empty($rule['extra_approver_ids'])) {
+            foreach (explode(',', $rule['extra_approver_ids']) as $v) {
+                $v = (int)$v;
+                if ($v > 0 && !in_array($v, $ids)) $ids[] = $v;
+            }
+        }
+        // 沒指定人時用 role 找一個
+        if (empty($ids) && !empty($rule['approver_role'])) {
+            $stmt = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
+            $stmt->execute(array($rule['approver_role']));
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($u) $ids[] = (int)$u['id'];
+        }
+        return $ids;
+    }
+
+    /**
+     * 任一人核准後，把同 (module, target_id, level_order) 其他 pending 設為 cancelled
+     * 用於「多人擇一簽核」場景。flow 已 approved 的不會被影響。
+     */
+    public function cancelSiblingPendingFlows($module, $targetId, $levelOrder, $excludeFlowId)
+    {
+        $stmt = $this->db->prepare("
+            UPDATE approval_flows
+            SET status = 'cancelled', decided_at = NOW()
+            WHERE module = ? AND target_id = ? AND level_order = ?
+              AND status = 'pending' AND id <> ?
+        ");
+        $stmt->execute(array($module, $targetId, $levelOrder, $excludeFlowId));
+        return $stmt->rowCount();
     }
 
     /**
@@ -607,6 +661,7 @@ class ApprovalModel
 
     /**
      * 送完工簽核（只送 level 1 = eng_manager）
+     * 若規則含 extra_approver_ids，會為每個簽核人建立一筆 flow（任一簽核即可通過該關）
      * 若無規則則自動建立預設規則
      */
     public function submitCaseCompletion($caseId, $submittedBy = null)
@@ -631,44 +686,47 @@ class ApprovalModel
 
         if (!$rule) return array('auto_approved' => true);
 
-        $approverId = $rule['approver_id'];
-        if (!$approverId && $rule['approver_role']) {
-            $stmt2 = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
-            $stmt2->execute(array($rule['approver_role']));
-            $user = $stmt2->fetch(PDO::FETCH_ASSOC);
-            if ($user) $approverId = $user['id'];
-        }
+        $approverIds = $this->resolveRuleApproverIds($rule);
+        if (empty($approverIds)) return array('auto_approved' => true);
 
-        if (!$approverId) return array('auto_approved' => true);
-
-        $stmt3 = $this->db->prepare("
+        $insertStmt = $this->db->prepare("
             INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
             VALUES ('case_completion', ?, ?, 1, ?, 'pending', ?)
         ");
-        $stmt3->execute(array($caseId, $rule['id'], $approverId, $submittedBy));
-
-        return array(
-            array(
+        $created = array();
+        foreach ($approverIds as $aid) {
+            $insertStmt->execute(array($caseId, $rule['id'], $aid, $submittedBy));
+            $created[] = array(
                 'id' => (int)$this->db->lastInsertId(),
-                'approver_id' => $approverId,
+                'approver_id' => $aid,
                 'level_order' => 1,
-            )
-        );
+            );
+        }
+        return $created;
     }
 
     /**
      * 完工簽核 - 工程主管核准後推進到 level 2（會計）
-     * @return bool true=已推進到下一關, false=全部簽完
+     * 多人擇一簽核：當該 level 至少一筆 approved 且無 pending 時，視為通過該關
+     * @return bool true=還有下一關待簽, false=全部簽完
      */
     public function advanceCaseCompletion($caseId)
     {
-        // 檢查 level 1 是否都通過
+        // 檢查 level 1 是否還有 pending（多人擇一：只要無 pending 就視為已決定）
         $stmt = $this->db->prepare("
             SELECT COUNT(*) FROM approval_flows
-            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1 AND status != 'approved'
+            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1 AND status = 'pending'
         ");
         $stmt->execute(array($caseId));
-        if ((int)$stmt->fetchColumn() > 0) return true; // level 1 還沒全過
+        if ((int)$stmt->fetchColumn() > 0) return true; // level 1 還有人待簽
+
+        // 確認 level 1 至少有一筆 approved（避免全部 cancelled 也推進）
+        $okStmt = $this->db->prepare("
+            SELECT COUNT(*) FROM approval_flows
+            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1 AND status = 'approved'
+        ");
+        $okStmt->execute(array($caseId));
+        if ((int)$okStmt->fetchColumn() === 0) return false; // 沒人核准就不推進
 
         // 檢查 level 2 是否已建立
         $stmt2 = $this->db->prepare("
@@ -677,10 +735,10 @@ class ApprovalModel
         ");
         $stmt2->execute(array($caseId));
         if ((int)$stmt2->fetchColumn() > 0) {
-            // level 2 已存在 → 檢查是否全過
+            // level 2 已存在 → 同樣以 pending 判斷
             $stmt3 = $this->db->prepare("
                 SELECT COUNT(*) FROM approval_flows
-                WHERE module = 'case_completion' AND target_id = ? AND level_order = 2 AND status != 'approved'
+                WHERE module = 'case_completion' AND target_id = ? AND level_order = 2 AND status = 'pending'
             ");
             $stmt3->execute(array($caseId));
             return (int)$stmt3->fetchColumn() > 0; // true=還沒全過
@@ -700,15 +758,8 @@ class ApprovalModel
             return false;
         }
 
-        $approverId = $rule2['approver_id'];
-        if (!$approverId && $rule2['approver_role']) {
-            $st = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
-            $st->execute(array($rule2['approver_role']));
-            $u = $st->fetch(PDO::FETCH_ASSOC);
-            if ($u) $approverId = $u['id'];
-        }
-
-        if (!$approverId) return false; // 找不到簽核人 → 直接結案
+        $approverIds = $this->resolveRuleApproverIds($rule2);
+        if (empty($approverIds)) return false; // 找不到簽核人 → 直接結案
 
         // 取得原始送簽人
         $origStmt = $this->db->prepare("
@@ -719,10 +770,13 @@ class ApprovalModel
         $origStmt->execute(array($caseId));
         $submittedBy = $origStmt->fetchColumn() ?: 0;
 
-        $this->db->prepare("
+        $insertStmt = $this->db->prepare("
             INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
             VALUES ('case_completion', ?, ?, 2, ?, 'pending', ?)
-        ")->execute(array($caseId, $rule2['id'], $approverId, $submittedBy));
+        ");
+        foreach ($approverIds as $aid) {
+            $insertStmt->execute(array($caseId, $rule2['id'], $aid, $submittedBy));
+        }
 
         return true; // 還有下一關
     }

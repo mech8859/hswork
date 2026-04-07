@@ -158,6 +158,10 @@ switch ($action) {
         break;
 
     case 'delete':
+        if (!Auth::hasPermission('inventory.delete')) {
+            Session::flash('error', '無刪除權限');
+            redirect('/returns.php');
+        }
         $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
         if ($id > 0) {
             try {

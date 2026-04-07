@@ -177,8 +177,8 @@ switch ($action) {
 
     // ---- 刪除請款單 ----
     case 'delete':
-        if (!$isBoss) {
-            Session::flash('error', '無權限執行此操作');
+        if (!Auth::hasPermission('finance.delete')) {
+            Session::flash('error', '無刪除權限');
             redirect('/receivables.php');
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {

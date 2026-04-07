@@ -149,7 +149,7 @@ if (!empty($case['attachments'])) {
     <div class="card-header">附件管理</div>
     <div class="attach-grid">
         <?php foreach ($attachTypes as $typeKey => $typeLabel): ?>
-        <div class="attach-type-card" id="atc-<?= $typeKey ?>">
+        <div class="attach-type-card" id="atc-<?= $typeKey ?>" data-file-type="<?= $typeKey ?>">
             <div class="atc-header">
                 <span class="atc-title"><?= e($typeLabel) ?></span>
                 <span class="atc-count" id="atc-count-<?= $typeKey ?>"><?= count($groupedAtt[$typeKey]) ?></span>
@@ -171,7 +171,7 @@ if (!empty($case['attachments'])) {
             </div>
             <label class="atc-add-btn">
                 <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="uploadFiles(this, '<?= $typeKey ?>')">
-                <span>＋ 上傳<?= e($typeLabel) ?></span>
+                <span>＋ 上傳<?= e($typeLabel) ?>（或拖曳檔案進來）</span>
             </label>
         </div>
         <?php endforeach; ?>
@@ -188,23 +188,30 @@ if (!empty($case['attachments'])) {
 function openLightbox(src) { var o = document.getElementById('lightboxOverlay'); document.getElementById('lightboxImg').src = src; o.style.display = 'flex'; }
 function closeLightbox() { document.getElementById('lightboxOverlay').style.display = 'none'; }
 
+var CASE_ID_BT = '<?= $case['id'] ?>';
 function uploadFiles(input, fileType) {
-    var files = input.files;
-    if (!files.length) return;
+    if (!input.files.length) return;
+    doUpload(input.files, fileType, input.parentElement, function(){ input.value = ''; });
+}
+function doUpload(files, fileType, addBtn, doneCb) {
     var csrfToken = document.querySelector('input[name="csrf_token"]').value;
-    var addBtn = input.parentElement;
     var origText = addBtn.querySelector('span').textContent;
     var uploaded = 0, total = files.length;
     addBtn.querySelector('span').textContent = '上傳中 0/' + total + '...';
     for (var i = 0; i < files.length; i++) {
         (function(file) {
-            if (file.size > 20 * 1024 * 1024) { alert(file.name + ' 超過 20MB'); uploaded++; if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; } return; }
+            if (file.size > 20 * 1024 * 1024) {
+                alert(file.name + ' 超過 20MB');
+                uploaded++;
+                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); }
+                return;
+            }
             var fd = new FormData();
             fd.append('file', file);
             fd.append('file_type', fileType);
             fd.append('csrf_token', csrfToken);
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/cases.php?action=upload_attachment&id=<?= $case['id'] ?>');
+            xhr.open('POST', '/cases.php?action=upload_attachment&id=' + CASE_ID_BT);
             xhr.onload = function() {
                 uploaded++;
                 addBtn.querySelector('span').textContent = '上傳中 ' + uploaded + '/' + total + '...';
@@ -223,15 +230,49 @@ function uploadFiles(input, fileType) {
                             document.getElementById('atc-files-' + fileType).insertAdjacentHTML('beforeend', html);
                             updateCount(fileType, 1);
                         } else { alert(res.error || '上傳失敗'); }
-                    } catch(e) { alert('上傳失敗'); }
+                    } catch(e) { alert('上傳失敗：' + e.message); }
+                } else {
+                    alert('上傳失敗 (HTTP ' + xhr.status + ')');
                 }
-                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; }
+                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); }
             };
-            xhr.onerror = function() { uploaded++; alert('網路錯誤'); if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; input.value = ''; } };
+            xhr.onerror = function() {
+                uploaded++;
+                alert('網路錯誤');
+                if (uploaded >= total) { addBtn.querySelector('span').textContent = origText; if (doneCb) doneCb(); }
+            };
             xhr.send(fd);
         })(files[i]);
     }
 }
+
+// 拖曳上傳
+(function() {
+    function bindCard(card) {
+        var fileType = card.getAttribute('data-file-type');
+        var addBtn = card.querySelector('.atc-add-btn');
+        ['dragenter','dragover'].forEach(function(ev){
+            card.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); card.classList.add('atc-drag-over'); });
+        });
+        ['dragleave','drop'].forEach(function(ev){
+            card.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); if (ev === 'dragleave' && card.contains(e.relatedTarget)) return; card.classList.remove('atc-drag-over'); });
+        });
+        card.addEventListener('drop', function(e) {
+            var files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) doUpload(files, fileType, addBtn);
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.attach-type-card[data-file-type]').forEach(bindCard);
+    });
+    // 防止整頁被瀏覽器當成檔案開啟
+    ['dragover','drop'].forEach(function(ev){
+        window.addEventListener(ev, function(e){
+            if (e.target.closest('.attach-type-card')) return;
+            e.preventDefault();
+        });
+    });
+})();
 
 function updateCount(fileType, delta) {
     var el = document.getElementById('atc-count-' + fileType);
@@ -291,6 +332,8 @@ function deleteAttachment(id, fileType) {
 .atc-file:not(.atc-file-img) .atc-del:hover { color:#e53935; }
 .atc-add-btn { display:flex; align-items:center; justify-content:center; padding:8px; border:2px dashed var(--gray-300); border-radius:6px; cursor:pointer; color:var(--gray-500); font-size:.85rem; transition:all .15s; }
 .atc-add-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(33,150,243,.04); }
+.attach-type-card.atc-drag-over { border-color:var(--primary); background:rgba(33,150,243,.08); box-shadow:0 0 0 3px rgba(33,150,243,.15); }
+.attach-type-card.atc-drag-over .atc-add-btn { border-color:var(--primary); color:var(--primary); }
 .lightbox-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
 .lightbox-overlay img { max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
 .lightbox-close { position:absolute; top:16px; right:24px; color:#fff; font-size:2rem; cursor:pointer; z-index:10000; }
