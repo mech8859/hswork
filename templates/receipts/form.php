@@ -130,8 +130,8 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>銀行明細上傳編號</label>
-                <input type="text" name="bank_ref" class="form-control" placeholder="CC-2026-..."
+                <label>銀行交易編號</label>
+                <input type="text" name="bank_ref" class="form-control" placeholder="BT-2026-..."
                        value="<?= e($isEdit && !empty($record['bank_ref']) ? $record['bank_ref'] : '') ?>">
             </div>
             <div class="form-group">

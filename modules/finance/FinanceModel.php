@@ -1113,10 +1113,14 @@ class FinanceModel
      */
     public function createBankTransaction($data)
     {
+        // 自動產生銀行交易編號（BT-2026-000001）
+        $transactionNumber = generate_doc_number('bank_transactions', !empty($data['transaction_date']) ? $data['transaction_date'] : null);
+
         $stmt = $this->db->prepare("INSERT INTO bank_transactions
-            (bank_account, transaction_date, summary, debit_amount, credit_amount, balance, description, remark, upload_no, remittance_code, counterparty_account, memo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (transaction_number, bank_account, transaction_date, summary, debit_amount, credit_amount, balance, description, remark, upload_no, remittance_code, counterparty_account, memo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute(array(
+            $transactionNumber,
             $data['bank_account'],
             $data['transaction_date'],
             isset($data['summary']) ? $data['summary'] : '',

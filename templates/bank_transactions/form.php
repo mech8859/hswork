@@ -18,6 +18,11 @@ $bankOptions = FinanceModel::bankAccountOptions();
         <div class="card-header">交易資訊</div>
         <div class="form-row">
             <div class="form-group">
+                <label>銀行交易編號</label>
+                <input type="text" class="form-control" disabled style="background:#f5f5f5;color:#1a73e8;font-weight:600"
+                       value="<?= e($isEdit && !empty($record['transaction_number']) ? $record['transaction_number'] : peek_next_doc_number('bank_transactions')) ?>">
+            </div>
+            <div class="form-group">
                 <label>銀行帳戶 *</label>
                 <select name="bank_account" class="form-control" required>
                     <option value="">請選擇</option>
