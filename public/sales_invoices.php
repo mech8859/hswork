@@ -41,12 +41,23 @@ switch ($action) {
             Session::flash('error', '無權限執行此操作');
             redirect('/sales_invoices.php');
         }
+        // 從案件管理過來時 case_id + return=case
+        $fromCaseId = isset($_REQUEST['case_id']) ? (int)$_REQUEST['case_id'] : 0;
+        $returnTo = isset($_REQUEST['return']) ? $_REQUEST['return'] : '';
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/sales_invoices.php');
             }
             $userId = Session::getUser()['id'];
+            // 若是從案件來，強制設定 reference_type/id
+            $refType = !empty($_POST['reference_type']) ? $_POST['reference_type'] : null;
+            $refId = !empty($_POST['reference_id']) ? $_POST['reference_id'] : null;
+            if ($fromCaseId > 0) {
+                $refType = 'case';
+                $refId = $fromCaseId;
+            }
             $data = array(
                 'invoice_number'  => !empty($_POST['invoice_number']) ? $_POST['invoice_number'] : null,
                 'invoice_date'    => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
@@ -60,8 +71,8 @@ switch ($action) {
                 'report_period'   => !empty($_POST['report_period']) ? $_POST['report_period'] : null,
                 'invoice_format'  => !empty($_POST['invoice_format']) ? $_POST['invoice_format'] : null,
                 'status'          => !empty($_POST['status']) ? $_POST['status'] : 'pending',
-                'reference_type'  => !empty($_POST['reference_type']) ? $_POST['reference_type'] : null,
-                'reference_id'    => !empty($_POST['reference_id']) ? $_POST['reference_id'] : null,
+                'reference_type'  => $refType,
+                'reference_id'    => $refId,
                 'note'            => !empty($_POST['note']) ? $_POST['note'] : null,
                 'created_by'      => $userId,
             );
@@ -77,11 +88,30 @@ switch ($action) {
             }
 
             Session::flash('success', '銷項發票已新增');
+            // 從案件來的，跳回案件編輯頁
+            $postReturn = !empty($_POST['return']) ? $_POST['return'] : '';
+            $postCaseId = !empty($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+            if ($postReturn === 'case' && $postCaseId > 0) {
+                redirect('/cases.php?action=edit&id=' . $postCaseId);
+            }
             redirect('/sales_invoices.php');
         }
 
         $record = null;
         $customers = $model->getCustomers();
+
+        // 從案件來時，預先帶入客戶資料
+        $prefillCustomerName = '';
+        $prefillCustomerTaxId = '';
+        if ($fromCaseId > 0) {
+            $caseStmt = Database::getInstance()->prepare("SELECT billing_title, billing_tax_id FROM cases WHERE id = ?");
+            $caseStmt->execute(array($fromCaseId));
+            $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
+            if ($caseRow) {
+                $prefillCustomerName = $caseRow['billing_title'];
+                $prefillCustomerTaxId = $caseRow['billing_tax_id'];
+            }
+        }
 
         $pageTitle = '新增銷項發票';
         $currentPage = 'sales_invoices';
@@ -128,10 +158,21 @@ switch ($action) {
             $model->updateSalesInvoice($id, $data);
             AuditLog::log('sales_invoices', 'update', $id, '更新銷項發票');
             Session::flash('success', '銷項發票已更新');
+            // 若是從案件管理過來的，跳回案件編輯頁
+            $postReturn = !empty($_POST['return']) ? $_POST['return'] : '';
+            $postCaseId = !empty($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+            if ($postReturn === 'case' && $postCaseId > 0) {
+                redirect('/cases.php?action=edit&id=' . $postCaseId);
+            }
             redirect('/sales_invoices.php');
         }
 
         $customers = $model->getCustomers();
+        // GET 模式時也要支援 case_id + return 參數（編輯頁從案件來時用）
+        $fromCaseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
+        $returnTo = isset($_GET['return']) ? $_GET['return'] : '';
+        $prefillCustomerName = '';
+        $prefillCustomerTaxId = '';
 
         // 編輯鎖定
         require_once __DIR__ . '/../includes/EditingLock.php';

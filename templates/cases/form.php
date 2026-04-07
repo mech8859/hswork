@@ -892,6 +892,38 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
                 <input type="text" name="billing_tax_id" class="form-control" value="<?= e($case['billing_tax_id'] ?? '') ?>" placeholder="8碼統編">
             </div>
         </div>
+
+        <!-- 銷項發票 -->
+        <?php if ($case): $caseSalesInvoices = $case['sales_invoices'] ?? array(); ?>
+        <div style="margin:8px 0;padding:10px;background:#fafafa;border:1px solid var(--gray-200);border-radius:6px">
+            <div class="d-flex justify-between align-center" style="margin-bottom:6px">
+                <strong style="font-size:.9rem">銷項發票</strong>
+                <a href="/sales_invoices.php?action=create&case_id=<?= $case['id'] ?>&return=case" class="btn btn-primary btn-sm">+ 新增銷項發票</a>
+            </div>
+            <?php if (empty($caseSalesInvoices)): ?>
+            <div class="text-muted text-center" style="padding:12px;font-size:.85rem">尚無銷項發票</div>
+            <?php else: ?>
+            <table class="table" style="font-size:.85rem;margin:0">
+                <thead><tr><th style="width:120px">日期</th><th style="width:140px">發票號碼</th><th class="text-right" style="width:120px">含稅金額</th><th style="width:80px">狀態</th><th style="width:60px">操作</th></tr></thead>
+                <tbody>
+                <?php foreach ($caseSalesInvoices as $si):
+                    $statusLabels = array('draft'=>'草稿','pending'=>'待確認','confirmed'=>'已確認','voided'=>'作廢');
+                    $statusLabel = isset($statusLabels[$si['status']]) ? $statusLabels[$si['status']] : $si['status'];
+                ?>
+                <tr>
+                    <td><?= e($si['invoice_date']) ?></td>
+                    <td style="color:var(--primary);font-weight:600"><?= e($si['invoice_number']) ?></td>
+                    <td class="text-right">$<?= number_format($si['total_amount']) ?></td>
+                    <td><span class="badge"><?= e($statusLabel) ?></span></td>
+                    <td><a href="/sales_invoices.php?action=edit&id=<?= $si['id'] ?>&return=case&case_id=<?= $case['id'] ?>" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px">編輯</a></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="form-row">
             <div class="form-group">
                 <label>帳務請款聯絡人</label>

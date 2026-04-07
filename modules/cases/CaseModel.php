@@ -206,6 +206,15 @@ class CaseModel
             $case['billing_items'] = array();
         }
 
+        // 該案件已開立的銷項發票
+        try {
+            $stmt = $this->db->prepare("SELECT id, invoice_number, invoice_date, total_amount, status FROM sales_invoices WHERE reference_type = 'case' AND reference_id = ? ORDER BY invoice_date DESC, id DESC");
+            $stmt->execute([$id]);
+            $case['sales_invoices'] = $stmt->fetchAll();
+        } catch (Exception $e) {
+            $case['sales_invoices'] = array();
+        }
+
         // 施工回報紀錄（手動/Ragic匯入）
         try {
             $stmt = $this->db->prepare('SELECT cwl.*, u.real_name as creator_name FROM case_work_logs cwl LEFT JOIN users u ON cwl.created_by = u.id WHERE cwl.case_id = ? ORDER BY cwl.work_date DESC');

@@ -16,6 +16,13 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
 
 <form method="POST" class="mt-2" id="salesInvoiceForm">
     <?= csrf_field() ?>
+    <?php if (!empty($fromCaseId) && !empty($returnTo)): ?>
+    <input type="hidden" name="case_id" value="<?= (int)$fromCaseId ?>">
+    <input type="hidden" name="return" value="<?= e($returnTo) ?>">
+    <div style="background:#e3f2fd;border:1px solid #1976d2;color:#1565c0;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:.9rem">
+        🔗 此發票由案件管理建立，存檔後將自動關聯至案件並跳回案件編輯頁
+    </div>
+    <?php endif; ?>
 
     <!-- 賣方資訊 -->
     <div class="card">
@@ -124,13 +131,13 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
             <div class="form-group">
                 <label>買方統一編號 *</label>
                 <input type="text" name="customer_tax_id" id="fldCustomerTaxId" class="form-control"
-                       value="<?= e($isEdit && !empty($record['customer_tax_id']) ? $record['customer_tax_id'] : '') ?>"
+                       value="<?= e($isEdit && !empty($record['customer_tax_id']) ? $record['customer_tax_id'] : (!empty($prefillCustomerTaxId) ? $prefillCustomerTaxId : '')) ?>"
                        maxlength="8" placeholder="8碼統編" required oninput="onSalesTaxIdInput(this)">
             </div>
             <div class="form-group">
                 <label>買方名稱 *</label>
                 <input type="text" name="customer_name" id="fldCustomerName" class="form-control"
-                       value="<?= e($isEdit && !empty($record['customer_name']) ? $record['customer_name'] : '') ?>" required>
+                       value="<?= e($isEdit && !empty($record['customer_name']) ? $record['customer_name'] : (!empty($prefillCustomerName) ? $prefillCustomerName : '')) ?>" required>
             </div>
         </div>
     </div>
