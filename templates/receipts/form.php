@@ -23,6 +23,8 @@
     </div>
 </div>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2" id="receiptForm">
     <?= csrf_field() ?>
 

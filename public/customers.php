@@ -126,6 +126,14 @@ switch ($action) {
         $files = $model->getFiles($id);
         $repairPhotos = $model->getRepairPhotos($id);
 
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('customers', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('customers', $id, Auth::id()) : array();
+        $editingLockModule = 'customers';
+        $editingLockRecordId = $id;
+
         $pageTitle = $customer['name'] . ' - 客戶管理';
         $currentPage = 'customers';
         require __DIR__ . '/../templates/layouts/header.php';

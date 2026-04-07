@@ -163,6 +163,14 @@ switch ($action) {
         $record['purchase_details'] = $model->getPayablePurchaseDetails($record['id']);
         $record['return_details'] = $model->getPayableReturnDetails($record['id']);
 
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('payables', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('payables', $id, Auth::id()) : array();
+        $editingLockModule = 'payables';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯應付帳款單';
         $currentPage = 'payables';
         require __DIR__ . '/../templates/layouts/header.php';
@@ -193,6 +201,51 @@ switch ($action) {
         $like = '%' . $q . '%';
         $stmt = Database::getInstance()->prepare("SELECT id, vendor_code, name, short_name, contact_person, phone FROM vendors WHERE is_active = 1 AND (name LIKE ? OR short_name LIKE ? OR vendor_code LIKE ?) ORDER BY name LIMIT 15");
         $stmt->execute(array($like, $like, $like));
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        break;
+
+    // ---- AJAX: 依廠商與日期區間搜尋退貨單 ----
+    case 'ajax_search_returns':
+        header('Content-Type: application/json');
+        $vendorName = trim($_GET['vendor_name'] ?? '');
+        $dateFrom   = trim($_GET['date_from'] ?? '');
+        $dateTo     = trim($_GET['date_to'] ?? '');
+        if ($vendorName === '') { echo json_encode(array()); break; }
+        $where = 'r.vendor_name = ?';
+        $params = array($vendorName);
+        if ($dateFrom !== '') { $where .= ' AND r.return_date >= ?'; $params[] = $dateFrom; }
+        if ($dateTo !== '')   { $where .= ' AND r.return_date <= ?'; $params[] = $dateTo; }
+        $sql = "SELECT r.id, r.return_number, r.return_date, r.vendor_name, r.total_amount, r.total_qty, r.status,
+                       b.name AS branch_name, gr.gr_number AS source_gr_number
+                FROM returns r
+                LEFT JOIN branches b ON r.branch_id = b.id
+                LEFT JOIN goods_receipts gr ON r.gr_id = gr.id
+                WHERE $where
+                ORDER BY r.return_date DESC, r.id DESC
+                LIMIT 200";
+        $stmt = Database::getInstance()->prepare($sql);
+        $stmt->execute($params);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        break;
+
+    // ---- AJAX: 依廠商與日期區間搜尋進貨單 ----
+    case 'ajax_search_goods_receipts':
+        header('Content-Type: application/json');
+        $vendorName = trim($_GET['vendor_name'] ?? '');
+        $dateFrom   = trim($_GET['date_from'] ?? '');
+        $dateTo     = trim($_GET['date_to'] ?? '');
+        if ($vendorName === '') { echo json_encode(array()); break; }
+        $where = 'vendor_name = ?';
+        $params = array($vendorName);
+        if ($dateFrom !== '') { $where .= ' AND gr_date >= ?'; $params[] = $dateFrom; }
+        if ($dateTo !== '')   { $where .= ' AND gr_date <= ?'; $params[] = $dateTo; }
+        $sql = "SELECT id, gr_number, gr_date, vendor_name, branch_name, total_amount, total_qty, status, paid_amount
+                FROM goods_receipts
+                WHERE $where
+                ORDER BY gr_date DESC, id DESC
+                LIMIT 200";
+        $stmt = Database::getInstance()->prepare($sql);
+        $stmt->execute($params);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
 

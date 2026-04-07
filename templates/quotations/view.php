@@ -79,6 +79,8 @@ foreach ($approvalStatus['flows'] as $af) {
     </div>
 </div>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <!-- 簽核紀錄 -->
 <?php if (!empty($approvalStatus['flows'])): ?>
 <div class="card mb-2" style="border-left:4px solid <?= $approvalStatus['overall'] === 'approved' ? 'var(--success)' : ($approvalStatus['overall'] === 'rejected' ? 'var(--danger)' : '#2196F3') ?>">

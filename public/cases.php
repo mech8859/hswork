@@ -158,6 +158,16 @@ switch ($action) {
         $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
 
+        // 編輯鎖定（多人同時編輯提醒，純警示不阻擋）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) {
+            EditingLock::set('cases', $id, $_curUser['id'], $_curUser['real_name']);
+        }
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('cases', $id, Auth::id()) : array();
+        $editingLockModule = 'cases';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯案件';
         $currentPage = 'cases';
         require __DIR__ . '/../templates/layouts/header.php';

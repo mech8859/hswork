@@ -87,6 +87,8 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
 </div>
 <?php endif; ?>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2" onsubmit="return validateCaseForm()">
     <?= csrf_field() ?>
 

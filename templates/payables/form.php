@@ -26,6 +26,8 @@
 <form id="deleteForm" method="POST" action="/payables.php?action=delete&id=<?= $record['id'] ?>" style="display:none"><?= csrf_field() ?></form>
 <?php endif; ?>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2" id="payableForm">
     <?= csrf_field() ?>
 
@@ -214,7 +216,11 @@
     <div class="card">
         <div class="card-header d-flex justify-between align-center">
             <span>進貨明細</span>
-            <button type="button" class="btn btn-primary btn-sm" onclick="addPurchaseDetailRow()">+ 新增</button>
+            <div class="d-flex gap-1 align-center">
+                <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">未稅合計：<strong id="pdSumDisplay" style="color:var(--primary);font-size:1rem">$0</strong></span>
+                <button type="button" class="btn btn-outline btn-sm" onclick="openGrPickerModal()" title="依本單廠商搜尋進貨單，可多選後帶入">📋 從進貨單帶入</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addPurchaseDetailRow()">+ 新增</button>
+            </div>
         </div>
         <input type="hidden" name="pd_rendered" value="1">
         <div id="purchaseDetailBody">
@@ -257,7 +263,11 @@
     <div class="card">
         <div class="card-header d-flex justify-between align-center">
             <span>進退明細</span>
-            <button type="button" class="btn btn-primary btn-sm" onclick="addReturnDetailRow()">+ 新增</button>
+            <div class="d-flex gap-1 align-center">
+                <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">退款合計：<strong id="rdSumDisplay" style="color:var(--danger);font-size:1rem">$0</strong></span>
+                <button type="button" class="btn btn-outline btn-sm" onclick="openRtPickerModal()" title="依本單廠商搜尋退貨單，可多選後帶入">📋 從退貨單帶入</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addReturnDetailRow()">+ 新增</button>
+            </div>
         </div>
         <input type="hidden" name="rd_rendered" value="1">
         <div id="returnDetailBody">
@@ -384,6 +394,78 @@
     </div>
 </form>
 
+<!-- 退貨單挑選 Modal -->
+<div id="rtPickerModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeRtPickerModal()">
+    <div class="modal-content" style="max-width:920px">
+        <div class="modal-header">
+            <h3 style="margin:0">從退貨單帶入</h3>
+            <button type="button" onclick="closeRtPickerModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row" style="align-items:flex-end;margin-bottom:12px">
+                <div class="form-group">
+                    <label>廠商名稱</label>
+                    <input type="text" id="rtpVendor" class="form-control" readonly style="background:#f5f5f5">
+                </div>
+                <div class="form-group">
+                    <label>起始日期</label>
+                    <input type="date" id="rtpDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>結束日期</label>
+                    <input type="date" id="rtpDateTo" class="form-control">
+                </div>
+                <div class="form-group" style="flex:0 0 auto">
+                    <button type="button" class="btn btn-primary" onclick="searchRtPicker()">搜尋</button>
+                </div>
+            </div>
+            <div id="rtpResult" style="max-height:420px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:6px">
+                <div style="padding:20px;text-align:center;color:#999">點擊「搜尋」開始查詢</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeRtPickerModal()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="adoptSelectedRt()">採用選取項目</button>
+        </div>
+    </div>
+</div>
+
+<!-- 進貨單挑選 Modal -->
+<div id="grPickerModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeGrPickerModal()">
+    <div class="modal-content" style="max-width:920px">
+        <div class="modal-header">
+            <h3 style="margin:0">從進貨單帶入</h3>
+            <button type="button" onclick="closeGrPickerModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row" style="align-items:flex-end;margin-bottom:12px">
+                <div class="form-group">
+                    <label>廠商名稱</label>
+                    <input type="text" id="grpVendor" class="form-control" readonly style="background:#f5f5f5">
+                </div>
+                <div class="form-group">
+                    <label>起始日期</label>
+                    <input type="date" id="grpDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>結束日期</label>
+                    <input type="date" id="grpDateTo" class="form-control">
+                </div>
+                <div class="form-group" style="flex:0 0 auto">
+                    <button type="button" class="btn btn-primary" onclick="searchGrPicker()">搜尋</button>
+                </div>
+            </div>
+            <div id="grpResult" style="max-height:420px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:6px">
+                <div style="padding:20px;text-align:center;color:#999">點擊「搜尋」開始查詢</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeGrPickerModal()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="adoptSelectedGr()">採用選取項目</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ---- 金額自動計算 ----
 // 稅額預設依未稅總額×5%自動帶入；使用者手動修改後不再覆寫
@@ -470,9 +552,152 @@ function toggleRows(btn) {
     }
 }
 
+// ---- 進貨單挑選 Modal ----
+function openGrPickerModal() {
+    var vendorInp = document.querySelector('input[name="vendor_name"]');
+    var vendor = vendorInp ? vendorInp.value.trim() : '';
+    if (!vendor) {
+        alert('請先選擇廠商名稱');
+        if (vendorInp) vendorInp.focus();
+        return;
+    }
+    document.getElementById('grpVendor').value = vendor;
+    // 預設日期區間：今年 1 月 1 日 ~ 今天
+    var today = new Date();
+    var y = today.getFullYear();
+    var todayStr = y + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+    var df = document.getElementById('grpDateFrom');
+    var dt = document.getElementById('grpDateTo');
+    if (!df.value) df.value = y + '-01-01';
+    if (!dt.value) dt.value = todayStr;
+    document.getElementById('grPickerModal').style.display = 'flex';
+    // 自動搜尋
+    searchGrPicker();
+}
+function closeGrPickerModal() {
+    document.getElementById('grPickerModal').style.display = 'none';
+}
+function searchGrPicker() {
+    var vendor = document.getElementById('grpVendor').value;
+    var df = document.getElementById('grpDateFrom').value;
+    var dt = document.getElementById('grpDateTo').value;
+    var box = document.getElementById('grpResult');
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:#999">搜尋中…</div>';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/payables.php?action=ajax_search_goods_receipts&vendor_name=' + encodeURIComponent(vendor) + '&date_from=' + encodeURIComponent(df) + '&date_to=' + encodeURIComponent(dt));
+    xhr.onload = function() {
+        try {
+            var rows = JSON.parse(xhr.responseText);
+            renderGrResult(rows);
+        } catch (e) {
+            box.innerHTML = '<div style="padding:20px;text-align:center;color:#c62828">查詢失敗</div>';
+        }
+    };
+    xhr.send();
+}
+function renderGrResult(rows) {
+    var box = document.getElementById('grpResult');
+    if (!rows || !rows.length) {
+        box.innerHTML = '<div style="padding:20px;text-align:center;color:#999">查無資料</div>';
+        return;
+    }
+    // 取得已存在的進貨單號（避免重複帶入）
+    var existing = {};
+    document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[purchase_number]"]').forEach(function(el) {
+        if (el.value) existing[el.value] = true;
+    });
+    var html = '<table style="width:100%;font-size:.85rem;border-collapse:collapse">' +
+        '<thead style="background:#f5f5f5;position:sticky;top:0"><tr>' +
+            '<th style="padding:8px"><input type="checkbox" id="grpSelectAll" onchange="grpToggleAll(this)"></th>' +
+            '<th style="padding:8px;text-align:left">進貨單號</th>' +
+            '<th style="padding:8px;text-align:left">日期</th>' +
+            '<th style="padding:8px;text-align:left">分公司</th>' +
+            '<th style="padding:8px;text-align:right">數量</th>' +
+            '<th style="padding:8px;text-align:right">含稅金額</th>' +
+            '<th style="padding:8px;text-align:left">狀態</th>' +
+        '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var dup = existing[r.gr_number];
+        var dataAttr = ' data-gr=\'' + JSON.stringify(r).replace(/'/g, '&#39;') + '\'';
+        html += '<tr style="border-top:1px solid #f0f0f0' + (dup ? ';background:#fff3e0' : '') + '">' +
+            '<td style="padding:8px;text-align:center">' + (dup ? '<span style="color:#e65100" title="已存在">✓</span>' : '<input type="checkbox" class="grp-row-chk"' + dataAttr + '>') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.gr_number || '') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.gr_date || '') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.branch_name || '') + '</td>' +
+            '<td style="padding:8px;text-align:right">' + (parseFloat(r.total_qty) || 0) + '</td>' +
+            '<td style="padding:8px;text-align:right">$' + Number(r.total_amount || 0).toLocaleString() + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.status || '') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+function escapeHtml(s) {
+    if (s == null) return '';
+    var d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+function grpToggleAll(cb) {
+    document.querySelectorAll('.grp-row-chk').forEach(function(c) { c.checked = cb.checked; });
+}
+function adoptSelectedGr() {
+    var checked = document.querySelectorAll('.grp-row-chk:checked');
+    if (!checked.length) { alert('請至少勾選一筆進貨單'); return; }
+    var added = 0;
+    checked.forEach(function(cb) {
+        try {
+            var r = JSON.parse(cb.getAttribute('data-gr').replace(/&#39;/g, "'"));
+            // 假設含稅 5%，未稅 = round(total/1.05), 稅 = total - 未稅
+            var total = Math.round(parseFloat(r.total_amount) || 0);
+            var untaxed = Math.round(total / 1.05);
+            var tax = total - untaxed;
+            addPurchaseDetailRow({
+                purchase_date: r.gr_date || '',
+                purchase_number: r.gr_number || '',
+                branch_name: r.branch_name || '',
+                vendor_name: r.vendor_name || '',
+                amount_untaxed: untaxed,
+                tax_amount: tax,
+                total_amount: total,
+            });
+            added++;
+        } catch (e) {}
+    });
+    closeGrPickerModal();
+    if (added > 0) alert('已帶入 ' + added + ' 筆進貨單');
+}
+
+// ---- 進貨明細未稅合計 ----
+function recalcPdSum() {
+    var sum = 0;
+    document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[amount_untaxed]"]').forEach(function(el) {
+        sum += parseInt(el.value) || 0;
+    });
+    var disp = document.getElementById('pdSumDisplay');
+    if (disp) disp.textContent = '$' + sum.toLocaleString();
+}
+document.addEventListener('DOMContentLoaded', recalcPdSum);
+// 用事件委派監聽變動 + 刪除
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.name && /^pd\[\d+\]\[amount_untaxed\]$/.test(e.target.name)) {
+        recalcPdSum();
+    }
+});
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('detail-toggle-close') && e.target.closest('.pd-item')) {
+        // 等 row 被 remove 後再算
+        setTimeout(recalcPdSum, 0);
+    }
+});
+
 // ---- 進貨明細 動態列 ----
 var pdIdx = document.querySelectorAll('#purchaseDetailBody .pd-item').length;
-function addPurchaseDetailRow() {
+function addPurchaseDetailRow(preset) {
+    preset = preset || {};
+    var v = function(k) { return preset[k] != null ? String(preset[k]) : ''; };
+    var n = function(k) { return preset[k] != null ? preset[k] : 0; };
     var container = document.getElementById('purchaseDetailBody');
     var div = document.createElement('div');
     div.className = 'pd-item detail-item';
@@ -480,11 +705,11 @@ function addPurchaseDetailRow() {
     var i = pdIdx++;
     div.innerHTML =
         '<div class="form-row" style="align-items:flex-end">' +
-            '<div class="form-group"><label>進貨日期</label><input type="date" name="pd['+i+'][purchase_date]" class="form-control"></div>' +
-            '<div class="form-group"><label>進貨單號</label><input type="text" name="pd['+i+'][purchase_number]" class="form-control"></div>' +
-            '<div class="form-group"><label>分公司</label><input type="text" name="pd['+i+'][branch_name]" class="form-control"></div>' +
-            '<div class="form-group"><label>未稅金額</label><input type="number" name="pd['+i+'][amount_untaxed]" class="form-control" step="1" value="0"></div>' +
-            '<div class="form-group"><label>發票字軌</label><input type="text" name="pd['+i+'][invoice_track]" class="form-control"></div>' +
+            '<div class="form-group"><label>進貨日期</label><input type="date" name="pd['+i+'][purchase_date]" class="form-control" value="'+v('purchase_date')+'"></div>' +
+            '<div class="form-group"><label>進貨單號</label><input type="text" name="pd['+i+'][purchase_number]" class="form-control" value="'+v('purchase_number')+'"></div>' +
+            '<div class="form-group"><label>分公司</label><input type="text" name="pd['+i+'][branch_name]" class="form-control" value="'+v('branch_name')+'"></div>' +
+            '<div class="form-group"><label>未稅金額</label><input type="number" name="pd['+i+'][amount_untaxed]" class="form-control" step="1" value="'+n('amount_untaxed')+'"></div>' +
+            '<div class="form-group"><label>發票字軌</label><input type="text" name="pd['+i+'][invoice_track]" class="form-control" value="'+v('invoice_track')+'"></div>' +
             '<div style="flex:0;display:flex;gap:4px;padding-bottom:2px">' +
                 '<button type="button" class="detail-toggle detail-toggle-open" onclick="toggleRows(this)">+</button>' +
                 '<button type="button" class="detail-toggle detail-toggle-close" onclick="this.closest(\'.detail-item\').remove()">×</button>' +
@@ -492,26 +717,155 @@ function addPurchaseDetailRow() {
         '</div>' +
         '<div class="detail-extra" style="display:none">' +
             '<div class="form-row">' +
-                '<div class="form-group"><label>對帳月份</label><input type="month" name="pd['+i+'][check_month]" class="form-control"></div>' +
-                '<div class="form-group"><label>廠商名稱</label><input type="text" name="pd['+i+'][vendor_name]" class="form-control"></div>' +
-                '<div class="form-group"><label>稅額</label><input type="number" name="pd['+i+'][tax_amount]" class="form-control" step="1" value="0"></div>' +
-                '<div class="form-group"><label>含稅金額</label><input type="number" name="pd['+i+'][total_amount]" class="form-control" step="1" value="0"></div>' +
-                '<div class="form-group"><label>已付金額</label><input type="number" name="pd['+i+'][paid_amount]" class="form-control" step="1" value="0"></div>' +
+                '<div class="form-group"><label>對帳月份</label><input type="month" name="pd['+i+'][check_month]" class="form-control" value="'+v('check_month')+'"></div>' +
+                '<div class="form-group"><label>廠商名稱</label><input type="text" name="pd['+i+'][vendor_name]" class="form-control" value="'+v('vendor_name')+'"></div>' +
+                '<div class="form-group"><label>稅額</label><input type="number" name="pd['+i+'][tax_amount]" class="form-control" step="1" value="'+n('tax_amount')+'"></div>' +
+                '<div class="form-group"><label>含稅金額</label><input type="number" name="pd['+i+'][total_amount]" class="form-control" step="1" value="'+n('total_amount')+'"></div>' +
+                '<div class="form-group"><label>已付金額</label><input type="number" name="pd['+i+'][paid_amount]" class="form-control" step="1" value="'+n('paid_amount')+'"></div>' +
             '</div>' +
             '<div class="form-row">' +
-                '<div class="form-group"><label>付款日期</label><input type="date" name="pd['+i+'][payment_date]" class="form-control"></div>' +
-                '<div class="form-group"><label>發票日期</label><input type="date" name="pd['+i+'][invoice_date]" class="form-control"></div>' +
-                '<div class="form-group"><label>發票金額</label><input type="number" name="pd['+i+'][invoice_amount]" class="form-control" step="1" value="0"></div>' +
-                '<div class="form-group"><label>月結核對</label><input type="text" name="pd['+i+'][monthly_check]" class="form-control"></div>' +
-                '<div class="form-group"><label>備註</label><input type="text" name="pd['+i+'][note]" class="form-control"></div>' +
+                '<div class="form-group"><label>付款日期</label><input type="date" name="pd['+i+'][payment_date]" class="form-control" value="'+v('payment_date')+'"></div>' +
+                '<div class="form-group"><label>發票日期</label><input type="date" name="pd['+i+'][invoice_date]" class="form-control" value="'+v('invoice_date')+'"></div>' +
+                '<div class="form-group"><label>發票金額</label><input type="number" name="pd['+i+'][invoice_amount]" class="form-control" step="1" value="'+n('invoice_amount')+'"></div>' +
+                '<div class="form-group"><label>月結核對</label><input type="text" name="pd['+i+'][monthly_check]" class="form-control" value="'+v('monthly_check')+'"></div>' +
+                '<div class="form-group"><label>備註</label><input type="text" name="pd['+i+'][note]" class="form-control" value="'+v('note')+'"></div>' +
             '</div>' +
         '</div>';
     container.appendChild(div);
+    recalcPdSum();
+}
+
+// ---- 進退明細退款合計 ----
+function recalcRdSum() {
+    var sum = 0;
+    document.querySelectorAll('#returnDetailBody input[name^="rd"][name$="[refund_amount]"]').forEach(function(el) {
+        sum += parseInt(el.value) || 0;
+    });
+    var disp = document.getElementById('rdSumDisplay');
+    if (disp) disp.textContent = '$' + sum.toLocaleString();
+}
+document.addEventListener('DOMContentLoaded', recalcRdSum);
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.name && /^rd\[\d+\]\[refund_amount\]$/.test(e.target.name)) {
+        recalcRdSum();
+    }
+});
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('detail-toggle-close') && e.target.closest('.rd-item')) {
+        setTimeout(recalcRdSum, 0);
+    }
+});
+
+// ---- 退貨單挑選 Modal ----
+function openRtPickerModal() {
+    var vendorInp = document.querySelector('input[name="vendor_name"]');
+    var vendor = vendorInp ? vendorInp.value.trim() : '';
+    if (!vendor) {
+        alert('請先選擇廠商名稱');
+        if (vendorInp) vendorInp.focus();
+        return;
+    }
+    document.getElementById('rtpVendor').value = vendor;
+    var today = new Date();
+    var y = today.getFullYear();
+    var todayStr = y + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+    var df = document.getElementById('rtpDateFrom');
+    var dt = document.getElementById('rtpDateTo');
+    if (!df.value) df.value = y + '-01-01';
+    if (!dt.value) dt.value = todayStr;
+    document.getElementById('rtPickerModal').style.display = 'flex';
+    searchRtPicker();
+}
+function closeRtPickerModal() {
+    document.getElementById('rtPickerModal').style.display = 'none';
+}
+function searchRtPicker() {
+    var vendor = document.getElementById('rtpVendor').value;
+    var df = document.getElementById('rtpDateFrom').value;
+    var dt = document.getElementById('rtpDateTo').value;
+    var box = document.getElementById('rtpResult');
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:#999">搜尋中…</div>';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/payables.php?action=ajax_search_returns&vendor_name=' + encodeURIComponent(vendor) + '&date_from=' + encodeURIComponent(df) + '&date_to=' + encodeURIComponent(dt));
+    xhr.onload = function() {
+        try {
+            var rows = JSON.parse(xhr.responseText);
+            renderRtResult(rows);
+        } catch (e) {
+            box.innerHTML = '<div style="padding:20px;text-align:center;color:#c62828">查詢失敗</div>';
+        }
+    };
+    xhr.send();
+}
+function renderRtResult(rows) {
+    var box = document.getElementById('rtpResult');
+    if (!rows || !rows.length) {
+        box.innerHTML = '<div style="padding:20px;text-align:center;color:#999">查無資料</div>';
+        return;
+    }
+    var existing = {};
+    document.querySelectorAll('#returnDetailBody input[name^="rd"][name$="[return_number]"]').forEach(function(el) {
+        if (el.value) existing[el.value] = true;
+    });
+    var html = '<table style="width:100%;font-size:.85rem;border-collapse:collapse">' +
+        '<thead style="background:#f5f5f5;position:sticky;top:0"><tr>' +
+            '<th style="padding:8px"><input type="checkbox" id="rtpSelectAll" onchange="rtpToggleAll(this)"></th>' +
+            '<th style="padding:8px;text-align:left">退貨單號</th>' +
+            '<th style="padding:8px;text-align:left">日期</th>' +
+            '<th style="padding:8px;text-align:left">分公司</th>' +
+            '<th style="padding:8px;text-align:left">來源進貨單</th>' +
+            '<th style="padding:8px;text-align:right">退款金額</th>' +
+            '<th style="padding:8px;text-align:left">狀態</th>' +
+        '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var dup = existing[r.return_number];
+        var dataAttr = ' data-rt=\'' + JSON.stringify(r).replace(/'/g, '&#39;') + '\'';
+        html += '<tr style="border-top:1px solid #f0f0f0' + (dup ? ';background:#fff3e0' : '') + '">' +
+            '<td style="padding:8px;text-align:center">' + (dup ? '<span style="color:#e65100" title="已存在">✓</span>' : '<input type="checkbox" class="rtp-row-chk"' + dataAttr + '>') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.return_number || '') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.return_date || '') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.branch_name || '') + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.source_gr_number || '') + '</td>' +
+            '<td style="padding:8px;text-align:right">$' + Number(r.total_amount || 0).toLocaleString() + '</td>' +
+            '<td style="padding:8px">' + escapeHtml(r.status || '') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+function rtpToggleAll(cb) {
+    document.querySelectorAll('.rtp-row-chk').forEach(function(c) { c.checked = cb.checked; });
+}
+function adoptSelectedRt() {
+    var checked = document.querySelectorAll('.rtp-row-chk:checked');
+    if (!checked.length) { alert('請至少勾選一筆退貨單'); return; }
+    var added = 0;
+    checked.forEach(function(cb) {
+        try {
+            var r = JSON.parse(cb.getAttribute('data-rt').replace(/&#39;/g, "'"));
+            addReturnDetailRow({
+                return_date: r.return_date || '',
+                return_number: r.return_number || '',
+                branch_name: r.branch_name || '',
+                vendor_name: r.vendor_name || '',
+                purchase_number: r.source_gr_number || '',
+                refund_amount: Math.round(parseFloat(r.total_amount) || 0),
+                doc_status: r.status || '',
+            });
+            added++;
+        } catch (e) {}
+    });
+    closeRtPickerModal();
+    if (added > 0) alert('已帶入 ' + added + ' 筆退貨單');
 }
 
 // ---- 進退明細 動態列 ----
 var rdIdx = document.querySelectorAll('#returnDetailBody .rd-item').length;
-function addReturnDetailRow() {
+function addReturnDetailRow(preset) {
+    preset = preset || {};
+    var v = function(k) { return preset[k] != null ? String(preset[k]) : ''; };
+    var n = function(k) { return preset[k] != null ? preset[k] : 0; };
     var container = document.getElementById('returnDetailBody');
     var div = document.createElement('div');
     div.className = 'rd-item detail-item';
@@ -519,10 +873,10 @@ function addReturnDetailRow() {
     var i = rdIdx++;
     div.innerHTML =
         '<div class="form-row" style="align-items:flex-end">' +
-            '<div class="form-group"><label>退貨日期</label><input type="date" name="rd['+i+'][return_date]" class="form-control"></div>' +
-            '<div class="form-group"><label>來源退回單號</label><input type="text" name="rd['+i+'][return_number]" class="form-control"></div>' +
-            '<div class="form-group"><label>所屬分公司</label><input type="text" name="rd['+i+'][branch_name]" class="form-control"></div>' +
-            '<div class="form-group"><label>退款金額</label><input type="number" name="rd['+i+'][refund_amount]" class="form-control" step="1" value="0"></div>' +
+            '<div class="form-group"><label>退貨日期</label><input type="date" name="rd['+i+'][return_date]" class="form-control" value="'+v('return_date')+'"></div>' +
+            '<div class="form-group"><label>來源退回單號</label><input type="text" name="rd['+i+'][return_number]" class="form-control" value="'+v('return_number')+'"></div>' +
+            '<div class="form-group"><label>所屬分公司</label><input type="text" name="rd['+i+'][branch_name]" class="form-control" value="'+v('branch_name')+'"></div>' +
+            '<div class="form-group"><label>退款金額</label><input type="number" name="rd['+i+'][refund_amount]" class="form-control" step="1" value="'+n('refund_amount')+'"></div>' +
             '<div style="flex:0;display:flex;gap:4px;padding-bottom:2px">' +
                 '<button type="button" class="detail-toggle detail-toggle-open" onclick="toggleRows(this)">+</button>' +
                 '<button type="button" class="detail-toggle detail-toggle-close" onclick="this.closest(\'.detail-item\').remove()">×</button>' +
@@ -530,18 +884,19 @@ function addReturnDetailRow() {
         '</div>' +
         '<div class="detail-extra" style="display:none">' +
             '<div class="form-row">' +
-                '<div class="form-group"><label>來源進貨單號</label><input type="text" name="rd['+i+'][purchase_number]" class="form-control"></div>' +
-                '<div class="form-group"><label>廠商名稱</label><input type="text" name="rd['+i+'][vendor_name]" class="form-control"></div>' +
-                '<div class="form-group"><label>單據狀態</label><input type="text" name="rd['+i+'][doc_status]" class="form-control"></div>' +
-                '<div class="form-group"><label>倉庫名稱</label><input type="text" name="rd['+i+'][warehouse_name]" class="form-control"></div>' +
+                '<div class="form-group"><label>來源進貨單號</label><input type="text" name="rd['+i+'][purchase_number]" class="form-control" value="'+v('purchase_number')+'"></div>' +
+                '<div class="form-group"><label>廠商名稱</label><input type="text" name="rd['+i+'][vendor_name]" class="form-control" value="'+v('vendor_name')+'"></div>' +
+                '<div class="form-group"><label>單據狀態</label><input type="text" name="rd['+i+'][doc_status]" class="form-control" value="'+v('doc_status')+'"></div>' +
+                '<div class="form-group"><label>倉庫名稱</label><input type="text" name="rd['+i+'][warehouse_name]" class="form-control" value="'+v('warehouse_name')+'"></div>' +
             '</div>' +
             '<div class="form-row">' +
-                '<div class="form-group"><label>退回原因</label><input type="text" name="rd['+i+'][return_reason]" class="form-control"></div>' +
-                '<div class="form-group"><label>會計處理方式</label><input type="text" name="rd['+i+'][accounting_method]" class="form-control"></div>' +
-                '<div class="form-group"><label>折讓單據</label><input type="text" name="rd['+i+'][allowance_doc]" class="form-control"></div>' +
+                '<div class="form-group"><label>退回原因</label><input type="text" name="rd['+i+'][return_reason]" class="form-control" value="'+v('return_reason')+'"></div>' +
+                '<div class="form-group"><label>會計處理方式</label><input type="text" name="rd['+i+'][accounting_method]" class="form-control" value="'+v('accounting_method')+'"></div>' +
+                '<div class="form-group"><label>折讓單據</label><input type="text" name="rd['+i+'][allowance_doc]" class="form-control" value="'+v('allowance_doc')+'"></div>' +
             '</div>' +
         '</div>';
     container.appendChild(div);
+    recalcRdSum();
 }
 </script>
 

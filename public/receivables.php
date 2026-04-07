@@ -168,6 +168,14 @@ switch ($action) {
         $branches = $model->getBranches($branchIds);
         $salesUsers = $model->getSalesUsers($branchIds);
 
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('receivables', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('receivables', $id, Auth::id()) : array();
+        $editingLockModule = 'receivables';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯請款單 - ' . $record['invoice_number'];
         $currentPage = 'receivables';
         require __DIR__ . '/../templates/layouts/header.php';

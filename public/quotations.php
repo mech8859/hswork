@@ -92,6 +92,15 @@ switch ($action) {
         $salespeople = $model->getSalespeople($branchIds);
         $branches = $model->getBranches();
         $cases = $model->getCaseOptions($branchIds);
+
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('quotations', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('quotations', $id, Auth::id()) : array();
+        $editingLockModule = 'quotations';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯報價單';
         $currentPage = 'quotations';
         require __DIR__ . '/../templates/layouts/header.php';
@@ -107,6 +116,15 @@ switch ($action) {
         if (!$canManage && !$canView && $canOwn && $quote['sales_id'] != Auth::id()) {
             Session::flash('error', '無權限'); redirect('/quotations.php');
         }
+
+        // 編輯鎖定（多人同時開啟提醒；view 也納入因為使用者多從這裡進入）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('quotations', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('quotations', $id, Auth::id()) : array();
+        $editingLockModule = 'quotations';
+        $editingLockRecordId = $id;
+
         $pageTitle = '報價單 ' . $quote['quotation_number'];
         $currentPage = 'quotations';
         require __DIR__ . '/../templates/layouts/header.php';

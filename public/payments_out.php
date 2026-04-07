@@ -164,6 +164,14 @@ switch ($action) {
         $branchItems = $model->getPaymentOutBranches($record['id']);
         $voucherItems = $model->getPaymentOutVouchers($record['id']);
 
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('payments_out', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('payments_out', $id, Auth::id()) : array();
+        $editingLockModule = 'payments_out';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯付款單 - ' . (!empty($record['payment_number']) ? $record['payment_number'] : $record['id']);
         $currentPage = 'payments_out';
         require __DIR__ . '/../templates/layouts/header.php';

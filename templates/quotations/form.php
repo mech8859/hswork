@@ -5,6 +5,8 @@ $sections = $isEdit ? $quote['sections'] : array(array('title' => '', 'items' =>
 ?>
 <h2><?= $isEdit ? '編輯報價單 - ' . e($quote['quotation_number']) : '新增報價單' ?></h2>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2" id="quoteForm">
     <?= csrf_field() ?>
 

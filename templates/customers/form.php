@@ -44,6 +44,8 @@ $isEdit = !empty($customer);
 </div>
 <?php endif; ?>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2" id="customerForm">
     <?= csrf_field() ?>
 

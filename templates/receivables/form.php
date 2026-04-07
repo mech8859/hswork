@@ -31,6 +31,8 @@ $paymentTermsOptions = FinanceModel::paymentTermsOptions();
 <form id="deleteForm" method="POST" action="/receivables.php?action=delete&id=<?= $record['id'] ?>" style="display:none"><?= csrf_field() ?></form>
 <?php endif; ?>
 
+<?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
 <form method="POST" class="mt-2">
     <?= csrf_field() ?>
 

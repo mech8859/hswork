@@ -194,6 +194,15 @@ switch ($action) {
         $items = $model->getReceiptItems($record['id']);
         $branches = $model->getBranches($branchIds);
         $salesUsers = $model->getSalesUsers($branchIds);
+
+        // 編輯鎖定（多人同時編輯提醒）
+        require_once __DIR__ . '/../includes/EditingLock.php';
+        $_curUser = Auth::user();
+        if ($_curUser && $id > 0) EditingLock::set('receipts', $id, $_curUser['id'], $_curUser['real_name']);
+        $otherEditors = ($id > 0) ? EditingLock::getOthers('receipts', $id, Auth::id()) : array();
+        $editingLockModule = 'receipts';
+        $editingLockRecordId = $id;
+
         $pageTitle = '編輯收款單';
         $currentPage = 'receipts';
         require __DIR__ . '/../templates/layouts/header.php';

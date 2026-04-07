@@ -11,7 +11,7 @@ class EditingLock
             ->execute(array($module, $recordId, $userId, $userName));
     }
 
-    public static function getOthers($module, $recordId, $excludeUserId, $timeoutMinutes = 5)
+    public static function getOthers($module, $recordId, $excludeUserId, $timeoutMinutes = 2)
     {
         $db = Database::getInstance();
         $stmt = $db->prepare("SELECT user_id, user_name, heartbeat_at FROM editing_locks WHERE module = ? AND record_id = ? AND user_id != ? AND heartbeat_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)");
