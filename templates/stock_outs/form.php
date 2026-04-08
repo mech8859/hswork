@@ -89,6 +89,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
                         <th style="width:40px">#</th>
                         <th style="width:130px">型號</th>
                         <th style="min-width:200px">品名</th>
+                        <th style="min-width:140px">備註</th>
                         <th style="width:100px">規格</th>
                         <th style="width:70px">單位</th>
                         <th style="width:80px">數量</th>
@@ -107,6 +108,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
                             <input type="text" name="items[0][product_name]" class="form-control so-product-name" value="" autocomplete="off" placeholder="輸入關鍵字搜尋..." oninput="soSearchProduct(this)">
                             <div class="so-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
                         </td>
+                        <td><input type="text" name="items[0][note]" class="form-control" value="" placeholder="備註"></td>
                         <td><input type="text" name="items[0][spec]" class="form-control" value=""></td>
                         <td><input type="text" name="items[0][unit]" class="form-control" value=""></td>
                         <td><input type="number" name="items[0][quantity]" class="form-control" step="1" min="1" value="1"></td>
@@ -186,6 +188,7 @@ function addItemRow() {
     tr.innerHTML = '<td class="item-seq">' + seq + '</td>'
         + '<td><input type="hidden" name="items['+itemIdx+'][product_id]" class="so-product-id" value=""><input type="text" name="items['+itemIdx+'][model]" class="form-control so-model" value="" readonly></td>'
         + '<td style="position:relative"><input type="text" name="items['+itemIdx+'][product_name]" class="form-control so-product-name" value="" autocomplete="off" placeholder="輸入關鍵字搜尋..." oninput="soSearchProduct(this)"><div class="so-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></td>'
+        + '<td><input type="text" name="items['+itemIdx+'][note]" class="form-control" value="" placeholder="備註"></td>'
         + '<td><input type="text" name="items['+itemIdx+'][spec]" class="form-control" value=""></td>'
         + '<td><input type="text" name="items['+itemIdx+'][unit]" class="form-control" value=""></td>'
         + '<td><input type="number" name="items['+itemIdx+'][quantity]" class="form-control" step="1" min="1" value="1"></td>'

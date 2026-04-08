@@ -92,6 +92,7 @@ switch ($action) {
                         'unit'         => !empty($item['unit']) ? $item['unit'] : null,
                         'quantity'     => $qty,
                         'unit_price'   => !empty($item['unit_price']) ? $item['unit_price'] : 0,
+                        'note'         => !empty($item['note']) ? $item['note'] : null,
                     );
                     $totalQty += $qty;
                 }
