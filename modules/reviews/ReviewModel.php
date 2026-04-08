@@ -134,7 +134,8 @@ class ReviewModel
     }
 
     /**
-     * 取得可選工程人員清單
+     * 取得可選工程人員清單（依分公司過濾）
+     * 用於：清單頁的 篩選下拉
      * 條件：is_engineer = 1 或 role 為工程類 (engineer, eng_manager, eng_deputy)
      */
     public function getEngineerOptions(array $branchIds)
@@ -151,6 +152,25 @@ class ReviewModel
             ORDER BY u.branch_id, u.real_name
         ");
         $stmt->execute($branchIds);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 取得「所有」可選工程人員清單（不依分公司過濾）
+     * 用於：新增/編輯五星評價的表單，因為跨點施工常見，
+     *      製表人即使看不到其他分公司，也要能勾到支援的師傅
+     * 條件：is_engineer = 1 或 role 為工程類
+     */
+    public function getAllActiveEngineerOptions()
+    {
+        $stmt = $this->db->query("
+            SELECT u.id, u.real_name, u.branch_id, b.name AS branch_name
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            WHERE u.is_active = 1
+              AND (u.is_engineer = 1 OR u.role IN ('engineer','eng_manager','eng_deputy'))
+            ORDER BY u.branch_id, u.real_name
+        ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

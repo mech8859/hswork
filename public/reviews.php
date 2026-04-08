@@ -34,7 +34,8 @@ switch ($action) {
         $branches = $model->getBranchOptions($branchIds);
 
         // 建立人員 id → name 對照（給列表顯示用）
-        $engineers = $model->getEngineerOptions($branchIds);
+        // 用全公司清單，避免跨分公司支援師傅在列表顯示空白
+        $engineers = $model->getAllActiveEngineerOptions();
         $engineerNameMap = array();
         foreach ($engineers as $eng) {
             $engineerNameMap[(int)$eng['id']] = $eng['real_name'];
@@ -54,7 +55,8 @@ switch ($action) {
             redirect('/reviews.php');
         }
         $record = null;
-        $engineers = $model->getEngineerOptions($branchIds);
+        // 表單載入「所有 active 工程人員」（跨分公司支援，避免漏掉支援師傅）
+        $engineers = $model->getAllActiveEngineerOptions();
         $branches = $model->getBranchOptions($branchIds);
         $nextNumber = peek_next_doc_number('five_star_reviews');
 
@@ -77,7 +79,8 @@ switch ($action) {
             Session::flash('error', '找不到記錄');
             redirect('/reviews.php');
         }
-        $engineers = $model->getEngineerOptions($branchIds);
+        // 表單載入「所有 active 工程人員」（跨分公司支援，避免漏掉支援師傅）
+        $engineers = $model->getAllActiveEngineerOptions();
         $branches = $model->getBranchOptions($branchIds);
 
         $pageTitle = '編輯五星評價';
