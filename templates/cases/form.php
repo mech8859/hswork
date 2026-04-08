@@ -218,7 +218,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <?php
                 $currentStatus = isset($case['status']) ? $case['status'] : 'tracking';
                 $isBoss = Session::getUser() && Session::getUser()['role'] === 'boss';
-                $approvalStatuses = array('closed', 'completed_pending');
+                $approvalStatuses = array('closed', 'completed_pending', 'unpaid');
                 ?>
                 <select name="status" class="form-control">
                     <?php foreach (CaseModel::progressOptions() as $v => $l):
@@ -915,6 +915,139 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <input type="text" name="billing_tax_id" id="billingTaxIdInput" class="form-control" value="<?= e($case['billing_tax_id'] ?? '') ?>" placeholder="8碼統編">
             </div>
         </div>
+
+        <!-- 完工 3 關簽核 timeline + 我的簽核 -->
+        <?php if ($case):
+            require_once __DIR__ . '/../../modules/approvals/ApprovalModel.php';
+            $_compApp = new ApprovalModel();
+            $_compTimeline = $_compApp->getCaseCompletionTimeline($case['id']);
+            $_myFlow = $_compApp->getMyPendingCompletionFlow($case['id'], Auth::id());
+            $_levelLabels = array(1 => '工程主管', 2 => '行政人員', 3 => '會計人員');
+            // 自動帶值: 有無收款預設
+            $_autoHasPayment = ((float)($case['total_collected'] ?? 0) > 0) ? 1 : 0;
+            $_balance = (int)($case['balance_amount'] ?? 0);
+        ?>
+        <?php if (!empty($_compTimeline) || $_myFlow): ?>
+        <div style="margin:8px 0;padding:12px;background:#e3f2fd;border:1px solid #1565c0;border-radius:6px">
+            <div style="font-weight:600;margin-bottom:8px">📋 完工簽核流程</div>
+            <?php if (!empty($_compTimeline)): ?>
+            <table style="width:100%;font-size:.82rem;margin-bottom:8px">
+                <thead>
+                    <tr style="background:rgba(255,255,255,.5)">
+                        <th style="padding:4px 8px;text-align:left;width:90px">關卡</th>
+                        <th style="padding:4px 8px;text-align:left">簽核人</th>
+                        <th style="padding:4px 8px;text-align:left;width:80px">狀態</th>
+                        <th style="padding:4px 8px;text-align:left;width:140px">時間</th>
+                        <th style="padding:4px 8px;text-align:left">備註 / 額外資料</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($_compTimeline as $f):
+                        $payload = !empty($f['payload']) ? json_decode($f['payload'], true) : array();
+                    ?>
+                    <tr style="border-top:1px solid rgba(0,0,0,.08)">
+                        <td style="padding:4px 8px">第<?= (int)$f['level_order'] ?>關 <?= e(isset($_levelLabels[$f['level_order']]) ? $_levelLabels[$f['level_order']] : '') ?></td>
+                        <td style="padding:4px 8px"><?= e($f['approver_name'] ?? '-') ?></td>
+                        <td style="padding:4px 8px">
+                            <?php if ($f['status'] === 'pending'): ?><span style="color:#e65100">待簽核</span>
+                            <?php elseif ($f['status'] === 'approved'): ?><span style="color:#2e7d32">✓ 已核准</span>
+                            <?php elseif ($f['status'] === 'rejected'): ?><span style="color:#c62828">✗ 已駁回</span>
+                            <?php elseif ($f['status'] === 'cancelled'): ?><span style="color:#999">已取消</span>
+                            <?php else: ?><?= e($f['status']) ?><?php endif; ?>
+                        </td>
+                        <td style="padding:4px 8px"><?= e($f['decided_at'] ?? '-') ?></td>
+                        <td style="padding:4px 8px;color:#666">
+                            <?php if (!empty($payload['has_payment'])): ?>✓ 有收款<?php endif; ?>
+                            <?php if (isset($payload['has_payment']) && empty($payload['has_payment'])): ?>✗ 無收款<?php endif; ?>
+                            <?php if (!empty($payload['payment_received'])): ?> ✓ 款項已入帳<?php endif; ?>
+                            <?php if (!empty($f['comment'])): ?> <?= e($f['comment']) ?><?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+
+            <?php if ($_myFlow): ?>
+            <div style="background:#fff;padding:10px;border-radius:4px;border:1px solid #1565c0">
+                <strong>✋ 您要簽核：第 <?= (int)$_myFlow['level_order'] ?> 關 (<?= e($_levelLabels[$_myFlow['level_order']] ?? '') ?>)</strong>
+                <form method="POST" action="/approvals.php?action=approve" style="margin-top:8px" onsubmit="return confirm('確定核准？');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="flow_id" value="<?= (int)$_myFlow['id'] ?>">
+                    <input type="hidden" name="module" value="case_completion">
+                    <input type="hidden" name="target_id" value="<?= (int)$case['id'] ?>">
+                    <input type="hidden" name="redirect" value="/cases.php?action=edit&id=<?= (int)$case['id'] ?>#sec-billing">
+
+                    <?php if ($_myFlow['level_order'] == 2): ?>
+                    <!-- Level 2 行政人員：勾選有無收款 -->
+                    <div style="margin:6px 0">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                            <input type="checkbox" name="has_payment" value="1" <?= $_autoHasPayment ? 'checked' : '' ?>>
+                            <span>有收款（依目前總收款金額自動帶入：$<?= number_format((float)($case['total_collected'] ?? 0)) ?>，可手動勾消）</span>
+                        </label>
+                        <small style="color:#666">勾起 → 進入第 3 關（會計確認入帳）<br>不勾 → 案件直接進入「完工未收款」狀態</small>
+                    </div>
+                    <?php elseif ($_myFlow['level_order'] == 3): ?>
+                    <!-- Level 3 會計人員：勾款項已入帳 -->
+                    <div style="margin:6px 0">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                            <input type="checkbox" name="payment_received" value="1" required>
+                            <span>款項已入帳（必勾才能結案）</span>
+                        </label>
+                        <?php if ($_balance !== 0): ?>
+                        <div style="margin-top:6px;padding:8px;background:#ffebee;border:1px solid #c62828;border-radius:4px;font-size:.85rem;color:#c62828">
+                            ⚠ 警告：尾款還有 <strong>$<?= number_format($_balance) ?></strong>，<strong>無法結案</strong>。請先到帳款交易紀錄補登收款，或請業務做折讓。
+                        </div>
+                        <?php else: ?>
+                        <small style="color:#2e7d32">✓ 尾款 $0，可以結案</small>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <div style="margin-top:6px">
+                        <input type="text" name="comment" class="form-control" placeholder="備註（選填）" style="font-size:.85rem">
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:8px">
+                        <button type="submit" class="btn btn-success btn-sm" <?= ($_myFlow['level_order'] == 3 && $_balance !== 0) ? 'disabled' : '' ?>>✓ 核准</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="completionRejectShow(<?= (int)$_myFlow['id'] ?>, <?= (int)$case['id'] ?>)">✗ 駁回</button>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; endif; ?>
+
+        <!-- 完工駁回對話框 -->
+        <?php if (!empty($_myFlow)): ?>
+        <div id="completionRejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center">
+            <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%">
+                <h3 style="margin-top:0">駁回完工簽核</h3>
+                <form method="POST" action="/approvals.php?action=reject">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="flow_id" id="completionRejectFlowId">
+                    <input type="hidden" name="module" value="case_completion">
+                    <input type="hidden" name="target_id" id="completionRejectCaseId">
+                    <input type="hidden" name="redirect" id="completionRejectRedirect">
+                    <div style="margin-bottom:12px">
+                        <label style="font-size:.85rem;font-weight:600">駁回原因</label>
+                        <textarea name="comment" class="form-control" rows="3" placeholder="請輸入駁回原因" required></textarea>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('completionRejectModal').style.display='none'">取消</button>
+                        <button type="submit" class="btn btn-danger">確定駁回</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script>
+        function completionRejectShow(flowId, caseId) {
+            document.getElementById('completionRejectFlowId').value = flowId;
+            document.getElementById('completionRejectCaseId').value = caseId;
+            document.getElementById('completionRejectRedirect').value = '/cases.php?action=edit&id=' + caseId + '#sec-billing';
+            document.getElementById('completionRejectModal').style.display = 'flex';
+        }
+        </script>
+        <?php endif; ?>
 
         <!-- 無訂金排工簽核 -->
         <?php if ($case):

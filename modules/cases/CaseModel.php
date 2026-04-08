@@ -398,8 +398,8 @@ class CaseModel
      */
     public function update(int $id, array $data): void
     {
-        // 完工狀態保護：closed / completed_pending 只能透過簽核流程變更
-        $protectedStatuses = array('closed', 'completed_pending');
+        // 完工狀態保護：closed / completed_pending / unpaid 只能透過簽核流程變更
+        $protectedStatuses = array('closed', 'completed_pending', 'unpaid');
         $newStatus = isset($data['status']) ? $data['status'] : '';
         if (in_array($newStatus, $protectedStatuses) && empty($data['_from_approval'])) {
             $cur = $this->db->prepare("SELECT status FROM cases WHERE id = ?");
@@ -409,7 +409,12 @@ class CaseModel
             if ($curStatus !== $newStatus) {
                 $user = Session::getUser();
                 if (!$user || $user['role'] !== 'boss') {
-                    $label = $newStatus === 'closed' ? '已完工結案' : '已完工待簽核';
+                    $labels = array(
+                        'closed' => '已完工結案',
+                        'completed_pending' => '已完工待簽核',
+                        'unpaid' => '完工未收款',
+                    );
+                    $label = isset($labels[$newStatus]) ? $labels[$newStatus] : $newStatus;
                     throw new \RuntimeException('「' . $label . '」需透過完工簽核流程變更，無法手動修改');
                 }
             }

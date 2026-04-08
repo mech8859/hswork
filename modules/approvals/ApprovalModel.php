@@ -718,99 +718,211 @@ class ApprovalModel
     }
 
     /**
-     * 完工簽核 - 工程主管核准後推進到 level 2（會計）
-     * 多人擇一簽核：當該 level 至少一筆 approved 且無 pending 時，視為通過該關
-     * @return bool true=還有下一關待簽, false=全部簽完
+     * 完工簽核 - 多關推進邏輯（3 關）
+     *
+     * Level 1 (工程主管) approved → 自動建立 Level 2 (行政人員)
+     * Level 2 (行政人員) approved with payload has_payment=true → 自動建立 Level 3 (會計)
+     * Level 2 (行政人員) approved with payload has_payment=false → 不建 Level 3，案件 status='unpaid'
+     * Level 3 (會計) approved → 案件 status='closed' (但需先檢查 balance_amount=0，否則 throw)
+     *
+     * @return array
+     *   - next_level: int|null 下一關層級（null=已結束）
+     *   - status: string  'pending_next' / 'unpaid' / 'closed' / 'no_rule'
+     *   - error: string|null  錯誤訊息（例如尾款不為 0）
      */
     public function advanceCaseCompletion($caseId)
     {
-        // 檢查 level 1 是否還有 pending（多人擇一：只要無 pending 就視為已決定）
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM approval_flows
-            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1 AND status = 'pending'
-        ");
+        // ---- 1) 檢查 level 1 ----
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=1 AND status='pending'");
         $stmt->execute(array($caseId));
-        if ((int)$stmt->fetchColumn() > 0) return true; // level 1 還有人待簽
-
-        // 確認 level 1 至少有一筆 approved（避免全部 cancelled 也推進）
-        $okStmt = $this->db->prepare("
-            SELECT COUNT(*) FROM approval_flows
-            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1 AND status = 'approved'
-        ");
+        if ((int)$stmt->fetchColumn() > 0) {
+            return array('next_level' => 1, 'status' => 'pending_next', 'error' => null);
+        }
+        $okStmt = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=1 AND status='approved'");
         $okStmt->execute(array($caseId));
-        if ((int)$okStmt->fetchColumn() === 0) return false; // 沒人核准就不推進
+        if ((int)$okStmt->fetchColumn() === 0) {
+            // 沒人核准 level 1 → 不推進
+            return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
+        }
 
-        // 檢查 level 2 是否已建立
-        $stmt2 = $this->db->prepare("
-            SELECT COUNT(*) FROM approval_flows
-            WHERE module = 'case_completion' AND target_id = ? AND level_order = 2
-        ");
+        // ---- 2) 檢查 level 2 ----
+        $stmt2 = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=2");
         $stmt2->execute(array($caseId));
-        if ((int)$stmt2->fetchColumn() > 0) {
-            // level 2 已存在 → 同樣以 pending 判斷
-            $stmt3 = $this->db->prepare("
-                SELECT COUNT(*) FROM approval_flows
-                WHERE module = 'case_completion' AND target_id = ? AND level_order = 2 AND status = 'pending'
-            ");
-            $stmt3->execute(array($caseId));
-            return (int)$stmt3->fetchColumn() > 0; // true=還沒全過
+        if ((int)$stmt2->fetchColumn() === 0) {
+            // 還沒建 level 2 → 建立
+            return $this->buildNextCompletionLevel($caseId, 2);
+        }
+        // level 2 已存在 → 是否還有 pending
+        $stmt2p = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=2 AND status='pending'");
+        $stmt2p->execute(array($caseId));
+        if ((int)$stmt2p->fetchColumn() > 0) {
+            return array('next_level' => 2, 'status' => 'pending_next', 'error' => null);
+        }
+        // level 2 已決定 → 讀取 payload 看 has_payment
+        $payloadStmt = $this->db->prepare("
+            SELECT payload FROM approval_flows
+            WHERE module='case_completion' AND target_id=? AND level_order=2 AND status='approved'
+            ORDER BY decided_at DESC LIMIT 1
+        ");
+        $payloadStmt->execute(array($caseId));
+        $payloadStr = $payloadStmt->fetchColumn();
+        $hasPayment = false;
+        if ($payloadStr) {
+            $payload = json_decode($payloadStr, true);
+            $hasPayment = !empty($payload['has_payment']);
+        }
+        if (!$hasPayment) {
+            // 無收款 → 案件 status='unpaid'，流程結束
+            return array('next_level' => null, 'status' => 'unpaid', 'error' => null);
         }
 
-        // level 2 不存在 → 自動建立
-        $rule = $this->db->prepare("
-            SELECT * FROM approval_rules
-            WHERE module = 'case_completion' AND is_active = 1 AND level_order = 2
-            ORDER BY id LIMIT 1
-        ");
-        $rule->execute();
-        $rule2 = $rule->fetch(PDO::FETCH_ASSOC);
-
-        if (!$rule2) {
-            // 沒有 level 2 規則 → 直接結案
-            return false;
+        // ---- 3) 檢查 level 3 ----
+        $stmt3 = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=3");
+        $stmt3->execute(array($caseId));
+        if ((int)$stmt3->fetchColumn() === 0) {
+            // 還沒建 level 3 → 建立
+            return $this->buildNextCompletionLevel($caseId, 3);
         }
-
-        $approverIds = $this->resolveRuleApproverIds($rule2);
-        if (empty($approverIds)) return false; // 找不到簽核人 → 直接結案
-
-        // 取得原始送簽人
-        $origStmt = $this->db->prepare("
-            SELECT submitted_by FROM approval_flows
-            WHERE module = 'case_completion' AND target_id = ? AND level_order = 1
-            ORDER BY id LIMIT 1
-        ");
-        $origStmt->execute(array($caseId));
-        $submittedBy = $origStmt->fetchColumn() ?: 0;
-
-        $insertStmt = $this->db->prepare("
-            INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
-            VALUES ('case_completion', ?, ?, 2, ?, 'pending', ?)
-        ");
-        foreach ($approverIds as $aid) {
-            $insertStmt->execute(array($caseId, $rule2['id'], $aid, $submittedBy));
+        $stmt3p = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=3 AND status='pending'");
+        $stmt3p->execute(array($caseId));
+        if ((int)$stmt3p->fetchColumn() > 0) {
+            return array('next_level' => 3, 'status' => 'pending_next', 'error' => null);
         }
-
-        return true; // 還有下一關
+        // level 3 已決定 → 檢查 balance_amount
+        $okStmt3 = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=3 AND status='approved'");
+        $okStmt3->execute(array($caseId));
+        if ((int)$okStmt3->fetchColumn() === 0) {
+            return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
+        }
+        // 強制檢查尾款
+        $bal = $this->db->prepare("SELECT balance_amount FROM cases WHERE id = ?");
+        $bal->execute(array($caseId));
+        $balance = (int)$bal->fetchColumn();
+        if ($balance !== 0) {
+            return array(
+                'next_level' => null,
+                'status' => 'closed_blocked',
+                'error' => '尾款還有 $' . number_format($balance) . '，無法結案。請先補登收款或折讓金額。',
+            );
+        }
+        return array('next_level' => null, 'status' => 'closed', 'error' => null);
     }
 
     /**
-     * 確保 case_completion 規則存在（自動建立預設）
+     * 建立完工簽核的下一關（由 advanceCaseCompletion 呼叫）
+     */
+    private function buildNextCompletionLevel($caseId, $level)
+    {
+        $rule = $this->db->prepare("
+            SELECT * FROM approval_rules
+            WHERE module='case_completion' AND is_active=1 AND level_order=?
+            ORDER BY id LIMIT 1
+        ");
+        $rule->execute(array($level));
+        $ruleRow = $rule->fetch(PDO::FETCH_ASSOC);
+        if (!$ruleRow) {
+            return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
+        }
+        $approverIds = $this->resolveRuleApproverIds($ruleRow);
+        if (empty($approverIds)) {
+            return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
+        }
+        // 取得原始送簽人
+        $orig = $this->db->prepare("SELECT submitted_by FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=1 ORDER BY id LIMIT 1");
+        $orig->execute(array($caseId));
+        $submittedBy = $orig->fetchColumn() ?: 0;
+        $insertStmt = $this->db->prepare("
+            INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
+            VALUES ('case_completion', ?, ?, ?, ?, 'pending', ?)
+        ");
+        foreach ($approverIds as $aid) {
+            $insertStmt->execute(array($caseId, $ruleRow['id'], $level, $aid, $submittedBy));
+        }
+        return array('next_level' => $level, 'status' => 'pending_next', 'error' => null);
+    }
+
+    /**
+     * 寫入 approval_flows.payload (JSON)
+     */
+    public function setFlowPayload($flowId, $payload)
+    {
+        $json = is_array($payload) ? json_encode($payload, JSON_UNESCAPED_UNICODE) : (string)$payload;
+        try {
+            $this->db->prepare("UPDATE approval_flows SET payload = ? WHERE id = ?")
+                     ->execute(array($json, $flowId));
+        } catch (Exception $e) {
+            // payload 欄位可能不存在 (migration 未跑) - 靜默忽略
+            error_log('setFlowPayload error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 讀取 approval_flows.payload (JSON)
+     */
+    public function getFlowPayload($flowId)
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT payload FROM approval_flows WHERE id = ?");
+            $stmt->execute(array($flowId));
+            $row = $stmt->fetchColumn();
+            if (!$row) return array();
+            $decoded = json_decode($row, true);
+            return is_array($decoded) ? $decoded : array();
+        } catch (Exception $e) {
+            return array();
+        }
+    }
+
+    /**
+     * 取得案件完工簽核的完整 timeline (3 關所有 flows)
+     */
+    public function getCaseCompletionTimeline($caseId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT af.*, u.real_name AS approver_name, su.real_name AS submitter_name
+            FROM approval_flows af
+            LEFT JOIN users u ON af.approver_id = u.id
+            LEFT JOIN users su ON af.submitted_by = su.id
+            WHERE af.module = 'case_completion' AND af.target_id = ?
+            ORDER BY af.level_order, af.id
+        ");
+        $stmt->execute(array($caseId));
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 取得目前使用者該案件待簽核的 flow（如果有）
+     */
+    public function getMyPendingCompletionFlow($caseId, $userId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT * FROM approval_flows
+            WHERE module='case_completion' AND target_id=? AND approver_id=? AND status='pending'
+            ORDER BY level_order DESC LIMIT 1
+        ");
+        $stmt->execute(array($caseId, $userId));
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * 確保 case_completion 三條規則都存在（Level 1/2/3）
      */
     private function ensureCaseCompletionRules()
     {
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM approval_rules WHERE module = 'case_completion' AND is_active = 1");
-        $stmt->execute();
-        if ((int)$stmt->fetchColumn() > 0) return;
-
-        // 自動建立預設規則
-        $this->db->prepare("
-            INSERT INTO approval_rules (module, rule_name, min_amount, max_amount, min_profit_rate, approver_role, approver_id, level_order, is_active)
-            VALUES ('case_completion', '完工簽核 - 工程主管', 0, NULL, NULL, 'eng_manager', NULL, 1, 1)
-        ")->execute();
-        $this->db->prepare("
-            INSERT INTO approval_rules (module, rule_name, min_amount, max_amount, min_profit_rate, approver_role, approver_id, level_order, is_active)
-            VALUES ('case_completion', '完工簽核 - 會計確認', 0, NULL, NULL, 'admin_staff', NULL, 2, 1)
-        ")->execute();
+        $defaults = array(
+            1 => array('name' => '完工簽核 - Level 1 工程主管', 'role' => 'eng_manager'),
+            2 => array('name' => '完工簽核 - Level 2 行政人員（勾選有無收款）', 'role' => 'admin_staff'),
+            3 => array('name' => '完工簽核 - Level 3 會計人員（確認入帳）', 'role' => 'accountant'),
+        );
+        foreach ($defaults as $level => $info) {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM approval_rules WHERE module='case_completion' AND level_order=? AND is_active=1");
+            $stmt->execute(array($level));
+            if ((int)$stmt->fetchColumn() > 0) continue;
+            $this->db->prepare("
+                INSERT INTO approval_rules (module, rule_name, min_amount, max_amount, min_profit_rate, approver_role, approver_id, level_order, is_active)
+                VALUES ('case_completion', ?, 0, NULL, NULL, ?, NULL, ?, 1)
+            ")->execute(array($info['name'], $info['role'], $level));
+        }
     }
 
     /**

@@ -92,38 +92,85 @@ switch ($action) {
                     require_once __DIR__ . '/../modules/notifications/NotificationModel.php';
                     $notifModel = new NotificationModel();
                     $db = Database::getInstance();
-                    $caseStmt = $db->prepare("SELECT title, branch_id FROM cases WHERE id = ?");
+                    $caseStmt = $db->prepare("SELECT title, branch_id, status, balance_amount FROM cases WHERE id = ?");
                     $caseStmt->execute(array($targetId));
                     $caseInfo = $caseStmt->fetch();
                     $caseTitleAppr = $caseInfo ? $caseInfo['title'] : '';
 
-                    // 多人擇一簽核：取消同 level 其他 pending（取得 flow level）
+                    // 取得當前 flow 的 level
                     $lvStmt = $db->prepare("SELECT level_order FROM approval_flows WHERE id = ?");
                     $lvStmt->execute(array($flowId));
                     $flowLevel = (int)$lvStmt->fetchColumn();
+
+                    // Level 3 結案前先檢查 balance_amount = 0（強制）
+                    if ($flowLevel === 3 && $caseInfo && (int)$caseInfo['balance_amount'] !== 0) {
+                        // 將剛剛 approve 的 flow 退回 pending（撤回）
+                        $db->prepare("UPDATE approval_flows SET status='pending', decided_at=NULL WHERE id=?")->execute(array($flowId));
+                        Session::flash('error', '尾款還有 $' . number_format($caseInfo['balance_amount']) . '，無法結案。請先補登收款或折讓金額。');
+                        $redirect = !empty($_POST['redirect']) ? $_POST['redirect'] : '/approvals.php';
+                        redirect($redirect);
+                        break;
+                    }
+
+                    // 寫入 payload (Level 2: has_payment, Level 3: payment_received)
+                    if ($flowLevel === 2) {
+                        $hasPayment = !empty($_POST['has_payment']);
+                        $model->setFlowPayload($flowId, array('has_payment' => $hasPayment));
+                    } elseif ($flowLevel === 3) {
+                        $paymentReceived = !empty($_POST['payment_received']);
+                        if (!$paymentReceived) {
+                            // 必勾才能核准
+                            $db->prepare("UPDATE approval_flows SET status='pending', decided_at=NULL WHERE id=?")->execute(array($flowId));
+                            Session::flash('error', '會計簽核必須勾選「款項已入帳」');
+                            $redirect = !empty($_POST['redirect']) ? $_POST['redirect'] : '/approvals.php';
+                            redirect($redirect);
+                            break;
+                        }
+                        $model->setFlowPayload($flowId, array('payment_received' => true));
+                    }
+
+                    // 多人擇一簽核：取消同 level 其他 pending
                     if ($flowLevel > 0) {
                         $model->cancelSiblingPendingFlows('case_completion', $targetId, $flowLevel, $flowId);
                     }
 
-                    // 完工簽核多關流程
-                    $stillPending = $model->advanceCaseCompletion($targetId);
-                    if (!$stillPending) {
-                        // 全部簽完 → 案件結案
-                        $db->prepare("UPDATE cases SET status = 'closed' WHERE id = ?")->execute(array($targetId));
+                    // 推進到下一關
+                    $advance = $model->advanceCaseCompletion($targetId);
+                    $advStatus = isset($advance['status']) ? $advance['status'] : 'no_rule';
+
+                    if ($advStatus === 'closed_blocked') {
+                        // 不應該到這裡（前面已擋），保險起見再擋一次
+                        Session::flash('error', $advance['error']);
+                    } elseif ($advStatus === 'closed') {
+                        // 全部簽完 + 尾款=0 → 案件結案
+                        $db->prepare("UPDATE cases SET status = 'closed', progress = 'closed' WHERE id = ?")->execute(array($targetId));
                         Session::flash('success', '已核准，案件已完工結案');
+                    } elseif ($advStatus === 'unpaid') {
+                        // Level 2 勾無收款 → 完工未收款
+                        $db->prepare("UPDATE cases SET status = 'unpaid', progress = 'unpaid' WHERE id = ?")->execute(array($targetId));
+                        Session::flash('success', '已核准 (勾選無收款)，案件狀態：完工未收款');
+                    } elseif ($advStatus === 'pending_next') {
+                        // 送下一關 → 通知
+                        $nextLevel = (int)$advance['next_level'];
+                        $levelLabels = array(2 => '行政人員', 3 => '會計人員');
+                        $nextLabel = isset($levelLabels[$nextLevel]) ? $levelLabels[$nextLevel] : '下一關';
+
+                        // 通知下一關所有 pending 簽核人
+                        $nextStmt = $db->prepare("SELECT approver_id FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=? AND status='pending'");
+                        $nextStmt->execute(array($targetId, $nextLevel));
+                        foreach ($nextStmt->fetchAll(PDO::FETCH_COLUMN) as $approverId) {
+                            $notifModel->send(
+                                $approverId,
+                                'approval_pending',
+                                '待簽核（完工 第' . $nextLevel . '關）：' . $caseTitleAppr,
+                                '請進入案件確認簽核',
+                                '/cases.php?action=edit&id=' . $targetId . '#sec-billing',
+                                'case', $targetId, Auth::id()
+                            );
+                        }
+                        Session::flash('success', '已核准，已送 ' . $nextLabel . ' 簽核');
                     } else {
-                        // 送下一關（會計）→ 通知會計
-                        $db->prepare("UPDATE cases SET status = 'accounting_pending' WHERE id = ?")->execute(array($targetId));
-                        $notifModel->sendToRole(
-                            'admin_staff',
-                            $caseInfo ? $caseInfo['branch_id'] : null,
-                            'accounting_pending',
-                            '待入帳確認：' . $caseTitleAppr,
-                            '工程主管已簽核完工，請確認帳款入帳',
-                            '/approvals.php',
-                            'case', $targetId, Auth::id()
-                        );
-                        Session::flash('success', '已核准，已送會計確認入帳');
+                        Session::flash('success', '已核准');
                     }
                 } elseif ($module === 'case_payments' && $targetId) {
                     if ($model->isFullyApproved('case_payments', $targetId)) {
