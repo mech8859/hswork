@@ -340,6 +340,90 @@ class ReturnModel
     }
 
     // ============================================================
+    // ADMIN 工具區（測試期專用 - 完成後可移除）
+    // ADMIN_TOOL_BLOCK_START
+    // ============================================================
+
+    /**
+     * ADMIN: 退貨單刪除前防呆檢查
+     */
+    public function checkDeletable($id)
+    {
+        $reasons = array();
+        $record = $this->getById($id);
+        if (!$record) {
+            $reasons[] = '退貨單不存在';
+            return $reasons;
+        }
+        $rtNumber = isset($record['return_number']) ? $record['return_number'] : '';
+
+        // 1) 是否被應付帳款引用
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM payable_return_details WHERE return_number = ?");
+            $stmt->execute(array($rtNumber));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此退貨單已被應付帳款明細引用 (return_number=' . $rtNumber . ')';
+            }
+        } catch (Exception $e) {}
+
+        // 2) 是否有 inventory_transactions 引用
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM inventory_transactions WHERE reference_type = 'return' AND reference_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此退貨單已產生庫存異動紀錄（請改用盤點單調整）';
+            }
+        } catch (Exception $e) {}
+
+        // 3) 對應自動分錄
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM journal_entries WHERE source_module = 'return' AND source_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此退貨單已產生會計分錄，請先處理分錄';
+            }
+        } catch (Exception $e) {}
+
+        return $reasons;
+    }
+
+    /**
+     * ADMIN: 硬刪退貨單
+     */
+    public function deleteHard($id)
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute(array($id));
+            $this->db->prepare("DELETE FROM returns WHERE id = ?")->execute(array($id));
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * ADMIN: 修改退貨單廠商
+     * 注意：returns 表只存 vendor_name (無 vendor_id 欄位)
+     * 但仍要求 vendor_id 必填（驗證用 autocomplete 才能存）
+     * @param int $id
+     * @param array $data 必須含 vendor_name + vendor_id
+     */
+    public function updateBasic($id, $data)
+    {
+        if (empty($data['vendor_name']) || empty($data['vendor_id'])) {
+            throw new Exception('廠商必須從廠商管理選擇，不可空白');
+        }
+        $this->db->prepare("UPDATE returns SET vendor_name = ?, updated_at = NOW() WHERE id = ?")
+                 ->execute(array($data['vendor_name'], $id));
+        return true;
+    }
+
+    // ADMIN_TOOL_BLOCK_END
+
+    // ============================================================
     // 明細儲存
     // ============================================================
 

@@ -2,7 +2,7 @@
 
 <h2><?= $isEdit ? '編輯進貨單 - ' . e($record['gr_number']) : '新增進貨單' ?></h2>
 
-<form method="POST" class="mt-2" id="grForm">
+<form method="POST" class="mt-2" id="grForm" onsubmit="return grValidateVendorBeforeSubmit()">
     <?= csrf_field() ?>
 
     <?php
@@ -78,11 +78,13 @@
             </div>
         </div>
         <div class="form-row">
-            <div class="form-group">
-                <label>廠商名稱</label>
-                <input type="text" name="vendor_name" id="vendor_name" class="form-control"
-                       value="<?= e($gv('vendor_name')) ?>">
+            <div class="form-group" style="position:relative">
+                <label>廠商名稱 <span style="color:#c62828">*</span> <small style="color:#888;font-weight:normal">(必須從廠商管理選擇)</small></label>
+                <input type="text" name="vendor_name" id="vendor_name" class="form-control" autocomplete="off"
+                       value="<?= e($gv('vendor_name')) ?>" oninput="grVendorAutoSearch(this)" required>
                 <input type="hidden" name="vendor_id" id="vendor_id" value="<?= e($gv('vendor_id')) ?>">
+                <div id="grVendorACDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+                <small id="grVendorWarning" style="display:none;color:#c62828;font-size:.75rem">⚠ 廠商必須從下拉選單選擇，找不到請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</small>
             </div>
             <div class="form-group">
                 <label>收貨人</label>
@@ -503,4 +505,65 @@ document.getElementById('grBranch').addEventListener('change', function() {
 });
 // Init on load
 if (document.getElementById('grWarehouse').value) onGrWarehouseChange();
+
+// ===== 廠商強制必選 autocomplete =====
+function grValidateVendorBeforeSubmit() {
+    var vid = document.getElementById('vendor_id').value;
+    var vname = document.getElementById('vendor_name').value.trim();
+    if (!vname) {
+        alert('請輸入廠商名稱');
+        return false;
+    }
+    if (!vid || parseInt(vid) <= 0) {
+        alert('廠商必須從下拉清單選擇，不可手動輸入。\n找不到請先到「廠商管理」建立。');
+        document.getElementById('grVendorWarning').style.display = 'block';
+        return false;
+    }
+    return true;
+}
+var grVendorTimer = null;
+function grVendorAutoSearch(inp) {
+    // 改字立刻清掉 vendor_id (避免改名字後仍套用舊 id)
+    document.getElementById('vendor_id').value = '';
+    document.getElementById('grVendorWarning').style.display = 'none';
+    clearTimeout(grVendorTimer);
+    var q = inp.value.trim();
+    var dd = document.getElementById('grVendorACDropdown');
+    if (q.length < 1) { dd.style.display = 'none'; return; }
+    grVendorTimer = setTimeout(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/payments_out.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
+        xhr.onload = function() {
+            try { var list = JSON.parse(xhr.responseText); } catch(e) { return; }
+            if (!list.length) {
+                dd.innerHTML = '<div style="padding:8px 12px;color:#c62828;font-size:.85rem">無符合廠商，請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</div>';
+                dd.style.display = 'block';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < list.length; i++) {
+                html += '<div class="grv-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:.85rem" '
+                    + 'data-id="' + (list[i].id||'') + '" data-name="' + (list[i].name||'').replace(/"/g,'&quot;') + '" '
+                    + 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">'
+                    + '<div style="font-weight:600">' + (list[i].name||'') + '</div>'
+                    + '<div style="font-size:.75rem;color:#888">' + (list[i].vendor_code ? '編號:' + list[i].vendor_code : '') + ' ' + (list[i].contact_person||'') + ' ' + (list[i].phone||'') + '</div></div>';
+            }
+            dd.innerHTML = html;
+            dd.style.display = 'block';
+            dd.querySelectorAll('.grv-item').forEach(function(it) {
+                it.addEventListener('click', function() {
+                    document.getElementById('vendor_name').value = this.getAttribute('data-name');
+                    document.getElementById('vendor_id').value = this.getAttribute('data-id');
+                    dd.style.display = 'none';
+                });
+            });
+        };
+        xhr.send();
+    }, 250);
+}
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('grVendorACDropdown');
+    var inp = document.getElementById('vendor_name');
+    if (dd && !dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
+});
 </script>

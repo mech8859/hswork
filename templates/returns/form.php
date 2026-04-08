@@ -54,10 +54,12 @@
                 <div id="rtCustomerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--gray-200);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
             </div>
             <div class="form-group" style="position:relative">
-                <label>廠商名稱</label>
-                <input type="text" name="vendor_name" id="rtVendorInput" class="form-control"
-                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" autocomplete="off" placeholder="輸入關鍵字搜尋或手動輸入">
+                <label>廠商名稱 <span style="color:#c62828">*</span> <small style="color:#888;font-weight:normal">(必須從廠商管理選擇)</small></label>
+                <input type="text" name="vendor_name" id="rtVendorInput" class="form-control" required
+                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" autocomplete="off" placeholder="輸入關鍵字搜尋廠商">
+                <input type="hidden" name="vendor_id" id="rtVendorId" value="<?= e($isEdit && !empty($record['vendor_id']) ? $record['vendor_id'] : '') ?>">
                 <div id="rtVendorDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--gray-200);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+                <small style="color:#888;font-size:.7rem">⚠ 找不到請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</small>
             </div>
             <div class="form-group">
                 <label>來源單據類型</label>
@@ -288,13 +290,15 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// ---- 廠商搜尋 ----
+// ---- 廠商搜尋（強制必選）----
 (function(){
     var inp = document.getElementById('rtVendorInput');
     var dd = document.getElementById('rtVendorDropdown');
+    var idEl = document.getElementById('rtVendorId');
     if (!inp || !dd) return;
     var timer = null;
     inp.addEventListener('input', function(){
+        if (idEl) idEl.value = '';  // 改字立刻清掉 vendor_id
         clearTimeout(timer);
         var q = this.value.trim();
         if (q.length < 1) { dd.style.display = 'none'; return; }
@@ -302,11 +306,16 @@ document.addEventListener('click', function(e) {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '/payments_out.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
             xhr.onload = function(){
-                var list = JSON.parse(xhr.responseText);
-                if (!list.length) { dd.innerHTML = '<div style="padding:8px;color:#999;font-size:.85rem">無符合廠商</div>'; dd.style.display = 'block'; return; }
+                var list;
+                try { list = JSON.parse(xhr.responseText); } catch(e) { return; }
+                if (!list.length) {
+                    dd.innerHTML = '<div style="padding:8px;color:#c62828;font-size:.85rem">無符合廠商，請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</div>';
+                    dd.style.display = 'block';
+                    return;
+                }
                 var html = '';
                 for (var i = 0; i < list.length; i++) {
-                    html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" data-name="' + escHtml(list[i].name||'') + '" onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">' +
+                    html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" data-id="' + (list[i].id||'') + '" data-name="' + escHtml(list[i].name||'') + '" onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">' +
                         '<div style="font-weight:600">' + escHtml(list[i].name||'') + '</div>' +
                         (list[i].contact_person ? '<div style="font-size:.75rem;color:#888">' + escHtml(list[i].contact_person) + '</div>' : '') + '</div>';
                 }
@@ -317,8 +326,32 @@ document.addEventListener('click', function(e) {
         }, 300);
     });
     dd.addEventListener('click', function(e){
-        var item = e.target.closest('div[data-name]');
-        if (item) { inp.value = item.dataset.name; dd.style.display = 'none'; }
+        var item = e.target.closest('div[data-id]');
+        if (item) {
+            inp.value = item.dataset.name;
+            if (idEl) idEl.value = item.dataset.id;
+            dd.style.display = 'none';
+        }
+    });
+})();
+
+// ---- 提交前驗證：廠商必須有 ID ----
+(function(){
+    var form = document.getElementById('returnForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e){
+        var vname = document.getElementById('rtVendorInput');
+        var vid = document.getElementById('rtVendorId');
+        if (!vname || !vname.value.trim()) {
+            e.preventDefault();
+            alert('請輸入廠商');
+            return false;
+        }
+        if (!vid || !vid.value || parseInt(vid.value) <= 0) {
+            e.preventDefault();
+            alert('廠商必須從下拉清單選擇，不可手動輸入。\n找不到請先到「廠商管理」建立。');
+            return false;
+        }
     });
 })();
 

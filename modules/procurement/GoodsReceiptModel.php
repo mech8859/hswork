@@ -393,6 +393,117 @@ class GoodsReceiptModel
     }
 
     // ============================================================
+    // ADMIN 工具區（測試期專用 - 完成後可移除）
+    // 標記：ADMIN_TOOL_BLOCK_START / ADMIN_TOOL_BLOCK_END
+    // ============================================================
+    // ADMIN_TOOL_BLOCK_START
+
+    /**
+     * ADMIN: 進貨單刪除前防呆檢查
+     * @return array 空陣列=可刪；非空=拒絕原因清單
+     */
+    public function checkDeletable($id)
+    {
+        $reasons = array();
+        $record = $this->getById($id);
+        if (!$record) {
+            $reasons[] = '進貨單不存在';
+            return $reasons;
+        }
+        $grNumber = $record['gr_number'];
+
+        // 1) 是否被應付帳款引用 (payable_purchase_details.purchase_number)
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM payable_purchase_details WHERE purchase_number = ?");
+            $stmt->execute(array($grNumber));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已被應付帳款明細引用 (purchase_number=' . $grNumber . ')';
+            }
+        } catch (Exception $e) {}
+
+        // 2) 是否被進項發票引用 (purchase_invoices.reference_type='goods_receipt')
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM purchase_invoices WHERE reference_type = 'goods_receipt' AND reference_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已被進項發票引用';
+            }
+        } catch (Exception $e) {}
+
+        // 3) 是否被入庫單引用 (stock_ins.source_type='goods_receipt')
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM stock_ins WHERE source_type = 'goods_receipt' AND source_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已轉成入庫單，請先處理入庫單';
+            }
+        } catch (Exception $e) {}
+
+        // 4) 是否有 inventory_transactions 引用
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM inventory_transactions WHERE reference_type = 'goods_receipt' AND reference_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已產生庫存異動紀錄（請改用盤點單調整）';
+            }
+        } catch (Exception $e) {}
+
+        // 5) 是否被退貨單引用 (returns.gr_id)
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM returns WHERE gr_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已被退貨單引用';
+            }
+        } catch (Exception $e) {}
+
+        // 6) 對應自動分錄
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM journal_entries WHERE source_module = 'goods_receipt' AND source_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此進貨單已產生會計分錄，請先處理分錄';
+            }
+        } catch (Exception $e) {}
+
+        return $reasons;
+    }
+
+    /**
+     * ADMIN: 硬刪進貨單
+     */
+    public function deleteHard($id)
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM goods_receipt_items WHERE goods_receipt_id = ?")->execute(array($id));
+            $this->db->prepare("DELETE FROM goods_receipts WHERE id = ?")->execute(array($id));
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * ADMIN: 修改進貨單廠商
+     * @param int $id
+     * @param array $data 必須含 vendor_name + vendor_id (autocomplete 帶入)
+     */
+    public function updateBasic($id, $data)
+    {
+        if (empty($data['vendor_name']) || empty($data['vendor_id'])) {
+            throw new Exception('廠商必須從廠商管理選擇，不可空白');
+        }
+        $this->db->prepare("UPDATE goods_receipts SET vendor_name = ?, vendor_id = ?, updated_at = NOW() WHERE id = ?")
+                 ->execute(array($data['vendor_name'], (int)$data['vendor_id'], $id));
+        return true;
+    }
+
+    // ADMIN_TOOL_BLOCK_END
+
+    // ============================================================
     // 從採購單建立
     // ============================================================
 

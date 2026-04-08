@@ -33,6 +33,12 @@ switch ($action) {
                 redirect('/returns.php');
             }
 
+            // 強制廠商必選 (vendor_id 必填)
+            if (empty($_POST['vendor_id']) || empty($_POST['vendor_name'])) {
+                Session::flash('error', '廠商必須從廠商管理選擇，不可手動輸入或留空');
+                redirect('/returns.php?action=create');
+            }
+
             $userId = Session::getUser()['id'];
             $data = array(
                 'return_date'    => !empty($_POST['return_date']) ? $_POST['return_date'] : date('Y-m-d'),
@@ -88,6 +94,19 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
+                redirect('/returns.php?action=edit&id=' . $id);
+            }
+
+            // 強制廠商必選（編輯時）
+            // 歷史單舊資料 vendor_id 為空也允許保留，只擋「使用者改了廠商欄位卻沒帶 ID」
+            $oldVendorName = isset($record['vendor_name']) ? trim($record['vendor_name']) : '';
+            $newVendorName = isset($_POST['vendor_name']) ? trim($_POST['vendor_name']) : '';
+            if ($newVendorName === '') {
+                Session::flash('error', '廠商不可留空');
+                redirect('/returns.php?action=edit&id=' . $id);
+            }
+            if ($newVendorName !== $oldVendorName && empty($_POST['vendor_id'])) {
+                Session::flash('error', '廠商必須從廠商管理選擇，不可手動輸入');
                 redirect('/returns.php?action=edit&id=' . $id);
             }
 
@@ -173,6 +192,62 @@ switch ($action) {
         }
         redirect('/returns.php');
         break;
+
+    // ============================================================
+    // ADMIN_TOOL_BLOCK_START - 測試期專用，完成後可整段移除
+    // ============================================================
+    case 'admin_delete':
+        $u = Auth::user();
+        if (!$u || $u['role'] !== 'admin') {
+            Session::flash('error', '無權限執行此操作（僅系統管理者）');
+            redirect('/returns.php');
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '請從畫面操作');
+            redirect('/returns.php');
+        }
+        $id = (int)(!empty($_POST['id']) ? $_POST['id'] : 0);
+        if (!$id) { Session::flash('error', '參數錯誤'); redirect('/returns.php'); }
+        $reasons = $model->checkDeletable($id);
+        if (!empty($reasons)) {
+            Session::flash('error', '無法刪除：' . implode('；', $reasons));
+            redirect('/returns.php?action=view&id=' . $id);
+        }
+        try {
+            $model->deleteHard($id);
+            AuditLog::log('returns', 'admin_delete', $id, '管理者刪除整張退貨單');
+            Session::flash('success', '退貨單已刪除');
+        } catch (Exception $e) {
+            Session::flash('error', '刪除失敗：' . $e->getMessage());
+        }
+        redirect('/returns.php');
+        break;
+
+    case 'admin_edit_basic':
+        $u = Auth::user();
+        if (!$u || $u['role'] !== 'admin') {
+            Session::flash('error', '無權限執行此操作（僅系統管理者）');
+            redirect('/returns.php');
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '請從畫面操作');
+            redirect('/returns.php');
+        }
+        $id = (int)(!empty($_POST['id']) ? $_POST['id'] : 0);
+        if (!$id) { Session::flash('error', '參數錯誤'); redirect('/returns.php'); }
+        try {
+            $model->updateBasic($id, array(
+                'vendor_name' => trim(!empty($_POST['vendor_name']) ? $_POST['vendor_name'] : ''),
+                'vendor_id'   => (int)(!empty($_POST['vendor_id']) ? $_POST['vendor_id'] : 0),
+            ));
+            AuditLog::log('returns', 'admin_edit_basic', $id, '管理者修改廠商: ' . $_POST['vendor_name']);
+            Session::flash('success', '廠商已更新');
+        } catch (Exception $e) {
+            Session::flash('error', '更新失敗：' . $e->getMessage());
+        }
+        redirect('/returns.php?action=view&id=' . $id);
+        break;
+    // ADMIN_TOOL_BLOCK_END
 
     default:
         redirect('/returns.php');

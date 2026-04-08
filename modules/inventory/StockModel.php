@@ -1153,6 +1153,185 @@ class StockModel
     }
 
     // ============================================================
+    // ADMIN 工具區（測試期專用 - 完成後可移除）
+    // 標記：ADMIN_TOOL_BLOCK_START / ADMIN_TOOL_BLOCK_END
+    // ============================================================
+    // ADMIN_TOOL_BLOCK_START
+
+    /**
+     * ADMIN: 出庫單刪除前防呆檢查
+     * 任一條件成立都不允許刪除（避免下游連結遺失）
+     * @return array 空陣列=可刪；非空=拒絕原因清單
+     */
+    public function checkStockOutDeletable($id)
+    {
+        $reasons = array();
+        $record = $this->getStockOutById($id);
+        if (!$record) {
+            $reasons[] = '出庫單不存在';
+            return $reasons;
+        }
+
+        // 1) 是否已開過餘料入庫單（manual_return 子單）
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM stock_ins WHERE source_type = 'manual_return' AND source_id = ?");
+        $stmt->execute(array($id));
+        if ((int)$stmt->fetchColumn() > 0) {
+            $reasons[] = '此出庫單已開過餘料入庫單，請先處理子單據';
+        }
+
+        // 2) 是否有 inventory_transactions 引用
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM inventory_transactions WHERE reference_type = 'stock_out' AND reference_id = ?");
+        $stmt->execute(array($id));
+        if ((int)$stmt->fetchColumn() > 0) {
+            $reasons[] = '此出庫單已產生庫存異動紀錄，刪除會造成庫存不一致（請改用盤點單調整）';
+        }
+
+        // 3) 是否有任何品項已實際出貨 (shipped_qty > 0)
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(shipped_qty), 0) FROM stock_out_items WHERE stock_out_id = ?");
+        $stmt->execute(array($id));
+        if ((int)$stmt->fetchColumn() > 0) {
+            $reasons[] = '此出庫單已有品項實際出貨 (shipped_qty > 0)';
+        }
+
+        // 4) 是否有對應的自動分錄（保守起見全擋）
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM journal_entries WHERE source_module = 'stock_out' AND source_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此出庫單已產生會計分錄，請先處理分錄';
+            }
+        } catch (Exception $e) { /* journal_entries 表不存在則略 */ }
+
+        return $reasons;
+    }
+
+    /**
+     * ADMIN: 硬刪出庫單（呼叫前必須先 checkStockOutDeletable）
+     */
+    public function deleteStockOutHard($id)
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM stock_out_items WHERE stock_out_id = ?")->execute(array($id));
+            $this->db->prepare("DELETE FROM stock_outs WHERE id = ?")->execute(array($id));
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * ADMIN: 修改出庫單客戶基本資訊
+     * @param int $id
+     * @param array $data 允許 customer_name + customer_id（由 autocomplete 帶入）
+     */
+    public function updateStockOutBasic($id, $data)
+    {
+        $sets = array();
+        $params = array();
+        if (array_key_exists('customer_name', $data)) {
+            $sets[] = 'customer_name = ?';
+            $params[] = !empty($data['customer_name']) ? $data['customer_name'] : null;
+        }
+        if (array_key_exists('customer_id', $data)) {
+            $sets[] = 'customer_id = ?';
+            $params[] = !empty($data['customer_id']) ? (int)$data['customer_id'] : null;
+        }
+        if (empty($sets)) return false;
+        $params[] = $id;
+        $sql = "UPDATE stock_outs SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE id = ?";
+        $this->db->prepare($sql)->execute($params);
+        return true;
+    }
+
+    /**
+     * ADMIN: 入庫單刪除前防呆檢查
+     */
+    public function checkStockInDeletable($id)
+    {
+        $reasons = array();
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM stock_ins WHERE id = ?");
+        $stmt->execute(array($id));
+        if ((int)$stmt->fetchColumn() === 0) {
+            $reasons[] = '入庫單不存在';
+            return $reasons;
+        }
+
+        // 1) 是否有 inventory_transactions 引用
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM inventory_transactions WHERE reference_type = 'stock_in' AND reference_id = ?");
+        $stmt->execute(array($id));
+        if ((int)$stmt->fetchColumn() > 0) {
+            $reasons[] = '此入庫單已產生庫存異動紀錄，刪除會造成庫存不一致（請改用盤點單調整）';
+        }
+
+        // 2) 是否有任何品項已實際入庫
+        try {
+            $stmt = $this->db->prepare("SELECT COALESCE(SUM(received_qty), 0) FROM stock_in_items WHERE stock_in_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此入庫單已有品項實際入庫 (received_qty > 0)';
+            }
+        } catch (Exception $e) { /* 欄位不存在略 */ }
+
+        // 3) 對應自動分錄
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM journal_entries WHERE source_module = 'stock_in' AND source_id = ?");
+            $stmt->execute(array($id));
+            if ((int)$stmt->fetchColumn() > 0) {
+                $reasons[] = '此入庫單已產生會計分錄，請先處理分錄';
+            }
+        } catch (Exception $e) {}
+
+        return $reasons;
+    }
+
+    /**
+     * ADMIN: 硬刪入庫單
+     */
+    public function deleteStockInHard($id)
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM stock_in_items WHERE stock_in_id = ?")->execute(array($id));
+            $this->db->prepare("DELETE FROM stock_ins WHERE id = ?")->execute(array($id));
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * ADMIN: 修改入庫單廠商/客戶基本資訊
+     * 注意：stock_ins 表只有 vendor_name / customer_name 欄位，無 vendor_id / customer_id
+     * @param int $id
+     * @param array $data 允許 vendor_name, customer_name
+     */
+    public function updateStockInBasic($id, $data)
+    {
+        $sets = array();
+        $params = array();
+        if (array_key_exists('vendor_name', $data)) {
+            $sets[] = 'vendor_name = ?';
+            $params[] = !empty($data['vendor_name']) ? $data['vendor_name'] : null;
+        }
+        if (array_key_exists('customer_name', $data)) {
+            $sets[] = 'customer_name = ?';
+            $params[] = !empty($data['customer_name']) ? $data['customer_name'] : null;
+        }
+        if (empty($sets)) return false;
+        $params[] = $id;
+        $sql = "UPDATE stock_ins SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE id = ?";
+        $this->db->prepare($sql)->execute($params);
+        return true;
+    }
+
+    // ADMIN_TOOL_BLOCK_END
+
+    // ============================================================
     // 倉庫列表
     // ============================================================
 

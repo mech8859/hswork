@@ -84,9 +84,96 @@ $canEdit = $canManage && in_array($record['status'], array('待確認', 'pending
         <button type="button" id="btnManualReturn" class="btn btn-sm" style="background:#7B1FA2;color:#fff" onclick="enterReturnMode()">手動餘料入庫</button>
         <?php endif; ?>
         <button type="button" class="btn btn-outline btn-sm no-print" onclick="window.print()">列印</button>
+        <?php
+        // ADMIN_TOOL_BLOCK_START - 測試期專用，完成後可整段移除
+        $__adminUser = Auth::user();
+        $__isAdmin = $__adminUser && $__adminUser['role'] === 'admin';
+        ?>
+        <?php if ($__isAdmin): ?>
+        <button type="button" class="btn btn-sm no-print" style="background:#9c27b0;color:#fff" onclick="adminOpenEditCustomer()">🔧 管理者改客戶</button>
+        <button type="button" class="btn btn-sm no-print" style="background:#c62828;color:#fff" onclick="adminConfirmDelete()">🗑 管理者刪除整張單</button>
+        <?php endif; ?>
+        <!-- ADMIN_TOOL_BLOCK_END -->
         <?= back_button('/stock_outs.php') ?>
     </div>
 </div>
+
+<?php /* ADMIN_TOOL_BLOCK_START */ if ($__isAdmin): ?>
+<!-- 管理者：刪除表單 -->
+<form id="adminDeleteForm" method="POST" action="/stock_outs.php?action=admin_delete" style="display:none">
+    <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
+    <input type="hidden" name="id" value="<?= (int)$record['id'] ?>">
+</form>
+
+<!-- 管理者：改客戶 modal -->
+<div id="adminEditCustomerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%">
+        <h3 style="margin-top:0">🔧 管理者：修改客戶</h3>
+        <form method="POST" action="/stock_outs.php?action=admin_edit_basic">
+            <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
+            <input type="hidden" name="id" value="<?= (int)$record['id'] ?>">
+            <input type="hidden" name="customer_id" id="adminEditCustomerId" value="<?= (int)(!empty($record['customer_id']) ? $record['customer_id'] : 0) ?>">
+            <div style="margin-bottom:12px;position:relative">
+                <label style="font-size:.85rem;font-weight:600">客戶（從客戶管理選擇）</label>
+                <input type="text" name="customer_name" id="adminEditCustomerName" autocomplete="off" class="form-control" value="<?= e(!empty($record['customer_name']) ? $record['customer_name'] : '') ?>" oninput="adminSearchCustomer(this)" required>
+                <div id="adminCustomerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;z-index:10001;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button" class="btn btn-outline" onclick="adminCloseEditCustomer()">取消</button>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function adminConfirmDelete() {
+    if (confirm('確定要刪除此出庫單？\n\n注意：此操作無法復原。\n如有下游引用會被防呆擋下。')) {
+        document.getElementById('adminDeleteForm').submit();
+    }
+}
+function adminOpenEditCustomer() { document.getElementById('adminEditCustomerModal').style.display = 'flex'; }
+function adminCloseEditCustomer() { document.getElementById('adminEditCustomerModal').style.display = 'none'; }
+var adminCustTimer = null;
+function adminSearchCustomer(inp) {
+    clearTimeout(adminCustTimer);
+    var q = inp.value.trim();
+    var dd = document.getElementById('adminCustomerDropdown');
+    if (q.length < 1) { dd.style.display = 'none'; return; }
+    adminCustTimer = setTimeout(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/stock_outs.php?action=ajax_search_customer&keyword=' + encodeURIComponent(q));
+        xhr.onload = function() {
+            try { var list = JSON.parse(xhr.responseText); } catch(e) { return; }
+            if (!list.length) { dd.innerHTML = '<div style="padding:8px;color:#999">無符合客戶</div>'; dd.style.display = 'block'; return; }
+            var html = '';
+            for (var i = 0; i < list.length; i++) {
+                html += '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee" '
+                    + 'data-id="' + (list[i].id||'') + '" data-name="' + (list[i].name||'').replace(/"/g,'&quot;') + '" '
+                    + 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">'
+                    + '<div style="font-weight:600">' + (list[i].name||'') + '</div>'
+                    + '<div style="font-size:.75rem;color:#888">' + (list[i].customer_no||'') + '</div></div>';
+            }
+            dd.innerHTML = html;
+            dd.style.display = 'block';
+            dd.querySelectorAll('div[data-id]').forEach(function(it) {
+                it.addEventListener('click', function() {
+                    document.getElementById('adminEditCustomerName').value = this.getAttribute('data-name');
+                    document.getElementById('adminEditCustomerId').value = this.getAttribute('data-id');
+                    dd.style.display = 'none';
+                });
+            });
+        };
+        xhr.send();
+    }, 250);
+}
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('adminCustomerDropdown');
+    var inp = document.getElementById('adminEditCustomerName');
+    if (dd && !dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
+});
+</script>
+<?php endif; /* ADMIN_TOOL_BLOCK_END */ ?>
 
 <!-- 基本資訊 -->
 <div class="card">

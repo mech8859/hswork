@@ -230,6 +230,62 @@ switch ($action) {
         redirect('/stock_ins.php?action=view&id=' . $id);
         break;
 
+    // ============================================================
+    // ADMIN_TOOL_BLOCK_START - 測試期專用，完成後可整段移除
+    // ============================================================
+    case 'admin_delete':
+        $u = Auth::user();
+        if (!$u || $u['role'] !== 'admin') {
+            Session::flash('error', '無權限執行此操作（僅系統管理者）');
+            redirect('/stock_ins.php');
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '請從畫面操作');
+            redirect('/stock_ins.php');
+        }
+        $id = (int)(!empty($_POST['id']) ? $_POST['id'] : 0);
+        if (!$id) { Session::flash('error', '參數錯誤'); redirect('/stock_ins.php'); }
+        $reasons = $model->checkStockInDeletable($id);
+        if (!empty($reasons)) {
+            Session::flash('error', '無法刪除：' . implode('；', $reasons));
+            redirect('/stock_ins.php?action=view&id=' . $id);
+        }
+        try {
+            $model->deleteStockInHard($id);
+            AuditLog::log('stock_ins', 'admin_delete', $id, '管理者刪除整張入庫單');
+            Session::flash('success', '入庫單已刪除');
+        } catch (Exception $e) {
+            Session::flash('error', '刪除失敗：' . $e->getMessage());
+        }
+        redirect('/stock_ins.php');
+        break;
+
+    case 'admin_edit_basic':
+        $u = Auth::user();
+        if (!$u || $u['role'] !== 'admin') {
+            Session::flash('error', '無權限執行此操作（僅系統管理者）');
+            redirect('/stock_ins.php');
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '請從畫面操作');
+            redirect('/stock_ins.php');
+        }
+        $id = (int)(!empty($_POST['id']) ? $_POST['id'] : 0);
+        if (!$id) { Session::flash('error', '參數錯誤'); redirect('/stock_ins.php'); }
+        $payload = array();
+        if (isset($_POST['vendor_name'])) $payload['vendor_name'] = trim($_POST['vendor_name']);
+        if (isset($_POST['customer_name'])) $payload['customer_name'] = trim($_POST['customer_name']);
+        try {
+            $model->updateStockInBasic($id, $payload);
+            AuditLog::log('stock_ins', 'admin_edit_basic', $id, '管理者修改廠商/客戶');
+            Session::flash('success', '廠商/客戶已更新');
+        } catch (Exception $e) {
+            Session::flash('error', '更新失敗：' . $e->getMessage());
+        }
+        redirect('/stock_ins.php?action=view&id=' . $id);
+        break;
+    // ADMIN_TOOL_BLOCK_END
+
     default:
         redirect('/stock_ins.php');
         break;

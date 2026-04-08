@@ -32,15 +32,114 @@ function viewReturnTypeBadge($type) {
         ?></small>
         <?php endif; ?>
     </div>
-    <div class="d-flex gap-1">
+    <div class="d-flex gap-1 flex-wrap">
         <?php if ($record['status'] === 'draft'): ?>
         <a href="/returns.php?action=confirm&id=<?= $record['id'] ?>" class="btn btn-success btn-sm" onclick="return confirm('確認此退貨單？確認後將更新庫存且無法再編輯。')">確認退貨</a>
         <a href="/returns.php?action=edit&id=<?= $record['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <a href="/returns.php?action=delete&id=<?= $record['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('確定要刪除此退貨單？')">刪除</a>
         <?php endif; ?>
+        <?php
+        // ADMIN_TOOL_BLOCK_START
+        $__rtAdmin = Auth::user();
+        $__rtIsAdmin = $__rtAdmin && $__rtAdmin['role'] === 'admin';
+        ?>
+        <?php if ($__rtIsAdmin): ?>
+        <button type="button" class="btn btn-sm" style="background:#9c27b0;color:#fff" onclick="rtAdminOpenEdit()">🔧 管理者改廠商</button>
+        <button type="button" class="btn btn-sm" style="background:#c62828;color:#fff" onclick="rtAdminConfirmDelete()">🗑 管理者刪除整張單</button>
+        <?php endif; ?>
+        <!-- ADMIN_TOOL_BLOCK_END -->
         <?= back_button('/returns.php') ?>
     </div>
 </div>
+
+<?php /* ADMIN_TOOL_BLOCK_START */ if ($__rtIsAdmin): ?>
+<form id="rtAdminDeleteForm" method="POST" action="/returns.php?action=admin_delete" style="display:none">
+    <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
+    <input type="hidden" name="id" value="<?= (int)$record['id'] ?>">
+</form>
+
+<div id="rtAdminEditModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%">
+        <h3 style="margin-top:0">🔧 管理者：修改廠商</h3>
+        <form method="POST" action="/returns.php?action=admin_edit_basic" onsubmit="return rtAdminValidateBeforeSubmit()">
+            <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
+            <input type="hidden" name="id" value="<?= (int)$record['id'] ?>">
+            <input type="hidden" name="vendor_id" id="rtAdminVendorId" value="0">
+            <div style="margin-bottom:12px;position:relative">
+                <label style="font-size:.85rem;font-weight:600">廠商（必須從廠商管理選擇）<span style="color:#c62828">*</span></label>
+                <input type="text" name="vendor_name" id="rtAdminVendor" autocomplete="off" class="form-control" value="<?= e(!empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" oninput="rtAdminSearchVendor(this)" required>
+                <div id="rtAdminVendorDD" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;z-index:10001;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+            </div>
+            <p style="font-size:.78rem;color:#888;margin:0 0 12px 0">⚠ 廠商必須從下拉清單點選；找不到請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</p>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button" class="btn btn-outline" onclick="rtAdminCloseEdit()">取消</button>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function rtAdminConfirmDelete() {
+    if (confirm('確定要刪除此退貨單？\n\n注意：此操作無法復原。\n如有下游引用會被防呆擋下。')) {
+        document.getElementById('rtAdminDeleteForm').submit();
+    }
+}
+function rtAdminOpenEdit() { document.getElementById('rtAdminEditModal').style.display = 'flex'; }
+function rtAdminCloseEdit() { document.getElementById('rtAdminEditModal').style.display = 'none'; }
+function rtAdminValidateBeforeSubmit() {
+    var vid = document.getElementById('rtAdminVendorId').value;
+    if (!vid || parseInt(vid) <= 0) {
+        alert('請從下拉清單選擇廠商，不可手動輸入');
+        return false;
+    }
+    return true;
+}
+var rtAdminTimer = null;
+function rtAdminSearchVendor(inp) {
+    document.getElementById('rtAdminVendorId').value = '';
+    clearTimeout(rtAdminTimer);
+    var q = inp.value.trim();
+    var dd = document.getElementById('rtAdminVendorDD');
+    if (q.length < 1) { dd.style.display = 'none'; return; }
+    rtAdminTimer = setTimeout(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/payments_out.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
+        xhr.onload = function() {
+            try { var list = JSON.parse(xhr.responseText); } catch(e) { return; }
+            if (!list.length) {
+                dd.innerHTML = '<div style="padding:8px;color:#c62828">無符合廠商，請先到 <a href="/vendors.php" target="_blank">廠商管理</a> 建立</div>';
+                dd.style.display = 'block';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < list.length; i++) {
+                html += '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee" '
+                    + 'data-id="' + (list[i].id||'') + '" data-name="' + (list[i].name||'').replace(/"/g,'&quot;') + '" '
+                    + 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">'
+                    + '<div style="font-weight:600">' + (list[i].name||'') + '</div>'
+                    + '<div style="font-size:.75rem;color:#888">' + (list[i].vendor_code ? list[i].vendor_code : '') + '</div></div>';
+            }
+            dd.innerHTML = html;
+            dd.style.display = 'block';
+            dd.querySelectorAll('div[data-id]').forEach(function(it) {
+                it.addEventListener('click', function() {
+                    document.getElementById('rtAdminVendor').value = this.getAttribute('data-name');
+                    document.getElementById('rtAdminVendorId').value = this.getAttribute('data-id');
+                    dd.style.display = 'none';
+                });
+            });
+        };
+        xhr.send();
+    }, 250);
+}
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('rtAdminVendorDD');
+    var inp = document.getElementById('rtAdminVendor');
+    if (dd && !dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
+});
+</script>
+<?php endif; /* ADMIN_TOOL_BLOCK_END */ ?>
 
 <div class="card">
     <div class="card-header">基本資訊</div>
