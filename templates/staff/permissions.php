@@ -68,6 +68,7 @@ $modules = array(
     'vehicles'             => array('label' => '車輛管理',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'worklog'              => array('label' => '施工回報',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'attendance'           => array('label' => '出勤',       'levels' => array('view'), 'has_delete' => false),
+    'reviews'              => array('label' => '五星評價',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'quotations'           => array('label' => '報價管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
     'customers'            => array('label' => '客戶管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
     'business_calendar'    => array('label' => '業務行事曆', 'levels' => array('manage', 'view'), 'has_delete' => false),

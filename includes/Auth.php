@@ -152,6 +152,7 @@ class Auth
                     'procurement' => array('procurement.manage', 'procurement.view'),
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
+                    'reviews' => array('reviews.manage', 'reviews.view'),
                     'system' => array('system.manage'),
                 );
                 // 覆蓋模組權限
@@ -430,6 +431,7 @@ class Auth
                     'procurement' => array('procurement.manage', 'procurement.view'),
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
+                    'reviews' => array('reviews.manage', 'reviews.view'),
                     'system' => array('system.manage'),
                 );
                 foreach ($custom as $module => $value) {

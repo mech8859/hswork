@@ -444,7 +444,7 @@ switch ($action) {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/staff.php?action=permissions&id=' . $id); }
 
             // 組合自訂權限 JSON
-            $allModules = array('cases','schedule','repairs','staff','staff_skills','leaves','inter_branch','reports','products','vehicles','worklog','attendance','quotations','customers','business_calendar','business_tracking','engineering_tracking','finance','procurement','inventory','accounting','settings','system');
+            $allModules = array('cases','schedule','repairs','staff','staff_skills','leaves','inter_branch','reports','products','vehicles','worklog','attendance','quotations','customers','business_calendar','business_tracking','engineering_tracking','finance','procurement','inventory','accounting','reviews','settings','system');
             $customPerms = array();
             $hasCustom = false;
 

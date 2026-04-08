@@ -6,8 +6,8 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
 
-// 權限：重用 schedule（工程管理）權限
-if (!Auth::hasPermission('schedule.manage') && !Auth::hasPermission('schedule.view') && !Auth::hasPermission('all')) {
+// 權限：獨立模組權限
+if (!Auth::hasPermission('reviews.manage') && !Auth::hasPermission('reviews.view') && !Auth::hasPermission('all')) {
     Session::flash('error', '無權限');
     redirect('/');
 }
@@ -17,7 +17,7 @@ require_once __DIR__ . '/../modules/reviews/ReviewModel.php';
 $model = new ReviewModel();
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 $branchIds = Auth::getAccessibleBranchIds();
-$canManage = Auth::hasPermission('schedule.manage') || Auth::hasPermission('all');
+$canManage = Auth::hasPermission('reviews.manage') || Auth::hasPermission('all');
 
 switch ($action) {
     // ---- 列表 ----
