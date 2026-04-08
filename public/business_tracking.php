@@ -108,7 +108,13 @@ switch ($action) {
 
     // ---- 編輯 ----
     case 'edit':
-        if (!Auth::hasPermission('business_tracking.manage') && !Auth::hasPermission('business_tracking.own')) {
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
+        $hasManage = Auth::hasPermission('business_tracking.manage');
+        $hasView = Auth::hasPermission('business_tracking.view') || $hasManage;
+        $hasOwn = Auth::hasPermission('business_tracking.own');
+
+        if (!$isAdmin && !$hasManage && !$hasView && !$hasOwn) {
             Session::flash('error', '權限不足');
             redirect('/business_tracking.php');
         }
@@ -120,15 +126,37 @@ switch ($action) {
             redirect('/business_tracking.php');
         }
 
-        // own 權限只能編輯自己的
-        if (Auth::hasPermission('business_tracking.own') && !Auth::hasPermission('business_tracking.manage')) {
-            if ((int)$case['sales_id'] !== Auth::id()) {
-                Session::flash('error', '權限不足');
-                redirect('/business_tracking.php');
-            }
+        $isOwn = ((int)$case['sales_id'] === (int)Auth::id());
+
+        // 判定可否編輯（高層 / manage 一律可編；own 權限只能編自己；view 權限不能編）
+        if ($isAdmin || $hasManage) {
+            $canEdit = true;
+        } elseif ($hasOwn) {
+            $canEdit = $isOwn;
+        } else {
+            $canEdit = false;
+        }
+
+        // 判定可否檢視（own 只能看自己的；view/manage 都能看）
+        if ($isAdmin || $hasManage || $hasView) {
+            $canView = true;
+        } elseif ($hasOwn) {
+            $canView = $isOwn;
+        } else {
+            $canView = false;
+        }
+
+        if (!$canView) {
+            Session::flash('error', '權限不足');
+            redirect('/business_tracking.php');
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // 後端守門：無編輯權限不能 POST 儲存
+            if (!$canEdit) {
+                Session::flash('error', '無編輯權限，僅可檢視');
+                redirect('/business_tracking.php?action=edit&id=' . $id);
+            }
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/business_tracking.php?action=edit&id=' . $id);
@@ -254,7 +282,7 @@ switch ($action) {
         $salespeople = $model->getSalespeople();
         $branches = $model->getBranches();
 
-        $pageTitle = '編輯案件';
+        $pageTitle = $canEdit ? '編輯案件' : '檢視案件';
         $currentPage = 'business_tracking';
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/business_tracking/form.php';
@@ -263,6 +291,12 @@ switch ($action) {
 
     // ---- 檢視詳情 ----
     case 'view':
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
+        $hasManage = Auth::hasPermission('business_tracking.manage');
+        $hasView = Auth::hasPermission('business_tracking.view') || $hasManage;
+        $hasOwn = Auth::hasPermission('business_tracking.own');
+
         $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
         $case = $model->getById($id);
         if (!$case) {
@@ -270,9 +304,11 @@ switch ($action) {
             redirect('/business_tracking.php');
         }
 
-        // own 權限只能看自己的
-        if (Auth::hasPermission('business_tracking.own') && !Auth::hasPermission('business_tracking.manage') && !Auth::hasPermission('business_tracking.view')) {
-            if ((int)$case['sales_id'] !== Auth::id()) {
+        $isOwn = ((int)$case['sales_id'] === (int)Auth::id());
+
+        // own 權限只能看自己的；view/manage 都能看
+        if (!$isAdmin && !$hasManage && !$hasView) {
+            if (!$hasOwn || !$isOwn) {
                 Session::flash('error', '權限不足');
                 redirect('/business_tracking.php');
             }

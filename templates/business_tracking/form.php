@@ -2,13 +2,16 @@
 $caseTypeOptions = CaseModel::caseTypeOptions();
 $sourceOptions = CaseModel::caseSourceOptions();
 $isEdit = !empty($case);
+if (!isset($canEdit)) $canEdit = true;
+$readOnly = $isEdit && !$canEdit;
+require __DIR__ . '/../_readonly_form_helper.php';
 ?>
 <div class="d-flex justify-between align-center mb-2">
-    <h2><?= $isEdit ? '編輯案件' : '新增進件' ?></h2>
+    <h2><?= $isEdit ? ($readOnly ? '檢視案件' : '編輯案件') : '新增進件' ?></h2>
     <?= back_button('/business_tracking.php') ?>
 </div>
 
-<form method="POST" action="/business_tracking.php?action=<?= $isEdit ? 'edit&id='.$case['id'] : 'create' ?>">
+<form method="POST" action="/business_tracking.php?action=<?= $isEdit ? 'edit&id='.$case['id'] : 'create' ?>" class="<?= $readOnly ? 'form-readonly' : '' ?>">
     <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
 
     <div class="card mb-2">
