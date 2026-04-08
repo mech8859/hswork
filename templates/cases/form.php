@@ -730,10 +730,18 @@ require __DIR__ . '/../_readonly_form_helper.php';
     <!-- 帳款交易紀錄 -->
     <?php if ($case):
         $casePayments = $case['case_payments'] ?? array();
+        // 編輯/刪除權限：只有 boss（系統管理者）可以修改或刪除已存的交易
+        // 新增權限：維持 finance section 編輯權限（業務/行政/助理都能新增）
+        $_pmtUser = Auth::user();
+        $_canEditPayment = $_pmtUser && $_pmtUser['role'] === 'boss';
     ?>
     <div class="card" id="sec-case-payments">
         <div class="card-header d-flex justify-between align-center">
-            <span>帳款交易紀錄</span>
+            <span>帳款交易紀錄
+                <?php if (!$_canEditPayment): ?>
+                <small style="color:#888;font-weight:normal">（存檔後僅系統管理者可修改/刪除）</small>
+                <?php endif; ?>
+            </span>
             <?php if (Auth::canEditSection('finance')): ?>
             <button type="button" class="btn btn-primary btn-sm" onclick="togglePaymentForm()">+ 新增交易</button>
             <?php endif; ?>
@@ -807,7 +815,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <?php else: ?>
         <div class="table-responsive">
             <table class="table" style="font-size:.9rem">
-                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">未稅</th><th class="text-right" style="width:70px">稅額</th><th class="text-right" style="width:90px">總金額</th><th style="width:120px">收款單號</th><th>備註</th><th style="width:50px">憑證</th><?php if (Auth::canEditSection('finance')): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
+                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">未稅</th><th class="text-right" style="width:70px">稅額</th><th class="text-right" style="width:90px">總金額</th><th style="width:120px">收款單號</th><th>備註</th><th style="width:50px">憑證</th><?php if ($_canEditPayment): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
                 <tbody>
                     <?php $payTotal = 0; $payUntaxedTotal = 0; $payTaxTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; $payUntaxedTotal += isset($cp['untaxed_amount']) ? $cp['untaxed_amount'] : 0; $payTaxTotal += isset($cp['tax_amount']) ? $cp['tax_amount'] : 0; ?>
                     <tr style="cursor:pointer" onclick="openPaymentDetail(<?= $cp['id'] ?>)">
@@ -831,13 +839,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
                                 endforeach;
                             else: ?>-<?php endif;
                         ?></td>
-                        <?php if (Auth::canEditSection('finance')): ?>
-                        <td><button type="button" class="btn btn-outline btn-sm" style="color:var(--danger);font-size:.75rem" onclick="deleteCasePayment(<?= $cp['id'] ?>)">刪除</button></td>
+                        <?php if ($_canEditPayment): ?>
+                        <td><button type="button" class="btn btn-outline btn-sm" style="color:var(--danger);font-size:.75rem" onclick="event.stopPropagation();deleteCasePayment(<?= $cp['id'] ?>)">刪除</button></td>
                         <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right">$<?= number_format($payUntaxedTotal) ?></td><td class="text-right">$<?= number_format($payTaxTotal) ?></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td colspan="4"></td></tr></tfoot>
+                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right">$<?= number_format($payUntaxedTotal) ?></td><td class="text-right">$<?= number_format($payTaxTotal) ?></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td colspan="<?= $_canEditPayment ? '4' : '3' ?>"></td></tr></tfoot>
             </table>
         </div>
         <?php endif; ?>
@@ -1948,8 +1956,8 @@ var CASE_DATA = {
                     <input type="number" id="pd_amount" class="form-control">
                 </div>
                 <div class="form-group" style="flex:2">
-                    <label>收款單號</label>
-                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-...">
+                    <label>收款單號 <small style="color:#888">(連動鎖定，不可修改)</small></label>
+                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-..." readonly style="background:#f5f5f5">
                 </div>
             </div>
             <div class="form-group">
@@ -1961,10 +1969,17 @@ var CASE_DATA = {
                 <div id="pd_current_image"></div>
                 <input type="file" id="pd_image" accept="image/*" multiple>
             </div>
+            <?php if (!$_canEditPayment): ?>
+            <div style="margin-top:8px;padding:8px 12px;background:#fff8e1;border:1px solid #ffc107;border-radius:4px;font-size:.85rem;color:#856404">
+                ℹ️ 此交易已存檔，僅可檢視。如需修改或刪除，請聯絡系統管理者。
+            </div>
+            <?php endif; ?>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-outline" onclick="closePaymentDetail()">取消</button>
+            <button type="button" class="btn btn-outline" onclick="closePaymentDetail()">關閉</button>
+            <?php if ($_canEditPayment): ?>
             <button type="button" class="btn btn-primary" onclick="savePaymentEdit()">儲存變更</button>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -3005,8 +3020,8 @@ function saveNewCustomer() {
                     <input type="number" id="pd_amount" class="form-control">
                 </div>
                 <div class="form-group" style="flex:2">
-                    <label>收款單號</label>
-                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-...">
+                    <label>收款單號 <small style="color:#888">(連動鎖定，不可修改)</small></label>
+                    <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-..." readonly style="background:#f5f5f5">
                 </div>
             </div>
             <div class="form-group">
@@ -3018,10 +3033,17 @@ function saveNewCustomer() {
                 <div id="pd_current_image"></div>
                 <input type="file" id="pd_image" accept="image/*" multiple>
             </div>
+            <?php if (!$_canEditPayment): ?>
+            <div style="margin-top:8px;padding:8px 12px;background:#fff8e1;border:1px solid #ffc107;border-radius:4px;font-size:.85rem;color:#856404">
+                ℹ️ 此交易已存檔，僅可檢視。如需修改或刪除，請聯絡系統管理者。
+            </div>
+            <?php endif; ?>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-outline" onclick="closePaymentDetail()">取消</button>
+            <button type="button" class="btn btn-outline" onclick="closePaymentDetail()">關閉</button>
+            <?php if ($_canEditPayment): ?>
             <button type="button" class="btn btn-primary" onclick="savePaymentEdit()">儲存變更</button>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -3072,6 +3094,9 @@ function saveNewCustomer() {
 </div>
 
 <script>
+// 使用者是否為 boss（控制 modal 是否可編輯）
+var __PD_CAN_EDIT = <?= $_canEditPayment ? 'true' : 'false' ?>;
+
 // ===== 帳務交易 Modal =====
 function openPaymentDetail(id) {
     var xhr = new XMLHttpRequest();
@@ -3083,6 +3108,9 @@ function openPaymentDetail(id) {
         document.getElementById('pd_id').value = d.id;
         document.getElementById('pd_date').value = d.payment_date || '';
         document.getElementById('pd_amount').value = d.amount || 0;
+        document.getElementById('pd_untaxed_amount').value = d.untaxed_amount || '';
+        document.getElementById('pd_tax_amount').value = d.tax_amount || '';
+        document.getElementById('pd_receipt_number').value = d.receipt_number || '';
         document.getElementById('pd_note').value = d.note || '';
 
         // Set selects
@@ -3126,7 +3154,27 @@ function openPaymentDetail(id) {
         } else {
             imgDiv.innerHTML = '<span class="text-muted">無憑證圖片</span>';
         }
-        document.getElementById('pd_image').value = '';
+        var imgInput = document.getElementById('pd_image');
+        if (imgInput) imgInput.value = '';
+
+        // 非 boss → 全部欄位設為唯讀（receipt_number 永遠唯讀）
+        if (!__PD_CAN_EDIT) {
+            ['pd_date','pd_amount','pd_untaxed_amount','pd_tax_amount','pd_note'].forEach(function(fid) {
+                var el = document.getElementById(fid);
+                if (el) {
+                    el.setAttribute('readonly', 'readonly');
+                    el.style.background = '#f5f5f5';
+                }
+            });
+            ['pd_type','pd_method'].forEach(function(fid) {
+                var el = document.getElementById(fid);
+                if (el) {
+                    el.setAttribute('disabled', 'disabled');
+                    el.style.background = '#f5f5f5';
+                }
+            });
+            if (imgInput) imgInput.style.display = 'none';
+        }
 
         document.getElementById('paymentDetailModal').style.display = 'flex';
     };

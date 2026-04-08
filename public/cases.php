@@ -427,10 +427,16 @@ switch ($action) {
         }
         break;
 
-    // ---- AJAX: 編輯帳款交易 ----
+    // ---- AJAX: 編輯帳款交易（僅 boss）----
     case 'edit_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        // 權限保護：只有 boss 可編輯（前端 readonly + 後端雙重檢查）
+        $__editUser = Auth::user();
+        if (!$__editUser || $__editUser['role'] !== 'boss') {
+            echo json_encode(array('success' => false, 'error' => '無編輯權限，僅系統管理者可修改已存的帳款交易'));
+            break;
+        }
         try {
         $pid = (int)($_POST['payment_id'] ?? 0);
         $db = Database::getInstance();
@@ -445,11 +451,12 @@ switch ($action) {
         $newAmount = (int)($_POST['amount'] ?? 0);
         $newUntaxed = (int)($_POST['untaxed_amount'] ?? 0);
         $newTax = (int)($_POST['tax_amount'] ?? 0);
-        $newReceiptNo = $_POST['receipt_number'] ?? null;
+        // ⚠ 連動保護：receipt_number 永遠不可修改（用原值），避免破壞與 receipts 表的連動
+        $newReceiptNo = $pay['receipt_number'];
         $newNote = $_POST['note'] ?? '';
 
-        $db->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, receipt_number=?, note=? WHERE id=?')
-            ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newReceiptNo, $newNote, $pid));
+        $db->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, note=? WHERE id=?')
+            ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newNote, $pid));
 
         // 同步更新對應的收款單（若有 receipt_number）
         if (!empty($newReceiptNo)) {
@@ -482,19 +489,47 @@ switch ($action) {
         }
         break;
 
-    // ---- AJAX: 刪除帳款交易 ----
+    // ---- AJAX: 刪除帳款交易（僅 boss + 連動防呆）----
     case 'delete_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
-        if (!Auth::canEditSection('delete') && !Auth::hasPermission('finance.delete') && !Auth::hasPermission('all')) {
-            echo json_encode(array('success' => false, 'error' => '無刪除權限'));
+        // 權限保護：只有 boss 可刪除
+        $__delUser = Auth::user();
+        if (!$__delUser || $__delUser['role'] !== 'boss') {
+            echo json_encode(array('success' => false, 'error' => '無刪除權限，僅系統管理者可刪除已存的帳款交易'));
             break;
         }
         $pid = (int)($_POST['payment_id'] ?? 0);
-        $delStmt = Database::getInstance()->prepare('SELECT case_id FROM case_payments WHERE id = ?');
+        $db = Database::getInstance();
+        $delStmt = $db->prepare('SELECT case_id, receipt_number FROM case_payments WHERE id = ?');
         $delStmt->execute(array($pid));
-        $delCaseId = (int)$delStmt->fetchColumn();
-        Database::getInstance()->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
+        $delRow = $delStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$delRow) {
+            echo json_encode(array('success' => false, 'error' => '找不到紀錄'));
+            break;
+        }
+        $delCaseId = (int)$delRow['case_id'];
+        $delReceiptNo = $delRow['receipt_number'];
+
+        // ⚠ 連動防呆：如果有對應收款單，擋下並提示
+        if (!empty($delReceiptNo)) {
+            try {
+                $rcptStmt = $db->prepare("SELECT id FROM receipts WHERE receipt_number = ? LIMIT 1");
+                $rcptStmt->execute(array($delReceiptNo));
+                $rcptId = $rcptStmt->fetchColumn();
+                if ($rcptId) {
+                    echo json_encode(array(
+                        'success' => false,
+                        'error' => '無法刪除：此交易連動到收款單 ' . $delReceiptNo . '。請先到「收款單管理」刪除該張收款單，再回來刪除此交易（避免兩邊資料不一致）。',
+                    ));
+                    break;
+                }
+            } catch (Exception $e) {
+                error_log('check linked receipt failed: ' . $e->getMessage());
+            }
+        }
+
+        $db->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
         if ($delCaseId) updateTotalCollected($delCaseId);
         echo json_encode(array('success' => true));
         break;
