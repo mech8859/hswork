@@ -66,16 +66,39 @@ switch ($action) {
         break;
 
     case 'edit':
-        if (!$canManage) { Session::flash('error', '無權限'); redirect('/quotations.php'); }
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
         $id = (int)($_GET['id'] ?? 0);
         $quote = $model->getById($id);
         if (!$quote) { Session::flash('error', '報價單不存在'); redirect('/quotations.php'); }
-        if (!QuotationModel::canEdit($quote['status'])) {
-            Session::flash('error', '此報價單狀態不可編輯');
+
+        $isOwn = ((int)($quote['sales_id'] ?? 0) === (int)Auth::id());
+        $statusEditable = QuotationModel::canEdit($quote['status']);
+
+        // 判定可否編輯：高層 / manage 一律可（前提：狀態允許編輯）
+        // own：可編自己的（前提：狀態允許編輯）
+        // view：不可編
+        $canEditQuote = $statusEditable && ($isAdmin || $canManage || ($canOwn && $isOwn));
+        // 判定可否檢視：view/manage/own 都能看
+        $canViewQuote = $isAdmin || $canManage || $canView || ($canOwn && $isOwn);
+        if (!$canViewQuote) {
+            Session::flash('error', '無權限');
+            redirect('/quotations.php');
+        }
+        if (!$canEditQuote && !$statusEditable) {
+            // 狀態不可編就算 manage 也不能編；至少讓使用者看
+            Session::flash('error', '此報價單狀態不可編輯，僅可檢視');
             redirect('/quotations.php?action=view&id=' . $id);
         }
+        // 兼容舊變數名
+        $canEdit = $canEditQuote;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // 後端守門
+            if (!$canEdit) {
+                Session::flash('error', '無編輯權限，僅可檢視');
+                redirect('/quotations.php?action=edit&id='.$id);
+            }
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/quotations.php?action=edit&id='.$id); }
             AuditLog::logChange('quotations', $id, $quote['quote_number'] ?? "報價單#{$id}", $quote, $_POST, array('customer_name','status','total_amount','valid_until'));
             $model->update($id, $_POST);
@@ -101,7 +124,7 @@ switch ($action) {
         $editingLockModule = 'quotations';
         $editingLockRecordId = $id;
 
-        $pageTitle = '編輯報價單';
+        $pageTitle = $canEdit ? '編輯報價單' : '檢視報價單';
         $currentPage = 'quotations';
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/quotations/form.php';

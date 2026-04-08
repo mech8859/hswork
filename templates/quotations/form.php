@@ -2,12 +2,15 @@
 $isEdit = !empty($quote);
 $fmt = $isEdit ? $quote['format'] : 'simple';
 $sections = $isEdit ? $quote['sections'] : array(array('title' => '', 'items' => array(array())));
+if (!isset($canEdit)) $canEdit = true;
+$readOnly = $isEdit && !$canEdit;
+require __DIR__ . '/../_readonly_form_helper.php';
 ?>
-<h2><?= $isEdit ? '編輯報價單 - ' . e($quote['quotation_number']) : '新增報價單' ?></h2>
+<h2><?= $isEdit ? ($readOnly ? '檢視報價單 - ' : '編輯報價單 - ') . e($quote['quotation_number']) : '新增報價單' ?></h2>
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
-<form method="POST" class="mt-2" id="quoteForm">
+<form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" id="quoteForm">
     <?= csrf_field() ?>
 
     <!-- 客戶資訊 -->
