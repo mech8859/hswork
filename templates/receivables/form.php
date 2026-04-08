@@ -323,6 +323,23 @@ function readNumRecv(el) {
     var n = parseFloat(v);
     return isNaN(n) ? 0 : n;
 }
+// 標記稅額是否被使用者手動編輯過
+// 編輯模式：如果存進來的稅額 ≠ 小計×5% → 視為已手動（保留原值）
+var recvTaxManualEdited = false;
+<?php if ($isEdit): ?>
+(function() {
+    var savedSubtotal = <?= (int)($record['subtotal'] ?? 0) ?>;
+    var savedTax = <?= (int)($record['tax'] ?? 0) ?>;
+    var calcTax = Math.round(savedSubtotal * 0.05);
+    if (savedTax !== calcTax) {
+        recvTaxManualEdited = true;
+    }
+})();
+<?php endif; ?>
+var recvTaxEl = document.getElementById('taxInput');
+if (recvTaxEl) {
+    recvTaxEl.addEventListener('input', function() { recvTaxManualEdited = true; });
+}
 function calcRecvRow(el) {
     var row = el.closest('tr');
     var price = readNumRecv(row.querySelector('.recv-price'));
@@ -338,6 +355,10 @@ function removeRecvRow(btn) {
 }
 function calcTotal() {
     var s = readNumRecv(document.getElementById('subtotalInput'));
+    // 小計變動 + 稅額未被手動編輯 → 自動以 5% 計算
+    if (!recvTaxManualEdited && recvTaxEl) {
+        recvTaxEl.value = Math.round(s * 0.05);
+    }
     var t = readNumRecv(document.getElementById('taxInput'));
     var sh = readNumRecv(document.querySelector('[name="shipping"]'));
     document.getElementById('totalInput').value = s + t + sh;

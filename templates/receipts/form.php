@@ -295,11 +295,37 @@ function readNum(id) {
     var n = parseFloat(v);
     return isNaN(n) ? 0 : n;
 }
+// 標記稅額是否被使用者手動編輯過（避免覆寫使用者輸入）
+// 編輯模式：如果存進來的稅額 ≠ 小計×5% → 視為已手動（保留原值）
+var taxManualEdited = false;
+<?php if ($isEdit): ?>
+(function() {
+    var savedSubtotal = <?= (int)($record['subtotal'] ?? 0) ?>;
+    var savedTax = <?= (int)($record['tax'] ?? 0) ?>;
+    var calcTax = Math.round(savedSubtotal * 0.05);
+    if (savedTax !== calcTax) {
+        taxManualEdited = true; // 跟自動計算不符 → 視為使用者手動填
+    }
+})();
+<?php endif; ?>
 function calcTotal() {
     var subtotal = readNum('f_subtotal');
+    // 小計變動 + 稅額未被手動編輯 → 自動以 5% 計算
+    if (!taxManualEdited) {
+        var calcTax = Math.round(subtotal * 0.05);
+        document.getElementById('f_tax').value = calcTax;
+    }
     var tax = readNum('f_tax');
     var discount = readNum('f_discount');
     document.getElementById('f_total').value = subtotal + tax - discount;
+}
+
+// 稅額被使用者編輯時標記 manual
+var taxInput = document.getElementById('f_tax');
+if (taxInput) {
+    taxInput.addEventListener('input', function() {
+        taxManualEdited = true;
+    });
 }
 
 var triggers = document.querySelectorAll('.calc-trigger');

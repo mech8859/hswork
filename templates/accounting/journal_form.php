@@ -101,6 +101,12 @@ $isCopy = isset($prefillEntry) && !$entry;
 </form>
 
 <script>
+// 防呆：移除千位逗號避免 parseInt('1,143') → 1
+// 用法：_jfNum(el.value) 或 _jfNum(el)
+function _jfNum(v) {
+    if (v && typeof v === 'object' && 'value' in v) v = v.value;
+    return parseInt(String(v || '0').replace(/,/g, '')) || 0;
+}
 function updateVoucherNumber() {
     var date = document.getElementById('fldVoucherDate').value;
     if (!date) return;
@@ -655,7 +661,7 @@ function removeLine(idx) {
 
 // 同列借貸互斥
 function onDebitInput(el) {
-    var val = parseInt(el.value) || 0;
+    var val = _jfNum(el);
     var tr = el.closest('tr');
     if (val > 0) {
         var creditInput = tr.querySelector('.credit-input');
@@ -671,7 +677,7 @@ function onDebitInput(el) {
     syncOffsetAmount(idx);
 }
 function onCreditInput(el) {
-    var val = parseInt(el.value) || 0;
+    var val = _jfNum(el);
     var tr = el.closest('tr');
     if (val > 0) {
         var debitInput = tr.querySelector('.debit-input');
@@ -710,7 +716,7 @@ function autoSetOffsetFlag(el, direction) {
     var offsetFlagSel = document.getElementById('offset_flag_' + idx);
     if (!offsetFlagSel) return;
 
-    var val = parseInt(el.value) || 0;
+    var val = _jfNum(el);
     if (val <= 0) return;
 
     var typeNum = parseInt(acct.type_num) || 0;
@@ -761,7 +767,7 @@ function syncOffsetAmount(idx) {
 
     var debitInput = tr.querySelector('.debit-input');
     var creditInput = tr.querySelector('.credit-input');
-    var entryAmt = Math.max(parseInt(debitInput && debitInput.value || 0), parseInt(creditInput && creditInput.value || 0));
+    var entryAmt = Math.max(_jfNum(debitInput), _jfNum(creditInput));
 
     if (entryAmt > max) {
         amtInput.value = '';
@@ -779,8 +785,8 @@ function calcTotals() {
     var debits = document.querySelectorAll('.debit-input');
     var credits = document.querySelectorAll('.credit-input');
     var totalD = 0, totalC = 0;
-    for (var i = 0; i < debits.length; i++) totalD += parseInt(debits[i].value || 0);
-    for (var i = 0; i < credits.length; i++) totalC += parseInt(credits[i].value || 0);
+    for (var i = 0; i < debits.length; i++) totalD += _jfNum(debits[i]);
+    for (var i = 0; i < credits.length; i++) totalC += _jfNum(credits[i]);
 
     document.getElementById('totalDebit').textContent = totalD.toLocaleString();
     document.getElementById('totalCredit').textContent = totalC.toLocaleString();
@@ -886,8 +892,8 @@ document.getElementById('journalForm').addEventListener('submit', function(ev) {
     var totalD = 0, totalC = 0;
     var debits = document.querySelectorAll('.debit-input');
     var credits = document.querySelectorAll('.credit-input');
-    for (var i = 0; i < debits.length; i++) totalD += parseInt(debits[i].value || 0);
-    for (var i = 0; i < credits.length; i++) totalC += parseInt(credits[i].value || 0);
+    for (var i = 0; i < debits.length; i++) totalD += _jfNum(debits[i]);
+    for (var i = 0; i < credits.length; i++) totalC += _jfNum(credits[i]);
     if (Math.abs(totalD - totalC) > 0.01) {
         ev.preventDefault();
         alert('借方合計與貸方合計不相等，請修正後再儲存');
@@ -1062,7 +1068,7 @@ function showOffsetLedgerModal(ledgers, idx) {
     var tr = document.getElementById('line_' + idx);
     var dI = tr ? tr.querySelector('.debit-input') : null;
     var cI = tr ? tr.querySelector('.credit-input') : null;
-    var entryAmt = Math.max(parseInt(dI && dI.value || 0), parseInt(cI && cI.value || 0));
+    var entryAmt = Math.max(_jfNum(dI), _jfNum(cI));
 
     var html = '<div style="padding:16px">';
     html += '<h3 id="offsetModalHeader" style="margin:0 0 12px;cursor:move;user-select:none">選擇要沖銷的立帳單 <span style="font-size:.85rem;color:#666;font-weight:normal">（可複選，拖曳標題移動）</span></h3>';
@@ -1160,7 +1166,7 @@ function updateOffsetSelection() {
     var tr = document.getElementById('line_' + idx);
     var dI = tr ? tr.querySelector('.debit-input') : null;
     var cI = tr ? tr.querySelector('.credit-input') : null;
-    var entryAmt = Math.max(parseInt(dI && dI.value || 0), parseInt(cI && cI.value || 0));
+    var entryAmt = Math.max(_jfNum(dI), _jfNum(cI));
 
     var summary = document.getElementById('offsetSelSummary');
     var warn = '';
@@ -1226,8 +1232,8 @@ function confirmMultiOffset() {
     // 取得原始行資訊
     var dI = tr.querySelector('.debit-input');
     var cI = tr.querySelector('.credit-input');
-    var entryAmt = Math.max(parseInt(dI && dI.value || 0), parseInt(cI && cI.value || 0));
-    var isDebit = (parseInt(dI && dI.value || 0) > 0);
+    var entryAmt = Math.max(_jfNum(dI), _jfNum(cI));
+    var isDebit = (_jfNum(dI) > 0);
 
     var accountIdInput = tr.querySelector('input[name*="[account_id]"]');
     var ccSelect = tr.querySelector('select[name*="[cost_center_id]"]');

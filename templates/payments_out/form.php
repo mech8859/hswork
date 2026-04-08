@@ -369,7 +369,9 @@ function calcVoucherTotal() {
     var total = 0;
     var amounts = document.querySelectorAll('#voucherBody .voucher-amount');
     for (var i = 0; i < amounts.length; i++) {
-        total += parseInt(amounts[i].value) || 0;
+        // 防呆：移除千位逗號避免 parseInt('1,143') → 1
+        var v = String(amounts[i].value || '0').replace(/,/g, '');
+        total += parseInt(v) || 0;
     }
     document.getElementById('voucherTotal').textContent = '$' + total.toLocaleString();
 }

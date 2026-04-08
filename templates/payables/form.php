@@ -620,7 +620,9 @@ function validatePayableForm() {
 // ---- 發票小計自動計算 ----
 function calcInvRow(el) {
     var tr = el.closest('tr');
-    var untaxed = parseInt(tr.querySelector('.inv-untaxed').value) || 0;
+    // 防呆：移除千位逗號避免 parseInt('1,143') → 1
+    var rawVal = String(tr.querySelector('.inv-untaxed').value || '').replace(/,/g, '');
+    var untaxed = parseInt(rawVal) || 0;
     var tax = Math.round(untaxed * 0.05);
     var subtotal = untaxed + tax;
     tr.querySelector('.inv-tax').value = tax;

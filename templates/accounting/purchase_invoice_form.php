@@ -398,8 +398,14 @@ function onTypeChange() {
     calcTax();
 }
 
+// 防呆：移除千位逗號避免 parseInt('1,143') → 1
+function _piRead(id) {
+    var el = document.getElementById(id);
+    if (!el) return 0;
+    return parseInt(String(el.value || '0').replace(/,/g, '')) || 0;
+}
 function calcTax() {
-    var untaxed = parseInt(document.getElementById('fldUntaxed').value) || 0;
+    var untaxed = _piRead('fldUntaxed');
     var type = document.getElementById('fldInvoiceType').value;
     var tax = 0;
     if (type !== '免稅' && type !== '零稅率') {
@@ -410,8 +416,8 @@ function calcTax() {
 }
 
 function calcTotal() {
-    var untaxed = parseInt(document.getElementById('fldUntaxed').value) || 0;
-    var tax = parseInt(document.getElementById('fldTaxAmt').value) || 0;
+    var untaxed = _piRead('fldUntaxed');
+    var tax = _piRead('fldTaxAmt');
     document.getElementById('fldTotal').value = (untaxed + tax) || '';
 }
 </script>
