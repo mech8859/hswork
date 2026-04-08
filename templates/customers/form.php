@@ -3,6 +3,9 @@ $categoryOptions = CustomerModel::categoryOptions();
 $fileTypeOptions = CustomerModel::fileTypeOptions();
 $canManage = isset($canManage) ? $canManage : Auth::hasPermission('customers.manage');
 $isEdit = !empty($customer);
+if (!isset($canEdit)) $canEdit = $canManage;
+$readOnly = $isEdit && !$canEdit;
+require __DIR__ . '/../_readonly_form_helper.php';
 ?>
 
 <!-- 頁首 -->
@@ -46,7 +49,7 @@ $isEdit = !empty($customer);
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
-<form method="POST" class="mt-2" id="customerForm">
+<form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" id="customerForm">
     <?= csrf_field() ?>
 
     <!-- sec-basic: 基本資料 -->

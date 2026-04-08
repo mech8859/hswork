@@ -84,7 +84,19 @@ switch ($action) {
         $customer = $model->getById($id);
         if (!$customer) { Session::flash('error', '客戶不存在'); redirect('/customers.php'); }
 
-        $canManage = Auth::hasPermission('customers.manage');
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
+        $hasManage = Auth::hasPermission('customers.manage');
+        $hasView = Auth::hasPermission('customers.view') || $hasManage;
+        $hasOwn = Auth::hasPermission('customers.own');
+        $canManage = $hasManage; // backward compat
+        $canEdit = $isAdmin || $hasManage;
+        // 注意：own 權限對客戶這個共用資源預設不允許編輯（避免互相覆蓋）
+        $canView = $canEdit || $hasView || $hasOwn;
+        if (!$canView) {
+            Session::flash('error', '權限不足');
+            redirect('/customers.php');
+        }
 
         // 自動從關聯案件補進件資訊（case_number/case_date/source_company 為空時）
         if (empty($customer['case_number'])) {
@@ -104,7 +116,11 @@ switch ($action) {
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            Auth::requirePermission('customers.manage');
+            // 後端守門：無編輯權限不能 POST
+            if (!$canEdit) {
+                Session::flash('error', '無編輯權限，僅可檢視');
+                redirect('/customers.php?action=edit&id='.$id);
+            }
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/customers.php?action=edit&id='.$id); }
             AuditLog::logChange('customers', $id, $customer['name'], $customer, $_POST, array('name','category','contact_person','phone','mobile','email','address','tax_id','invoice_title','legacy_customer_no'));
             $model->update($id, $_POST);
