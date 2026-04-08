@@ -549,18 +549,35 @@ class ReportModel
 
         // ── 付款單 + 分公司拆帳 ──
         // 加 exclude_from_branch_stats 旗標：用於計算「分公司年度統計（不含補帳）」
-        $stmt = $this->db->prepare("
-            SELECT po.payment_date, po.total_amount AS po_total,
-                   po.exclude_from_branch_stats,
-                   pob.amount AS branch_amount, b.name AS branch_name
-            FROM payments_out po
-            LEFT JOIN payment_out_branches pob ON pob.payment_out_id = po.id
-            LEFT JOIN branches b ON pob.branch_id = b.id
-            WHERE po.payment_date BETWEEN ? AND ?
-            ORDER BY po.payment_date
-        ");
-        $stmt->execute(array($yearStart, $yearEnd));
-        $payRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // 防呆：欄位可能還沒建立（migration 112 未跑）→ try/catch 後用 fallback
+        try {
+            $stmt = $this->db->prepare("
+                SELECT po.payment_date, po.total_amount AS po_total,
+                       po.exclude_from_branch_stats,
+                       pob.amount AS branch_amount, b.name AS branch_name
+                FROM payments_out po
+                LEFT JOIN payment_out_branches pob ON pob.payment_out_id = po.id
+                LEFT JOIN branches b ON pob.branch_id = b.id
+                WHERE po.payment_date BETWEEN ? AND ?
+                ORDER BY po.payment_date
+            ");
+            $stmt->execute(array($yearStart, $yearEnd));
+            $payRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            // exclude_from_branch_stats 欄位不存在 → 使用舊版查詢
+            $stmt = $this->db->prepare("
+                SELECT po.payment_date, po.total_amount AS po_total,
+                       0 AS exclude_from_branch_stats,
+                       pob.amount AS branch_amount, b.name AS branch_name
+                FROM payments_out po
+                LEFT JOIN payment_out_branches pob ON pob.payment_out_id = po.id
+                LEFT JOIN branches b ON pob.branch_id = b.id
+                WHERE po.payment_date BETWEEN ? AND ?
+                ORDER BY po.payment_date
+            ");
+            $stmt->execute(array($yearStart, $yearEnd));
+            $payRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         // ── 現金明細 ──
         $stmt = $this->db->prepare("

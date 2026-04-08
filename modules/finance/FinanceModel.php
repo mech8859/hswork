@@ -1016,70 +1016,136 @@ class FinanceModel
     {
         $number = $this->generateNumber('PO', 'payments_out', 'payment_number');
         // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
-        $stmt = $this->db->prepare("
-            INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
-                payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
-                total_amount, main_category, sub_category, note, exclude_from_branch_stats, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ");
-        $stmt->execute(array(
-            $number,
-            $data['create_date'],
-            !empty($data['payment_date']) ? $data['payment_date'] : null,
-            !empty($data['payable_id']) ? $data['payable_id'] : null,
-            !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
-            !empty($data['payment_method']) ? $data['payment_method'] : null,
-            !empty($data['payment_type']) ? $data['payment_type'] : null,
-            !empty($data['payment_terms']) ? $data['payment_terms'] : null,
-            !empty($data['status']) ? $data['status'] : '待付款',
-            !empty($data['subtotal']) ? $data['subtotal'] : 0,
-            !empty($data['tax']) ? $data['tax'] : 0,
-            !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
-            !empty($data['total_amount']) ? $data['total_amount'] : 0,
-            !empty($data['main_category']) ? $data['main_category'] : null,
-            !empty($data['sub_category']) ? $data['sub_category'] : null,
-            !empty($data['note']) ? $data['note'] : null,
-            !empty($data['exclude_from_branch_stats']) ? 1 : 0,
-            !empty($data['registrar']) ? $data['registrar'] : null,
-            $data['created_by'],
-            $data['created_by'],
-        ));
+        // 防呆：exclude_from_branch_stats 欄位可能還沒建立（migration 112 未跑）→ try/catch
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
+                    payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
+                    total_amount, main_category, sub_category, note, exclude_from_branch_stats, registrar, created_by, updated_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+            $stmt->execute(array(
+                $number,
+                $data['create_date'],
+                !empty($data['payment_date']) ? $data['payment_date'] : null,
+                !empty($data['payable_id']) ? $data['payable_id'] : null,
+                !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                !empty($data['payment_method']) ? $data['payment_method'] : null,
+                !empty($data['payment_type']) ? $data['payment_type'] : null,
+                !empty($data['payment_terms']) ? $data['payment_terms'] : null,
+                !empty($data['status']) ? $data['status'] : '待付款',
+                !empty($data['subtotal']) ? $data['subtotal'] : 0,
+                !empty($data['tax']) ? $data['tax'] : 0,
+                !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
+                !empty($data['total_amount']) ? $data['total_amount'] : 0,
+                !empty($data['main_category']) ? $data['main_category'] : null,
+                !empty($data['sub_category']) ? $data['sub_category'] : null,
+                !empty($data['note']) ? $data['note'] : null,
+                !empty($data['exclude_from_branch_stats']) ? 1 : 0,
+                !empty($data['registrar']) ? $data['registrar'] : null,
+                $data['created_by'],
+                $data['created_by'],
+            ));
+        } catch (Exception $e) {
+            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats
+            $stmt = $this->db->prepare("
+                INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
+                    payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
+                    total_amount, main_category, sub_category, note, registrar, created_by, updated_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+            $stmt->execute(array(
+                $number,
+                $data['create_date'],
+                !empty($data['payment_date']) ? $data['payment_date'] : null,
+                !empty($data['payable_id']) ? $data['payable_id'] : null,
+                !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                !empty($data['payment_method']) ? $data['payment_method'] : null,
+                !empty($data['payment_type']) ? $data['payment_type'] : null,
+                !empty($data['payment_terms']) ? $data['payment_terms'] : null,
+                !empty($data['status']) ? $data['status'] : '待付款',
+                !empty($data['subtotal']) ? $data['subtotal'] : 0,
+                !empty($data['tax']) ? $data['tax'] : 0,
+                !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
+                !empty($data['total_amount']) ? $data['total_amount'] : 0,
+                !empty($data['main_category']) ? $data['main_category'] : null,
+                !empty($data['sub_category']) ? $data['sub_category'] : null,
+                !empty($data['note']) ? $data['note'] : null,
+                !empty($data['registrar']) ? $data['registrar'] : null,
+                $data['created_by'],
+                $data['created_by'],
+            ));
+        }
         return $this->db->lastInsertId();
     }
 
     public function updatePaymentOut($id, $data)
     {
         // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
-        $stmt = $this->db->prepare("
-            UPDATE payments_out SET
-                create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
-                payment_method=?, payment_type=?, payment_terms=?, status=?,
-                subtotal=?, tax=?, remittance_fee=?, total_amount=?,
-                main_category=?, sub_category=?, note=?, exclude_from_branch_stats=?, updated_by=?
-            WHERE id=?
-        ");
-        $stmt->execute(array(
-            $data['create_date'],
-            !empty($data['payment_date']) ? $data['payment_date'] : null,
-            !empty($data['payable_id']) ? $data['payable_id'] : null,
-            !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
-            !empty($data['payment_method']) ? $data['payment_method'] : null,
-            !empty($data['payment_type']) ? $data['payment_type'] : null,
-            !empty($data['payment_terms']) ? $data['payment_terms'] : null,
-            !empty($data['status']) ? $data['status'] : '待付款',
-            !empty($data['subtotal']) ? $data['subtotal'] : 0,
-            !empty($data['tax']) ? $data['tax'] : 0,
-            !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
-            !empty($data['total_amount']) ? $data['total_amount'] : 0,
-            !empty($data['main_category']) ? $data['main_category'] : null,
-            !empty($data['sub_category']) ? $data['sub_category'] : null,
-            !empty($data['note']) ? $data['note'] : null,
-            !empty($data['exclude_from_branch_stats']) ? 1 : 0,
-            $data['updated_by'],
-            $id,
-        ));
+        // 防呆：exclude_from_branch_stats 欄位可能還沒建立 → try/catch
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE payments_out SET
+                    create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
+                    payment_method=?, payment_type=?, payment_terms=?, status=?,
+                    subtotal=?, tax=?, remittance_fee=?, total_amount=?,
+                    main_category=?, sub_category=?, note=?, exclude_from_branch_stats=?, updated_by=?
+                WHERE id=?
+            ");
+            $stmt->execute(array(
+                $data['create_date'],
+                !empty($data['payment_date']) ? $data['payment_date'] : null,
+                !empty($data['payable_id']) ? $data['payable_id'] : null,
+                !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                !empty($data['payment_method']) ? $data['payment_method'] : null,
+                !empty($data['payment_type']) ? $data['payment_type'] : null,
+                !empty($data['payment_terms']) ? $data['payment_terms'] : null,
+                !empty($data['status']) ? $data['status'] : '待付款',
+                !empty($data['subtotal']) ? $data['subtotal'] : 0,
+                !empty($data['tax']) ? $data['tax'] : 0,
+                !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
+                !empty($data['total_amount']) ? $data['total_amount'] : 0,
+                !empty($data['main_category']) ? $data['main_category'] : null,
+                !empty($data['sub_category']) ? $data['sub_category'] : null,
+                !empty($data['note']) ? $data['note'] : null,
+                !empty($data['exclude_from_branch_stats']) ? 1 : 0,
+                $data['updated_by'],
+                $id,
+            ));
+        } catch (Exception $e) {
+            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats
+            $stmt = $this->db->prepare("
+                UPDATE payments_out SET
+                    create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
+                    payment_method=?, payment_type=?, payment_terms=?, status=?,
+                    subtotal=?, tax=?, remittance_fee=?, total_amount=?,
+                    main_category=?, sub_category=?, note=?, updated_by=?
+                WHERE id=?
+            ");
+            $stmt->execute(array(
+                $data['create_date'],
+                !empty($data['payment_date']) ? $data['payment_date'] : null,
+                !empty($data['payable_id']) ? $data['payable_id'] : null,
+                !empty($data['vendor_name']) ? $data['vendor_name'] : null,
+                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                !empty($data['payment_method']) ? $data['payment_method'] : null,
+                !empty($data['payment_type']) ? $data['payment_type'] : null,
+                !empty($data['payment_terms']) ? $data['payment_terms'] : null,
+                !empty($data['status']) ? $data['status'] : '待付款',
+                !empty($data['subtotal']) ? $data['subtotal'] : 0,
+                !empty($data['tax']) ? $data['tax'] : 0,
+                !empty($data['remittance_fee']) ? $data['remittance_fee'] : 0,
+                !empty($data['total_amount']) ? $data['total_amount'] : 0,
+                !empty($data['main_category']) ? $data['main_category'] : null,
+                !empty($data['sub_category']) ? $data['sub_category'] : null,
+                !empty($data['note']) ? $data['note'] : null,
+                $data['updated_by'],
+                $id,
+            ));
+        }
     }
 
     public function deletePaymentOut($id)
