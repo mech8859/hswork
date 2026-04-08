@@ -2,16 +2,19 @@
 $activityTypes = BusinessCalendarModel::activityTypes();
 $regionOptions = BusinessCalendarModel::regionOptions();
 $isEdit = !empty($event);
+if (!isset($canEdit)) $canEdit = true;
+$readOnly = $isEdit && !$canEdit;
 $statusOptions = array(
     'planned' => '計劃中',
     'completed' => '已完成',
     'cancelled' => '已取消',
 );
+require __DIR__ . '/../_readonly_form_helper.php';
 ?>
 
-<h2><?= $isEdit ? '編輯業務行程' : '新增業務行程' ?></h2>
+<h2><?= $isEdit ? ($readOnly ? '檢視業務行程' : '編輯業務行程') : '新增業務行程' ?></h2>
 
-<form method="POST" class="mt-2" id="bcForm">
+<form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" id="bcForm">
     <?= csrf_field() ?>
 
     <div class="card">
@@ -103,8 +106,8 @@ $statusOptions = array(
 
     <div class="d-flex gap-1 mt-2">
         <button type="submit" class="btn btn-primary"><?= $isEdit ? '儲存變更' : '建立行程' ?></button>
-        <a href="/business_calendar.php" class="btn btn-outline">取消</a>
-        <?php if ($isEdit): ?>
+        <a href="/business_calendar.php" class="btn btn-outline">返回</a>
+        <?php if ($isEdit && $canEdit): ?>
         <a href="/business_calendar.php?action=delete&id=<?= $event['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>"
            class="btn btn-danger" style="margin-left:auto"
            onclick="return confirm('確定要刪除此行程嗎？')">刪除</a>

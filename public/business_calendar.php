@@ -102,22 +102,37 @@ switch ($action) {
         $event = $model->getById($id);
         if (!$event) { Session::flash('error', '行程不存在'); redirect('/business_calendar.php'); }
 
-        // 業務（role=sales 或 is_sales=1）只能編輯自己承辦（staff_id）的行程
-        // 非業務 + 有 business_calendar.manage 或 boss/manager → 可編輯所有
         $cu = Auth::user();
-        $isSales = ($cu['role'] === 'sales') || !empty($cu['is_sales']);
+
+        // 高層管理者一律可編輯（即使勾選 is_sales 也不應被限制）
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
+        $hasManage = Auth::hasPermission('business_calendar.manage');
+        $hasView = Auth::hasPermission('business_calendar.view') || $hasManage;
         $isOwn = ((int)$event['staff_id'] === (int)Auth::id()) || ((int)$event['created_by'] === (int)Auth::id());
-        if ($isSales) {
-            $canEdit = $isOwn;
+        // 純業務角色（boss/manager 除外）
+        $isSalesOnly = !$isAdmin && (($cu['role'] === 'sales') || !empty($cu['is_sales']));
+
+        if ($isAdmin || $hasManage) {
+            $canEdit = true;     // 高層或有 manage 權限 → 可編
+        } elseif ($isSalesOnly) {
+            $canEdit = $isOwn;   // 業務只能編自己
         } else {
-            $canEdit = Auth::hasPermission('business_calendar.manage') || in_array($cu['role'], array('boss', 'manager', 'vice_president')) || $isOwn;
+            $canEdit = $isOwn;
         }
-        if (!$canEdit) {
-            Session::flash('error', '權限不足，業務人員只能編輯自己承辦的行程');
+
+        // 檢視：可編必可看；另外有 view 權限也可看
+        $canView = $canEdit || $hasView;
+        if (!$canView) {
+            Session::flash('error', '權限不足');
             redirect('/business_calendar.php');
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // 後端守門：即使前端被繞過，沒 canEdit 仍會被擋
+            if (!$canEdit) {
+                Session::flash('error', '無編輯權限，僅可檢視');
+                redirect('/business_calendar.php?action=edit&id='.$id);
+            }
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/business_calendar.php?action=edit&id='.$id); }
             $model->update($id, $_POST);
             Session::flash('success', '行程已更新');
@@ -125,7 +140,7 @@ switch ($action) {
         }
         $salespeople = $model->getSalespeople();
 
-        $pageTitle = '編輯業務行程';
+        $pageTitle = $canEdit ? '編輯業務行程' : '檢視業務行程';
         $currentPage = 'business_calendar';
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/business_calendar/form.php';
