@@ -578,6 +578,229 @@ class StockModel
     }
 
     // ============================================================
+    // 出庫單 - 編輯功能輔助方法
+    // ============================================================
+
+    /**
+     * 判斷出庫單未確認品項目前的庫存狀態
+     * 用於編輯時決定如何反向/正向操作庫存
+     *
+     * @return string 'pending' | 'reserved' | 'prepared'
+     */
+    public function getStockOutItemsState($stockOutId)
+    {
+        $record = $this->getStockOutById($stockOutId);
+        if (!$record) return 'pending';
+
+        $status = $record['status'];
+        if ($status === '待確認' || $status === 'pending') return 'pending';
+        if ($status === '已預扣') return 'reserved';
+        if ($status === '已備貨') return 'prepared';
+
+        // 部分出庫：查最後一筆 non-case_out transaction 推論前狀態
+        $stmt = $this->db->prepare("
+            SELECT type FROM inventory_transactions
+            WHERE reference_type = 'stock_out' AND reference_id = ?
+              AND type IN ('reserve', 'unreserve', 'prepare', 'unprepare')
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute(array($stockOutId));
+        $lastType = $stmt->fetchColumn();
+
+        if ($lastType === 'prepare') return 'prepared';
+        if ($lastType === 'reserve') return 'reserved';
+        // unreserve / unprepare / 無 → pending
+        return 'pending';
+    }
+
+    /**
+     * 編輯出庫單明細（批次處理刪除/修改/新增）
+     *
+     * @param int $stockOutId
+     * @param array $changes ['deleted' => [itemId...], 'updated' => [{id, quantity, unit_price, note}...], 'added' => [{product_id, product_name, model, unit, quantity, unit_price, note}...]]
+     * @param int $userId
+     * @return array ['deleted'=>n, 'updated'=>n, 'added'=>n]
+     */
+    public function editStockOutItems($stockOutId, array $changes, $userId)
+    {
+        $record = $this->getStockOutById($stockOutId);
+        if (!$record) throw new Exception('出庫單不存在');
+
+        $allowedStatuses = array('待確認', 'pending', '已預扣', '已備貨', '部分出庫');
+        if (!in_array($record['status'], $allowedStatuses, true)) {
+            throw new Exception('此狀態不允許編輯：' . $record['status']);
+        }
+
+        $itemState = $this->getStockOutItemsState($stockOutId);
+        $warehouseId = $record['warehouse_id'];
+        if (!$warehouseId) throw new Exception('出庫單缺少倉庫資訊');
+        $soNumber = !empty($record['so_number']) ? $record['so_number'] : '';
+
+        require_once __DIR__ . '/InventoryModel.php';
+        $invModel = new InventoryModel();
+
+        $this->db->beginTransaction();
+        try {
+            $results = array('deleted' => 0, 'updated' => 0, 'added' => 0);
+
+            // ---- 1. 刪除 ----
+            if (!empty($changes['deleted']) && is_array($changes['deleted'])) {
+                foreach ($changes['deleted'] as $delId) {
+                    $delId = (int)$delId;
+                    if ($delId <= 0) continue;
+
+                    $stmt = $this->db->prepare("SELECT * FROM stock_out_items WHERE id = ? AND stock_out_id = ?");
+                    $stmt->execute(array($delId, $stockOutId));
+                    $item = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if (!$item) continue;
+
+                    // 已出貨的列不可刪
+                    $shippedQty = isset($item['shipped_qty']) ? (float)$item['shipped_qty'] : 0;
+                    if ($shippedQty > 0) {
+                        throw new Exception('已出貨的品項不可刪除：' . ($item['product_name'] ?: '(未命名)'));
+                    }
+
+                    $pid = !empty($item['product_id']) ? (int)$item['product_id'] : 0;
+                    $qty = (float)$item['quantity'];
+
+                    // 依狀態反向庫存
+                    if ($pid && $qty > 0) {
+                        if ($itemState === 'reserved') {
+                            $invModel->unreserveStock($pid, $warehouseId, $qty, 'stock_out', $stockOutId, '編輯刪除: ' . $soNumber, $userId);
+                        } elseif ($itemState === 'prepared') {
+                            $invModel->unprepareStock($pid, $warehouseId, $qty, 'stock_out', $stockOutId, '編輯刪除: ' . $soNumber, $userId);
+                        }
+                    }
+
+                    $this->db->prepare("DELETE FROM stock_out_items WHERE id = ?")->execute(array($delId));
+                    $results['deleted']++;
+                }
+            }
+
+            // ---- 2. 修改 ----
+            if (!empty($changes['updated']) && is_array($changes['updated'])) {
+                foreach ($changes['updated'] as $upd) {
+                    $itemId = isset($upd['id']) ? (int)$upd['id'] : 0;
+                    if ($itemId <= 0) continue;
+
+                    $stmt = $this->db->prepare("SELECT * FROM stock_out_items WHERE id = ? AND stock_out_id = ?");
+                    $stmt->execute(array($itemId, $stockOutId));
+                    $item = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if (!$item) continue;
+
+                    $shippedQty = isset($item['shipped_qty']) ? (float)$item['shipped_qty'] : 0;
+                    if ($shippedQty > 0) {
+                        throw new Exception('已出貨的品項不可修改：' . ($item['product_name'] ?: '(未命名)'));
+                    }
+
+                    $pid = !empty($item['product_id']) ? (int)$item['product_id'] : 0;
+                    $oldQty = (float)$item['quantity'];
+                    $newQty = isset($upd['quantity']) ? (float)$upd['quantity'] : $oldQty;
+                    if ($newQty <= 0) throw new Exception('數量必須大於 0');
+
+                    $delta = $newQty - $oldQty;
+
+                    // 依狀態調整庫存
+                    if ($delta != 0 && $pid) {
+                        if ($itemState === 'reserved') {
+                            if ($delta > 0) {
+                                $invModel->reserveStock($pid, $warehouseId, $delta, 'stock_out', $stockOutId, '編輯增量: ' . $soNumber, $userId);
+                            } else {
+                                $invModel->unreserveStock($pid, $warehouseId, abs($delta), 'stock_out', $stockOutId, '編輯減量: ' . $soNumber, $userId);
+                            }
+                        } elseif ($itemState === 'prepared') {
+                            if ($delta > 0) {
+                                // 先 reserve 再 prepare
+                                $invModel->reserveStock($pid, $warehouseId, $delta, 'stock_out', $stockOutId, '編輯增量: ' . $soNumber, $userId);
+                                $invModel->prepareStock($pid, $warehouseId, $delta, 'stock_out', $stockOutId, '編輯增量: ' . $soNumber, $userId);
+                            } else {
+                                $invModel->unprepareStock($pid, $warehouseId, abs($delta), 'stock_out', $stockOutId, '編輯減量: ' . $soNumber, $userId);
+                            }
+                        }
+                    }
+
+                    $unitPrice = isset($upd['unit_price']) ? (float)$upd['unit_price'] : (float)$item['unit_price'];
+                    $note = isset($upd['note']) ? $upd['note'] : $item['note'];
+                    $this->db->prepare("UPDATE stock_out_items SET quantity = ?, unit_price = ?, note = ? WHERE id = ?")
+                             ->execute(array($newQty, $unitPrice, $note, $itemId));
+                    $results['updated']++;
+                }
+            }
+
+            // ---- 3. 新增 ----
+            if (!empty($changes['added']) && is_array($changes['added'])) {
+                $maxSort = $this->db->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM stock_out_items WHERE stock_out_id = ?");
+                $maxSort->execute(array($stockOutId));
+                $nextSort = (int)$maxSort->fetchColumn();
+
+                $insertStmt = $this->db->prepare("
+                    INSERT INTO stock_out_items
+                        (stock_out_id, product_id, model, product_name, unit, quantity, shipped_qty, unit_price, note, sort_order, is_confirmed)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0)
+                ");
+
+                foreach ($changes['added'] as $new) {
+                    $pid = !empty($new['product_id']) ? (int)$new['product_id'] : 0;
+                    $qty = isset($new['quantity']) ? (float)$new['quantity'] : 0;
+                    if ($qty <= 0) throw new Exception('新增品項數量必須大於 0');
+
+                    $productName = isset($new['product_name']) ? trim($new['product_name']) : '';
+                    $model = isset($new['model']) ? trim($new['model']) : '';
+                    $unit = isset($new['unit']) ? trim($new['unit']) : '';
+                    $unitPrice = isset($new['unit_price']) ? (float)$new['unit_price'] : 0;
+                    $note = isset($new['note']) ? trim($new['note']) : '';
+
+                    if ($productName === '' && $model === '' && $pid <= 0) {
+                        throw new Exception('新增品項至少需要品名或型號');
+                    }
+
+                    $insertStmt->execute(array(
+                        $stockOutId,
+                        $pid ?: null,
+                        $model ?: null,
+                        $productName ?: null,
+                        $unit ?: null,
+                        $qty,
+                        $unitPrice,
+                        $note ?: null,
+                        $nextSort++,
+                    ));
+
+                    // 依狀態正向庫存（新品項比照當前狀態預扣/備貨）
+                    if ($pid && $qty > 0) {
+                        if ($itemState === 'reserved') {
+                            $invModel->reserveStock($pid, $warehouseId, $qty, 'stock_out', $stockOutId, '編輯新增: ' . $soNumber, $userId);
+                        } elseif ($itemState === 'prepared') {
+                            $invModel->reserveStock($pid, $warehouseId, $qty, 'stock_out', $stockOutId, '編輯新增: ' . $soNumber, $userId);
+                            $invModel->prepareStock($pid, $warehouseId, $qty, 'stock_out', $stockOutId, '編輯新增: ' . $soNumber, $userId);
+                        }
+                    }
+
+                    $results['added']++;
+                }
+            }
+
+            // 重新計算 total_qty
+            $this->db->prepare("
+                UPDATE stock_outs
+                SET total_qty = (SELECT COALESCE(SUM(quantity), 0) FROM stock_out_items WHERE stock_out_id = ?),
+                    updated_by = ?, updated_at = NOW()
+                WHERE id = ?
+            ")->execute(array($stockOutId, $userId, $stockOutId));
+
+            // 更新狀態（若有可能觸發狀態變更）
+            $this->updateStockOutStatus($stockOutId, $userId);
+
+            $this->db->commit();
+            return $results;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    // ============================================================
     // 出庫單 - 備品管理
     // ============================================================
 

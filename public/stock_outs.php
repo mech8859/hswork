@@ -317,6 +317,41 @@ switch ($action) {
         }
         break;
 
+    // ---- 編輯明細（批次 AJAX）----
+    case 'edit_items':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$canManage) {
+            echo json_encode(array('error' => '無權限'));
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('error' => '方法錯誤'));
+            exit;
+        }
+        // CSRF 從 header 取得（JSON body 不方便帶）
+        $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '';
+        if ($csrfHeader !== Session::getCsrfToken()) {
+            echo json_encode(array('error' => '安全驗證失敗'));
+            exit;
+        }
+
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        $payload = file_get_contents('php://input');
+        $changes = json_decode($payload, true);
+        if (!is_array($changes)) {
+            echo json_encode(array('error' => '無效的請求資料'));
+            exit;
+        }
+
+        try {
+            $results = $model->editStockOutItems($id, $changes, Auth::id());
+            AuditLog::log('stock_outs', 'edit_items', $id, sprintf('編輯明細：刪除%d / 修改%d / 新增%d', $results['deleted'], $results['updated'], $results['added']));
+            echo json_encode(array('success' => true, 'results' => $results));
+        } catch (Exception $e) {
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+        exit;
+
     // ---- 新增備品 AJAX ----
     case 'ajax_add_spare':
         if (!$canManage) { header('Content-Type: application/json'); echo json_encode(array('error' => '無權限')); break; }

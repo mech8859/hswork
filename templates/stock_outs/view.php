@@ -40,6 +40,9 @@ if (!empty($items)) {
 }
 $hasUnconfirmed = $hasUnshipped; // 相容舊變數名
 $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) && $hasUnshipped;
+
+// 編輯模式支援的狀態（待確認 / 已預扣 / 已備貨 / 部分出庫）
+$canEdit = $canManage && in_array($record['status'], array('待確認', 'pending', '已預扣', '已備貨', '部分出庫'), true);
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -56,7 +59,7 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
         ?></small>
         <?php endif; ?>
     </div>
-    <div class="d-flex gap-1 flex-wrap">
+    <div class="d-flex gap-1 flex-wrap" id="actionBtnBar">
         <?php if ($canManage && $isPending && $hasUnconfirmed): ?>
         <a href="/stock_outs.php?action=reserve&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="return confirm('確認預扣庫存？將從可用庫存扣除。')">預扣庫存</a>
         <?php endif; ?>
@@ -67,6 +70,9 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
         <?php if ($canManage && $canConfirmItems): ?>
         <button type="button" class="btn btn-sm" style="background:var(--success);color:#fff" onclick="confirmCheckedItems()">確認勾選出庫</button>
         <a href="/stock_outs.php?action=cancel&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="return confirm('確定取消此出庫單？已出庫品項紀錄將保留。')">取消出庫</a>
+        <?php endif; ?>
+        <?php if ($canEdit): ?>
+        <button type="button" id="btnEnterEdit" class="btn btn-sm" style="background:#ff9800;color:#fff" onclick="enterEditMode()">✏ 編輯明細</button>
         <?php endif; ?>
         <?php if ($canManage && !$isPending && !empty($record['has_return_material'])): ?>
         <a href="/stock_ins.php?action=create_from_return&stock_out_id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('確認將餘料建立入庫單？')">餘料入庫</a>
@@ -229,7 +235,13 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     // 庫存判斷：只要能夠出剩餘的部分就算 ok
                     $hasStock = ($remainingQty > 0 && $itemStock >= $remainingQty);
                 ?>
-                <tr<?= $isSpare ? ' style="background:#fff8e1"' : '' ?>>
+                <?php $isEditableRow = ($shippedQty == 0); // 未開始出貨的列才能編輯 ?>
+                <tr<?= $isSpare ? ' style="background:#fff8e1"' : '' ?>
+                    data-row-item-id="<?= (int)$item['id'] ?>"
+                    data-editable="<?= $isEditableRow ? '1' : '0' ?>"
+                    data-orig-qty="<?= $needQty ?>"
+                    data-orig-price="<?= $unitCost ?>"
+                    data-orig-note="<?= e($itemNote) ?>">
                     <td class="return-col" style="display:none"><?php if ($shippedQty > 0): ?><input type="checkbox" class="return-check" value="<?= (int)$item['id'] ?>" data-max="<?= $shippedQty ?>" data-product="<?= e($productName) ?>"><?php endif; ?></td>
                     <?php if ($canManage && $canConfirmItems): ?>
                     <td class="print-hide-col"><?php if (!$isFullyShipped && $hasStock): ?><input type="checkbox" class="item-check" value="<?= (int)$item['id'] ?>" data-qty="<?= $remainingQty ?>"><?php endif; ?></td>
@@ -241,13 +253,13 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                         <span style="background:#ff9800;color:#fff;padding:1px 6px;border-radius:3px;font-size:.7rem;margin-left:4px;font-weight:600">備品</span>
                         <?php endif; ?>
                         <?php if ($itemNote && $itemNote !== '備品'): ?>
-                        <span style="color:#888;font-size:.75rem;margin-left:4px">(<?= e($itemNote) ?>)</span>
+                        <span class="note-display" style="color:#888;font-size:.75rem;margin-left:4px">(<?= e($itemNote) ?>)</span>
                         <?php endif; ?>
                     </td>
                     <td><?= e($productModel) ?></td>
                     <td><?= e($unitDisplay) ?></td>
                     <td class="text-right" style="color:<?= $stockColor ?>"><?= $stockDisplay ?></td>
-                    <td class="text-right" style="font-weight:600"><?= $needQty ?></td>
+                    <td class="text-right need-cell" style="font-weight:600"><?= $needQty ?></td>
                     <td class="text-right" style="color:<?= $shippedQty > 0 ? '#1565c0' : '#999' ?>"><?= $shippedQty ?></td>
                     <td class="text-right" style="color:<?= $remainingQty > 0 ? '#e65100' : '#999' ?>;font-weight:<?= $remainingQty > 0 ? '600' : 'normal' ?>"><?= $remainingQty ?></td>
                     <?php if (!empty($returnedQtyMap)):
@@ -268,8 +280,8 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
-                    <td class="text-right">$<?= number_format($unitCost) ?></td>
-                    <td class="text-right">$<?= number_format($subtotal) ?></td>
+                    <td class="text-right price-cell">$<?= number_format($unitCost) ?></td>
+                    <td class="text-right subtotal-cell">$<?= number_format($subtotal) ?></td>
                     <td>
                         <?php
                         // 新狀態顯示邏輯
@@ -628,6 +640,461 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
         }
         document.body.appendChild(form);
         form.submit();
+    }
+    </script>
+    <?php endif; ?>
+
+    <!-- ============ 編輯明細模式 ============ -->
+    <?php if ($canEdit): ?>
+    <div id="editToolbar" style="display:none;padding:12px 16px;background:#fff3e0;border-top:2px solid #ff9800">
+        <div class="d-flex justify-between align-center flex-wrap gap-1">
+            <div style="font-size:.9rem;color:#e65100;font-weight:600">
+                ✏ 編輯模式
+                <small style="color:#888;font-weight:normal">｜可修改「未出貨」的列，已出貨列完全鎖定</small>
+            </div>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-outline btn-sm" style="color:#ff9800;border-color:#ff9800" onclick="showEditAddProductPicker()">+ 新增項目</button>
+                <button type="button" class="btn btn-sm" style="background:var(--success);color:#fff" onclick="saveEditChanges()">儲存變更</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="cancelEditMode()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯模式新增項目的 Modal -->
+    <div id="editAddModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center">
+        <div style="background:#fff;border-radius:8px;padding:20px;max-width:680px;width:90%;max-height:85vh;overflow:auto">
+            <div class="d-flex justify-between align-center mb-2">
+                <h3 style="margin:0">新增項目</h3>
+                <button type="button" onclick="closeEditAddModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer">&times;</button>
+            </div>
+            <div style="margin-bottom:10px">
+                <label style="font-size:.85rem;font-weight:600">搜尋產品</label>
+                <input type="text" id="editAddKeyword" class="form-control" placeholder="輸入關鍵字（至少 2 字）搜尋產品..." autocomplete="off" oninput="editAddSearch()">
+                <div id="editAddResults" style="margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:4px;display:none"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2;min-width:180px">
+                    <label style="font-size:.85rem;font-weight:600">品名 *</label>
+                    <input type="text" id="editAddName" class="form-control" readonly style="background:#f5f5f5;font-weight:600">
+                    <input type="hidden" id="editAddPid">
+                </div>
+                <div class="form-group" style="flex:1;min-width:100px">
+                    <label style="font-size:.85rem;font-weight:600">型號</label>
+                    <input type="text" id="editAddModel" class="form-control" readonly style="background:#f5f5f5;color:#1565c0">
+                </div>
+                <div class="form-group" style="flex:0 0 60px">
+                    <label style="font-size:.85rem;font-weight:600">單位</label>
+                    <input type="text" id="editAddUnit" class="form-control" readonly style="background:#f5f5f5">
+                </div>
+                <div class="form-group" style="flex:0 0 80px">
+                    <label style="font-size:.85rem;font-weight:600">庫存</label>
+                    <input type="text" id="editAddStock" class="form-control" readonly style="background:#f5f5f5;text-align:center">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:0 0 100px">
+                    <label style="font-size:.85rem;font-weight:600">需求量 *</label>
+                    <input type="number" id="editAddQty" class="form-control" min="1" value="1">
+                </div>
+                <div class="form-group" style="flex:0 0 120px">
+                    <label style="font-size:.85rem;font-weight:600">單價</label>
+                    <input type="number" id="editAddPrice" class="form-control" min="0" value="0">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label style="font-size:.85rem;font-weight:600">備註</label>
+                    <input type="text" id="editAddNote" class="form-control" placeholder="選填">
+                </div>
+            </div>
+            <div class="d-flex justify-end gap-1 mt-2">
+                <button type="button" class="btn btn-primary" onclick="addPendingItem()">加入明細</button>
+                <button type="button" class="btn btn-outline" onclick="closeEditAddModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .edit-mode-active .edit-hide { display: none !important; }
+    tr.edit-row-deleted { opacity: .3; text-decoration: line-through; background: #ffebee !important; }
+    tr.edit-row-new { background: #e8f5e9 !important; }
+    .edit-input { width: 70px; padding: 2px 4px; text-align: right; font-size: .85rem; border: 1px solid var(--primary); border-radius: 3px; }
+    .edit-input-text { width: 100%; padding: 2px 4px; font-size: .85rem; border: 1px solid var(--primary); border-radius: 3px; }
+    .edit-row-btn { padding: 2px 8px; font-size: .75rem; }
+    </style>
+
+    <script>
+    var editModeActive = false;
+    var pendingDeletes = [];       // 要刪除的既有 item id
+    var pendingAdds = [];          // 要新增的 item objects
+    var tempIdCounter = -1;        // 新增列的臨時 id (負數)
+    var editProducts = [];         // 搜尋結果快取
+
+    function enterEditMode() {
+        if (editModeActive) return;
+        editModeActive = true;
+        pendingDeletes = [];
+        pendingAdds = [];
+        tempIdCounter = -1;
+
+        document.body.classList.add('edit-mode-active');
+        document.getElementById('editToolbar').style.display = 'block';
+        // 隱藏其他 action 按鈕
+        var bar = document.getElementById('actionBtnBar');
+        if (bar) {
+            var btns = bar.querySelectorAll('a.btn, button.btn');
+            for (var i = 0; i < btns.length; i++) {
+                if (btns[i].id !== 'btnEnterEdit') btns[i].classList.add('edit-hide');
+            }
+        }
+        document.getElementById('btnEnterEdit').classList.add('edit-hide');
+
+        // 把可編輯列變成輸入框
+        var rows = document.querySelectorAll('tr[data-row-item-id][data-editable="1"]');
+        for (var r = 0; r < rows.length; r++) {
+            makeRowEditable(rows[r]);
+        }
+    }
+
+    function makeRowEditable(row) {
+        var itemId = row.getAttribute('data-row-item-id');
+        var origQty = row.getAttribute('data-orig-qty') || '1';
+        var origPrice = row.getAttribute('data-orig-price') || '0';
+        var origNote = row.getAttribute('data-orig-note') || '';
+
+        // 需求量變輸入框
+        var needCell = row.querySelector('.need-cell');
+        if (needCell) {
+            needCell.innerHTML = '<input type="number" class="edit-input edit-qty" min="1" value="' + origQty + '" onchange="onRowQtyChange(this)">';
+        }
+
+        // 單價變輸入框
+        var priceCell = row.querySelector('.price-cell');
+        if (priceCell) {
+            priceCell.innerHTML = '<input type="number" class="edit-input edit-price" min="0" value="' + origPrice + '" onchange="onRowPriceChange(this)">';
+        }
+
+        // 狀態欄加 × 刪除按鈕
+        var statusCell = row.querySelector('td:last-child');
+        // 因為 return-col 可能是 last child，先找非 return-col
+        var tds = row.querySelectorAll('td');
+        var statCell = tds[tds.length - 2]; // 倒數第二個是狀態，倒數第一是 return-col
+        if (statCell) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-danger btn-sm edit-delete-btn';
+            btn.style.cssText = 'padding:2px 8px;font-size:.75rem;margin-left:4px';
+            btn.innerHTML = '&times; 刪';
+            btn.onclick = function() { markRowDeleted(row); };
+            statCell.appendChild(btn);
+        }
+    }
+
+    function onRowQtyChange(inp) {
+        var row = inp.closest('tr');
+        var priceInp = row.querySelector('.edit-price');
+        var subtotalCell = row.querySelector('.subtotal-cell');
+        if (priceInp && subtotalCell) {
+            var qty = parseFloat(inp.value) || 0;
+            var price = parseFloat(priceInp.value) || 0;
+            subtotalCell.textContent = '$' + (qty * price).toLocaleString();
+        }
+    }
+    function onRowPriceChange(inp) {
+        var row = inp.closest('tr');
+        var qtyInp = row.querySelector('.edit-qty');
+        var subtotalCell = row.querySelector('.subtotal-cell');
+        if (qtyInp && subtotalCell) {
+            var qty = parseFloat(qtyInp.value) || 0;
+            var price = parseFloat(inp.value) || 0;
+            subtotalCell.textContent = '$' + (qty * price).toLocaleString();
+        }
+    }
+
+    function markRowDeleted(row) {
+        var itemId = parseInt(row.getAttribute('data-row-item-id'));
+        if (itemId > 0) {
+            // 既有列 → 加入 pendingDeletes
+            if (pendingDeletes.indexOf(itemId) === -1) pendingDeletes.push(itemId);
+            row.classList.add('edit-row-deleted');
+            // 把刪除按鈕改成復原
+            var btn = row.querySelector('.edit-delete-btn');
+            if (btn) {
+                btn.innerHTML = '↺ 還原';
+                btn.className = 'btn btn-outline btn-sm edit-delete-btn';
+                btn.style.cssText = 'padding:2px 8px;font-size:.75rem;margin-left:4px;color:#1976d2;border-color:#1976d2';
+                btn.onclick = function() { unmarkRowDeleted(row); };
+            }
+        } else {
+            // 新增的列 → 直接從 pendingAdds 移除 + 從 DOM 移除
+            var newId = itemId; // 負數
+            pendingAdds = pendingAdds.filter(function(p) { return p._tempId !== newId; });
+            row.parentNode.removeChild(row);
+        }
+    }
+
+    function unmarkRowDeleted(row) {
+        var itemId = parseInt(row.getAttribute('data-row-item-id'));
+        pendingDeletes = pendingDeletes.filter(function(x) { return x !== itemId; });
+        row.classList.remove('edit-row-deleted');
+        var btn = row.querySelector('.edit-delete-btn');
+        if (btn) {
+            btn.innerHTML = '&times; 刪';
+            btn.className = 'btn btn-danger btn-sm edit-delete-btn';
+            btn.style.cssText = 'padding:2px 8px;font-size:.75rem;margin-left:4px';
+            btn.onclick = function() { markRowDeleted(row); };
+        }
+    }
+
+    function cancelEditMode() {
+        if (pendingDeletes.length > 0 || pendingAdds.length > 0 || hasModifiedInputs()) {
+            if (!confirm('尚有未儲存的變更，確定放棄？')) return;
+        }
+        location.reload();
+    }
+
+    function hasModifiedInputs() {
+        var rows = document.querySelectorAll('tr[data-row-item-id][data-editable="1"]');
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            var origQty = row.getAttribute('data-orig-qty');
+            var origPrice = row.getAttribute('data-orig-price');
+            var qtyInp = row.querySelector('.edit-qty');
+            var priceInp = row.querySelector('.edit-price');
+            if (qtyInp && qtyInp.value != origQty) return true;
+            if (priceInp && priceInp.value != origPrice) return true;
+        }
+        return false;
+    }
+
+    function saveEditChanges() {
+        // 收集 updated
+        var updated = [];
+        var rows = document.querySelectorAll('tr[data-row-item-id][data-editable="1"]');
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            var itemId = parseInt(row.getAttribute('data-row-item-id'));
+            if (itemId <= 0) continue;
+            if (row.classList.contains('edit-row-deleted')) continue;
+            var origQty = parseFloat(row.getAttribute('data-orig-qty') || '0');
+            var origPrice = parseFloat(row.getAttribute('data-orig-price') || '0');
+            var qtyInp = row.querySelector('.edit-qty');
+            var priceInp = row.querySelector('.edit-price');
+            var newQty = qtyInp ? parseFloat(qtyInp.value) : origQty;
+            var newPrice = priceInp ? parseFloat(priceInp.value) : origPrice;
+            if (newQty !== origQty || newPrice !== origPrice) {
+                updated.push({
+                    id: itemId,
+                    quantity: newQty,
+                    unit_price: newPrice
+                });
+            }
+        }
+
+        // 清理 pendingAdds（移除臨時 _tempId）
+        var addPayload = [];
+        for (var j = 0; j < pendingAdds.length; j++) {
+            var p = pendingAdds[j];
+            addPayload.push({
+                product_id: p.product_id,
+                product_name: p.product_name,
+                model: p.model,
+                unit: p.unit,
+                quantity: p.quantity,
+                unit_price: p.unit_price,
+                note: p.note
+            });
+        }
+
+        if (pendingDeletes.length === 0 && updated.length === 0 && addPayload.length === 0) {
+            alert('沒有任何變更');
+            return;
+        }
+
+        var summary = '即將儲存:\n';
+        if (pendingDeletes.length > 0) summary += '  刪除 ' + pendingDeletes.length + ' 個品項\n';
+        if (updated.length > 0) summary += '  修改 ' + updated.length + ' 個品項\n';
+        if (addPayload.length > 0) summary += '  新增 ' + addPayload.length + ' 個品項\n';
+        summary += '\n庫存會自動同步調整，確定儲存？';
+        if (!confirm(summary)) return;
+
+        var payload = {
+            deleted: pendingDeletes,
+            updated: updated,
+            added: addPayload
+        };
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/stock_outs.php?action=edit_items&id=<?= $record['id'] ?>');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('X-CSRF-Token', '<?= e(Session::getCsrfToken()) ?>');
+        xhr.onload = function() {
+            try {
+                var res = JSON.parse(xhr.responseText);
+                if (res.success) {
+                    alert('儲存成功！刪除 ' + res.results.deleted + ' / 修改 ' + res.results.updated + ' / 新增 ' + res.results.added);
+                    location.reload();
+                } else {
+                    alert('儲存失敗：' + (res.error || '未知錯誤'));
+                }
+            } catch (e) {
+                alert('回應錯誤：' + xhr.responseText.substring(0, 200));
+            }
+        };
+        xhr.onerror = function() { alert('網路錯誤'); };
+        xhr.send(JSON.stringify(payload));
+    }
+
+    // ===== 新增項目 Modal =====
+    function showEditAddProductPicker() {
+        document.getElementById('editAddModal').style.display = 'flex';
+        document.getElementById('editAddKeyword').value = '';
+        document.getElementById('editAddName').value = '';
+        document.getElementById('editAddPid').value = '';
+        document.getElementById('editAddModel').value = '';
+        document.getElementById('editAddUnit').value = '';
+        document.getElementById('editAddStock').value = '';
+        document.getElementById('editAddQty').value = '1';
+        document.getElementById('editAddPrice').value = '0';
+        document.getElementById('editAddNote').value = '';
+        document.getElementById('editAddResults').style.display = 'none';
+        setTimeout(function() { document.getElementById('editAddKeyword').focus(); }, 100);
+    }
+    function closeEditAddModal() {
+        document.getElementById('editAddModal').style.display = 'none';
+    }
+
+    var editAddTimer = null;
+    var editAddWarehouseId = <?= (int)($record['warehouse_id'] ?? 0) ?>;
+    function editAddSearch() {
+        clearTimeout(editAddTimer);
+        var kw = document.getElementById('editAddKeyword').value.trim();
+        if (kw.length < 2) {
+            document.getElementById('editAddResults').style.display = 'none';
+            return;
+        }
+        editAddTimer = setTimeout(function() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/stock_outs.php?action=ajax_products&keyword=' + encodeURIComponent(kw) + '&warehouse_id=' + editAddWarehouseId);
+            xhr.onload = function() {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    renderEditAddResults(data);
+                } catch (e) {}
+            };
+            xhr.send();
+        }, 300);
+    }
+    function renderEditAddResults(data) {
+        var box = document.getElementById('editAddResults');
+        if (!data.length) {
+            box.innerHTML = '<div style="padding:8px;color:#999;font-size:.85rem">無符合產品</div>';
+            box.style.display = 'block';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+            var d = data[i];
+            var stockColor = d.stock_qty > 0 ? '#2e7d32' : '#c62828';
+            html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" ' +
+                'data-idx="' + i + '" ' +
+                'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'" ' +
+                'onclick="selectEditAddProduct(' + i + ')">' +
+                '<div style="font-weight:600">' + escHtml(d.name) + '</div>' +
+                '<div style="font-size:.75rem;color:#888">' +
+                (d.model ? '<span style="color:#1565c0">' + escHtml(d.model) + '</span> | ' : '') +
+                '<span style="color:' + stockColor + '">庫存: ' + d.stock_qty + '</span>' +
+                (d.category_name ? ' | ' + escHtml(d.category_name) : '') +
+                '</div></div>';
+        }
+        box.innerHTML = html;
+        box.style.display = 'block';
+        editProducts = data;
+    }
+    function escHtml(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+    function selectEditAddProduct(idx) {
+        var d = editProducts[idx];
+        if (!d) return;
+        document.getElementById('editAddPid').value = d.id;
+        document.getElementById('editAddName').value = d.name;
+        document.getElementById('editAddModel').value = d.model || '';
+        document.getElementById('editAddUnit').value = d.unit || '台';
+        document.getElementById('editAddStock').value = d.stock_qty || 0;
+        document.getElementById('editAddPrice').value = d.cost || 0;
+        document.getElementById('editAddResults').style.display = 'none';
+    }
+
+    function addPendingItem() {
+        var name = document.getElementById('editAddName').value.trim();
+        if (!name) { alert('請先選擇產品'); return; }
+        var qty = parseInt(document.getElementById('editAddQty').value) || 0;
+        if (qty <= 0) { alert('數量必須大於 0'); return; }
+        var pid = parseInt(document.getElementById('editAddPid').value) || 0;
+        var model = document.getElementById('editAddModel').value;
+        var unit = document.getElementById('editAddUnit').value || '台';
+        var price = parseFloat(document.getElementById('editAddPrice').value) || 0;
+        var note = document.getElementById('editAddNote').value.trim();
+
+        var tempId = tempIdCounter--;
+        pendingAdds.push({
+            _tempId: tempId,
+            product_id: pid,
+            product_name: name,
+            model: model,
+            unit: unit,
+            quantity: qty,
+            unit_price: price,
+            note: note
+        });
+
+        // 動態插入一列到表格
+        insertPendingAddRow(tempId, pid, name, model, unit, qty, price, note);
+
+        closeEditAddModal();
+    }
+
+    function insertPendingAddRow(tempId, pid, name, model, unit, qty, price, note) {
+        var tbody = document.querySelector('#soItemsTable tbody');
+        var tfoot = document.querySelector('#soItemsTable tfoot');
+        var row = document.createElement('tr');
+        row.className = 'edit-row-new';
+        row.setAttribute('data-row-item-id', tempId);
+        row.setAttribute('data-editable', '1');
+        row.setAttribute('data-orig-qty', qty);
+        row.setAttribute('data-orig-price', price);
+        row.setAttribute('data-orig-note', note);
+
+        var rowCount = tbody.children.length + 1;
+        var html = '';
+        // return-col (hidden)
+        html += '<td class="return-col" style="display:none"></td>';
+        <?php if ($canManage && $canConfirmItems): ?>
+        html += '<td class="print-hide-col"></td>';
+        <?php endif; ?>
+        html += '<td>' + rowCount + '</td>';
+        html += '<td>' + escHtml(name) + ' <span style="background:#4caf50;color:#fff;padding:1px 6px;border-radius:3px;font-size:.7rem">新</span>' + (note ? ' <span class="note-display" style="color:#888;font-size:.75rem">(' + escHtml(note) + ')</span>' : '') + '</td>';
+        html += '<td>' + escHtml(model) + '</td>';
+        html += '<td>' + escHtml(unit) + '</td>';
+        html += '<td class="text-right" style="color:#999">-</td>';
+        html += '<td class="text-right need-cell"><input type="number" class="edit-input edit-qty" min="1" value="' + qty + '" onchange="onRowQtyChange(this)"></td>';
+        html += '<td class="text-right" style="color:#999">0</td>';
+        html += '<td class="text-right" style="color:#e65100;font-weight:600">' + qty + '</td>';
+        <?php if (!empty($returnedQtyMap)): ?>
+        html += '<td></td><td></td>';
+        <?php endif; ?>
+        <?php if ($canConfirmItems): ?>
+        html += '<td class="text-right print-hide-col"><span style="color:#999">-</span></td>';
+        <?php endif; ?>
+        html += '<td class="text-right price-cell"><input type="number" class="edit-input edit-price" min="0" value="' + price + '" onchange="onRowPriceChange(this)"></td>';
+        html += '<td class="text-right subtotal-cell">$' + (qty * price).toLocaleString() + '</td>';
+        html += '<td><span style="color:#2e7d32;font-size:.8rem">新增</span> <button type="button" class="btn btn-danger btn-sm edit-delete-btn" style="padding:2px 8px;font-size:.75rem;margin-left:4px" onclick="markRowDeleted(this.closest(\'tr\'))">&times; 移除</button></td>';
+        html += '<td class="return-col" style="display:none"></td>';
+
+        row.innerHTML = html;
+        tbody.appendChild(row);
     }
     </script>
     <?php endif; ?>

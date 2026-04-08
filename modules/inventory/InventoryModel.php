@@ -400,6 +400,26 @@ class InventoryModel
     }
 
     /**
+     * 取消備貨：prepared_qty 減少, available_qty 增加（與 prepareStock 反向）
+     * 用於編輯模式下從已備貨狀態刪除未出貨品項
+     */
+    public function unprepareStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
+    {
+        $this->db->prepare("
+            UPDATE inventory SET available_qty = available_qty + ?, prepared_qty = GREATEST(prepared_qty - ?, 0)
+            WHERE product_id = ? AND warehouse_id = ?
+        ")->execute(array($qty, $qty, $productId, $warehouseId));
+
+        $existing = $this->getInventoryByProductWarehouse($productId, $warehouseId);
+        $qtyAfter = $existing ? $existing['stock_qty'] : 0;
+
+        $this->db->prepare("
+            INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
+            VALUES (?, ?, 'unprepare', ?, ?, ?, ?, ?, ?, NOW())
+        ")->execute(array($productId, $warehouseId, $qty, $qtyAfter, $refType, $refId, $note, $userId));
+    }
+
+    /**
      * 已備貨轉出庫：prepared_qty 減少, stock_qty 減少（available_qty 不動）
      */
     public function confirmPreparedStock($productId, $warehouseId, $qty, $refType, $refId, $note, $userId)
