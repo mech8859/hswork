@@ -91,7 +91,7 @@
                     <th class="text-right">稅額</th>
                     <th class="text-right">含稅金額</th>
                     <th>類型</th>
-                    <th>扣抵</th>
+                    <th>扣抵別</th>
                     <th>狀態</th>
                     <th>操作</th>
                 </tr>
@@ -107,7 +107,16 @@
                     <td class="text-right">$<?= number_format(!empty($r['tax_amount']) ? $r['tax_amount'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
                     <td><?= e(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') ?></td>
-                    <td><?= (!empty($r['deduction_type']) && $r['deduction_type'] === 'deductible') ? '<span style="color:var(--success)">可扣抵</span>' : '<span style="color:var(--danger)">不可扣抵</span>' ?></td>
+                    <td><?php
+                        $dcLabels = array(
+                            'deductible_purchase' => '<span style="color:var(--success)">進項之費用</span>',
+                            'deductible_asset'    => '<span style="color:#1565c0">固定資產</span>',
+                            'non_deductible'      => '<span style="color:#999">不可扣抵</span>',
+                        );
+                        echo !empty($r['deduction_category']) && isset($dcLabels[$r['deduction_category']])
+                            ? $dcLabels[$r['deduction_category']]
+                            : '';
+                    ?></td>
                     <td>
                         <span class="badge badge-<?= $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning') ?>">
                             <?= e(InvoiceModel::invoiceStatusOptions()[$r['status']]) ?>

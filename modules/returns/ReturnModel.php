@@ -349,8 +349,8 @@ class ReturnModel
         $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute(array($returnId));
 
         $stmt = $this->db->prepare("
-            INSERT INTO return_items (return_id, product_id, product_name, quantity, unit_price, amount, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO return_items (return_id, product_id, product_name, quantity, unit_price, tax_amount, amount, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($items as $item) {
@@ -359,7 +359,8 @@ class ReturnModel
             }
             $qty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
             $price = !empty($item['unit_price']) ? (float)$item['unit_price'] : 0;
-            $amount = !empty($item['amount']) ? (float)$item['amount'] : $qty * $price;
+            $tax = isset($item['tax_amount']) ? (float)$item['tax_amount'] : round($qty * $price * 0.05);
+            $amount = !empty($item['amount']) ? (float)$item['amount'] : ($qty * $price + $tax);
 
             $stmt->execute(array(
                 $returnId,
@@ -367,6 +368,7 @@ class ReturnModel
                 !empty($item['product_name']) ? $item['product_name'] : null,
                 $qty,
                 $price,
+                $tax,
                 $amount,
                 !empty($item['reason']) ? $item['reason'] : null,
             ));

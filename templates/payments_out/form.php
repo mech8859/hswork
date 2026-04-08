@@ -307,17 +307,22 @@ function onTaxManual() {
     taxManualEdited = true;
     recalcTotal();
 }
+function _num(id) {
+    var el = document.getElementById(id);
+    if (!el) return 0;
+    return parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+}
 function calcAmounts() {
-    var subtotal = parseInt(document.getElementById('subtotal').value) || 0;
+    var subtotal = _num('subtotal');
     if (!taxManualEdited) {
         document.getElementById('tax').value = Math.round(subtotal * 0.05);
     }
     recalcTotal();
 }
 function recalcTotal() {
-    var subtotal = parseInt(document.getElementById('subtotal').value) || 0;
-    var tax = parseInt(document.getElementById('tax').value) || 0;
-    var remittanceFee = parseInt(document.getElementById('remittanceFee').value) || 0;
+    var subtotal = _num('subtotal');
+    var tax = _num('tax');
+    var remittanceFee = _num('remittanceFee');
     document.getElementById('totalAmount').value = subtotal + tax + remittanceFee;
 }
 calcAmounts();

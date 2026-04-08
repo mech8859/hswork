@@ -47,7 +47,36 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/purchase_invoices.php');
             }
+
+            // 若是從應付帳款單跳過來的回寫流程，先檢查發票號碼是否已存在於 payable_invoices
+            $returnPayable = !empty($_POST['return_to_payable']) ? (int)$_POST['return_to_payable'] : 0;
+            $postInvNum = !empty($_POST['invoice_number']) ? trim(strtoupper($_POST['invoice_number'])) : '';
+            $returnPayableNumber = null;
+            if ($returnPayable > 0) {
+                // 先查這張應付帳款單號（供寫回 reference_id 使用）
+                $pnStmt = Database::getInstance()->prepare("SELECT payable_number FROM payables WHERE id = ?");
+                $pnStmt->execute(array($returnPayable));
+                $returnPayableNumber = $pnStmt->fetchColumn() ?: null;
+
+                if ($postInvNum !== '') {
+                    $dupStmt = Database::getInstance()->prepare("SELECT p.payable_number FROM payable_invoices pi JOIN payables p ON pi.payable_id = p.id WHERE pi.invoice_number = ? LIMIT 1");
+                    $dupStmt->execute(array($postInvNum));
+                    $dup = $dupStmt->fetchColumn();
+                    if ($dup) {
+                        Session::flash('error', '發票號碼 ' . $postInvNum . ' 已存在於應付帳款單 ' . $dup . '，請使用其他號碼');
+                        redirect('/purchase_invoices.php?action=create&vendor_name=' . urlencode($_POST['vendor_name'] ?? '') . '&return_to_payable=' . $returnPayable);
+                    }
+                }
+            }
+
             $userId = Session::getUser()['id'];
+            // 從應付帳款單跳來的：自動帶入關聯單據
+            $refType = !empty($_POST['reference_type']) ? $_POST['reference_type'] : null;
+            $refId   = !empty($_POST['reference_id']) ? $_POST['reference_id'] : null;
+            if ($returnPayable > 0 && $returnPayableNumber) {
+                $refType = 'payable';
+                $refId   = $returnPayableNumber;
+            }
             $data = array(
                 'invoice_number'     => !empty($_POST['invoice_number']) ? $_POST['invoice_number'] : null,
                 'invoice_date'       => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
@@ -64,8 +93,8 @@ switch ($action) {
                 'invoice_format'     => !empty($_POST['invoice_format']) ? $_POST['invoice_format'] : null,
                 'deduction_category' => !empty($_POST['deduction_category']) ? $_POST['deduction_category'] : null,
                 'status'             => !empty($_POST['status']) ? $_POST['status'] : 'pending',
-                'reference_type'     => !empty($_POST['reference_type']) ? $_POST['reference_type'] : null,
-                'reference_id'       => !empty($_POST['reference_id']) ? $_POST['reference_id'] : null,
+                'reference_type'     => $refType,
+                'reference_id'       => $refId,
                 'note'               => !empty($_POST['note']) ? $_POST['note'] : null,
                 'created_by'         => $userId,
             );
@@ -80,9 +109,48 @@ switch ($action) {
                 error_log('AutoJournal purchase_invoice error: ' . $autoJournalEx->getMessage());
             }
 
+            // 回寫到應付帳款發票明細（如果來源是 payables 頁面）
+            if ($returnPayable > 0) {
+                try {
+                    $db = Database::getInstance();
+                    $untaxed = (int)($data['amount_untaxed'] ?: 0);
+                    $taxAmt  = (int)($data['tax_amount'] ?: 0);
+                    $total   = (int)($data['total_amount'] ?: 0);
+                    $insStmt = $db->prepare("INSERT INTO payable_invoices (payable_id, invoice_date, invoice_number, tax_id, amount_untaxed, tax, subtotal) VALUES (?,?,?,?,?,?,?)");
+                    $insStmt->execute(array(
+                        $returnPayable,
+                        $data['invoice_date'],
+                        $data['invoice_number'],
+                        $data['vendor_tax_id'],
+                        $untaxed,
+                        $taxAmt,
+                        $total,
+                    ));
+                } catch (Exception $ex) {
+                    error_log('payable writeback error: ' . $ex->getMessage());
+                }
+                Session::flash('success', '進項發票已新增，並回寫至應付帳款單');
+                redirect('/payables.php?action=edit&id=' . $returnPayable);
+            }
+
             Session::flash('success', '進項發票已新增');
             redirect('/purchase_invoices.php');
         }
+
+        // 預設值：從 URL 參數帶入（從應付帳款頁面跳過來的情境）
+        $preset = array();
+        if (!empty($_GET['vendor_name'])) {
+            $preset['vendor_name'] = trim($_GET['vendor_name']);
+            // 依廠商名稱查 vendors 取統編
+            $vStmt = Database::getInstance()->prepare("SELECT id, name, tax_id FROM vendors WHERE name = ? AND is_active = 1 LIMIT 1");
+            $vStmt->execute(array($preset['vendor_name']));
+            $vRow = $vStmt->fetch(PDO::FETCH_ASSOC);
+            if ($vRow) {
+                $preset['vendor_id']     = (int)$vRow['id'];
+                $preset['vendor_tax_id'] = $vRow['tax_id'];
+            }
+        }
+        $returnToPayable = !empty($_GET['return_to_payable']) ? (int)$_GET['return_to_payable'] : 0;
 
         $record = null;
         $vendors = $model->getVendors();

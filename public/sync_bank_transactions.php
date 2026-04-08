@@ -57,6 +57,8 @@ foreach ($ragicIndex as $upNo => $ragic) {
 
     if (!isset($sysIndex[$upNo])) {
         try {
+            // 自動產生交易編號（BT-YYYY-NNNNNN）
+            $fields['transaction_number'] = generate_doc_number('bank_transactions', $fields['transaction_date']);
             $cols = array_keys($fields);
             $ph = array_fill(0, count($cols), '?');
             $db->prepare("INSERT INTO bank_transactions (" . implode(',', $cols) . ") VALUES (" . implode(',', $ph) . ")")->execute(array_values($fields));

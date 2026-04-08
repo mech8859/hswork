@@ -113,8 +113,9 @@ function viewReturnTypeBadge($type) {
             <div><strong>#<?= $idx + 1 ?></strong> <?= e(!empty($item['product_name']) ? $item['product_name'] : '-') ?></div>
             <div class="staff-card-meta">
                 <span>數量: <?= (int)$item['quantity'] ?></span>
-                <span>單價: $<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></span>
-                <span>金額: $<?= number_format(!empty($item['amount']) ? $item['amount'] : 0) ?></span>
+                <span>未稅單價: $<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></span>
+                <span>稅額: $<?= number_format(!empty($item['tax_amount']) ? $item['tax_amount'] : 0) ?></span>
+                <span>小計: $<?= number_format(!empty($item['amount']) ? $item['amount'] : 0) ?></span>
             </div>
             <?php if (!empty($item['reason'])): ?>
             <div class="staff-card-meta"><span>原因: <?= e($item['reason']) ?></span></div>
@@ -131,8 +132,9 @@ function viewReturnTypeBadge($type) {
                     <th>品名</th>
                     <th>型號</th>
                     <th class="text-right">數量</th>
-                    <th class="text-right">單價</th>
-                    <th class="text-right">金額</th>
+                    <th class="text-right">未稅單價</th>
+                    <th class="text-right">稅額</th>
+                    <th class="text-right">小計</th>
                     <th>原因</th>
                 </tr>
             </thead>
@@ -144,6 +146,7 @@ function viewReturnTypeBadge($type) {
                     <td><?= e(!empty($item['model_number']) ? $item['model_number'] : '-') ?></td>
                     <td class="text-right"><?= (int)$item['quantity'] ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></td>
+                    <td class="text-right">$<?= number_format(!empty($item['tax_amount']) ? $item['tax_amount'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['amount']) ? $item['amount'] : 0) ?></td>
                     <td><?= e(!empty($item['reason']) ? $item['reason'] : '-') ?></td>
                 </tr>
@@ -151,7 +154,7 @@ function viewReturnTypeBadge($type) {
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="5" class="text-right"><strong>合計</strong></td>
+                    <td colspan="6" class="text-right"><strong>合計</strong></td>
                     <td class="text-right"><strong>$<?= number_format(!empty($record['total_amount']) ? $record['total_amount'] : 0) ?></strong></td>
                     <td></td>
                 </tr>

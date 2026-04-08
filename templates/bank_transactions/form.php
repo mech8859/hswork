@@ -19,8 +19,17 @@ $bankOptions = FinanceModel::bankAccountOptions();
         <div class="form-row">
             <div class="form-group">
                 <label>銀行交易編號</label>
+                <?php
+                if ($isEdit) {
+                    // 編輯模式：顯示實際號碼（控制器若偵測到 NULL 會自動補號）
+                    $displayNum = !empty($record['transaction_number']) ? $record['transaction_number'] : '';
+                } else {
+                    // 新增模式：顯示下一個號碼預覽
+                    $displayNum = peek_next_doc_number('bank_transactions');
+                }
+                ?>
                 <input type="text" class="form-control" disabled style="background:#f5f5f5;color:#1a73e8;font-weight:600"
-                       value="<?= e($isEdit && !empty($record['transaction_number']) ? $record['transaction_number'] : peek_next_doc_number('bank_transactions')) ?>">
+                       value="<?= e($displayNum) ?>">
             </div>
             <div class="form-group">
                 <label>銀行帳戶 *</label>

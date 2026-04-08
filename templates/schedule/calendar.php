@@ -38,7 +38,7 @@ $capRed    = $totalEngineers;
         </div>
         <?php endif; ?>
         <?php if (Auth::hasPermission('schedule.manage')): ?>
-        <a href="/schedule.php?action=create" class="btn btn-primary btn-sm">+ 新增排工</a>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openCaseSearchModal()">+ 新增排工</button>
         <?php endif; ?>
     </div>
 </div>
@@ -558,6 +558,49 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 </div>
 <?php endif; ?>
 
+<!-- 新增排工 - 案件即時搜尋 Modal -->
+<?php if (Auth::hasPermission('schedule.manage')): ?>
+<div id="caseSearchModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeCaseSearchModal()">
+    <div class="modal-content" style="max-width:640px">
+        <div class="modal-header">
+            <h3>新增排工 - 選擇案件</h3>
+            <button type="button" onclick="closeCaseSearchModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group mb-1">
+                <input type="text" id="caseSearchInput" class="form-control" placeholder="輸入案件編號、標題、客戶、地址..." autocomplete="off">
+            </div>
+            <div style="font-size:.75rem;color:var(--gray-500);margin-bottom:6px">
+                搜尋範圍：
+                <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#7e57c2;color:#fff">待安排查修</span>
+                <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#2e7d32;color:#fff">成交待排工</span>
+                <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#1976d2;color:#fff">已排工/已排行事曆</span>
+                <span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#e53935;color:#fff">已進場/需再安排</span>
+            </div>
+            <div id="caseSearchResults" style="max-height:420px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius);padding:4px">
+                <div style="padding:20px;text-align:center;color:var(--gray-500);font-size:.85rem">載入中...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeCaseSearchModal()">取消</button>
+            <a href="/schedule.php?action=create" class="btn btn-primary btn-sm">直接進入新增排工</a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<style>
+/* 案件搜尋結果項目 */
+.case-search-item { display:block; padding:10px 12px; border-bottom:1px solid var(--gray-100); text-decoration:none; color:inherit; transition:background .15s; }
+.case-search-item:last-child { border-bottom:none; }
+.case-search-item:hover { background:#f0f7ff; }
+.case-search-item .cs-title { font-weight:600; font-size:.92rem; color:#1a73e8; }
+.case-search-item .cs-meta { font-size:.78rem; color:#555; margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
+.case-search-item .cs-addr { font-size:.78rem; color:#888; margin-top:2px; }
+.case-search-item .cs-tag { display:inline-block; padding:1px 6px; border-radius:3px; color:#fff; font-size:.7rem; font-weight:600; }
+.case-search-empty { padding:20px; text-align:center; color:var(--gray-500); font-size:.85rem; }
+</style>
+
 <style>
 /* 狀態圖例 */
 .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
@@ -907,4 +950,95 @@ function saveDaySetting() {
     xhr.onload = function() { if (xhr.status === 200) window.location.reload(); else alert('儲存失敗'); };
     xhr.send(form);
 }
+
+// ===== 新增排工 - 案件即時搜尋 =====
+var caseSearchTimer = null;
+var caseSearchXhr = null;
+
+function openCaseSearchModal() {
+    var modal = document.getElementById('caseSearchModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    var input = document.getElementById('caseSearchInput');
+    input.value = '';
+    setTimeout(function() { input.focus(); }, 50);
+    doCaseSearch(''); // 預設載入全部
+}
+
+function closeCaseSearchModal() {
+    var modal = document.getElementById('caseSearchModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function doCaseSearch(keyword) {
+    var resultsBox = document.getElementById('caseSearchResults');
+    if (caseSearchXhr) { try { caseSearchXhr.abort(); } catch(e) {} }
+    caseSearchXhr = new XMLHttpRequest();
+    caseSearchXhr.open('GET', '/schedule.php?action=ajax_search_cases&q=' + encodeURIComponent(keyword));
+    caseSearchXhr.onload = function() {
+        if (caseSearchXhr.status !== 200) {
+            resultsBox.innerHTML = '<div class="case-search-empty">搜尋失敗，請重試</div>';
+            return;
+        }
+        try {
+            var res = JSON.parse(caseSearchXhr.responseText);
+            renderCaseSearchResults(res.data || []);
+        } catch(e) {
+            resultsBox.innerHTML = '<div class="case-search-empty">回應錯誤</div>';
+        }
+    };
+    caseSearchXhr.onerror = function() {
+        resultsBox.innerHTML = '<div class="case-search-empty">網路錯誤</div>';
+    };
+    caseSearchXhr.send();
+}
+
+function renderCaseSearchResults(list) {
+    var box = document.getElementById('caseSearchResults');
+    if (!list || list.length === 0) {
+        box.innerHTML = '<div class="case-search-empty">沒有符合的案件</div>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        var title = escHtml(it.title || '');
+        var caseNum = escHtml(it.case_number || '');
+        var customer = escHtml(it.customer_name || '');
+        var address = escHtml(it.address || '');
+        var branch = escHtml(it.branch_name || '');
+        var tag = escHtml(it.tag_label || '');
+        var tagColor = it.tag_color || '#777';
+        html += '<a class="case-search-item" href="/schedule.php?action=create&case_id=' + it.id + '">' +
+                '<div class="cs-title">' + caseNum + ' ' + title + '</div>' +
+                '<div class="cs-meta">' +
+                '<span class="cs-tag" style="background:' + tagColor + '">' + tag + '</span>' +
+                (customer ? '<span>' + customer + '</span>' : '') +
+                (branch ? '<span style="color:#888">' + branch + '</span>' : '') +
+                '</div>' +
+                (address ? '<div class="cs-addr">' + address + '</div>' : '') +
+                '</a>';
+    }
+    box.innerHTML = html;
+}
+
+function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var input = document.getElementById('caseSearchInput');
+    if (input) {
+        input.addEventListener('input', function() {
+            var kw = this.value.trim();
+            if (caseSearchTimer) clearTimeout(caseSearchTimer);
+            caseSearchTimer = setTimeout(function() { doCaseSearch(kw); }, 220);
+        });
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeCaseSearchModal();
+        });
+    }
+});
 </script>

@@ -107,10 +107,36 @@ switch ($action) {
                 }
             }
 
-            $scheduleId = $model->create($_POST);
-            AuditLog::log('schedule', 'create', $scheduleId, ($_POST['schedule_date'] ?? '') . ' 排工');
+            // 收集施工日期（支援單日或批次多日）
+            $scheduleDates = array();
+            if (isset($_POST['schedule_dates']) && is_array($_POST['schedule_dates'])) {
+                foreach ($_POST['schedule_dates'] as $d) {
+                    $d = trim($d);
+                    if ($d !== '' && !in_array($d, $scheduleDates, true)) {
+                        $scheduleDates[] = $d;
+                    }
+                }
+            }
+            if (empty($scheduleDates) && !empty($_POST['schedule_date'])) {
+                $scheduleDates[] = trim($_POST['schedule_date']);
+            }
+            if (empty($scheduleDates)) {
+                Session::flash('error', '請選擇施工日期');
+                redirect('/schedule.php?action=create' . ($checkCaseId > 0 ? '&case_id=' . $checkCaseId : ''));
+                break;
+            }
+            sort($scheduleDates);
 
-            // 自動更新案件階段為 5 (已排工/已排行事曆)
+            $createdIds = array();
+            foreach ($scheduleDates as $d) {
+                $postForOne = $_POST;
+                $postForOne['schedule_date'] = $d;
+                $sid = $model->create($postForOne);
+                $createdIds[] = $sid;
+                AuditLog::log('schedule', 'create', $sid, $d . ' 排工');
+            }
+
+            // 自動更新案件階段為 5 (已排工/已排行事曆) — 僅需執行一次
             $caseIdForStage = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
             if ($caseIdForStage > 0) {
                 $stageDb = Database::getInstance();
@@ -123,8 +149,13 @@ switch ($action) {
                 }
             }
 
-            Session::flash('success', '排工已建立');
-            redirect('/schedule.php?action=view&id=' . $scheduleId);
+            if (count($createdIds) > 1) {
+                Session::flash('success', '已批次建立 ' . count($createdIds) . ' 筆排工（' . implode('、', $scheduleDates) . '）');
+                redirect('/schedule.php');
+            } else {
+                Session::flash('success', '排工已建立');
+                redirect('/schedule.php?action=view&id=' . $createdIds[0]);
+            }
         }
 
         $date = $_GET['date'] ?? date('Y-m-d');
@@ -219,6 +250,80 @@ switch ($action) {
         require __DIR__ . '/../templates/schedule/form.php';
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
+
+    // ---- AJAX: 即時搜尋可排工案件（涵蓋待安排查修/成交待排工/已排工/需再安排）----
+    case 'ajax_search_cases':
+        header('Content-Type: application/json; charset=utf-8');
+        $keyword = isset($_GET['q']) ? trim($_GET['q']) : '';
+        $db = Database::getInstance();
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+
+        $where = "c.branch_id IN ($ph) AND (c.status = 'awaiting_dispatch' OR c.stage IN (4,5,6))";
+        $params = $branchIds;
+
+        if ($keyword !== '') {
+            $kw = '%' . $keyword . '%';
+            $where .= " AND (c.case_number LIKE ? OR c.title LIKE ? OR c.customer_name LIKE ? OR c.address LIKE ?)";
+            $params[] = $kw;
+            $params[] = $kw;
+            $params[] = $kw;
+            $params[] = $kw;
+        }
+
+        $sql = "SELECT c.id, c.case_number, c.title, c.customer_name, c.address,
+                       c.stage, c.status, c.case_type, c.planned_start_time,
+                       b.name AS branch_name
+                FROM cases c
+                LEFT JOIN branches b ON c.branch_id = b.id
+                WHERE {$where}
+                ORDER BY
+                  CASE
+                    WHEN c.status = 'awaiting_dispatch' THEN 0
+                    WHEN c.stage = 4 THEN 1
+                    WHEN c.stage = 6 THEN 2
+                    WHEN c.stage = 5 THEN 3
+                    ELSE 9
+                  END,
+                  c.updated_at DESC
+                LIMIT 30";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $statusMap = array(
+            'awaiting_dispatch' => array('label' => '待安排查修', 'color' => '#7e57c2'),
+        );
+        $stageMap = array(
+            4 => array('label' => '成交待排工', 'color' => '#2e7d32'),
+            5 => array('label' => '已排工/已排行事曆', 'color' => '#1976d2'),
+            6 => array('label' => '已進場/需再安排', 'color' => '#e53935'),
+        );
+
+        $data = array();
+        foreach ($rows as $r) {
+            $tagLabel = '';
+            $tagColor = '#777';
+            if ($r['status'] === 'awaiting_dispatch') {
+                $tagLabel = $statusMap['awaiting_dispatch']['label'];
+                $tagColor = $statusMap['awaiting_dispatch']['color'];
+            } elseif (isset($stageMap[(int)$r['stage']])) {
+                $tagLabel = $stageMap[(int)$r['stage']]['label'];
+                $tagColor = $stageMap[(int)$r['stage']]['color'];
+            }
+            $data[] = array(
+                'id'            => (int)$r['id'],
+                'case_number'   => $r['case_number'],
+                'title'         => $r['title'],
+                'customer_name' => $r['customer_name'],
+                'address'       => $r['address'],
+                'branch_name'   => $r['branch_name'],
+                'tag_label'     => $tagLabel,
+                'tag_color'     => $tagColor,
+            );
+        }
+
+        echo json_encode(array('data' => $data), JSON_UNESCAPED_UNICODE);
+        exit;
 
     // ---- AJAX: 取得可用工程師 ----
     case 'ajax_engineers':

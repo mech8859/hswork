@@ -257,7 +257,7 @@ class InvoiceModel
     }
 
     /**
-     * 刪除進項發票 (僅 pending 可刪)
+     * 刪除進項發票 (僅 voided 可刪，需先作廢)
      */
     public function deletePurchaseInvoice($id)
     {
@@ -265,10 +265,10 @@ class InvoiceModel
         if (!$invoice) {
             return false;
         }
-        if ($invoice['status'] !== 'pending') {
-            throw new Exception('只能刪除待處理狀態的發票');
+        if ($invoice['status'] !== 'voided') {
+            throw new Exception('請先作廢此發票再進行刪除');
         }
-        $stmt = $this->db->prepare("DELETE FROM purchase_invoices WHERE id = ? AND status = 'pending'");
+        $stmt = $this->db->prepare("DELETE FROM purchase_invoices WHERE id = ? AND status = 'voided'");
         $stmt->execute(array($id));
         return $stmt->rowCount() > 0;
     }
@@ -441,7 +441,7 @@ class InvoiceModel
     }
 
     /**
-     * 刪除銷項發票 (僅 pending)
+     * 刪除銷項發票 (僅 voided 可刪，需先作廢)
      */
     public function deleteSalesInvoice($id)
     {
@@ -449,10 +449,10 @@ class InvoiceModel
         if (!$invoice) {
             return false;
         }
-        if ($invoice['status'] !== 'pending') {
-            throw new Exception('只能刪除待處理狀態的發票');
+        if ($invoice['status'] !== 'voided') {
+            throw new Exception('請先作廢此發票再進行刪除');
         }
-        $stmt = $this->db->prepare("DELETE FROM sales_invoices WHERE id = ? AND status = 'pending'");
+        $stmt = $this->db->prepare("DELETE FROM sales_invoices WHERE id = ? AND status = 'voided'");
         $stmt->execute(array($id));
         return $stmt->rowCount() > 0;
     }

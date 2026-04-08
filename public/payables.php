@@ -13,6 +13,52 @@ $branchIds = Auth::getAccessibleBranchIds();
 $isBoss = Auth::hasPermission('all');
 $canManageFinance = Auth::hasPermission('finance.manage');
 
+/**
+ * 檢查應付帳款發票明細重複
+ * @return string 空字串=OK；非空=錯誤訊息
+ */
+function checkPayableInvoiceDuplicates($invoices, $excludePayableId = 0)
+{
+    if (empty($invoices) || !is_array($invoices)) return '';
+    // 1. 表單內重複
+    $seen = array();
+    $formDup = array();
+    foreach ($invoices as $inv) {
+        $num = isset($inv['invoice_number']) ? trim(strtoupper($inv['invoice_number'])) : '';
+        if ($num === '') continue;
+        if (isset($seen[$num])) $formDup[$num] = true;
+        $seen[$num] = true;
+    }
+    if (!empty($formDup)) {
+        return '發票明細內有重複的發票號碼：' . implode('、', array_keys($formDup));
+    }
+    // 2. 全系統（排除自己這張）
+    $nums = array_keys($seen);
+    if (empty($nums)) return '';
+    $db = Database::getInstance();
+    $ph = implode(',', array_fill(0, count($nums), '?'));
+    $sql = "SELECT pi.invoice_number, p.payable_number
+            FROM payable_invoices pi
+            JOIN payables p ON pi.payable_id = p.id
+            WHERE pi.invoice_number IN ($ph)";
+    $params = $nums;
+    if ($excludePayableId > 0) {
+        $sql .= " AND pi.payable_id <> ?";
+        $params[] = $excludePayableId;
+    }
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $dups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($dups)) {
+        $msg = array();
+        foreach ($dups as $d) {
+            $msg[] = $d['invoice_number'] . '（已於 ' . $d['payable_number'] . ' 使用）';
+        }
+        return '以下發票號碼已存在於其他應付帳款單：' . implode('、', $msg);
+    }
+    return '';
+}
+
 switch ($action) {
     // ---- 應付帳款清單 ----
     case 'list':
@@ -43,6 +89,13 @@ switch ($action) {
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/payables.php');
+            }
+
+            // 發票號碼重複檢查（form 內 + 全系統）
+            $invDupError = checkPayableInvoiceDuplicates($_POST['invoices'] ?? array(), 0);
+            if ($invDupError) {
+                Session::flash('error', $invDupError);
+                redirect('/payables.php?action=create');
             }
 
             $userId = Session::getUser()['id'];
@@ -76,9 +129,9 @@ switch ($action) {
             if (!empty($_POST['rd'])) {
                 $model->savePayableReturnDetails($payableId, $_POST['rd']);
             }
-            // 儲存發票明細
-            if (!empty($_POST['invoices'])) {
-                $model->savePayableInvoices($payableId, $_POST['invoices']);
+            // 儲存發票明細（全刪光時仍要呼叫才能清掉 DB 舊資料）
+            if (!empty($_POST['invoices_rendered'])) {
+                $model->savePayableInvoices($payableId, isset($_POST['invoices']) ? $_POST['invoices'] : array());
             }
 
             AuditLog::log('payables', 'create', $payableId, '新增應付帳款單');
@@ -117,6 +170,13 @@ switch ($action) {
                 redirect('/payables.php?action=edit&id=' . $id);
             }
 
+            // 發票號碼重複檢查（form 內 + 全系統，排除自己）
+            $invDupError = checkPayableInvoiceDuplicates($_POST['invoices'] ?? array(), $id);
+            if ($invDupError) {
+                Session::flash('error', $invDupError);
+                redirect('/payables.php?action=edit&id=' . $id);
+            }
+
             $userId = Session::getUser()['id'];
             $data = array(
                 'create_date'    => !empty($_POST['create_date']) ? $_POST['create_date'] : date('Y-m-d'),
@@ -147,9 +207,9 @@ switch ($action) {
             if (!empty($_POST['rd_rendered'])) {
                 $model->savePayableReturnDetails($id, isset($_POST['rd']) ? $_POST['rd'] : array());
             }
-            // 儲存發票明細
-            if (isset($_POST['invoices'])) {
-                $model->savePayableInvoices($id, $_POST['invoices']);
+            // 儲存發票明細（全刪光時仍要呼叫才能清掉 DB 舊資料）
+            if (!empty($_POST['invoices_rendered'])) {
+                $model->savePayableInvoices($id, isset($_POST['invoices']) ? $_POST['invoices'] : array());
             }
 
             AuditLog::log('payables', 'update', $id, '更新應付帳款單');

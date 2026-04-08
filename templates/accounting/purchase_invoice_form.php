@@ -27,8 +27,18 @@ $refOptions = InvoiceModel::referenceTypeOptions();
 </div>
 <?php endif; ?>
 
+<?php $isVoided = $isEdit && !empty($record['status']) && $record['status'] === 'voided'; ?>
+<?php if ($isVoided): ?>
+<div style="padding:10px 14px;background:#ffebee;border:1px solid #e53935;border-radius:8px;margin-bottom:12px;color:#c62828;font-size:.9rem">
+    ⊘ 此發票已作廢，無法編輯內容。如需徹底移除資料，請按右下角「刪除」。
+</div>
+<?php endif; ?>
+
 <form method="POST" class="mt-2" id="purchaseInvoiceForm">
     <?= csrf_field() ?>
+    <?php if ($isVoided): ?>
+    <fieldset disabled style="border:none;padding:0;margin:0">
+    <?php endif; ?>
 
     <!-- 買方資訊 -->
     <div class="card">
@@ -81,7 +91,9 @@ $refOptions = InvoiceModel::referenceTypeOptions();
                     <option value="">請選擇</option>
                     <option value="deductible_purchase" <?= ($isEdit && !empty($record['deduction_category']) && $record['deduction_category'] === 'deductible_purchase') ? 'selected' : '' ?>>可扣抵之進貨及費用</option>
                     <option value="deductible_asset" <?= ($isEdit && !empty($record['deduction_category']) && $record['deduction_category'] === 'deductible_asset') ? 'selected' : '' ?>>可扣抵之固定資產</option>
-                    <option value="non_deductible" <?= ($isEdit && !empty($record['deduction_category']) && $record['deduction_category'] === 'non_deductible') ? 'selected' : '' ?>>不可扣抵之進貨及費用</option>
+                    <?php if ($isEdit && !empty($record['deduction_category']) && $record['deduction_category'] === 'non_deductible'): ?>
+                    <option value="non_deductible" selected>不可扣抵之進貨及費用（已停用）</option>
+                    <?php endif; ?>
                 </select>
             </div>
         </div>
@@ -129,28 +141,37 @@ $refOptions = InvoiceModel::referenceTypeOptions();
     </div>
 
     <!-- 供應商 -->
+    <?php
+    // 預填值：編輯模式用 record，新增模式用 preset（從 URL 帶入）
+    $prefVendorId    = $isEdit && !empty($record['vendor_id']) ? $record['vendor_id'] : (!empty($preset['vendor_id']) ? $preset['vendor_id'] : '');
+    $prefVendorName  = $isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : (!empty($preset['vendor_name']) ? $preset['vendor_name'] : '');
+    $prefVendorTaxId = $isEdit && !empty($record['vendor_tax_id']) ? $record['vendor_tax_id'] : (!empty($preset['vendor_tax_id']) ? $preset['vendor_tax_id'] : '');
+    ?>
     <div class="card">
-        <div class="card-header">供應商資訊</div>
-        <input type="hidden" name="vendor_id" id="fldVendorId" value="<?= e($isEdit && !empty($record['vendor_id']) ? $record['vendor_id'] : '') ?>">
+        <div class="card-header">供應商資訊<?php if (!$isEdit && !empty($returnToPayable)): ?> <span style="font-size:.8rem;color:#e65100">（儲存後將自動回寫至應付帳款單 #<?= (int)$returnToPayable ?>）</span><?php endif; ?></div>
+        <input type="hidden" name="vendor_id" id="fldVendorId" value="<?= e($prefVendorId) ?>">
+        <?php if (!$isEdit && !empty($returnToPayable)): ?>
+        <input type="hidden" name="return_to_payable" value="<?= (int)$returnToPayable ?>">
+        <?php endif; ?>
         <div class="form-row">
             <div class="form-group" style="position:relative">
                 <label>供應商（輸入關鍵字搜尋）</label>
                 <input type="text" id="piVendorSearch" class="form-control" autocomplete="off"
                        placeholder="輸入廠商名稱、統編搜尋..."
-                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>"
+                       value="<?= e($prefVendorName) ?>"
                        oninput="searchPiVendor(this)">
                 <div id="piVendorDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid var(--gray-200);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
             </div>
             <div class="form-group">
                 <label>賣方統一編號 *</label>
                 <input type="text" name="vendor_tax_id" id="fldVendorTaxId" class="form-control"
-                       value="<?= e($isEdit && !empty($record['vendor_tax_id']) ? $record['vendor_tax_id'] : '') ?>"
+                       value="<?= e($prefVendorTaxId) ?>"
                        maxlength="8" placeholder="8碼統編" required>
             </div>
             <div class="form-group">
                 <label>賣方名稱 *</label>
                 <input type="text" name="vendor_name" id="fldVendorName" class="form-control"
-                       value="<?= e($isEdit && !empty($record['vendor_name']) ? $record['vendor_name'] : '') ?>" required>
+                       value="<?= e($prefVendorName) ?>" required>
             </div>
         </div>
     </div>
@@ -196,9 +217,33 @@ $refOptions = InvoiceModel::referenceTypeOptions();
             </div>
             <div class="form-group">
                 <label>關聯單據編號</label>
-                <input type="text" name="reference_id" class="form-control"
-                       value="<?= e($isEdit && !empty($record['reference_id']) ? $record['reference_id'] : '') ?>"
-                       placeholder="選填">
+                <?php
+                $refId = $isEdit && !empty($record['reference_id']) ? $record['reference_id'] : '';
+                $refType = $isEdit && !empty($record['reference_type']) ? $record['reference_type'] : '';
+                // 根據類型解析連結
+                $refLink = '';
+                if ($refType === 'payable' && $refId) {
+                    $pidStmt = Database::getInstance()->prepare("SELECT id FROM payables WHERE payable_number = ? LIMIT 1");
+                    $pidStmt->execute(array($refId));
+                    $pid = (int)$pidStmt->fetchColumn();
+                    if ($pid > 0) $refLink = '/payables.php?action=edit&id=' . $pid;
+                } elseif ($refType === 'purchase' && $refId) {
+                    $gidStmt = Database::getInstance()->prepare("SELECT id FROM goods_receipts WHERE gr_number = ? LIMIT 1");
+                    $gidStmt->execute(array($refId));
+                    $gid = (int)$gidStmt->fetchColumn();
+                    if ($gid > 0) $refLink = '/goods_receipts.php?action=view&id=' . $gid;
+                }
+                ?>
+                <div style="position:relative">
+                    <input type="text" name="reference_id" class="form-control"
+                           value="<?= e($refId) ?>"
+                           placeholder="選填"
+                           <?= $refLink ? 'style="padding-right:40px"' : '' ?>>
+                    <?php if ($refLink): ?>
+                    <a href="<?= e($refLink) ?>" target="_blank" title="開啟關聯單據"
+                       style="position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--primary);text-decoration:none;font-size:1.1rem">🔗</a>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -226,8 +271,20 @@ $refOptions = InvoiceModel::referenceTypeOptions();
         </div>
     </div>
 
+    <?php if ($isVoided): ?>
+    </fieldset>
+    <?php endif; ?>
+
     <?php $isConfirmed = $isEdit && !empty($record['status']) && $record['status'] === 'confirmed'; ?>
-    <?php if (!$isConfirmed): ?>
+    <?php if ($isVoided): ?>
+    <!-- 作廢狀態：只顯示刪除 / 返回 -->
+    <div class="d-flex justify-between mt-2">
+        <a href="/purchase_invoices.php" class="btn btn-outline">返回列表</a>
+        <?php if (Auth::hasPermission('accounting.manage')): ?>
+        <button type="button" class="btn btn-outline" style="color:#c62828;border-color:#c62828" onclick="if(confirm('此發票將永久刪除，確定要繼續？'))document.getElementById('piDeleteForm').submit()">刪除</button>
+        <?php endif; ?>
+    </div>
+    <?php elseif (!$isConfirmed): ?>
     <div class="d-flex justify-between mt-2">
         <div class="d-flex gap-1">
             <button type="submit" class="btn btn-primary"><?= $isEdit ? '儲存變更' : '新增進項發票' ?></button>
@@ -235,20 +292,7 @@ $refOptions = InvoiceModel::referenceTypeOptions();
         </div>
         <?php if ($isEdit && Auth::hasPermission('accounting.manage')): ?>
         <div class="d-flex gap-1">
-            <?php if (!empty($record['status']) && $record['status'] !== 'voided'): ?>
-            <form method="POST" action="/purchase_invoices.php?action=void" style="display:inline" onsubmit="return confirm('確定要作廢此發票？')">
-                <?= csrf_field() ?>
-                <input type="hidden" name="id" value="<?= $record['id'] ?>">
-                <button type="submit" class="btn btn-danger">作廢此發票</button>
-            </form>
-            <?php endif; ?>
-            <?php if (!empty($record['status']) && $record['status'] === 'pending'): ?>
-            <form method="POST" action="/purchase_invoices.php?action=delete" style="display:inline" onsubmit="return confirm('確定要刪除此發票？')">
-                <?= csrf_field() ?>
-                <input type="hidden" name="id" value="<?= $record['id'] ?>">
-                <button type="submit" class="btn btn-outline" style="color:#c62828;border-color:#c62828">刪除</button>
-            </form>
-            <?php endif; ?>
+            <button type="button" class="btn btn-danger" onclick="if(confirm('確定要作廢此發票？'))document.getElementById('piVoidForm').submit()">作廢此發票</button>
         </div>
         <?php endif; ?>
     </div>
@@ -258,6 +302,21 @@ $refOptions = InvoiceModel::referenceTypeOptions();
     </div>
     <?php endif; ?>
 </form>
+
+<?php if ($isEdit && Auth::hasPermission('accounting.manage')): ?>
+    <?php if (!empty($record['status']) && $record['status'] !== 'voided'): ?>
+    <form id="piVoidForm" method="POST" action="/purchase_invoices.php?action=void" style="display:none">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= $record['id'] ?>">
+    </form>
+    <?php endif; ?>
+    <?php if ($isVoided): ?>
+    <form id="piDeleteForm" method="POST" action="/purchase_invoices.php?action=delete" style="display:none">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= $record['id'] ?>">
+    </form>
+    <?php endif; ?>
+<?php endif; ?>
 <?php if ($isConfirmed && Auth::hasPermission('accounting.manage')): ?>
 <div class="d-flex justify-end gap-1 mt-1">
     <form method="POST" action="/purchase_invoices.php?action=unconfirm" onsubmit="return confirm('確定要取消確認？取消後可編輯或刪除。')">

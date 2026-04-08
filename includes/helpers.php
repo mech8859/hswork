@@ -264,6 +264,8 @@ function generate_doc_number($module, $forDate = null)
             'payables' => array('payables', 'payable_number'),
             'payments' => array('payments_out', 'payment_number'),
             'payments_out' => array('payments_out', 'payment_number'),
+            'bank_transactions' => array('bank_transactions', 'transaction_number'),
+            'five_star_reviews' => array('five_star_reviews', 'review_number'),
         );
         if (isset($tableMap[$module])) {
             $tableName = $tableMap[$module][0];
@@ -310,7 +312,48 @@ function generate_doc_number($module, $forDate = null)
 
     } catch (Exception $e) {
         if ($ownTransaction && $db->inTransaction()) $db->rollBack();
-        // fallback
+        // 記錄例外以便診斷
+        error_log('generate_doc_number failed for module=' . $module . ': ' . $e->getMessage());
+        // fallback：再試一次用 LIKE 直接查 table，避免再拿到通用 fallback
+        try {
+            $fbSeqStmt = $db->prepare("SELECT prefix, date_format, separator, seq_digits FROM number_sequences WHERE module = ?");
+            $fbSeqStmt->execute(array($seqModule));
+            $fbSeq = $fbSeqStmt->fetch(PDO::FETCH_ASSOC);
+            if ($fbSeq) {
+                $fbPrefix = $fbSeq['prefix'];
+                $fbDateFmt = $fbSeq['date_format'];
+                $fbSep = $fbSeq['separator'];
+                $fbDigits = (int)$fbSeq['seq_digits'];
+                $fbTs = $forDate ? strtotime($forDate) : time();
+                $fbMap = array(
+                    'bank_transactions' => array('bank_transactions', 'transaction_number'),
+                    'cases' => array('cases', 'case_number'),
+                    'customers' => array('customers', 'customer_no'),
+                    'receivables' => array('receivables', 'invoice_number'),
+                    'receipts' => array('receipts', 'receipt_number'),
+                    'payables' => array('payables', 'payable_number'),
+                );
+                if (isset($fbMap[$module])) {
+                    $fbTbl = $fbMap[$module][0];
+                    $fbCol = $fbMap[$module][1];
+                    $fbLpParts = array();
+                    if ($fbPrefix !== '') $fbLpParts[] = $fbPrefix;
+                    if (!empty($fbDateFmt)) $fbLpParts[] = date($fbDateFmt, $fbTs);
+                    $fbLike = implode($fbSep, $fbLpParts);
+                    $fbMaxStmt = $db->prepare("SELECT MAX(CAST(SUBSTRING_INDEX(`{$fbCol}`, '{$fbSep}', -1) AS UNSIGNED)) FROM `{$fbTbl}` WHERE `{$fbCol}` LIKE ?");
+                    $fbMaxStmt->execute(array($fbLike . '%'));
+                    $fbNext = (int)$fbMaxStmt->fetchColumn() + 1;
+                    $fbParts = array();
+                    if ($fbPrefix !== '') $fbParts[] = $fbPrefix;
+                    if (!empty($fbDateFmt)) $fbParts[] = date($fbDateFmt, $fbTs);
+                    if ($fbDigits > 0) $fbParts[] = str_pad($fbNext, $fbDigits, '0', STR_PAD_LEFT);
+                    return implode($fbSep, $fbParts);
+                }
+            }
+        } catch (Exception $e2) {
+            error_log('generate_doc_number fallback also failed: ' . $e2->getMessage());
+        }
+        // 最終 fallback：通用格式
         return strtoupper($module) . '-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
     }
 }
@@ -369,6 +412,7 @@ function peek_next_doc_number($module, $forDate = null)
         'payables' => array('payables', 'payable_number'),
         'payments' => array('payments_out', 'payment_number'),
         'payments_out' => array('payments_out', 'payment_number'),
+        'bank_transactions' => array('bank_transactions', 'transaction_number'),
     );
     $lpParts = array();
     if ($prefix !== '') $lpParts[] = $prefix;

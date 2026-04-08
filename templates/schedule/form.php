@@ -19,6 +19,16 @@ if ($isEdit) {
                 <input type="date" max="2099-12-31" name="schedule_date" id="scheduleDate" class="form-control"
                        value="<?= e($schedule['schedule_date'] ?? $date ?? date('Y-m-d')) ?>" required
                        onchange="reloadSuggestions()">
+                <?php if (!$isEdit): ?>
+                <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addDateToBatch()">+ 加入批次多日</button>
+                    <small class="text-muted">按此將主日期加入批次，可重複指定多日</small>
+                </div>
+                <div id="batchDatesList" style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"></div>
+                <small class="text-muted" id="batchHint" style="display:none;margin-top:4px">
+                    ⚡ 將批次建立 <strong id="batchCount">0</strong> 筆排工（工程師/車輛以主日期為準，其他日期請自行確認無衝突）
+                </small>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>案件 *</label>
@@ -210,6 +220,16 @@ if ($isEdit) {
 .engineer-busy { opacity: .6; }
 .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; }
+.batch-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 12px;
+    background: #e3f2fd; color: #1565c0;
+    font-size: .78rem; font-weight: 600;
+    border: 1px solid #90caf9;
+}
+.batch-chip.batch-chip-primary { background: #fff3e0; color: #e65100; border-color: #ffb74d; }
+.batch-chip a { color: inherit; text-decoration: none; font-weight: 700; cursor: pointer; margin-left: 2px; }
+.batch-chip a:hover { color: #c62828; }
 </style>
 
 <script>
@@ -330,4 +350,105 @@ function reloadSuggestions() {
 }
 
 updateCount();
+
+// ===== 多日批次排工 =====
+var batchDates = [];
+var isEditMode = <?= $isEdit ? 'true' : 'false' ?>;
+
+function addDateToBatch() {
+    var dateInput = document.getElementById('scheduleDate');
+    var d = dateInput.value;
+    if (!d) { alert('請先選擇施工日期'); return; }
+    if (batchDates.indexOf(d) !== -1) {
+        alert('此日期已在批次清單中');
+        return;
+    }
+    batchDates.push(d);
+    batchDates.sort();
+    renderBatchDates();
+}
+
+function removeBatchDate(d) {
+    batchDates = batchDates.filter(function(x) { return x !== d; });
+    renderBatchDates();
+}
+
+function renderBatchDates() {
+    var box = document.getElementById('batchDatesList');
+    if (!box) return;
+    var primary = document.getElementById('scheduleDate').value;
+    var html = '';
+    for (var i = 0; i < batchDates.length; i++) {
+        var d = batchDates[i];
+        var display = formatShortDate(d);
+        var cls = (d === primary) ? 'batch-chip batch-chip-primary' : 'batch-chip';
+        var title = (d === primary) ? ' title="主日期（推薦工程師依此日期）"' : '';
+        html += '<span class="' + cls + '"' + title + '>' + display +
+                ' <a onclick="removeBatchDate(\'' + d + '\')">×</a></span>';
+    }
+    box.innerHTML = html;
+    var hint = document.getElementById('batchHint');
+    var cnt = document.getElementById('batchCount');
+    if (hint && cnt) {
+        hint.style.display = batchDates.length > 0 ? 'block' : 'none';
+        cnt.textContent = batchDates.length;
+    }
+}
+
+function formatShortDate(ymd) {
+    // 2026-04-08 → 4/8 (一)
+    var parts = ymd.split('-');
+    if (parts.length !== 3) return ymd;
+    var dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var weekdays = ['日','一','二','三','四','五','六'];
+    return parseInt(parts[1]) + '/' + parseInt(parts[2]) + ' (' + weekdays[dateObj.getDay()] + ')';
+}
+
+// 主日期變更時重新渲染 chip 顏色標記
+(function() {
+    if (isEditMode) return;
+    var dateInput = document.getElementById('scheduleDate');
+    if (dateInput) {
+        dateInput.addEventListener('change', function() {
+            renderBatchDates();
+        });
+    }
+})();
+
+// 提交時處理：若有批次日期則送出 schedule_dates[]
+(function() {
+    if (isEditMode) return;
+    var form = document.getElementById('scheduleForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        if (batchDates.length === 0) return; // 單日模式，用原本 schedule_date
+
+        // 若主日期不在批次清單中，提示使用者
+        var primary = document.getElementById('scheduleDate').value;
+        if (primary && batchDates.indexOf(primary) === -1) {
+            var ok = confirm('主日期 ' + primary + ' 尚未加入批次清單。\n\n按「確定」會自動將主日期加入一起建立；按「取消」請自行調整。');
+            if (!ok) { e.preventDefault(); return; }
+            batchDates.push(primary);
+            batchDates.sort();
+        }
+
+        // 確認批次建立
+        var msg = '將批次建立以下 ' + batchDates.length + ' 筆排工：\n\n';
+        for (var i = 0; i < batchDates.length; i++) msg += '• ' + batchDates[i] + '\n';
+        msg += '\n工程師/車輛/點工均相同，請確認無衝突。確定建立？';
+        if (!confirm(msg)) { e.preventDefault(); return; }
+
+        // 移除 schedule_date name 以避免送出單日欄位
+        var dateInput = document.getElementById('scheduleDate');
+        dateInput.removeAttribute('name');
+        // 注入 hidden schedule_dates[]
+        for (var j = 0; j < batchDates.length; j++) {
+            var h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = 'schedule_dates[]';
+            h.value = batchDates[j];
+            form.appendChild(h);
+        }
+    });
+})();
 </script>

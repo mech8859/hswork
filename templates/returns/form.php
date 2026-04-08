@@ -99,8 +99,10 @@
                         <th style="min-width:120px">型號</th>
                         <th style="min-width:180px">品名</th>
                         <th style="width:80px">數量</th>
-                        <th style="width:100px">單價</th>
-                        <th style="width:100px">小計</th>
+                        <th style="width:100px">未稅單價</th>
+                        <th style="width:110px">未稅總額</th>
+                        <th style="width:90px">稅額</th>
+                        <th style="width:110px">小計</th>
                         <th style="min-width:120px">原因</th>
                         <th style="width:40px"></th>
                     </tr>
@@ -110,6 +112,8 @@
                 <tfoot>
                     <tr>
                         <td colspan="5" class="text-right"><strong>合計</strong></td>
+                        <td><strong id="untaxedTotalDisplay" style="color:var(--primary)">$0</strong></td>
+                        <td></td>
                         <td><strong id="totalDisplay">$0</strong></td>
                         <td colspan="2"></td>
                     </tr>
@@ -157,14 +161,18 @@ function addItem(data) {
     var productName = (data && data.product_name) ? data.product_name : '';
     var qty = (data && data.quantity) ? parseInt(data.quantity) || '' : '';
     var price = (data && data.unit_price) ? parseInt(data.unit_price) || '' : '';
+    var tax = (data && data.tax_amount) ? parseInt(data.tax_amount) || '' : '';
     var amount = (data && data.amount) ? parseInt(data.amount) || '' : '';
     var reason = (data && data.reason) ? data.reason : '';
 
+    var untaxedTotal = (qty && price) ? (qty * price) : '';
     tr.innerHTML = '<td>' + (idx + 1) + '</td>' +
         '<td><input type="hidden" name="items[' + idx + '][product_id]" class="rt-product-id" value="' + escHtml(productId) + '"><input type="text" name="items[' + idx + '][model]" class="form-control rt-model" value="' + escHtml(model) + '" placeholder="型號" readonly></td>' +
         '<td style="position:relative"><input type="text" name="items[' + idx + '][product_name]" class="form-control rt-product-name" value="' + escHtml(productName) + '" placeholder="輸入關鍵字搜尋..." autocomplete="off" oninput="searchProduct(this)"><div class="rt-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></td>' +
         '<td><input type="number" name="items[' + idx + '][quantity]" class="form-control item-qty" value="' + escHtml(qty) + '" min="0" step="1" oninput="calcRow(this)"></td>' +
         '<td><input type="number" name="items[' + idx + '][unit_price]" class="form-control item-price" value="' + escHtml(price) + '" min="0" step="1" oninput="calcRow(this)"></td>' +
+        '<td><input type="number" class="form-control item-untaxed" value="' + escHtml(untaxedTotal) + '" readonly style="background:#f5f5f5"></td>' +
+        '<td><input type="number" name="items[' + idx + '][tax_amount]" class="form-control item-tax" value="' + escHtml(tax) + '" min="0" step="1" readonly style="background:#f5f5f5"></td>' +
         '<td><input type="number" name="items[' + idx + '][amount]" class="form-control item-amount" value="' + escHtml(amount) + '" min="0" step="1" readonly></td>' +
         '<td><input type="text" name="items[' + idx + '][reason]" class="form-control" value="' + escHtml(reason) + '" placeholder="原因"></td>' +
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>';
@@ -181,7 +189,11 @@ function calcRow(el) {
     var tr = el.closest('tr');
     var qty = parseInt(tr.querySelector('.item-qty').value) || 0;
     var price = parseInt(tr.querySelector('.item-price').value) || 0;
-    tr.querySelector('.item-amount').value = qty * price;
+    var untaxed = qty * price;
+    var tax = Math.round(untaxed * 0.05);
+    tr.querySelector('.item-untaxed').value = untaxed || '';
+    tr.querySelector('.item-tax').value = tax;
+    tr.querySelector('.item-amount').value = untaxed + tax;
     calcTotal();
 }
 
@@ -193,6 +205,15 @@ function calcTotal() {
     }
     document.getElementById('totalAmount').value = total;
     document.getElementById('totalDisplay').textContent = '$' + total.toLocaleString();
+
+    // 未稅總額合計
+    var untaxedEls = document.querySelectorAll('.item-untaxed');
+    var untaxedSum = 0;
+    for (var j = 0; j < untaxedEls.length; j++) {
+        untaxedSum += parseInt(untaxedEls[j].value) || 0;
+    }
+    var disp = document.getElementById('untaxedTotalDisplay');
+    if (disp) disp.textContent = '$' + untaxedSum.toLocaleString();
 }
 
 function escHtml(str) {

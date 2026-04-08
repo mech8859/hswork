@@ -240,8 +240,8 @@ class StockModel
         $stmt = $this->db->prepare("
             INSERT INTO stock_ins
                 (si_number, si_date, status, source_type, source_id, source_number,
-                 warehouse_id, branch_id, branch_name, customer_name, note, total_qty, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                 warehouse_id, branch_id, branch_name, customer_name, vendor_name, note, total_qty, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute(array(
             $number,
@@ -254,6 +254,7 @@ class StockModel
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['branch_name']) ? $data['branch_name'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
+            !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['note']) ? $data['note'] : null,
             !empty($data['total_qty']) ? $data['total_qty'] : 0,
             $data['created_by'],

@@ -309,30 +309,58 @@ function calcTotals() {
 
 // 品名即時搜尋
 var pnTimer = null;
+function _removeAllPnDropdowns() {
+    document.querySelectorAll('.pn-dropdown').forEach(function(d){
+        if (typeof d._cleanup === 'function') d._cleanup();
+        d.remove();
+    });
+}
+function _positionPnDropdown(dd, input) {
+    var r = input.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top = (r.bottom + 2) + 'px';
+    dd.style.left = r.left + 'px';
+    dd.style.width = r.width + 'px';
+    dd.style.zIndex = '10000';
+}
 function searchProductByName(input, idx) {
     clearTimeout(pnTimer);
-    var oldDd = input.parentNode.querySelector('.pn-dropdown');
-    if (oldDd) oldDd.remove();
+    _removeAllPnDropdowns();
     var q = input.value.trim();
     if (q.length < 2) return;
     pnTimer = setTimeout(function() {
-        fetch('/products.php?action=ajax_search&keyword=' + encodeURIComponent(q))
+        // 改用 inventory 的搜尋 endpoint：僅啟用品項、按品名排序、20 筆
+        fetch('/inventory.php?action=ajax_search_products&q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
-        .then(function(results) {
+        .then(function(resp) {
+            // 相容兩種回傳格式：{data:[...]} 或直接 [...]
+            var results = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []);
             if (!results || !results.length) return;
             var dd = document.createElement('div');
             dd.className = 'pn-dropdown';
             var html = '';
             for (var i = 0; i < Math.min(results.length, 10); i++) {
                 var p = results[i];
-                html += '<div class="pn-item" data-id="' + (p.id||'') + '" data-model="' + escAttr(p.model||'') + '" data-name="' + escAttr(p.name||'') + '" data-unit="' + escAttr(p.unit||'') + '" data-cost="' + (p.cost||0) + '">';
+                var pModel = p.model || p.model_number || '';
+                var pCost  = p.cost || p.price || 0;
+                html += '<div class="pn-item" data-id="' + (p.id||'') + '" data-model="' + escAttr(pModel) + '" data-name="' + escAttr(p.name||'') + '" data-unit="' + escAttr(p.unit||'') + '" data-cost="' + pCost + '">';
                 html += '<b>' + escH(p.name) + '</b>';
-                if (p.model) html += ' <small style="color:#888">' + escH(p.model) + '</small>';
-                if (p.cost) html += ' <small style="color:#e53935">$' + Number(p.cost).toLocaleString() + '</small>';
+                if (pModel) html += ' <small style="color:#888">' + escH(pModel) + '</small>';
+                if (pCost) html += ' <small style="color:#e53935">$' + Number(pCost).toLocaleString() + '</small>';
                 html += '</div>';
             }
             dd.innerHTML = html;
-            input.parentNode.appendChild(dd);
+            // 用 position:fixed 逃離 .table-responsive 的 overflow
+            document.body.appendChild(dd);
+            _positionPnDropdown(dd, input);
+            // 捲動或視窗調整時重新定位
+            var reposition = function(){ _positionPnDropdown(dd, input); };
+            window.addEventListener('scroll', reposition, true);
+            window.addEventListener('resize', reposition);
+            dd._cleanup = function(){
+                window.removeEventListener('scroll', reposition, true);
+                window.removeEventListener('resize', reposition);
+            };
             dd.querySelectorAll('.pn-item').forEach(function(item) {
                 item.addEventListener('click', function() {
                     var row = input.closest('tr');
@@ -348,6 +376,7 @@ function searchProductByName(input, idx) {
                         priceInput.value = this.getAttribute('data-cost');
                         calcRowAmount(row);
                     }
+                    if (typeof dd._cleanup === 'function') dd._cleanup();
                     dd.remove();
                 });
             });
@@ -356,8 +385,7 @@ function searchProductByName(input, idx) {
 }
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.pn-dropdown') && !e.target.classList.contains('product-name-input')) {
-        var dds = document.querySelectorAll('.pn-dropdown');
-        for (var i = 0; i < dds.length; i++) dds[i].remove();
+        _removeAllPnDropdowns();
     }
 });
 

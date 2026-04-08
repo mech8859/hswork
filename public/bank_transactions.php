@@ -57,6 +57,21 @@ switch ($action) {
         $record = $model->getBankTransaction($id);
         if (!$record) { redirect('/bank_transactions.php'); }
 
+        // 批次匯入的舊資料若無交易編號，開啟編輯時自動補上
+        if (empty($record['transaction_number'])) {
+            $newNum = generate_doc_number('bank_transactions', !empty($record['transaction_date']) ? $record['transaction_date'] : null);
+            if (!empty($newNum)) {
+                $db = Database::getInstance();
+                try {
+                    $db->prepare("UPDATE bank_transactions SET transaction_number = ? WHERE id = ? AND (transaction_number IS NULL OR transaction_number = '')")
+                       ->execute(array($newNum, $id));
+                    $record['transaction_number'] = $newNum;
+                } catch (Exception $autoNumEx) {
+                    error_log('bank_transaction auto number failed: ' . $autoNumEx->getMessage());
+                }
+            }
+        }
+
         $pageTitle = '編輯銀行交易';
         $currentPage = 'bank_transactions';
         require __DIR__ . '/../templates/layouts/header.php';
@@ -100,6 +115,41 @@ switch ($action) {
         }
         redirect('/bank_transactions.php');
         break;
+
+    // ---- AJAX: 切換星號記號 ----
+    case 'toggle_star':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$canManageFinance && !$isBoss) {
+            echo json_encode(array('error' => '無權限'));
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('error' => '方法錯誤'));
+            exit;
+        }
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        if ($id <= 0) {
+            echo json_encode(array('error' => '參數錯誤'));
+            exit;
+        }
+        try {
+            $db = Database::getInstance();
+            // 取得目前狀態
+            $curStmt = $db->prepare("SELECT is_starred FROM bank_transactions WHERE id = ?");
+            $curStmt->execute(array($id));
+            $cur = $curStmt->fetchColumn();
+            if ($cur === false) {
+                echo json_encode(array('error' => '記錄不存在'));
+                exit;
+            }
+            $new = ((int)$cur === 1) ? 0 : 1;
+            $db->prepare("UPDATE bank_transactions SET is_starred = ? WHERE id = ?")
+               ->execute(array($new, $id));
+            echo json_encode(array('success' => true, 'starred' => $new));
+        } catch (Exception $e) {
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+        exit;
 
     // ---- 批次匯入表單 ----
     case 'import':

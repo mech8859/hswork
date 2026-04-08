@@ -103,7 +103,13 @@
     <!-- 手機卡片 -->
     <div class="staff-cards show-mobile">
         <?php foreach ($records as $r): ?>
-        <a href="/bank_transactions.php?action=edit&id=<?= (int)$r['id'] ?>" class="staff-card" style="text-decoration:none;color:inherit">
+        <?php $isStar = !empty($r['is_starred']); ?>
+        <div class="staff-card" style="position:relative">
+            <span class="star-toggle <?= $isStar ? 'is-on' : '' ?>"
+                  data-id="<?= (int)$r['id'] ?>"
+                  onclick="event.preventDefault();event.stopPropagation();toggleStar(this)"
+                  style="position:absolute;top:10px;right:10px;font-size:1.3rem">&#9733;</span>
+            <a href="/bank_transactions.php?action=edit&id=<?= (int)$r['id'] ?>" style="text-decoration:none;color:inherit;display:block;padding-right:28px">
             <div class="d-flex justify-between align-center">
                 <strong><?= e(!empty($r['summary']) ? $r['summary'] : '-') ?></strong>
                 <span class="text-muted" style="font-size:.8rem"><?= e(!empty($r['transaction_date']) ? $r['transaction_date'] : '-') ?></span>
@@ -120,7 +126,8 @@
             <?php if (!empty($r['description'])): ?>
             <div class="staff-card-meta"><span><?= e($r['description']) ?></span></div>
             <?php endif; ?>
-        </a>
+            </a>
+        </div>
         <?php endforeach; ?>
     </div>
 
@@ -129,6 +136,7 @@
         <table class="table">
             <thead>
                 <tr>
+                    <th style="width:32px"></th>
                     <th>交易日期</th>
                     <th>銀行帳戶</th>
                     <th>摘要</th>
@@ -141,7 +149,14 @@
             </thead>
             <tbody>
                 <?php foreach ($records as $r): ?>
+                <?php $isStar = !empty($r['is_starred']); ?>
                 <tr>
+                    <td class="text-center">
+                        <span class="star-toggle <?= $isStar ? 'is-on' : '' ?>"
+                              data-id="<?= (int)$r['id'] ?>"
+                              onclick="toggleStar(this)"
+                              title="標記/取消標記">&#9733;</span>
+                    </td>
                     <td><?= e(!empty($r['transaction_date']) ? $r['transaction_date'] : '-') ?></td>
                     <td style="font-size:.85rem"><?= e(!empty($r['bank_account']) ? $r['bank_account'] : '-') ?></td>
                     <td><?= e(!empty($r['summary']) ? $r['summary'] : '-') ?></td>
@@ -173,4 +188,50 @@
 .hide-mobile { display: none; }
 @media (min-width: 768px) { .show-mobile { display: none !important; } .hide-mobile { display: block !important; } }
 @media (max-width: 767px) { .bank-sum-value { font-size: 1.1rem; } }
+
+/* 星號記號 */
+.star-toggle {
+    display: inline-block;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: #d0d0d0;
+    transition: color .15s, transform .15s;
+    user-select: none;
+    line-height: 1;
+}
+.star-toggle:hover { color: #f1c40f; transform: scale(1.15); }
+.star-toggle.is-on { color: #f1c40f; }
+.star-toggle.is-on:hover { color: #e0a800; }
+.star-toggle.saving { opacity: .5; pointer-events: none; }
 </style>
+
+<script>
+function toggleStar(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id');
+    if (!id) return;
+    el.classList.add('saving');
+    var form = new FormData();
+    form.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/bank_transactions.php?action=toggle_star');
+    xhr.onload = function() {
+        el.classList.remove('saving');
+        if (xhr.status !== 200) { alert('儲存失敗'); return; }
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.error) { alert(res.error); return; }
+            if (res.starred) {
+                el.classList.add('is-on');
+            } else {
+                el.classList.remove('is-on');
+            }
+        } catch (e) { alert('回應錯誤'); }
+    };
+    xhr.onerror = function() {
+        el.classList.remove('saving');
+        alert('網路錯誤');
+    };
+    xhr.send(form);
+}
+</script>

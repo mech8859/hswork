@@ -14,8 +14,18 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
 </div>
 <?php endif; ?>
 
+<?php $isVoided = $isEdit && !empty($record['status']) && $record['status'] === 'voided'; ?>
+<?php if ($isVoided): ?>
+<div style="padding:10px 14px;background:#ffebee;border:1px solid #e53935;border-radius:8px;margin-bottom:12px;color:#c62828;font-size:.9rem">
+    ⊘ 此發票已作廢，無法編輯內容。如需徹底移除資料，請按右下角「刪除」。
+</div>
+<?php endif; ?>
+
 <form method="POST" class="mt-2" id="salesInvoiceForm">
     <?= csrf_field() ?>
+    <?php if ($isVoided): ?>
+    <fieldset disabled style="border:none;padding:0;margin:0">
+    <?php endif; ?>
     <?php if (!empty($fromCaseId) && !empty($returnTo)): ?>
     <input type="hidden" name="case_id" value="<?= (int)$fromCaseId ?>">
     <input type="hidden" name="return" value="<?= e($returnTo) ?>">
@@ -203,22 +213,9 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
             <button type="submit" class="btn btn-primary"><?= $isEdit ? '儲存變更' : '新增銷項發票' ?></button>
             <a href="/sales_invoices.php" class="btn btn-outline">取消</a>
         </div>
-        <?php if ($isEdit && Auth::hasPermission('accounting.manage')): ?>
+        <?php if ($isEdit && Auth::hasPermission('accounting.manage') && !$isVoided): ?>
         <div class="d-flex gap-1">
-            <?php if (!empty($record['status']) && $record['status'] !== 'voided'): ?>
-            <form method="POST" action="/sales_invoices.php?action=void" style="display:inline" onsubmit="return confirm('確定要作廢此發票？')">
-                <?= csrf_field() ?>
-                <input type="hidden" name="id" value="<?= $record['id'] ?>">
-                <button type="submit" class="btn btn-danger">作廢此發票</button>
-            </form>
-            <?php endif; ?>
-            <?php if (!empty($record['status']) && $record['status'] === 'pending'): ?>
-            <form method="POST" action="/sales_invoices.php?action=delete" style="display:inline" onsubmit="return confirm('確定要刪除此發票？')">
-                <?= csrf_field() ?>
-                <input type="hidden" name="id" value="<?= $record['id'] ?>">
-                <button type="submit" class="btn btn-outline" style="color:#c62828;border-color:#c62828">刪除</button>
-            </form>
-            <?php endif; ?>
+            <button type="button" class="btn btn-danger" onclick="if(confirm('確定要作廢此發票？'))document.getElementById('siVoidForm').submit()">作廢此發票</button>
         </div>
         <?php endif; ?>
     </div>
@@ -227,7 +224,32 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
         <?= back_button('/sales_invoices.php') ?>
     </div>
     <?php endif; ?>
+    <?php if ($isVoided): ?>
+    </fieldset>
+    <!-- 作廢狀態：返回 / 刪除 -->
+    <div class="d-flex justify-between mt-2">
+        <a href="/sales_invoices.php" class="btn btn-outline">返回列表</a>
+        <?php if (Auth::hasPermission('accounting.manage')): ?>
+        <button type="button" class="btn btn-outline" style="color:#c62828;border-color:#c62828" onclick="if(confirm('此發票將永久刪除，確定要繼續？'))document.getElementById('siDeleteForm').submit()">刪除</button>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </form>
+
+<?php if ($isEdit && Auth::hasPermission('accounting.manage')): ?>
+    <?php if (!$isVoided): ?>
+    <form id="siVoidForm" method="POST" action="/sales_invoices.php?action=void" style="display:none">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= $record['id'] ?>">
+    </form>
+    <?php endif; ?>
+    <?php if ($isVoided): ?>
+    <form id="siDeleteForm" method="POST" action="/sales_invoices.php?action=delete" style="display:none">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= $record['id'] ?>">
+    </form>
+    <?php endif; ?>
+<?php endif; ?>
 <?php if ($isConfirmed && Auth::hasPermission('accounting.manage')): ?>
 <div class="d-flex justify-end gap-1 mt-1">
     <form method="POST" action="/sales_invoices.php?action=unconfirm" onsubmit="return confirm('確定要取消確認？取消後可編輯或刪除。')">

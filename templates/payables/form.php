@@ -28,7 +28,7 @@
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
-<form method="POST" class="mt-2" id="payableForm">
+<form method="POST" class="mt-2" id="payableForm" onsubmit="return validatePayableForm()">
     <?= csrf_field() ?>
 
     <!-- 基本資訊 -->
@@ -163,7 +163,10 @@
     <div class="card">
         <div class="card-header d-flex justify-between align-center">
             <span>分公司拆帳</span>
-            <button type="button" class="btn btn-primary btn-sm" onclick="addBranchRow()">+ 新增</button>
+            <div class="d-flex gap-1 align-center">
+                <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">合計：<strong id="branchSumDisplay" style="color:var(--primary);font-size:1rem">$0</strong></span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addBranchRow()">+ 新增</button>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table" id="branchTable">
@@ -218,6 +221,7 @@
             <span>進貨明細</span>
             <div class="d-flex gap-1 align-center">
                 <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">未稅合計：<strong id="pdSumDisplay" style="color:var(--primary);font-size:1rem">$0</strong></span>
+                <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">進貨淨額：<strong id="pdNetDisplay" style="color:#2e7d32;font-size:1rem">$0</strong></span>
                 <button type="button" class="btn btn-outline btn-sm" onclick="openGrPickerModal()" title="依本單廠商搜尋進貨單，可多選後帶入">📋 從進貨單帶入</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="addPurchaseDetailRow()">+ 新增</button>
             </div>
@@ -306,8 +310,14 @@
     <div class="card">
         <div class="card-header d-flex justify-between align-center">
             <span>發票明細</span>
-            <button type="button" class="btn btn-primary btn-sm" onclick="addInvoiceRow()">+ 新增</button>
+            <div class="d-flex gap-1">
+                <?php if ($isEdit): ?>
+                <button type="button" class="btn btn-outline btn-sm" onclick="gotoNewPurchaseInvoice()" title="跳到進項發票頁面新增，存檔後自動回寫本單">📄 新增進項發票</button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-primary btn-sm" onclick="addInvoiceRow()">+ 新增</button>
+            </div>
         </div>
+        <input type="hidden" name="invoices_rendered" value="1">
         <div class="table-responsive">
             <table class="table" id="invoiceTable">
                 <thead>
@@ -326,7 +336,7 @@
                         <?php foreach ($invoiceItems as $idx => $inv): ?>
                         <tr>
                             <td><input type="date" max="2099-12-31" name="invoices[<?= $idx ?>][invoice_date]" class="form-control" value="<?= e(!empty($inv['invoice_date']) ? $inv['invoice_date'] : '') ?>"></td>
-                            <td><input type="text" name="invoices[<?= $idx ?>][invoice_number]" class="form-control" value="<?= e(!empty($inv['invoice_number']) ? $inv['invoice_number'] : '') ?>"></td>
+                            <td><input type="text" name="invoices[<?= $idx ?>][invoice_number]" class="form-control" value="<?= e(!empty($inv['invoice_number']) ? $inv['invoice_number'] : '') ?>" maxlength="10" oninput="formatInvoiceNumber(this)" onblur="onInvoiceNumberBlur(this)" style="text-transform:uppercase"></td>
                             <td><input type="text" name="invoices[<?= $idx ?>][tax_id]" class="form-control" value="<?= e(!empty($inv['tax_id']) ? $inv['tax_id'] : '') ?>"></td>
                             <td><input type="number" name="invoices[<?= $idx ?>][amount_untaxed]" class="form-control inv-untaxed" step="1" min="0" value="<?= !empty($inv['amount_untaxed']) ? (int)$inv['amount_untaxed'] : 0 ?>" oninput="calcInvRow(this)"></td>
                             <td><input type="number" name="invoices[<?= $idx ?>][tax]" class="form-control inv-tax" step="1" min="0" value="<?= !empty($inv['tax']) ? (int)$inv['tax'] : 0 ?>" readonly></td>
@@ -337,7 +347,7 @@
                     <?php else: ?>
                         <tr>
                             <td><input type="date" max="2099-12-31" name="invoices[0][invoice_date]" class="form-control" value=""></td>
-                            <td><input type="text" name="invoices[0][invoice_number]" class="form-control" value="" placeholder="發票號碼" maxlength="10" oninput="formatInvoiceNumber(this)" onblur="validateInvoiceNumber(this)" style="text-transform:uppercase"></td>
+                            <td><input type="text" name="invoices[0][invoice_number]" class="form-control" value="" placeholder="發票號碼" maxlength="10" oninput="formatInvoiceNumber(this)" onblur="onInvoiceNumberBlur(this)" style="text-transform:uppercase"></td>
                             <td><input type="text" name="invoices[0][tax_id]" class="form-control" value="" placeholder="統一編號"></td>
                             <td><input type="number" name="invoices[0][amount_untaxed]" class="form-control inv-untaxed" step="1" min="0" value="0" oninput="calcInvRow(this)"></td>
                             <td><input type="number" name="invoices[0][tax]" class="form-control inv-tax" step="1" min="0" value="0" readonly></td>
@@ -475,18 +485,25 @@ function onTaxManual() {
     taxManualEdited = true;
     recalcTotal();
 }
+// 千分位格式化會把輸入值轉成 "1,000" 格式；parseInt 遇到逗號就停，要先 strip
+function _num(id) {
+    var el = document.getElementById(id);
+    if (!el) return 0;
+    var v = String(el.value || '').replace(/,/g, '');
+    return parseInt(v) || 0;
+}
 function calcAmounts() {
-    var subtotal = parseInt(document.getElementById('fldSubtotal').value) || 0;
+    var subtotal = _num('fldSubtotal');
     if (!taxManualEdited) {
         document.getElementById('fldTax').value = Math.round(subtotal * 0.05);
     }
     recalcTotal();
 }
 function recalcTotal() {
-    var subtotal = parseInt(document.getElementById('fldSubtotal').value) || 0;
-    var tax = parseInt(document.getElementById('fldTax').value) || 0;
+    var subtotal = _num('fldSubtotal');
+    var tax = _num('fldTax');
     var total = subtotal + tax;
-    var prepaid = parseInt(document.getElementById('fldPrepaid').value) || 0;
+    var prepaid = _num('fldPrepaid');
     document.getElementById('fldTotal').value = total;
     document.getElementById('fldPayable').value = total - prepaid;
 }
@@ -503,9 +520,39 @@ function addBranchRow() {
     tr.innerHTML = '<td><select name="branches['+branchIdx+'][branch_id]" class="form-control"><option value="">請選擇</option>'+opts+'</select></td>'
         + '<td><input type="number" name="branches['+branchIdx+'][amount]" class="form-control" step="1" min="0" value="0"></td>'
         + '<td><input type="text" name="branches['+branchIdx+'][note]" class="form-control" value=""></td>'
-        + '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>';
+        + '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove();recalcBranchSum()">X</button></td>';
     tbody.appendChild(tr);
     branchIdx++;
+    recalcBranchSum();
+}
+
+// ---- 分公司拆帳合計 ----
+function recalcBranchSum() {
+    var sum = 0;
+    document.querySelectorAll('#branchBody input[name^="branches"][name$="[amount]"]').forEach(function(el) {
+        sum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    var disp = document.getElementById('branchSumDisplay');
+    if (disp) disp.textContent = '$' + sum.toLocaleString();
+}
+document.addEventListener('DOMContentLoaded', recalcBranchSum);
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.name && /^branches\[\d+\]\[amount\]$/.test(e.target.name)) {
+        recalcBranchSum();
+    }
+});
+
+// ---- 跳到新增進項發票（並帶回寫資訊）----
+function gotoNewPurchaseInvoice() {
+    var vendorInp = document.querySelector('input[name="vendor_name"]');
+    var vendor = vendorInp ? vendorInp.value.trim() : '';
+    if (!vendor) { alert('請先選擇廠商名稱'); if (vendorInp) vendorInp.focus(); return; }
+    var payableId = '<?= $isEdit ? (int)$record['id'] : 0 ?>';
+    if (!payableId) { alert('請先存檔應付帳款單'); return; }
+    var url = '/purchase_invoices.php?action=create'
+        + '&vendor_name=' + encodeURIComponent(vendor)
+        + '&return_to_payable=' + payableId;
+    window.location.href = url;
 }
 
 // ---- 發票明細 動態列 ----
@@ -514,7 +561,7 @@ function addInvoiceRow() {
     var tbody = document.getElementById('invoiceBody');
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><input type="date" max="2099-12-31" name="invoices['+invIdx+'][invoice_date]" class="form-control" value=""></td>'
-        + '<td><input type="text" name="invoices['+invIdx+'][invoice_number]" class="form-control" value="" placeholder="發票號碼" maxlength="10" oninput="formatInvoiceNumber(this)" onblur="validateInvoiceNumber(this)" style="text-transform:uppercase"></td>'
+        + '<td><input type="text" name="invoices['+invIdx+'][invoice_number]" class="form-control" value="" placeholder="發票號碼" maxlength="10" oninput="formatInvoiceNumber(this)" onblur="onInvoiceNumberBlur(this)" style="text-transform:uppercase"></td>'
         + '<td><input type="text" name="invoices['+invIdx+'][tax_id]" class="form-control" value="" placeholder="統一編號"></td>'
         + '<td><input type="number" name="invoices['+invIdx+'][amount_untaxed]" class="form-control inv-untaxed" step="1" min="0" value="0" oninput="calcInvRow(this)"></td>'
         + '<td><input type="number" name="invoices['+invIdx+'][tax]" class="form-control inv-tax" step="1" min="0" value="0" readonly></td>'
@@ -522,6 +569,52 @@ function addInvoiceRow() {
         + '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>';
     tbody.appendChild(tr);
     invIdx++;
+}
+
+// ---- 發票號碼重複檢查（本表單內）----
+function checkDuplicateInvoiceNumbers() {
+    var inputs = document.querySelectorAll('#invoiceBody input[name^="invoices"][name$="[invoice_number]"]');
+    var seen = {};
+    var dups = {};
+    inputs.forEach(function(el) {
+        el.style.borderColor = '';
+        var v = (el.value || '').trim().toUpperCase();
+        if (!v) return;
+        if (seen[v] === undefined) {
+            seen[v] = [el];
+        } else {
+            seen[v].push(el);
+            dups[v] = true;
+        }
+    });
+    var dupList = Object.keys(dups);
+    if (dupList.length > 0) {
+        dupList.forEach(function(v) {
+            seen[v].forEach(function(el) { el.style.borderColor = '#e53935'; el.style.background = '#ffebee'; });
+        });
+    }
+    return dupList;
+}
+function onInvoiceNumberBlur(el) {
+    validateInvoiceNumber(el); // 既有格式檢查
+    var dups = checkDuplicateInvoiceNumbers();
+    // 清掉不重複者的紅底（checkDuplicateInvoiceNumbers 已處理）
+    document.querySelectorAll('#invoiceBody input[name$="[invoice_number]"]').forEach(function(e) {
+        if (!dups.length || dups.indexOf((e.value||'').trim().toUpperCase()) === -1) {
+            e.style.background = '';
+        }
+    });
+}
+function validatePayableForm() {
+    var dups = checkDuplicateInvoiceNumbers();
+    if (dups.length > 0) {
+        alert('發票明細有重複的發票號碼：' + dups.join('、') + '\n\n請修正後再儲存。');
+        // 捲到發票明細區
+        var firstDup = document.querySelector('#invoiceBody input[name$="[invoice_number]"][style*="ffebee"]');
+        if (firstDup) { firstDup.scrollIntoView({behavior:'smooth', block:'center'}); firstDup.focus(); }
+        return false;
+    }
+    return true;
 }
 
 // ---- 發票小計自動計算 ----
@@ -669,14 +762,29 @@ function adoptSelectedGr() {
     if (added > 0) alert('已帶入 ' + added + ' 筆進貨單');
 }
 
-// ---- 進貨明細未稅合計 ----
+// ---- 進貨明細未稅合計 + 進貨淨額 ----
 function recalcPdSum() {
     var sum = 0;
     document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[amount_untaxed]"]').forEach(function(el) {
-        sum += parseInt(el.value) || 0;
+        sum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
     });
     var disp = document.getElementById('pdSumDisplay');
     if (disp) disp.textContent = '$' + sum.toLocaleString();
+    recalcPdNet();
+}
+function recalcPdNet() {
+    // 進貨淨額 = 進貨明細未稅合計 − 進退明細退款合計
+    var pdSum = 0;
+    document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[amount_untaxed]"]').forEach(function(el) {
+        pdSum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    var rdSum = 0;
+    document.querySelectorAll('#returnDetailBody input[name^="rd"][name$="[refund_amount]"]').forEach(function(el) {
+        rdSum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    var net = pdSum - rdSum;
+    var netDisp = document.getElementById('pdNetDisplay');
+    if (netDisp) netDisp.textContent = '$' + net.toLocaleString();
 }
 document.addEventListener('DOMContentLoaded', recalcPdSum);
 // 用事件委派監聽變動 + 刪除
@@ -739,10 +847,11 @@ function addPurchaseDetailRow(preset) {
 function recalcRdSum() {
     var sum = 0;
     document.querySelectorAll('#returnDetailBody input[name^="rd"][name$="[refund_amount]"]').forEach(function(el) {
-        sum += parseInt(el.value) || 0;
+        sum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
     });
     var disp = document.getElementById('rdSumDisplay');
     if (disp) disp.textContent = '$' + sum.toLocaleString();
+    recalcPdNet();
 }
 document.addEventListener('DOMContentLoaded', recalcRdSum);
 document.addEventListener('input', function(e) {

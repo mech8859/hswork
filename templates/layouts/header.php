@@ -77,6 +77,9 @@
         <?php if (Auth::hasPermission('attendance.view') || Auth::hasPermission('schedule.manage') || Auth::hasPermission('schedule.view')): ?>
         <li><a href="/attendance.php" class="<?= ($currentPage ?? '') === 'attendance' ? 'active' : '' ?>">📊 出勤狀況表</a></li>
         <?php endif; ?>
+        <?php if (Auth::hasPermission('schedule.manage') || Auth::hasPermission('schedule.view') || Auth::hasPermission('all')): ?>
+        <li><a href="/reviews.php" class="<?= ($currentPage ?? '') === 'reviews' ? 'active' : '' ?>">⭐ 五星評價統計</a></li>
+        <?php endif; ?>
 
         <!-- 業務管理 -->
         <li class="nav-section">業務管理</li>

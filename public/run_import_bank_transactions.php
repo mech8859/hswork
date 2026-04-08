@@ -160,16 +160,20 @@ foreach ($records as $idx => $r) {
         if ($num <= 5 || $num % 200 == 0) echo "[{$num}] {$uploadNumber} {$bankAccount} \${$creditAmount} → 新增\n";
         if ($execute) {
             try {
+                // 自動產生交易編號（BT-YYYY-NNNNNN）
+                $txNumber = generate_doc_number('bank_transactions', $txDate);
                 $db->prepare("
                     INSERT INTO bank_transactions (
+                        transaction_number,
                         sys_number, upload_number, bank_account,
                         transaction_date, posting_date, transaction_time,
                         cash_transfer, summary, currency,
                         debit_amount, credit_amount, balance,
                         note, transfer_account, bank_code,
                         counter_account, remark, description, ragic_id
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ")->execute(array(
+                    $txNumber,
                     $sysNumber, $uploadNumber, $bankAccount,
                     $txDate, $postDate, $txTime,
                     $cashTransfer, $summary, $currency,
