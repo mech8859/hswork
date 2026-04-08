@@ -217,9 +217,10 @@ switch ($action) {
         $quote = $model->getById($id);
         if (!$quote) { Session::flash('error', '報價單不存在'); redirect('/quotations.php'); }
 
-        // 檢查是否有客戶
-        if (empty($quote['customer_id'])) {
-            Session::flash('error', '送簽核前請先關聯客戶（編輯報價單設定客戶名稱）');
+        // 檢查是否有客戶資訊：未成交客戶不會有 customer_id（從案件來）
+        // 只要有 customer_name 或關聯案件即可送簽核
+        if (empty($quote['customer_name']) && empty($quote['case_id'])) {
+            Session::flash('error', '送簽核前請先填寫客戶名稱或關聯案件');
             redirect('/quotations.php?action=view&id=' . $id);
             break;
         }
