@@ -76,7 +76,20 @@ switch ($action) {
                 'note'            => !empty($_POST['note']) ? $_POST['note'] : null,
                 'created_by'      => $userId,
             );
-            $invoiceId = $model->createSalesInvoice($data);
+            try {
+                $invoiceId = $model->createSalesInvoice($data);
+            } catch (Exception $e) {
+                Session::flash('error', $e->getMessage());
+                // 保留欄位資料供回填
+                Session::set('sales_invoice_form_data', $_POST);
+                $postReturn = !empty($_POST['return']) ? $_POST['return'] : '';
+                $postCaseId = !empty($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+                $back = '/sales_invoices.php?action=create';
+                if ($postReturn === 'case' && $postCaseId > 0) {
+                    $back .= '&case_id=' . $postCaseId . '&return=case';
+                }
+                redirect($back);
+            }
             AuditLog::log('sales_invoices', 'create', $invoiceId, '新增銷項發票');
 
             // Auto-journal on sales invoice create
@@ -155,7 +168,19 @@ switch ($action) {
                 'status'          => !empty($_POST['status']) ? $_POST['status'] : 'pending',
                 'note'            => !empty($_POST['note']) ? $_POST['note'] : null,
             );
-            $model->updateSalesInvoice($id, $data);
+            try {
+                $model->updateSalesInvoice($id, $data);
+            } catch (Exception $e) {
+                Session::flash('error', $e->getMessage());
+                Session::set('sales_invoice_form_data', $_POST);
+                $postReturn = !empty($_POST['return']) ? $_POST['return'] : '';
+                $postCaseId = !empty($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+                $back = '/sales_invoices.php?action=edit&id=' . $id;
+                if ($postReturn === 'case' && $postCaseId > 0) {
+                    $back .= '&case_id=' . $postCaseId . '&return=case';
+                }
+                redirect($back);
+            }
             AuditLog::log('sales_invoices', 'update', $id, '更新銷項發票');
             Session::flash('success', '銷項發票已更新');
             // 若是從案件管理過來的，跳回案件編輯頁
