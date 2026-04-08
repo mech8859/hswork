@@ -201,11 +201,11 @@ $paymentTermsOptions = FinanceModel::paymentTermsOptions();
         <div class="form-row">
             <div class="form-group">
                 <label>訂金</label>
-                <input type="number" name="deposit" class="form-control" value="<?= e($record['deposit'] ?? 0) ?>" min="0">
+                <input type="number" name="deposit" id="depositInput" class="form-control" value="<?= e($record['deposit'] ?? 0) ?>" min="0" oninput="calcTotal()">
             </div>
             <div class="form-group">
                 <label>折讓金額</label>
-                <input type="number" name="discount" class="form-control" value="<?= e($record['discount'] ?? 0) ?>" min="0">
+                <input type="number" name="discount" id="discountInput" class="form-control" value="<?= e($record['discount'] ?? 0) ?>" min="0" oninput="calcTotal()">
             </div>
         </div>
         <div class="form-row">
@@ -361,7 +361,10 @@ function calcTotal() {
     }
     var t = readNumRecv(document.getElementById('taxInput'));
     var sh = readNumRecv(document.querySelector('[name="shipping"]'));
-    document.getElementById('totalInput').value = s + t + sh;
+    var dep = readNumRecv(document.getElementById('depositInput'));
+    var disc = readNumRecv(document.getElementById('discountInput'));
+    // 總計 = 小計 + 稅額 + 運費 - 訂金 - 折讓金額
+    document.getElementById('totalInput').value = s + t + sh - dep - disc;
 }
 calcTotal();
 </script>
