@@ -69,6 +69,15 @@ $canEdit = array(
 );
 // 新增案件時全部可編輯
 if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
+
+// 表單級唯讀（由 controller 傳入 $caseCanEdit）
+if (!isset($caseCanEdit)) $caseCanEdit = true;
+$readOnly = $case && !$caseCanEdit;
+// 唯讀時，全部區段都鎖定
+if ($readOnly) {
+    foreach ($canEdit as $k => $v) { $canEdit[$k] = false; }
+}
+require __DIR__ . '/../_readonly_form_helper.php';
 ?>
 
 <!-- 區域導航 -->
@@ -89,7 +98,7 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
-<form method="POST" class="mt-2" onsubmit="return validateCaseForm()">
+<form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" onsubmit="return validateCaseForm()">
     <?= csrf_field() ?>
 
     <!-- 基本資料 -->

@@ -117,7 +117,41 @@ switch ($action) {
             redirect('/cases.php');
         }
 
+        // 權限判定：高層 / cases.manage 可編；own/assist/view 可看
+        // 注意：使用 $caseCanEdit 避免與表單裡的 $canEdit 區段陣列衝突
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss', 'manager', 'vice_president'));
+        $hasManage = Auth::hasPermission('cases.manage');
+        $hasView = Auth::hasPermission('cases.view') || $hasManage;
+        $hasOwn = Auth::hasPermission('cases.own');
+        $hasAssist = Auth::hasPermission('cases.assist');
+        $isOwn = ((int)($case['sales_id'] ?? 0) === (int)Auth::id());
+
+        if ($isAdmin || $hasManage) {
+            $caseCanEdit = true;
+        } elseif ($hasOwn) {
+            $caseCanEdit = $isOwn;
+        } else {
+            $caseCanEdit = false;
+        }
+        if ($isAdmin || $hasManage || $hasView) {
+            $caseCanView = true;
+        } elseif (($hasOwn && $isOwn) || $hasAssist) {
+            $caseCanView = true;
+        } else {
+            $caseCanView = false;
+        }
+        if (!$caseCanView) {
+            Session::flash('error', '權限不足');
+            redirect('/cases.php');
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // 後端守門：無編輯權限不能 POST
+            if (!$caseCanEdit) {
+                Session::flash('error', '無編輯權限，僅可檢視');
+                redirect('/cases.php?action=edit&id=' . $id);
+            }
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/cases.php?action=edit&id=' . $id);
@@ -168,7 +202,7 @@ switch ($action) {
         $editingLockModule = 'cases';
         $editingLockRecordId = $id;
 
-        $pageTitle = '編輯案件';
+        $pageTitle = $caseCanEdit ? '編輯案件' : '檢視案件';
         $currentPage = 'cases';
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/cases/form.php';
