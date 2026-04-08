@@ -7,7 +7,7 @@ $model = new CaseModel();
 $action = $_GET['action'] ?? 'list';
 $branchIds = Auth::getAccessibleBranchIds();
 
-// 帳款交易合計回寫 total_collected + 訂金金額/方式
+// 帳款交易合計回寫 total_collected + 訂金金額/方式 + balance_amount(尾款)
 function updateTotalCollected($caseId) {
     $db = Database::getInstance();
     // 總收款
@@ -25,8 +25,16 @@ function updateTotalCollected($caseId) {
     $depDateStmt = $db->prepare("SELECT payment_date FROM case_payments WHERE case_id = ? AND payment_type = '訂金' ORDER BY payment_date DESC, id DESC LIMIT 1");
     $depDateStmt->execute(array($caseId));
     $depositDate = $depDateStmt->fetchColumn() ?: null;
-    $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ? WHERE id = ?")
-        ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $caseId));
+    // 尾款 = (含稅金額 > 0 ? 含稅金額 : 成交金額) - 總收款金額
+    $caseStmt = $db->prepare("SELECT deal_amount, total_amount FROM cases WHERE id = ?");
+    $caseStmt->execute(array($caseId));
+    $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
+    $dealAmt  = $caseRow ? (int)$caseRow['deal_amount'] : 0;
+    $totalAmt = $caseRow ? (int)$caseRow['total_amount'] : 0;
+    $base = $totalAmt > 0 ? $totalAmt : $dealAmt;
+    $balance = $base > 0 ? max(0, $base - $total) : null;
+    $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ?, balance_amount = ? WHERE id = ?")
+        ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $balance, $caseId));
 }
 
 switch ($action) {
