@@ -677,9 +677,14 @@ if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
             <div class="form-group">
                 <label>帳款是否結清</label>
                 <select name="settlement_confirmed" class="form-control">
+                    <?php
+                    $settleVal = isset($case['settlement_confirmed']) ? $case['settlement_confirmed'] : '';
+                    $isZero = ($settleVal !== '' && $settleVal !== null && (int)$settleVal === 0);
+                    $isOne  = ($settleVal !== '' && $settleVal !== null && (int)$settleVal === 1);
+                    ?>
                     <option value="">請選擇</option>
-                    <option value="0" <?= isset($case['settlement_confirmed']) && $case['settlement_confirmed'] === '0' ? 'selected' : '' ?>>未結清</option>
-                    <option value="1" <?= ($case['settlement_confirmed'] ?? '') == '1' ? 'selected' : '' ?>>已結清</option>
+                    <option value="0" <?= $isZero ? 'selected' : '' ?>>未結清</option>
+                    <option value="1" <?= $isOne ? 'selected' : '' ?>>已結清</option>
                 </select>
             </div>
             <div class="form-group">

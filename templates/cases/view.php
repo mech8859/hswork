@@ -72,6 +72,18 @@
             <span class="detail-value"><?= e($case['sales_name'] ?: '-') ?></span>
         </div>
         <div class="detail-item">
+            <span class="detail-label">進件公司</span>
+            <span class="detail-value"><?= e(!empty($case['company']) ? $case['company'] : '-') ?></span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">案件來源</span>
+            <span class="detail-value"><?= e(!empty($case['case_source']) ? $case['case_source'] : '-') ?></span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">施工區域</span>
+            <span class="detail-value"><?= e(!empty($case['construction_area']) ? $case['construction_area'] : '-') ?></span>
+        </div>
+        <div class="detail-item">
             <span class="detail-label">是否已完工</span>
             <span class="detail-value"><?= !empty($case['is_completed']) ? '<span class="badge badge-success">已完工</span>' : '<span class="badge badge-secondary">未完工</span>' ?></span>
         </div>
@@ -98,7 +110,9 @@
 <?php
 $hasFinancial = !empty($case['quote_amount']) || !empty($case['deal_amount']) || !empty($case['total_amount'])
     || !empty($case['deposit_amount']) || !empty($case['balance_amount']) || !empty($case['completion_amount'])
-    || !empty($case['total_collected']);
+    || !empty($case['total_collected'])
+    || isset($case['settlement_confirmed']) && $case['settlement_confirmed'] !== null && $case['settlement_confirmed'] !== ''
+    || !empty($case['settlement_date']);
 if ($hasFinancial):
 ?>
 <div class="card">
@@ -168,6 +182,24 @@ if ($hasFinancial):
         <div class="detail-item">
             <span class="detail-label">總收款金額</span>
             <span class="detail-value financial-highlight">$<?= number_format($case['total_collected']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (isset($case['settlement_confirmed']) && $case['settlement_confirmed'] !== null && $case['settlement_confirmed'] !== ''): ?>
+        <div class="detail-item">
+            <span class="detail-label">帳款是否結清</span>
+            <span class="detail-value">
+                <?php if ((int)$case['settlement_confirmed'] === 1): ?>
+                <span class="badge badge-success">已結清</span>
+                <?php else: ?>
+                <span class="badge badge-warning">未結清</span>
+                <?php endif; ?>
+            </span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($case['settlement_date'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">帳款結清日期</span>
+            <span class="detail-value"><?= format_date($case['settlement_date']) ?></span>
         </div>
         <?php endif; ?>
     </div>

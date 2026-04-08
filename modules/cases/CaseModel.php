@@ -284,13 +284,16 @@ class CaseModel
                              work_time_start, work_time_end, has_time_restriction,
                              customer_break_time, allow_night_work, urgency, is_large_project,
                              customer_id, customer_name, customer_category, customer_phone, customer_mobile, contact_person, contact_line_id, customer_email,
-                             is_completed,
+                             is_completed, completion_date,
+                             contact_address, construction_area, construction_note, company, case_source,
+                             survey_date, survey_time, visit_method,
+                             settlement_confirmed, settlement_date,
                              billing_title, billing_tax_id, billing_contact, billing_phone, billing_mobile, billing_address, billing_email, billing_note,
                              registrar, updated_by,
                              repair_report_date, repair_fault_reason, repair_by_sales, repair_equipment, repair_staff, repair_helper,
                              repair_result, repair_description, repair_original_case, repair_original_complete_date, repair_original_warranty_date,
-                             repair_is_charged, repair_no_charge_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             repair_is_charged, repair_no_charge_reason, sales_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $data['branch_id'],
@@ -342,6 +345,17 @@ class CaseModel
             !empty($data['contact_line_id']) ? $data['contact_line_id'] : null,
             !empty($data['customer_email']) ? $data['customer_email'] : null,
             isset($data['is_completed']) ? (int)$data['is_completed'] : 0,
+            !empty($data['completion_date']) ? $data['completion_date'] : null,
+            !empty($data['contact_address']) ? $data['contact_address'] : null,
+            !empty($data['construction_area']) ? $data['construction_area'] : null,
+            !empty($data['construction_note']) ? $data['construction_note'] : null,
+            !empty($data['company']) ? $data['company'] : null,
+            !empty($data['case_source']) ? $data['case_source'] : null,
+            !empty($data['survey_date']) ? $data['survey_date'] : null,
+            !empty($data['survey_time']) ? $data['survey_time'] : null,
+            !empty($data['visit_method']) ? $data['visit_method'] : null,
+            isset($data['settlement_confirmed']) && $data['settlement_confirmed'] !== '' ? (int)$data['settlement_confirmed'] : null,
+            !empty($data['settlement_date']) ? $data['settlement_date'] : null,
             !empty($data['billing_title']) ? $data['billing_title'] : null,
             !empty($data['billing_tax_id']) ? $data['billing_tax_id'] : null,
             !empty($data['billing_contact']) ? $data['billing_contact'] : null,
@@ -365,6 +379,7 @@ class CaseModel
             !empty($data['repair_original_warranty_date']) ? $data['repair_original_warranty_date'] : null,
             !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
             !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
+            !empty($data['sales_note']) ? $data['sales_note'] : null,
         ]);
 
         $caseId = (int)$this->db->lastInsertId();
@@ -432,6 +447,7 @@ class CaseModel
                 branch_id = ?,
                 customer_id = ?, customer_name = ?, customer_category = ?, customer_phone = ?, customer_mobile = ?, contact_person = ?, contact_line_id = ?, customer_email = ?, construction_note = ?,
                 contact_address = ?, construction_area = ?, company = ?, case_source = ?, is_completed = ?, completion_date = ?, survey_date = ?, survey_time = ?, visit_method = ?,
+                settlement_confirmed = ?, settlement_date = ?,
                 billing_title = ?, billing_tax_id = ?, billing_contact = ?,
                 billing_phone = ?, billing_mobile = ?, billing_address = ?, billing_email = ?,
                 billing_note = ?, updated_by = ?,
@@ -499,6 +515,8 @@ class CaseModel
             !empty($data['survey_date']) ? $data['survey_date'] : null,
             !empty($data['survey_time']) ? $data['survey_time'] : null,
             !empty($data['visit_method']) ? $data['visit_method'] : null,
+            isset($data['settlement_confirmed']) && $data['settlement_confirmed'] !== '' ? (int)$data['settlement_confirmed'] : null,
+            !empty($data['settlement_date']) ? $data['settlement_date'] : null,
             !empty($data['billing_title']) ? $data['billing_title'] : null,
             !empty($data['billing_tax_id']) ? $data['billing_tax_id'] : null,
             !empty($data['billing_contact']) ? $data['billing_contact'] : null,

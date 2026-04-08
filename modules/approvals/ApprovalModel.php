@@ -437,9 +437,11 @@ class ApprovalModel
 
     /**
      * 取得單據資訊（各模組）
+     * 包在 try/catch 內，避免單一模組 SQL 錯誤導致整個待簽核頁面 500
      */
     private function getTargetInfo($module, $targetId)
     {
+        try {
         switch ($module) {
             case 'quotations':
                 $stmt = $this->db->prepare("SELECT id, quotation_number, customer_name, total_amount, status, quote_date FROM quotations WHERE id = ?");
@@ -452,13 +454,15 @@ class ApprovalModel
                 }
                 return $row ?: array();
             case 'case_completion':
-                $stmt = $this->db->prepare("SELECT id, case_number, title, customer_name, contract_amount, progress FROM cases WHERE id = ?");
+                // 修正: 原本用 contract_amount/progress 但 cases 表沒這兩個欄位
+                $stmt = $this->db->prepare("SELECT id, case_number, title, customer_name, deal_amount, total_amount, current_visit, total_visits FROM cases WHERE id = ?");
                 $stmt->execute(array($targetId));
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($row) {
                     $row['label'] = ($row['case_number'] ? $row['case_number'] . ' - ' : '') . $row['title'] . ' (' . $row['customer_name'] . ')';
                     $row['url'] = '/cases.php?action=edit&id=' . $targetId;
-                    $row['amount'] = $row['contract_amount'];
+                    $row['amount'] = !empty($row['total_amount']) ? $row['total_amount'] : $row['deal_amount'];
+                    $row['progress'] = $row['current_visit'] . '/' . $row['total_visits'];
                 }
                 return $row ?: array();
             case 'case_payments':
@@ -503,6 +507,14 @@ class ApprovalModel
                 return $row ?: array();
             default:
                 return array('label' => $module . ' #' . $targetId, 'url' => '#');
+        }
+        } catch (Exception $e) {
+            error_log('ApprovalModel::getTargetInfo error (' . $module . '#' . $targetId . '): ' . $e->getMessage());
+            return array(
+                'label' => $module . ' #' . $targetId . '（讀取失敗）',
+                'url' => '#',
+                'error' => $e->getMessage(),
+            );
         }
     }
 
