@@ -155,6 +155,58 @@
     </form>
 </div>
 
+<!-- 完工簽核流程說明卡 -->
+<div class="card mb-2" style="background:#e3f2fd;border-left:4px solid #1565c0">
+    <div class="card-header" style="background:transparent;border-bottom:1px solid rgba(21,101,192,.2)">
+        📋 完工簽核流程說明（case_completion）
+    </div>
+    <div style="padding:12px 16px;font-size:.85rem">
+        <p style="margin:0 0 10px 0;color:#666">
+            觸發時機：工程師在「施工回報」勾選「已完工」 → 案件 status 變 <code>completed_pending</code> → 自動送 Level 1
+        </p>
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="background:rgba(255,255,255,.6)">
+                    <th style="padding:6px 8px;text-align:left;width:60px">關卡</th>
+                    <th style="padding:6px 8px;text-align:left;width:100px">角色</th>
+                    <th style="padding:6px 8px;text-align:left;width:160px">簽核人怎麼做</th>
+                    <th style="padding:6px 8px;text-align:left">簽核後系統做什麼</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-top:1px solid rgba(0,0,0,.08)">
+                    <td style="padding:6px 8px;font-weight:600">Level 1</td>
+                    <td style="padding:6px 8px">工程主管<br><small style="color:#888">eng_manager</small></td>
+                    <td style="padding:6px 8px">點「核准」即可（不需勾任何欄位）</td>
+                    <td style="padding:6px 8px">→ 自動通知 <strong>Level 2 行政人員</strong></td>
+                </tr>
+                <tr style="border-top:1px solid rgba(0,0,0,.08)">
+                    <td style="padding:6px 8px;font-weight:600">Level 2</td>
+                    <td style="padding:6px 8px">行政人員<br><small style="color:#888">admin_staff</small></td>
+                    <td style="padding:6px 8px">勾選「<strong>有無收款</strong>」<br><small style="color:#888">系統依 total_collected 自動帶值，可手改</small></td>
+                    <td style="padding:6px 8px">
+                        ✅ 勾「<strong>有收款</strong>」 → 通知 Level 3 會計<br>
+                        ❌ 不勾 → 案件狀態 = <strong style="color:#e65100">完工未收款 (unpaid)</strong>，<u>流程結束</u>
+                    </td>
+                </tr>
+                <tr style="border-top:1px solid rgba(0,0,0,.08)">
+                    <td style="padding:6px 8px;font-weight:600">Level 3</td>
+                    <td style="padding:6px 8px">會計人員<br><small style="color:#888">accountant</small></td>
+                    <td style="padding:6px 8px">勾選「<strong>款項已入帳</strong>」<br><small style="color:#888">必勾才能核准</small></td>
+                    <td style="padding:6px 8px">
+                        系統檢查 <code>balance_amount === 0</code>：<br>
+                        ✅ 是 → 案件狀態 = <strong style="color:#2e7d32">已完工結案 (closed)</strong><br>
+                        ❌ 否 → 擋下並提示「尾款還有 $X，請先處理」
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.6);border-radius:4px;font-size:.78rem;color:#666">
+            <strong>多人簽核設定</strong>：在規則列「其他可簽核人」按住 <kbd>⌘ Cmd</kbd>（Mac）或 <kbd>Ctrl</kbd>（Windows）點選多人 → 任一人簽過就推進到下一關
+        </div>
+    </div>
+</div>
+
 <!-- 現有規則 -->
 <div class="card">
     <div class="card-header">現有規則</div>
@@ -176,10 +228,23 @@
                 </tr>
             </thead>
             <tbody>
+                <?php
+                // 完工簽核：每一關行為簡短說明
+                $compLevelHint = array(
+                    1 => '簽核後 → 自動送 Level 2 行政',
+                    2 => '勾「有收款」→ 送 Level 3；不勾 → 完工未收款',
+                    3 => '勾「款項已入帳」+ 尾款=0 → 結案',
+                );
+                ?>
                 <?php foreach ($rules as $rule): ?>
                 <tr id="rule-row-<?= $rule['id'] ?>">
                     <td><span class="badge badge-primary"><?= e(ApprovalModel::moduleLabel($rule['module'])) ?></span></td>
-                    <td><?= e($rule['rule_name']) ?></td>
+                    <td>
+                        <?= e($rule['rule_name']) ?>
+                        <?php if ($rule['module'] === 'case_completion' && isset($compLevelHint[(int)$rule['level_order']])): ?>
+                        <div style="font-size:.72rem;color:#1565c0;margin-top:2px">💡 <?= e($compLevelHint[(int)$rule['level_order']]) ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         $<?= number_format($rule['min_amount']) ?>
                         ~ <?= $rule['max_amount'] !== null ? '$' . number_format($rule['max_amount']) : '無上限' ?>
