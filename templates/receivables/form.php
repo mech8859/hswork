@@ -316,10 +316,17 @@ function addItemRow() {
     document.getElementById('itemsBody').insertAdjacentHTML('beforeend', html);
     itemIndex++;
 }
+// 防呆：移除千位逗號避免 parseFloat('1,143') → 1 的 bug
+function readNumRecv(el) {
+    if (!el) return 0;
+    var v = String(el.value || '0').replace(/,/g, '').trim();
+    var n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+}
 function calcRecvRow(el) {
     var row = el.closest('tr');
-    var price = parseFloat(row.querySelector('.recv-price').value) || 0;
-    var qty = parseFloat(row.querySelector('.recv-qty').value) || 1;
+    var price = readNumRecv(row.querySelector('.recv-price'));
+    var qty = readNumRecv(row.querySelector('.recv-qty')) || 1;
     row.querySelector('.recv-amount').value = Math.round(price * qty);
 }
 function removeRecvRow(btn) {
@@ -330,9 +337,9 @@ function removeRecvRow(btn) {
     for (var i = 0; i < rows.length; i++) rows[i].querySelector('.item-seq').textContent = i + 1;
 }
 function calcTotal() {
-    var s = parseFloat(document.getElementById('subtotalInput').value) || 0;
-    var t = parseFloat(document.getElementById('taxInput').value) || 0;
-    var sh = parseFloat(document.querySelector('[name="shipping"]').value) || 0;
+    var s = readNumRecv(document.getElementById('subtotalInput'));
+    var t = readNumRecv(document.getElementById('taxInput'));
+    var sh = readNumRecv(document.querySelector('[name="shipping"]'));
     document.getElementById('totalInput').value = s + t + sh;
 }
 calcTotal();

@@ -287,10 +287,18 @@ function removeRow(btn) {
 }
 
 // 自動計算總計 = 小計 + 稅額 - 折讓/匯費
+// 防呆：移除千位逗號避免 parseInt('1,143') → 1 的 bug
+function readNum(id) {
+    var el = document.getElementById(id);
+    if (!el) return 0;
+    var v = String(el.value || '0').replace(/,/g, '').trim();
+    var n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+}
 function calcTotal() {
-    var subtotal = parseInt(document.getElementById('f_subtotal').value) || 0;
-    var tax = parseInt(document.getElementById('f_tax').value) || 0;
-    var discount = parseInt(document.getElementById('f_discount').value) || 0;
+    var subtotal = readNum('f_subtotal');
+    var tax = readNum('f_tax');
+    var discount = readNum('f_discount');
     document.getElementById('f_total').value = subtotal + tax - discount;
 }
 
