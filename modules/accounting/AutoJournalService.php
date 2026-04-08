@@ -274,12 +274,18 @@ class AutoJournalService
             $am = new AccountingModel();
 
             // Calculate total from items
+            // 新語意（Migration 111 之後）：用 shipped_qty 計算實際銷貨成本
+            // fallback 到 quantity 以相容舊資料（shipped_qty 欄位不存在時）
             $items = isset($stockOut['items']) ? $stockOut['items'] : $sm->getStockOutItems($stockOutId);
             $totalCost = 0;
             foreach ($items as $item) {
-                $qty = isset($item['quantity']) ? (float)$item['quantity'] : 0;
+                $shipped = isset($item['shipped_qty']) ? (float)$item['shipped_qty'] : 0;
+                // 若無 shipped_qty（舊資料）或為 0 但已確認，退回用 quantity
+                if ($shipped <= 0 && !empty($item['is_confirmed'])) {
+                    $shipped = isset($item['quantity']) ? (float)$item['quantity'] : 0;
+                }
                 $price = isset($item['unit_cost']) ? (float)$item['unit_cost'] : (isset($item['unit_price']) ? (float)$item['unit_price'] : 0);
-                $totalCost += $qty * $price;
+                $totalCost += $shipped * $price;
             }
             if ($totalCost <= 0) return false;
 

@@ -630,7 +630,11 @@ class StockModel
      * 確認出庫單 -> 更新庫存（減少 stock_qty + available_qty）+ 建立 inventory_transaction
      */
     /**
-     * 確認出庫（全部未確認品項一次確認）
+     * 確認出庫（全部未完成品項一次確認到剩餘需求量）
+     *
+     * 新語意（Migration 111 之後）：
+     *   - 每個品項只出「需求 - 已出」的剩餘量
+     *   - 累加 shipped_qty，不覆寫 quantity
      */
     public function confirmStockOut($id, $userId)
     {
@@ -653,19 +657,25 @@ class StockModel
         $this->db->beginTransaction();
         try {
             foreach ($items as $item) {
-                if (!empty($item['is_confirmed'])) continue;
                 $productId = !empty($item['product_id']) ? $item['product_id'] : null;
-                $qty = !empty($item['quantity']) ? $item['quantity'] : 0;
-                if (!$productId || $qty <= 0) continue;
+                $needQty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
+                $alreadyShipped = isset($item['shipped_qty']) ? (float)$item['shipped_qty'] : 0;
+                $remaining = $needQty - $alreadyShipped;
+                if (!$productId || $needQty <= 0) continue;
+                if ($remaining <= 0) continue; // 已完全出貨
 
                 if ($isPrepared) {
-                    $invModel->confirmPreparedStock($productId, $warehouseId, abs($qty), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                    $invModel->confirmPreparedStock($productId, $warehouseId, abs($remaining), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
                 } elseif ($isReserved) {
-                    $invModel->confirmReservedStock($productId, $warehouseId, abs($qty), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                    $invModel->confirmReservedStock($productId, $warehouseId, abs($remaining), 'stock_out', $id, '出庫: ' . $soNumber, $userId);
                 } else {
-                    $invModel->adjustStock($productId, $warehouseId, -1 * abs($qty), 'case_out', 'stock_out', $id, '出庫: ' . $soNumber, $userId);
+                    $invModel->adjustStock($productId, $warehouseId, -1 * abs($remaining), 'case_out', 'stock_out', $id, '出庫: ' . $soNumber, $userId);
                 }
-                $this->db->prepare("UPDATE stock_out_items SET is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")->execute(array($item['id']));
+
+                // 累加 shipped_qty 到需求量 (剩餘全出)
+                $newShipped = $alreadyShipped + $remaining;
+                $this->db->prepare("UPDATE stock_out_items SET shipped_qty = ?, is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")
+                         ->execute(array($newShipped, $item['id']));
             }
 
             $this->updateStockOutStatus($id, $userId);
@@ -679,6 +689,13 @@ class StockModel
 
     /**
      * 確認單一品項出庫
+     *
+     * 新語意（Migration 111 之後）：
+     *   - quantity     = 業務需求量（固定，不被覆寫）
+     *   - shipped_qty  = 累計已出貨量（每次確認出貨累加）
+     *   - is_confirmed = shipped_qty >= quantity 時為 1
+     *
+     * 支援單品項多次部分出貨（例如需求 5，先出 2，再出 3）
      */
     public function confirmStockOutItem($stockOutId, $itemId, $userId, $confirmQty = null)
     {
@@ -695,14 +712,17 @@ class StockModel
         $stmt = $this->db->prepare("SELECT * FROM stock_out_items WHERE id = ? AND stock_out_id = ?");
         $stmt->execute(array($itemId, $stockOutId));
         $item = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$item || !empty($item['is_confirmed'])) return false;
+        if (!$item) return false;
 
         $productId = !empty($item['product_id']) ? $item['product_id'] : null;
-        $originalQty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
-        if (!$productId || $originalQty <= 0) return false;
+        $needQty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
+        $alreadyShipped = isset($item['shipped_qty']) ? (float)$item['shipped_qty'] : 0;
+        $remaining = $needQty - $alreadyShipped;
+        if (!$productId || $needQty <= 0) return false;
+        if ($remaining <= 0) return false; // 已完全出貨
 
-        // 使用自訂出庫數量（不可超過需求數量）
-        $qty = ($confirmQty !== null && $confirmQty > 0) ? min($confirmQty, $originalQty) : $originalQty;
+        // 本次出貨數量：不可超過剩餘需求量
+        $qty = ($confirmQty !== null && $confirmQty > 0) ? min($confirmQty, $remaining) : $remaining;
 
         require_once __DIR__ . '/InventoryModel.php';
         $invModel = new InventoryModel();
@@ -722,11 +742,16 @@ class StockModel
                 $invModel->adjustStock($productId, $warehouseId, -1 * abs($qty), 'case_out', 'stock_out', $stockOutId, '出庫: ' . $soNumber . ' (數量:' . $qty . ')', $userId);
             }
 
-            // 更新品項：如果出庫數量 < 需求數量，更新 quantity 為實際出庫量
-            if ($qty < $originalQty) {
-                $this->db->prepare("UPDATE stock_out_items SET quantity = ?, is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")->execute(array($qty, $itemId));
+            // 累加 shipped_qty，不覆寫 quantity
+            $newShipped = $alreadyShipped + $qty;
+            $isDone = ($newShipped >= $needQty) ? 1 : 0;
+            $confirmedAt = $isDone ? 'NOW()' : 'confirmed_at'; // 只在完成時才更新 confirmed_at
+            if ($isDone) {
+                $this->db->prepare("UPDATE stock_out_items SET shipped_qty = ?, is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")
+                         ->execute(array($newShipped, $itemId));
             } else {
-                $this->db->prepare("UPDATE stock_out_items SET is_confirmed = 1, confirmed_at = NOW() WHERE id = ?")->execute(array($itemId));
+                $this->db->prepare("UPDATE stock_out_items SET shipped_qty = ?, is_confirmed = 0 WHERE id = ?")
+                         ->execute(array($newShipped, $itemId));
             }
 
             $this->updateStockOutStatus($stockOutId, $userId);
@@ -739,24 +764,42 @@ class StockModel
     }
 
     /**
-     * 更新出庫單狀態（依品項確認情況）
+     * 更新出庫單狀態（依品項出貨進度）
+     *
+     * 邏輯（Migration 111 之後）：
+     *   - 全部品項 shipped_qty >= quantity → 已確認（已出庫）
+     *   - 有任何品項 shipped_qty > 0 但未全部完成 → 部分出庫
+     *   - 全部 shipped_qty == 0 → 不動（維持原狀態 待確認/已預扣/已備貨）
      */
     private function updateStockOutStatus($id, $userId)
     {
-        $total = $this->db->prepare("SELECT COUNT(*) FROM stock_out_items WHERE stock_out_id = ?");
-        $total->execute(array($id));
-        $totalCount = (int)$total->fetchColumn();
+        $stmt = $this->db->prepare("
+            SELECT
+                COUNT(*) AS total_count,
+                COALESCE(SUM(quantity), 0) AS total_need,
+                COALESCE(SUM(shipped_qty), 0) AS total_shipped,
+                COALESCE(SUM(CASE WHEN shipped_qty > 0 THEN 1 ELSE 0 END), 0) AS any_shipped_count,
+                COALESCE(SUM(CASE WHEN shipped_qty >= quantity THEN 1 ELSE 0 END), 0) AS fully_shipped_count
+            FROM stock_out_items
+            WHERE stock_out_id = ?
+        ");
+        $stmt->execute(array($id));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || (int)$row['total_count'] === 0) return;
 
-        $confirmed = $this->db->prepare("SELECT COUNT(*) FROM stock_out_items WHERE stock_out_id = ? AND is_confirmed = 1");
-        $confirmed->execute(array($id));
-        $confirmedCount = (int)$confirmed->fetchColumn();
+        $totalCount       = (int)$row['total_count'];
+        $fullyShippedCnt  = (int)$row['fully_shipped_count'];
+        $anyShippedCnt    = (int)$row['any_shipped_count'];
 
-        if ($confirmedCount >= $totalCount) {
+        if ($fullyShippedCnt >= $totalCount) {
+            // 所有品項都完成 → 已確認
             $this->db->prepare("UPDATE stock_outs SET status = '已確認', confirmed_by = ?, confirmed_at = NOW() WHERE id = ?")
                      ->execute(array($userId, $id));
-        } elseif ($confirmedCount > 0) {
+        } elseif ($anyShippedCnt > 0) {
+            // 有出但未完成 → 部分出庫
             $this->db->prepare("UPDATE stock_outs SET status = '部分出庫' WHERE id = ?")->execute(array($id));
         }
+        // else: 全都 shipped_qty = 0 → 維持原狀（待確認/已預扣/已備貨）
     }
 
     /**

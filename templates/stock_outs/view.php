@@ -29,13 +29,17 @@ $isPartial = ($record['status'] === '部分出庫');
 $isPreReserved = ($record['status'] === '已預扣');
 $isReserved = ($record['status'] === '已備貨');
 $items = isset($record['items']) ? $record['items'] : array();
-$hasUnconfirmed = false;
+// 新語意：還有剩餘 = shipped_qty < quantity
+$hasUnshipped = false;
 if (!empty($items)) {
     foreach ($items as $chkItem) {
-        if (empty($chkItem['is_confirmed'])) { $hasUnconfirmed = true; break; }
+        $itemNeed = isset($chkItem['quantity']) ? (float)$chkItem['quantity'] : 0;
+        $itemShipped = isset($chkItem['shipped_qty']) ? (float)$chkItem['shipped_qty'] : 0;
+        if ($itemShipped < $itemNeed) { $hasUnshipped = true; break; }
     }
 }
-$canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) && $hasUnconfirmed;
+$hasUnconfirmed = $hasUnshipped; // 相容舊變數名
+$canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) && $hasUnshipped;
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -199,7 +203,7 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
             <thead><tr>
                 <?php if ($canManage && $canConfirmItems): ?><th class="print-hide-col" style="width:35px"><input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)"></th><?php endif; ?>
                 <th class="return-col" style="width:35px;display:none"><input type="checkbox" id="returnCheckAll" onchange="toggleReturnCheckAll(this)"></th>
-                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><?php if (!empty($returnedQtyMap)): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">出庫數量</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:60px">狀態</th>
+                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><th class="text-right" style="width:60px">已出</th><th class="text-right" style="width:60px">剩餘</th><?php if (!empty($returnedQtyMap)): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">本次出貨</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:90px">狀態</th>
                 <th class="return-col" style="width:80px;display:none">入庫數量</th>
             </tr></thead>
             <tbody>
@@ -208,22 +212,27 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     $productName = isset($item['product_name']) ? $item['product_name'] : (isset($item['db_product_name']) ? $item['db_product_name'] : '-');
                     $productModel = isset($item['product_model']) ? $item['product_model'] : (isset($item['db_model']) ? $item['db_model'] : (isset($item['model']) ? $item['model'] : '-'));
                     $unitDisplay = isset($item['unit']) ? $item['unit'] : '-';
-                    $qty = (int)(isset($item['quantity']) ? $item['quantity'] : 0);
-                    $requestQty = (int)(isset($item['request_qty']) && $item['request_qty'] > 0 ? $item['request_qty'] : $qty);
+                    // 新語意：quantity = 需求量，shipped_qty = 累計已出
+                    $needQty = (int)(isset($item['quantity']) ? $item['quantity'] : 0);
+                    $shippedQty = (int)(isset($item['shipped_qty']) ? $item['shipped_qty'] : 0);
+                    $remainingQty = max(0, $needQty - $shippedQty);
+                    $isFullyShipped = ($shippedQty >= $needQty && $needQty > 0);
+                    $isPartialShipped = ($shippedQty > 0 && $shippedQty < $needQty);
                     $unitCost = (int)(isset($item['unit_cost']) ? $item['unit_cost'] : (isset($item['unit_price']) ? $item['unit_price'] : 0));
-                    $subtotal = $qty * $unitCost;
+                    $subtotal = $needQty * $unitCost; // 以需求量計算
                     $isSpare = !empty($item['is_spare']);
                     $itemNote = isset($item['note']) ? $item['note'] : '';
                     $pid = !empty($item['product_id']) ? (int)$item['product_id'] : 0;
                     $itemStock = isset($stockMap[$pid]) ? (int)$stockMap[$pid] : 0;
                     $stockDisplay = isset($stockMap[$pid]) ? $stockMap[$pid] : '-';
                     $stockColor = ($itemStock > 0) ? '#2e7d32' : '#c62828';
-                    $hasStock = ($itemStock >= $requestQty && $itemStock > 0);
+                    // 庫存判斷：只要能夠出剩餘的部分就算 ok
+                    $hasStock = ($remainingQty > 0 && $itemStock >= $remainingQty);
                 ?>
                 <tr<?= $isSpare ? ' style="background:#fff8e1"' : '' ?>>
-                    <td class="return-col" style="display:none"><?php if (!empty($item['is_confirmed'])): ?><input type="checkbox" class="return-check" value="<?= (int)$item['id'] ?>" data-max="<?= $qty ?>" data-product="<?= e($productName) ?>"><?php endif; ?></td>
+                    <td class="return-col" style="display:none"><?php if ($shippedQty > 0): ?><input type="checkbox" class="return-check" value="<?= (int)$item['id'] ?>" data-max="<?= $shippedQty ?>" data-product="<?= e($productName) ?>"><?php endif; ?></td>
                     <?php if ($canManage && $canConfirmItems): ?>
-                    <td class="print-hide-col"><?php if (empty($item['is_confirmed']) && $hasStock): ?><input type="checkbox" class="item-check" value="<?= (int)$item['id'] ?>" data-qty="<?= $qty ?>"><?php endif; ?></td>
+                    <td class="print-hide-col"><?php if (!$isFullyShipped && $hasStock): ?><input type="checkbox" class="item-check" value="<?= (int)$item['id'] ?>" data-qty="<?= $remainingQty ?>"><?php endif; ?></td>
                     <?php endif; ?>
                     <td><?= $idx + 1 ?></td>
                     <td>
@@ -238,47 +247,53 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
                     <td><?= e($productModel) ?></td>
                     <td><?= e($unitDisplay) ?></td>
                     <td class="text-right" style="color:<?= $stockColor ?>"><?= $stockDisplay ?></td>
-                    <td class="text-right"><?= $requestQty ?></td>
+                    <td class="text-right" style="font-weight:600"><?= $needQty ?></td>
+                    <td class="text-right" style="color:<?= $shippedQty > 0 ? '#1565c0' : '#999' ?>"><?= $shippedQty ?></td>
+                    <td class="text-right" style="color:<?= $remainingQty > 0 ? '#e65100' : '#999' ?>;font-weight:<?= $remainingQty > 0 ? '600' : 'normal' ?>"><?= $remainingQty ?></td>
                     <?php if (!empty($returnedQtyMap)):
                         $itemReturned = isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
-                        $actualUsed = max(0, $qty - $itemReturned);
+                        $actualUsed = max(0, $shippedQty - $itemReturned);
                     ?>
                     <td class="text-right" style="color:<?= $itemReturned > 0 ? '#e65100' : '#999' ?>"><?= $itemReturned > 0 ? $itemReturned : '-' ?></td>
                     <td class="text-right" style="font-weight:600;color:<?= $actualUsed > 0 ? '#1565c0' : '#999' ?>"><?= $actualUsed > 0 ? $actualUsed : '0' ?></td>
                     <?php endif; ?>
                     <?php if ($canConfirmItems): ?>
                     <td class="text-right print-hide-col">
-                        <?php if (empty($item['is_confirmed']) && $hasStock): ?>
-                        <input type="number" class="form-control confirm-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;display:inline-block;text-align:right;padding:2px 6px;font-size:.85rem" min="1" max="<?= $requestQty ?>" value="<?= $requestQty ?>">
-                        <?php elseif (!empty($item['is_confirmed'])): ?>
-                        <?= $qty ?>
+                        <?php if (!$isFullyShipped && $hasStock): ?>
+                        <input type="number" class="form-control confirm-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;display:inline-block;text-align:right;padding:2px 6px;font-size:.85rem" min="1" max="<?= $remainingQty ?>" value="<?= $remainingQty ?>">
+                        <?php elseif ($isFullyShipped): ?>
+                        <span style="color:#999">-</span>
                         <?php else: ?>
-                        -
+                        <span style="color:#c62828;font-size:.75rem">庫存不足</span>
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
                     <td class="text-right">$<?= number_format($unitCost) ?></td>
                     <td class="text-right">$<?= number_format($subtotal) ?></td>
                     <td>
-                        <?php if (!empty($item['is_confirmed'])):
-                            $itmRet = !empty($returnedQtyMap) && isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
-                            if ($itmRet >= $qty && $qty > 0): ?>
+                        <?php
+                        // 新狀態顯示邏輯
+                        $itmRet = !empty($returnedQtyMap) && isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
+                        if ($isFullyShipped):
+                            if ($itmRet >= $shippedQty && $shippedQty > 0): ?>
                         <span style="color:#e65100;font-weight:600;font-size:.75rem">已出庫｜全退</span>
                         <?php elseif ($itmRet > 0): ?>
                         <span style="color:#1976d2;font-weight:600;font-size:.75rem">已出庫｜部分退</span>
                         <?php else: ?>
                         <span style="color:#1565c0;font-weight:600;font-size:.8rem">已出庫</span>
                         <?php endif; ?>
-                        <?php elseif (!$hasStock): ?>
+                        <?php elseif ($isPartialShipped): ?>
+                        <span style="color:#e65100;font-weight:600;font-size:.78rem">部分出貨<br><small>(<?= $shippedQty ?>/<?= $needQty ?>)</small></span>
+                        <?php elseif (!$hasStock && $remainingQty > 0): ?>
                         <span style="color:#c62828;font-size:.75rem">庫存不足</span>
                         <?php else: ?>
                         <span style="color:#2e7d32;font-size:.8rem">待出庫</span>
                         <?php endif; ?>
-                        <?php if ($isSpare && $canManage && $canConfirmItems && empty($item['is_confirmed'])): ?>
+                        <?php if ($isSpare && $canManage && $canConfirmItems && !$isFullyShipped): ?>
                         <button type="button" class="btn btn-danger btn-sm" onclick="removeSpare(<?= (int)$item['id'] ?>)" title="移除備品" style="padding:2px 6px;font-size:.75rem;margin-left:4px">&times;</button>
                         <?php endif; ?>
                     </td>
-                    <td class="return-col" style="display:none"><?php if (!empty($item['is_confirmed'])): ?><input type="number" class="form-control return-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;text-align:right;padding:2px 6px;font-size:.85rem" min="0" max="<?= $qty ?>" value="0"><?php endif; ?></td>
+                    <td class="return-col" style="display:none"><?php if ($shippedQty > 0): ?><input type="number" class="form-control return-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;text-align:right;padding:2px 6px;font-size:.85rem" min="0" max="<?= $shippedQty ?>" value="0"><?php endif; ?></td>
                 </tr>
                 <?php $totalCost += $subtotal; ?>
                 <?php endforeach; ?>
@@ -286,10 +301,10 @@ $canConfirmItems = ($isPending || $isPartial || $isReserved || $isPreReserved) &
             <tfoot>
                 <tr>
                     <?php
-                    $colSpan = 7;
+                    $colSpan = 9; // # 品名 型號 單位 庫存 需求 已出 剩餘 + 合計前佔位
                     if ($canManage && $canConfirmItems) $colSpan++; // checkbox
                     if (!empty($returnedQtyMap)) $colSpan += 2; // 已退回 + 實際使用
-                    if ($canConfirmItems) $colSpan++; // 出庫數量
+                    if ($canConfirmItems) $colSpan++; // 本次出貨
                     ?>
                     <td colspan="<?= $colSpan ?>" class="text-right"><strong>合計</strong></td>
 
