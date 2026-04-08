@@ -70,9 +70,15 @@ $statusBadgeMap = array(
     <div class="staff-cards show-mobile">
         <?php foreach ($records as $r): ?>
         <?php $badgeCls = !empty($statusBadgeMap[$r['status']]) ? $statusBadgeMap[$r['status']] : 'badge-secondary'; ?>
+        <?php $isExcluded = !empty($r['exclude_from_branch_stats']); ?>
         <div class="staff-card" onclick="location.href='/payments_out.php?action=edit&id=<?= $r['id'] ?>'">
             <div class="d-flex justify-between align-center">
-                <strong><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></strong>
+                <strong>
+                    <?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?>
+                    <?php if ($isExcluded): ?>
+                    <span style="background:#ff9800;color:#fff;font-size:.7rem;padding:1px 6px;border-radius:3px;margin-left:4px">📌補帳</span>
+                    <?php endif; ?>
+                </strong>
                 <span class="badge <?= $badgeCls ?>"><?= e(!empty($r['status']) ? $r['status'] : '-') ?></span>
             </div>
             <div class="staff-card-meta">
@@ -102,8 +108,14 @@ $statusBadgeMap = array(
             <tbody>
                 <?php foreach ($records as $r): ?>
                 <?php $badgeCls = !empty($statusBadgeMap[$r['status']]) ? $statusBadgeMap[$r['status']] : 'badge-secondary'; ?>
-                <tr>
-                    <td><a href="/payments_out.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['payment_number']) ? $r['payment_number'] : '-') ?></a></td>
+                <?php $isExcluded = !empty($r['exclude_from_branch_stats']); ?>
+                <tr<?= $isExcluded ? ' style="background:#fff8e1"' : '' ?>>
+                    <td>
+                        <a href="/payments_out.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['payment_number']) ? $r['payment_number'] : '-') ?></a>
+                        <?php if ($isExcluded): ?>
+                        <span style="background:#ff9800;color:#fff;font-size:.7rem;padding:1px 6px;border-radius:3px;margin-left:4px;font-weight:600" title="不列入分公司年度統計">📌補帳</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= e(!empty($r['create_date']) ? $r['create_date'] : '-') ?></td>
                     <td><?= e(!empty($r['payment_date']) ? $r['payment_date'] : '-') ?></td>
                     <td><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></td>

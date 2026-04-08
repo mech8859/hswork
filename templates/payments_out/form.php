@@ -178,6 +178,13 @@
             <span>分公司拆帳</span>
             <button type="button" class="btn btn-primary btn-sm" onclick="addBranchRow()">+ 新增</button>
         </div>
+        <div style="padding:10px 16px;background:#fff8e1;border-bottom:1px solid var(--gray-200)">
+            <label class="checkbox-label" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:.9rem">
+                <input type="checkbox" name="exclude_from_branch_stats" value="1" <?= (!empty($record['exclude_from_branch_stats'])) ? 'checked' : '' ?>>
+                <span style="font-weight:600;color:#e65100">不列入分公司年度統計</span>
+                <small style="color:#888;font-weight:normal">（如：年終補帳、跨年度調整）</small>
+            </label>
+        </div>
         <div class="table-responsive">
             <table class="table" id="branchTable">
                 <thead>

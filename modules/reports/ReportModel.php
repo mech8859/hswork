@@ -548,8 +548,10 @@ class ReportModel
         $recvRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ── 付款單 + 分公司拆帳 ──
+        // 加 exclude_from_branch_stats 旗標：用於計算「分公司年度統計（不含補帳）」
         $stmt = $this->db->prepare("
             SELECT po.payment_date, po.total_amount AS po_total,
+                   po.exclude_from_branch_stats,
                    pob.amount AS branch_amount, b.name AS branch_name
             FROM payments_out po
             LEFT JOIN payment_out_branches pob ON pob.payment_out_id = po.id
@@ -674,15 +676,38 @@ class ReportModel
         }
 
         // ── 付款 pivot: branch × month ──
+        // 1. payPivot (含全部資料 — 含補帳項，現有報表用)
+        // 2. payPivotBranchOnly (排除已勾選「不列入分公司統計」項 — 分公司年度統計用)
         $payPivot = array();
+        $payPivotBranchOnly = array();
+        $excludedSummary = array('count' => 0, 'amount' => 0);
+        $excludedKeys = array(); // 避免同一筆 po 被算多次（一筆可能拆給多分公司有多列）
         foreach ($payRows as $r) {
             if (empty($r['payment_date'])) continue;
             $bn = !empty($r['branch_name']) ? $r['branch_name'] : '(未設定)';
             $m = substr($r['payment_date'], 0, 7);
             $amt = (float)$r['branch_amount'];
+            $isExcluded = !empty($r['exclude_from_branch_stats']);
+
+            // 全部版本
             if (!isset($payPivot[$bn])) $payPivot[$bn] = array();
             if (!isset($payPivot[$bn][$m])) $payPivot[$bn][$m] = 0;
             $payPivot[$bn][$m] += $amt;
+
+            // 排除補帳版本
+            if (!$isExcluded) {
+                if (!isset($payPivotBranchOnly[$bn])) $payPivotBranchOnly[$bn] = array();
+                if (!isset($payPivotBranchOnly[$bn][$m])) $payPivotBranchOnly[$bn][$m] = 0;
+                $payPivotBranchOnly[$bn][$m] += $amt;
+            } else {
+                // 統計被排除的金額（用 po_total 避免重複加）
+                $key = $r['payment_date'] . '|' . (string)$r['po_total'];
+                if (!isset($excludedKeys[$key])) {
+                    $excludedKeys[$key] = true;
+                    $excludedSummary['count']++;
+                    $excludedSummary['amount'] += (float)$r['po_total'];
+                }
+            }
         }
 
         // ── 現金月別 ──
@@ -876,6 +901,8 @@ class ReportModel
             'cash_out'       => $cashOut,
             'recv_pivot'     => $recvPivot,
             'pay_pivot'      => $payPivot,
+            'pay_pivot_branch_only' => $payPivotBranchOnly,
+            'pay_excluded_summary'  => $excludedSummary,
             'cash_monthly'   => $cashMonthly,
             'daily_net'      => $dailyNet,
             'branches'       => $branches,

@@ -63,6 +63,7 @@ switch ($action) {
                 'remittance_fee' => !empty($_POST['remittance_fee']) ? $_POST['remittance_fee'] : 0,
                 'total_amount'   => !empty($_POST['total_amount']) ? $_POST['total_amount'] : 0,
                 'note'           => !empty($_POST['note']) ? $_POST['note'] : null,
+                'exclude_from_branch_stats' => !empty($_POST['exclude_from_branch_stats']) ? 1 : 0,
                 'registrar'      => isset($user['real_name']) ? $user['real_name'] : null,
                 'created_by'     => $user['id'],
                 'updated_by'     => $user['id'],
@@ -131,6 +132,7 @@ switch ($action) {
                 'remittance_fee' => !empty($_POST['remittance_fee']) ? $_POST['remittance_fee'] : 0,
                 'total_amount'   => !empty($_POST['total_amount']) ? $_POST['total_amount'] : 0,
                 'note'           => !empty($_POST['note']) ? $_POST['note'] : null,
+                'exclude_from_branch_stats' => !empty($_POST['exclude_from_branch_stats']) ? 1 : 0,
                 'updated_by'     => $user['id'],
             );
             $model->updatePaymentOut($id, $data);

@@ -1019,8 +1019,8 @@ class FinanceModel
         $stmt = $this->db->prepare("
             INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
                 payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
-                total_amount, main_category, sub_category, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                total_amount, main_category, sub_category, note, exclude_from_branch_stats, registrar, created_by, updated_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
@@ -1040,6 +1040,7 @@ class FinanceModel
             !empty($data['main_category']) ? $data['main_category'] : null,
             !empty($data['sub_category']) ? $data['sub_category'] : null,
             !empty($data['note']) ? $data['note'] : null,
+            !empty($data['exclude_from_branch_stats']) ? 1 : 0,
             !empty($data['registrar']) ? $data['registrar'] : null,
             $data['created_by'],
             $data['created_by'],
@@ -1055,7 +1056,7 @@ class FinanceModel
                 create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
                 payment_method=?, payment_type=?, payment_terms=?, status=?,
                 subtotal=?, tax=?, remittance_fee=?, total_amount=?,
-                main_category=?, sub_category=?, note=?, updated_by=?
+                main_category=?, sub_category=?, note=?, exclude_from_branch_stats=?, updated_by=?
             WHERE id=?
         ");
         $stmt->execute(array(
@@ -1075,6 +1076,7 @@ class FinanceModel
             !empty($data['main_category']) ? $data['main_category'] : null,
             !empty($data['sub_category']) ? $data['sub_category'] : null,
             !empty($data['note']) ? $data['note'] : null,
+            !empty($data['exclude_from_branch_stats']) ? 1 : 0,
             $data['updated_by'],
             $id,
         ));

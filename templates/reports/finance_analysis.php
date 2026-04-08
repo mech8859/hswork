@@ -309,6 +309,65 @@ function pivotRowTotal2($data, $months) {
 </div>
 <?php endif; ?>
 
+<!-- 四之二、各分公司月別付款金額（不含補帳，分公司年度統計用）-->
+<?php if (!empty($analysis['pay_pivot_branch_only'])): ?>
+<div class="card" style="border-left:4px solid #ff9800">
+    <div class="card-header analysis-header">
+        四之二、各分公司月別付款金額 — <span style="color:#e65100">分公司年度統計用（不含補帳）</span>
+        <?php if (!empty($analysis['pay_excluded_summary']) && $analysis['pay_excluded_summary']['count'] > 0): ?>
+        <small style="color:#888;font-weight:normal;margin-left:8px">
+            已排除 <?= $analysis['pay_excluded_summary']['count'] ?> 筆補帳付款
+            （金額 $<?= number_format($analysis['pay_excluded_summary']['amount']) ?>）
+        </small>
+        <?php endif; ?>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>分公司</th>
+                <?php foreach ($months as $m): ?><th><?= substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+                <th>佔比</th>
+            </tr></thead>
+            <tbody>
+                <?php
+                $payGrandBO = 0;
+                foreach ($analysis['pay_pivot_branch_only'] as $br => $mdata) {
+                    $payGrandBO += pivotRowTotal2($mdata, $months);
+                }
+                foreach ($analysis['pay_pivot_branch_only'] as $br => $mdata):
+                    $rt = pivotRowTotal2($mdata, $months);
+                ?>
+                <tr>
+                    <td><?= e($br) ?></td>
+                    <?php foreach ($months as $m): $v = isset($mdata[$m]) ? $mdata[$m] : 0; ?>
+                    <td><?= $v > 0 ? number_format($v) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($rt) ?></td>
+                    <td><?= $payGrandBO > 0 ? round($rt / $payGrandBO * 100, 1) . '%' : '' ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <?php foreach ($months as $m):
+                        $ct = 0;
+                        foreach ($analysis['pay_pivot_branch_only'] as $d) { $ct += isset($d[$m]) ? $d[$m] : 0; }
+                    ?>
+                    <td><?= $ct > 0 ? number_format($ct) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($payGrandBO) ?></td>
+                    <td>100%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:8px 16px;background:#fff8e1;font-size:.8rem;color:#666">
+        💡 此表用於評估各分公司今年實際支出績效。已排除「會計補帳但不該算入分公司年度統計」的付款（如：去年年終、跨年度調整）。
+        如需查看完整付款金額（含補帳），請看上方「四、各分公司月別付款金額」。
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- 五、各分公司收支差額 -->
 <?php if (!empty($analysis['recv_pivot']) || !empty($analysis['pay_pivot'])): ?>
 <div class="card">
