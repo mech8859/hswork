@@ -44,6 +44,7 @@ $modules = array(
     'business_tracking'    => array('label' => '業務追蹤',   'levels' => array('manage', 'view', 'own'), 'has_delete' => false),
     'engineering_tracking' => array('label' => '工程追蹤',   'levels' => array('manage', 'view', 'own'), 'has_delete' => false),
     'finance'              => array('label' => '財務會計',   'levels' => array('manage', 'view'), 'has_delete' => true),
+    'petty_cash'           => array('label' => '零用金',     'levels' => array('manage', 'view'), 'has_delete' => false),
     'procurement'          => array('label' => '採購',       'levels' => array('manage', 'view'), 'has_delete' => false),
     'inventory'            => array('label' => '庫存',       'levels' => array('manage', 'view'), 'has_delete' => true),
     'accounting'           => array('label' => '會計管理',   'levels' => array('manage', 'view'), 'has_delete' => false),

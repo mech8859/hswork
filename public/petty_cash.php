@@ -1,16 +1,49 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
-if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('finance.view')) {
+
+// 權限：petty_cash.* 為新獨立權限，並向下相容 finance.*
+$canViewPetty = Auth::hasPermission('petty_cash.view') || Auth::hasPermission('petty_cash.manage')
+              || Auth::hasPermission('finance.view') || Auth::hasPermission('finance.manage')
+              || Auth::hasPermission('all');
+$canManagePetty = Auth::hasPermission('petty_cash.manage')
+                || Auth::hasPermission('finance.manage')
+                || Auth::hasPermission('all');
+
+if (!$canViewPetty) {
     Session::flash('error', '無權限存取');
     redirect('/');
 }
+
 require_once __DIR__ . '/../modules/finance/FinanceModel.php';
 
 $model = new FinanceModel();
 $action = !empty($_GET['action']) ? $_GET['action'] : 'list';
 $isBoss = Auth::hasPermission('all');
-$canManageFinance = Auth::hasPermission('finance.manage');
+$canManageFinance = $canManagePetty;
+
+// 取得使用者可存取的分公司（用於資料隔離守門）
+$accessibleBranchIds = Auth::getAccessibleBranchIds();
+
+/**
+ * 守門：檢查 record 的 branch_id 是否屬於使用者可存取分公司
+ */
+function pettyCashAssertBranchAccess($record, $accessibleBranchIds) {
+    if (!$record) return false;
+    if (empty($accessibleBranchIds)) return false;
+    $recBranchId = isset($record['branch_id']) ? (int)$record['branch_id'] : 0;
+    if ($recBranchId === 0) return true; // 無分公司限制的紀錄保留可看
+    return in_array($recBranchId, $accessibleBranchIds);
+}
+
+/**
+ * 守門：檢查使用者送出的 branch_id 是否在可存取範圍
+ */
+function pettyCashAssertPostBranchAccess($postBranchId, $accessibleBranchIds) {
+    $bid = (int)$postBranchId;
+    if ($bid === 0) return true; // 允許不指定分公司
+    return in_array($bid, $accessibleBranchIds);
+}
 
 // ========== 刪除 ==========
 if ($action === 'delete' && !empty($_GET['id'])) {
@@ -23,6 +56,11 @@ if ($action === 'delete' && !empty($_GET['id'])) {
         redirect('/petty_cash.php');
     }
     $delId = (int)$_GET['id'];
+    $rec = $model->getPettyCashById($delId);
+    if (!pettyCashAssertBranchAccess($rec, $accessibleBranchIds)) {
+        Session::flash('error', '無權限刪除此分公司的零用金記錄');
+        redirect('/petty_cash.php');
+    }
     AuditLog::log('petty_cash', 'delete', $delId, '刪除零用金記錄');
     $model->deletePettyCash($delId);
     Session::flash('success', '零用金記錄已刪除');
@@ -40,6 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update' && !empty($_GE
         redirect('/petty_cash.php');
     }
     $id = (int)$_GET['id'];
+    $rec = $model->getPettyCashById($id);
+    if (!pettyCashAssertBranchAccess($rec, $accessibleBranchIds)) {
+        Session::flash('error', '無權限修改此分公司的零用金記錄');
+        redirect('/petty_cash.php');
+    }
+    // 驗證新的 branch_id 也在範圍內
+    if (!empty($_POST['branch_id']) && !pettyCashAssertPostBranchAccess($_POST['branch_id'], $accessibleBranchIds)) {
+        Session::flash('error', '無權限將記錄改為此分公司');
+        redirect('/petty_cash.php');
+    }
     $model->updatePettyCash($id, array(
         'entry_date'      => !empty($_POST['entry_date']) ? $_POST['entry_date'] : null,
         'type'            => !empty($_POST['type']) ? $_POST['type'] : '支出',
@@ -63,8 +111,11 @@ if ($action === 'edit' && !empty($_GET['id'])) {
         Session::flash('error', '找不到此筆記錄');
         redirect('/petty_cash.php');
     }
-    $branchIds = Auth::getAccessibleBranchIds();
-    $branches = $model->getBranches($branchIds);
+    if (!pettyCashAssertBranchAccess($record, $accessibleBranchIds)) {
+        Session::flash('error', '無權限查看此分公司的零用金記錄');
+        redirect('/petty_cash.php');
+    }
+    $branches = $model->getBranches($accessibleBranchIds);
     $pageTitle = '零用金 - ' . (!empty($record['entry_number']) ? $record['entry_number'] : '檢視');
     $currentPage = 'petty_cash';
     require __DIR__ . '/../templates/layouts/header.php';
@@ -81,6 +132,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!verify_csrf()) {
         Session::flash('error', '安全驗證失敗');
+        redirect('/petty_cash.php');
+    }
+    // 驗證 branch_id 在可存取範圍
+    if (!empty($_POST['branch_id']) && !pettyCashAssertPostBranchAccess($_POST['branch_id'], $accessibleBranchIds)) {
+        Session::flash('error', '無權限新增此分公司的零用金記錄');
         redirect('/petty_cash.php');
     }
     $user = Auth::user();
@@ -118,21 +174,26 @@ $filters = array(
     'date_to'   => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
     'sort'      => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',
 );
-$branchIds = Auth::getAccessibleBranchIds();
-$branches = $model->getBranches($branchIds);
-$branchBalances = $model->getPettyCashBranchBalances($branchIds);
+// 若使用者手動篩選的 branch_id 不在可存取範圍，強制清掉避免繞過
+if (!empty($filters['branch_id']) && !in_array((int)$filters['branch_id'], $accessibleBranchIds)) {
+    $filters['branch_id'] = '';
+}
+
+$branches = $model->getBranches($accessibleBranchIds);
+$branchBalances = $model->getPettyCashBranchBalances($accessibleBranchIds);
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$result = $model->getPettyCashList($filters, $page);
+// 新版本：傳入 accessibleBranchIds 強制資料隔離
+$result = $model->getPettyCashList($filters, $page, 100, $accessibleBranchIds);
 $records = $result['data'];
 
-// Calculate running balance for each record
-$totalBalance = $model->getPettyCashBalanceUpTo($filters, 0);
+// Calculate running balance for each record（同樣強制隔離）
+$totalBalance = $model->getPettyCashBalanceUpTo($filters, 0, $accessibleBranchIds);
 
 $runningBalance = $totalBalance;
 if ($page > 1) {
     $perPage = $result['perPage'];
     $skipCount = ($page - 1) * $perPage;
-    $stmtSkip = $model->getPettyCashPageSum($filters, $skipCount);
+    $stmtSkip = $model->getPettyCashPageSum($filters, $skipCount, $accessibleBranchIds);
     $runningBalance = $totalBalance - $stmtSkip;
 }
 

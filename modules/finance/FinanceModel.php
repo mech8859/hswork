@@ -1393,10 +1393,21 @@ class FinanceModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getPettyCashList($filters = array(), $page = 1, $perPage = 100)
+    public function getPettyCashList($filters = array(), $page = 1, $perPage = 100, $accessibleBranchIds = null)
     {
         $where = '1=1';
         $params = array();
+
+        // 強制分公司隔離：只能看可存取分公司的資料
+        if ($accessibleBranchIds !== null) {
+            if (empty($accessibleBranchIds)) {
+                // 無任何可存取分公司 → 直接回空
+                return array('data' => array(), 'total' => 0, 'page' => $page, 'perPage' => $perPage, 'lastPage' => 1);
+            }
+            $bph = implode(',', array_fill(0, count($accessibleBranchIds), '?'));
+            $where .= " AND pc.branch_id IN ({$bph})";
+            $params = array_merge($params, $accessibleBranchIds);
+        }
 
         if (!empty($filters['branch_id'])) {
             $where .= ' AND pc.branch_id = ?';
@@ -1449,10 +1460,17 @@ class FinanceModel
     /**
      * Get total petty cash balance (income - expense) for all matching records.
      */
-    public function getPettyCashBalanceUpTo($filters, $unused = 0)
+    public function getPettyCashBalanceUpTo($filters, $unused = 0, $accessibleBranchIds = null)
     {
         $where = '1=1';
         $params = array();
+
+        if ($accessibleBranchIds !== null) {
+            if (empty($accessibleBranchIds)) return 0.0;
+            $bph = implode(',', array_fill(0, count($accessibleBranchIds), '?'));
+            $where .= " AND pc.branch_id IN ({$bph})";
+            $params = array_merge($params, $accessibleBranchIds);
+        }
 
         if (!empty($filters['branch_id'])) {
             $where .= ' AND pc.branch_id = ?';
@@ -1490,10 +1508,17 @@ class FinanceModel
      * Get sum of (income - expense) for the top N records (newest first).
      * Used to offset running balance for pagination.
      */
-    public function getPettyCashPageSum($filters, $limit)
+    public function getPettyCashPageSum($filters, $limit, $accessibleBranchIds = null)
     {
         $where = '1=1';
         $params = array();
+
+        if ($accessibleBranchIds !== null) {
+            if (empty($accessibleBranchIds)) return 0.0;
+            $bph = implode(',', array_fill(0, count($accessibleBranchIds), '?'));
+            $where .= " AND pc.branch_id IN ({$bph})";
+            $params = array_merge($params, $accessibleBranchIds);
+        }
 
         if (!empty($filters['branch_id'])) {
             $where .= ' AND pc.branch_id = ?';

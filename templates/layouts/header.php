@@ -121,19 +121,29 @@
         <?php endif; ?>
 
         <!-- 財務會計 -->
-        <?php if (Auth::hasPermission('finance.manage') || Auth::hasPermission('finance.view')): ?>
+        <?php
+        $hasFinancePerm = Auth::hasPermission('finance.manage') || Auth::hasPermission('finance.view');
+        $hasPettyCashPerm = Auth::hasPermission('petty_cash.manage') || Auth::hasPermission('petty_cash.view');
+        ?>
+        <?php if ($hasFinancePerm || $hasPettyCashPerm): ?>
         <li class="nav-section">財務會計</li>
+        <?php if ($hasFinancePerm): ?>
         <li><a href="/receivables.php" class="<?= ($currentPage ?? '') === 'receivables' ? 'active' : '' ?>">📄 應收帳款</a></li>
         <li><a href="/receipts.php" class="<?= ($currentPage ?? '') === 'receipts' ? 'active' : '' ?>">💰 收款單</a></li>
         <li><a href="/payables.php" class="<?= ($currentPage ?? '') === 'payables' ? 'active' : '' ?>">📋 應付帳款單</a></li>
         <li><a href="/payments_out.php" class="<?= ($currentPage ?? '') === 'payments_out' ? 'active' : '' ?>">💸 付款單</a></li>
         <li><a href="/bank_transactions.php" class="<?= ($currentPage ?? '') === 'bank_transactions' ? 'active' : '' ?>">🏦 銀行帳戶明細</a></li>
+        <?php endif; ?>
+        <?php if ($hasFinancePerm || $hasPettyCashPerm): ?>
         <li><a href="/petty_cash.php" class="<?= ($currentPage ?? '') === 'petty_cash' ? 'active' : '' ?>">🪙 零用金管理</a></li>
+        <?php endif; ?>
+        <?php if ($hasFinancePerm): ?>
         <li><a href="/reserve_fund.php" class="<?= ($currentPage ?? '') === 'reserve_fund' ? 'active' : '' ?>">💵 備用金管理</a></li>
         <li><a href="/cash_details.php" class="<?= ($currentPage ?? '') === 'cash_details' ? 'active' : '' ?>">📝 現金明細</a></li>
         <li><a href="/purchase_invoices.php" class="<?= ($currentPage ?? '') === 'purchase_invoices' ? 'active' : '' ?>">📥 進項發票</a></li>
         <li><a href="/sales_invoices.php" class="<?= ($currentPage ?? '') === 'sales_invoices' ? 'active' : '' ?>">📤 銷項發票</a></li>
         <li><a href="/tax_report.php" class="<?= ($currentPage ?? '') === 'tax_report' ? 'active' : '' ?>">📊 401營業稅申報</a></li>
+        <?php endif; ?>
         <?php endif; ?>
 
         <!-- 會計管理 -->

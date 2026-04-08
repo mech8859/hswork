@@ -153,6 +153,7 @@ class Auth
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
                     'reviews' => array('reviews.manage', 'reviews.view'),
+                    'petty_cash' => array('petty_cash.manage', 'petty_cash.view'),
                     'system' => array('system.manage'),
                 );
                 // 覆蓋模組權限
@@ -432,6 +433,7 @@ class Auth
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
                     'reviews' => array('reviews.manage', 'reviews.view'),
+                    'petty_cash' => array('petty_cash.manage', 'petty_cash.view'),
                     'system' => array('system.manage'),
                 );
                 foreach ($custom as $module => $value) {
