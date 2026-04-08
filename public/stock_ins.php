@@ -235,7 +235,7 @@ switch ($action) {
     // ============================================================
     case 'admin_delete':
         $u = Auth::user();
-        if (!$u || $u['role'] !== 'admin') {
+        if (!$u || $u['role'] !== 'boss') {
             Session::flash('error', '無權限執行此操作（僅系統管理者）');
             redirect('/stock_ins.php');
         }
@@ -262,7 +262,7 @@ switch ($action) {
 
     case 'admin_edit_basic':
         $u = Auth::user();
-        if (!$u || $u['role'] !== 'admin') {
+        if (!$u || $u['role'] !== 'boss') {
             Session::flash('error', '無權限執行此操作（僅系統管理者）');
             redirect('/stock_ins.php');
         }

@@ -41,7 +41,7 @@ function viewReturnTypeBadge($type) {
         <?php
         // ADMIN_TOOL_BLOCK_START
         $__rtAdmin = Auth::user();
-        $__rtIsAdmin = $__rtAdmin && $__rtAdmin['role'] === 'admin';
+        $__rtIsAdmin = $__rtAdmin && $__rtAdmin['role'] === 'boss';
         ?>
         <?php if ($__rtIsAdmin): ?>
         <button type="button" class="btn btn-sm" style="background:#9c27b0;color:#fff" onclick="rtAdminOpenEdit()">🔧 管理者改廠商</button>

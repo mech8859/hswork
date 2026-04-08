@@ -87,7 +87,7 @@ $canEdit = $canManage && in_array($record['status'], array('待確認', 'pending
         <?php
         // ADMIN_TOOL_BLOCK_START - 測試期專用，完成後可整段移除
         $__adminUser = Auth::user();
-        $__isAdmin = $__adminUser && $__adminUser['role'] === 'admin';
+        $__isAdmin = $__adminUser && $__adminUser['role'] === 'boss';
         ?>
         <?php if ($__isAdmin): ?>
         <button type="button" class="btn btn-sm no-print" style="background:#9c27b0;color:#fff" onclick="adminOpenEditCustomer()">🔧 管理者改客戶</button>

@@ -29,7 +29,7 @@ function grViewStatusBadge($status) {
         <?php
         // ADMIN_TOOL_BLOCK_START
         $__grAdmin = Auth::user();
-        $__grIsAdmin = $__grAdmin && $__grAdmin['role'] === 'admin';
+        $__grIsAdmin = $__grAdmin && $__grAdmin['role'] === 'boss';
         ?>
         <?php if ($__grIsAdmin): ?>
         <button type="button" class="btn btn-sm" style="background:#9c27b0;color:#fff" onclick="grAdminOpenEdit()">🔧 管理者改廠商</button>

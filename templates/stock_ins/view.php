@@ -26,7 +26,7 @@ function siViewStatusBadge($status) {
         <?php
         // ADMIN_TOOL_BLOCK_START
         $__siAdmin = Auth::user();
-        $__siIsAdmin = $__siAdmin && $__siAdmin['role'] === 'admin';
+        $__siIsAdmin = $__siAdmin && $__siAdmin['role'] === 'boss';
         ?>
         <?php if ($__siIsAdmin): ?>
         <button type="button" class="btn btn-sm" style="background:#9c27b0;color:#fff" onclick="siAdminOpenEdit()">🔧 管理者改廠商/客戶</button>
