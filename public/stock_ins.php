@@ -24,6 +24,7 @@ switch ($action) {
             'date_from'    => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
             'date_to'      => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
             'source_type'  => !empty($_GET['source_type']) ? $_GET['source_type'] : '',
+            'vendor_name'  => !empty($_GET['vendor_name']) ? $_GET['vendor_name'] : '',
         );
         $page = max(1, (int)(!empty($_GET['page']) ? $_GET['page'] : 1));
         $result = $model->getStockIns($filters, $page, 100);

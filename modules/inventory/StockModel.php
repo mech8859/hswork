@@ -164,6 +164,10 @@ class StockModel
             $where .= ' AND si.source_type = ?';
             $params[] = $filters['source_type'];
         }
+        if (!empty($filters['vendor_name'])) {
+            $where .= ' AND si.vendor_name LIKE ?';
+            $params[] = '%' . $filters['vendor_name'] . '%';
+        }
 
         // 總筆數
         $countStmt = $this->db->prepare("SELECT COUNT(*) FROM stock_ins si WHERE {$where}");

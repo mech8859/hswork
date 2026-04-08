@@ -36,6 +36,11 @@
                     <option value="manual_return" <?= (!empty($filters['source_type']) ? $filters['source_type'] : '') === 'manual_return' ? 'selected' : '' ?>>手動餘料入庫</option>
                 </select>
             </div>
+            <div class="form-group" style="position:relative">
+                <label>廠商名稱</label>
+                <input type="text" id="siVendorName" autocomplete="off" name="vendor_name" class="form-control" value="<?= e(!empty($filters['vendor_name']) ? $filters['vendor_name'] : '') ?>" placeholder="廠商名稱">
+                <div id="siVendorSuggestions" class="si-vendor-suggestions"></div>
+            </div>
             <div class="form-group">
                 <label>關鍵字</label>
                 <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="單號">
@@ -167,4 +172,58 @@ function siStatusBadge($status) {
 .hide-mobile { display: none; }
 @media (min-width: 768px) { .show-mobile { display: none !important; } .hide-mobile { display: block !important; } }
 .justify-center { justify-content: center; }
+.si-vendor-suggestions { display:none; position:absolute; top:100%; left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); box-shadow:var(--shadow); z-index:50; }
+.si-vendor-suggestions.show { display:block; }
+.si-vendor-suggestions .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--gray-100); }
+.si-vendor-suggestions .ac-item:hover { background:var(--gray-50); }
+.si-vendor-suggestions .ac-main { font-weight:600; font-size:.9rem; }
+.si-vendor-suggestions .ac-sub { font-size:.78rem; color:var(--gray-500); }
 </style>
+<script>
+(function() {
+    var input = document.getElementById('siVendorName');
+    var list = document.getElementById('siVendorSuggestions');
+    if (!input || !list) return;
+    var timer = null;
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var q = this.value.trim();
+        if (q.length < 1) { list.classList.remove('show'); return; }
+        timer = setTimeout(function() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/payments_out.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
+            xhr.onload = function() {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (!data || data.length === 0) { list.classList.remove('show'); return; }
+                    var html = '';
+                    for (var i = 0; i < data.length; i++) {
+                        var name = (data[i].name || '').replace(/"/g, '&quot;');
+                        var code = data[i].vendor_code || '';
+                        var contact = data[i].contact_person || '';
+                        var phone = data[i].phone || '';
+                        html += '<div class="ac-item" data-name="' + name + '">';
+                        html += '<div class="ac-main">' + (data[i].name || '') + '</div>';
+                        html += '<div class="ac-sub">' + (code ? '編號:' + code + ' | ' : '') + contact + ' ' + phone + '</div>';
+                        html += '</div>';
+                    }
+                    list.innerHTML = html;
+                    list.classList.add('show');
+                    list.querySelectorAll('.ac-item').forEach(function(el) {
+                        el.addEventListener('click', function() {
+                            input.value = this.getAttribute('data-name');
+                            list.classList.remove('show');
+                        });
+                    });
+                } catch (ex) {
+                    list.classList.remove('show');
+                }
+            };
+            xhr.send();
+        }, 250);
+    });
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !list.contains(e.target)) list.classList.remove('show');
+    });
+})();
+</script>
