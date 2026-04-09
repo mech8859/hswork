@@ -42,10 +42,11 @@
         // 出庫單狀態（純顯示）
         if (!empty($caseStockOutStatus) && $caseStockOutStatus['quote_count'] > 0):
             if ($caseStockOutStatus['stockout_count'] > 0):
+                foreach ($caseStockOutStatus['stockouts'] as $_so):
         ?>
-        <span style="color:var(--success);font-size:.85rem;font-weight:600;margin-left:12px">✓ 出庫單已建立</span>
-        <?php else: ?>
-        <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">⚠ 出庫單尚未建立</span>
+        <a href="/stock_outs.php?action=view&id=<?= $_so['id'] ?>" style="font-size:.85rem;font-weight:600;margin-left:12px;text-decoration:none;color:var(--success)" title="點擊查看出庫單">📦 出庫單 <?= e($_so['so_number']) ?> <span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:.7rem;padding:1px 6px"><?= e($_so['status']) ?></span></a>
+        <?php endforeach; else: ?>
+        <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">📦 出庫單尚未建立</span>
         <?php endif; endif; ?>
         <?php endif; ?>
     </div>
