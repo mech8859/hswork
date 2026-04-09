@@ -97,7 +97,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
     <a href="#sec-case-payments" class="sec-link">帳款交易 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= count($case['case_payments'] ?? array()) ?></span></a>
     <a href="#sec-schedule" class="sec-link">施工時程<?= $canEdit['schedule'] ? '' : ' 🔒' ?></a>
     <a href="#sec-attach" class="sec-link">附件管理<?= $canEdit['attach'] ? '' : ' 🔒' ?></a>
-    <a href="#sec-worklog" class="sec-link">施工回報 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= count($worklogTimeline) ?></span></a>
+    <?php
+    // 施工回報 badge：排工回報 + 手動/Ragic（排除已同步的避免重複計數）
+    $_wlBadgeCount = count($worklogTimeline);
+    foreach (($case['case_work_logs'] ?? array()) as $_cwl) {
+        if (empty($_cwl['source_worklog_id'])) $_wlBadgeCount++;
+    }
+    ?>
+    <a href="#sec-worklog" class="sec-link">施工回報 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= $_wlBadgeCount ?></span></a>
     <a href="#sec-readiness" class="sec-link">排工驗證</a>
     <a href="#sec-materials" class="sec-link">預計材料 <span class="badge" style="font-size:.7rem;padding:1px 6px;background:#eee;color:#666"><?= count($case['material_estimates'] ?? array()) ?></span></a>
     <a href="#sec-site" class="sec-link">現場環境<?= $canEdit['site'] ? '' : ' 🔒' ?></a>
@@ -1490,7 +1497,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
             );
         }
         // case_work_logs (Ragic 匯入或手動新增)
+        // 排除已從 work_logs 同步過來的（source_worklog_id 有值），避免跟 $worklogTimeline 重複
         foreach ($caseWorkLogs as $cwl) {
+            if (!empty($cwl['source_worklog_id'])) continue;
             // 解析 photo_paths JSON 為照片陣列
             $manualPhotos = array();
             if (!empty($cwl['photo_paths'])) {

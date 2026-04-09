@@ -75,6 +75,7 @@ class WorklogModel
             JOIN cases c ON s.case_id = c.id
             JOIN users u ON wl.user_id = u.id
             WHERE s.case_id = ?
+              AND wl.work_description IS NOT NULL AND wl.work_description != ''
             ORDER BY s.schedule_date DESC, wl.created_at DESC
             LIMIT $limit
         ");

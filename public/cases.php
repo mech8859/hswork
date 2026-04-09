@@ -185,7 +185,10 @@ switch ($action) {
             redirect('/cases.php?action=view&id=' . $id);
         }
 
-        $worklogTimeline = array();
+        // 載入排工回報（work_logs + photos + materials）
+        require_once __DIR__ . '/../modules/schedule/WorklogModel.php';
+        $_wlModel = new WorklogModel();
+        $worklogTimeline = $_wlModel->getCaseTimeline($id);
         $contacts = $case['contacts'] ?? array();
         $branches = $model->getAllBranches();
         $skills = $model->getAllSkills();
