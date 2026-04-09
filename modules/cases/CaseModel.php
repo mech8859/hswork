@@ -636,10 +636,11 @@ class CaseModel
     {
         $structureType = !empty($data['structure_type']) ? (is_array($data['structure_type']) ? implode(',', $data['structure_type']) : $data['structure_type']) : null;
         $conduitType = !empty($data['conduit_type']) ? (is_array($data['conduit_type']) ? implode(',', $data['conduit_type']) : $data['conduit_type']) : null;
+        $safetyEquipment = !empty($data['safety_equipment']) ? (is_array($data['safety_equipment']) ? implode(',', $data['safety_equipment']) : $data['safety_equipment']) : null;
 
         $stmt = $this->db->prepare('
-            INSERT INTO case_site_conditions (case_id, structure_type, conduit_type, floor_count, has_elevator, has_ladder_needed, ladder_size, high_ceiling_height, needs_scissor_lift, special_requirements)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO case_site_conditions (case_id, structure_type, conduit_type, floor_count, has_elevator, has_ladder_needed, ladder_size, high_ceiling_height, needs_scissor_lift, scissor_lift_height, safety_equipment, special_requirements)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 structure_type = VALUES(structure_type),
                 conduit_type = VALUES(conduit_type),
@@ -649,10 +650,13 @@ class CaseModel
                 ladder_size = VALUES(ladder_size),
                 high_ceiling_height = VALUES(high_ceiling_height),
                 needs_scissor_lift = VALUES(needs_scissor_lift),
+                scissor_lift_height = VALUES(scissor_lift_height),
+                safety_equipment = VALUES(safety_equipment),
                 special_requirements = VALUES(special_requirements)
         ');
         $ladderSize = !empty($data['has_ladder_needed']) ? ($data['ladder_size'] ?? null) : null;
         $highCeiling = !empty($data['high_ceiling_height']) ? $data['high_ceiling_height'] : null;
+        $scissorLiftHeight = !empty($data['needs_scissor_lift']) ? ($data['scissor_lift_height'] ?? null) : null;
         $stmt->execute([
             $caseId,
             $structureType,
@@ -663,6 +667,8 @@ class CaseModel
             $ladderSize ?: null,
             $highCeiling,
             $data['needs_scissor_lift'] ?? 0,
+            $scissorLiftHeight ?: null,
+            $safetyEquipment,
             $data['special_requirements'] ?? null,
         ]);
     }

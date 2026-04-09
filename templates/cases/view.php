@@ -460,11 +460,31 @@ document.addEventListener('keydown', function(e) {
         <div class="detail-item">
             <span class="detail-label">設施</span>
             <span class="detail-value">
-                <?= $sc['has_elevator'] ? '有電梯' : '' ?>
-                <?= $sc['has_ladder_needed'] ? '需要梯子' : '' ?>
-                <?= (!$sc['has_elevator'] && !$sc['has_ladder_needed']) ? '-' : '' ?>
+                <?php
+                $facilities = array();
+                if (!empty($sc['has_elevator'])) $facilities[] = '有電梯';
+                if (!empty($sc['has_ladder_needed'])) {
+                    $facilities[] = '拉梯' . (!empty($sc['ladder_size']) ? '(' . e($sc['ladder_size']) . '米)' : '');
+                }
+                if (!empty($sc['high_ceiling_height'])) $facilities[] = '挑高' . e($sc['high_ceiling_height']) . '米';
+                if (!empty($sc['needs_scissor_lift'])) {
+                    $facilities[] = '自走車' . (!empty($sc['scissor_lift_height']) ? '(' . e($sc['scissor_lift_height']) . '米)' : '');
+                }
+                echo $facilities ? implode('、', $facilities) : '-';
+                ?>
             </span>
         </div>
+        <?php if (!empty($sc['safety_equipment'])): ?>
+        <div class="detail-item">
+            <span class="detail-label">工安需求</span>
+            <span class="detail-value">
+                <?php
+                $safetyMap = array('helmet'=>'安全帽','reflective_vest'=>'反光背心','safety_shoes'=>'安全鞋','harness'=>'背負式安全帶','tool_lanyard'=>'工具防墜');
+                echo implode('、', array_map(function($v) use ($safetyMap) { return isset($safetyMap[$v]) ? $safetyMap[$v] : $v; }, explode(',', $sc['safety_equipment'])));
+                ?>
+            </span>
+        </div>
+        <?php endif; ?>
     </div>
     <?php if (!empty($sc['special_requirements'])): ?>
     <div class="mt-1"><span class="detail-label">特殊需求</span><p><?= nl2br(e($sc['special_requirements'])) ?></p></div>

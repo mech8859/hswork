@@ -132,6 +132,21 @@ function toggleHighCeiling() {
     wrap.style.display = document.getElementById('chkHighCeiling').checked ? 'inline-flex' : 'none';
     if (!document.getElementById('chkHighCeiling').checked) wrap.querySelector('input[name="high_ceiling_height"]').value = '';
 }
+function toggleScissorLift() {
+    document.getElementById('scissorLiftWrap').style.display = document.getElementById('chkScissorLift').checked ? 'flex' : 'none';
+}
+function toggleSafetyEquipment() {
+    document.getElementById('safetyEquipmentWrap').style.display = document.getElementById('chkSafetyToggle').checked ? 'flex' : 'none';
+}
+function onScissorPresetChange(radio) {
+    var input = document.getElementById('scissorLiftHeightInput');
+    if (radio.value === 'custom') {
+        input.value = '';
+        input.focus();
+    } else {
+        input.value = radio.value;
+    }
+}
 function toggleSkillLevel(cb) {
     var sel = cb.closest('.skill-item').querySelector('.skill-level');
     if (cb.checked) { sel.style.display = 'inline-block'; if (sel.value === '0') sel.value = '1'; }

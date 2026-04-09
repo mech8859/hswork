@@ -18,7 +18,9 @@ $siteNewCols = array(
     'ladder_size' => array("VARCHAR(10) DEFAULT NULL COMMENT '拉梯尺寸(米)'", 'has_ladder_needed'),
     'high_ceiling_height' => array("VARCHAR(20) DEFAULT NULL COMMENT '挑高場所高度(米)'", 'ladder_size'),
     'needs_scissor_lift' => array("TINYINT(1) DEFAULT 0 COMMENT '需要自走車'", 'high_ceiling_height'),
-    'special_requirements' => array("TEXT DEFAULT NULL COMMENT '特殊需求說明'", 'needs_scissor_lift'),
+    'scissor_lift_height' => array("VARCHAR(20) DEFAULT NULL COMMENT '自走車米數(8/10/12或自訂)'", 'needs_scissor_lift'),
+    'safety_equipment' => array("VARCHAR(255) DEFAULT NULL COMMENT '工安需求(逗號分隔)'", 'scissor_lift_height'),
+    'special_requirements' => array("TEXT DEFAULT NULL COMMENT '特殊需求說明'", 'safety_equipment'),
 );
 
 $added = 0;

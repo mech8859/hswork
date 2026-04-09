@@ -1745,9 +1745,46 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <div class="equip-item">
                     <label class="checkbox-label">
                         <input type="hidden" name="needs_scissor_lift" value="0">
-                        <input type="checkbox" name="needs_scissor_lift" value="1" <?= !empty($sc['needs_scissor_lift']) ? 'checked' : '' ?>>
+                        <input type="checkbox" name="needs_scissor_lift" value="1" id="chkScissorLift" <?= !empty($sc['needs_scissor_lift']) ? 'checked' : '' ?> onchange="toggleScissorLift()">
                         <span>自走車</span>
                     </label>
+                    <div id="scissorLiftWrap" style="display:<?= !empty($sc['needs_scissor_lift']) ? 'flex' : 'none' ?>;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap">
+                        <?php
+                        $scissorSizes = array('8'=>'8米','10'=>'10米','12'=>'12米');
+                        $currentScissor = isset($sc['scissor_lift_height']) ? $sc['scissor_lift_height'] : '';
+                        $isPreset = in_array($currentScissor, array('8','10','12'), true);
+                        foreach ($scissorSizes as $sv => $sl):
+                        ?>
+                        <label class="checkbox-label">
+                            <input type="radio" name="scissor_lift_height_preset" value="<?= $sv ?>" <?= $currentScissor === $sv ? 'checked' : '' ?> onchange="onScissorPresetChange(this)">
+                            <span><?= $sl ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                        <label class="checkbox-label">
+                            <input type="radio" name="scissor_lift_height_preset" value="custom" <?= ($currentScissor !== '' && !$isPreset) ? 'checked' : '' ?> onchange="onScissorPresetChange(this)">
+                            <span>自訂</span>
+                        </label>
+                        <input type="text" name="scissor_lift_height" id="scissorLiftHeightInput" class="form-control" style="width:80px" value="<?= e($currentScissor) ?>" placeholder="米數">
+                    </div>
+                </div>
+                <?php
+                $safetyItems = array('helmet'=>'安全帽', 'reflective_vest'=>'反光背心', 'safety_shoes'=>'安全鞋', 'harness'=>'背負式安全帶', 'tool_lanyard'=>'工具防墜');
+                $currentSafety = isset($sc['safety_equipment']) ? explode(',', $sc['safety_equipment']) : array();
+                $hasSafety = !empty($currentSafety) && $currentSafety[0] !== '';
+                ?>
+                <div class="equip-item">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkSafetyToggle" <?= $hasSafety ? 'checked' : '' ?> onchange="toggleSafetyEquipment()">
+                        <span>工安需求</span>
+                    </label>
+                    <div id="safetyEquipmentWrap" style="display:<?= $hasSafety ? 'flex' : 'none' ?>;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap">
+                        <?php foreach ($safetyItems as $sv => $sl): ?>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="safety_equipment[]" value="<?= $sv ?>" <?= in_array($sv, $currentSafety) ? 'checked' : '' ?>>
+                            <span><?= $sl ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1813,7 +1850,7 @@ var CASE_DATA = {
 };
 </script>
 <script src="/js/tw_districts.js"></script>
-<script src="/js/cases-form.js?v=20260407d"></script>
+<script src="/js/cases-form.js?v=20260409a"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">
@@ -2261,6 +2298,21 @@ function toggleHighCeiling() {
     var wrap = document.getElementById('highCeilingWrap');
     wrap.style.display = document.getElementById('chkHighCeiling').checked ? 'inline-flex' : 'none';
     if (!document.getElementById('chkHighCeiling').checked) wrap.querySelector('input[name="high_ceiling_height"]').value = '';
+}
+function toggleScissorLift() {
+    document.getElementById('scissorLiftWrap').style.display = document.getElementById('chkScissorLift').checked ? 'flex' : 'none';
+}
+function toggleSafetyEquipment() {
+    document.getElementById('safetyEquipmentWrap').style.display = document.getElementById('chkSafetyToggle').checked ? 'flex' : 'none';
+}
+function onScissorPresetChange(radio) {
+    var input = document.getElementById('scissorLiftHeightInput');
+    if (radio.value === 'custom') {
+        input.value = '';
+        input.focus();
+    } else {
+        input.value = radio.value;
+    }
 }
 function toggleSkillLevel(cb) {
     var sel = cb.closest('.skill-item').querySelector('.skill-level');
