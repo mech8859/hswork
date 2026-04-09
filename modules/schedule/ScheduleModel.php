@@ -700,12 +700,13 @@ class ScheduleModel
         }
         unset($eng);
 
-        // 3b. 查修案件：repair_priority 工程師加分（影響排序，不影響評分）
+        // 3b. 查修案件：repair_priority 工程師加分 + 強制 1 人團隊
         $isRepairCase = in_array($case['case_type'], array('repair', 'old_repair', 'new_repair'));
         if ($isRepairCase) {
+            $maxEng = 1; // 查修案只需 1 人
             foreach ($allEngineers as &$eng) {
                 if (!empty($eng['repair_priority'])) {
-                    $eng['skill_score'] += 10;
+                    $eng['skill_score'] += 20; // 加大優先權重
                 }
             }
             unset($eng);
@@ -1112,8 +1113,8 @@ class ScheduleModel
         $candidates = array();
         $teamSize = min($maxEng, count($available));
         if ($teamSize < 1) return array();
-        // 若無所需技能，team size 至少 2
-        if (empty($requiredSkills) && $teamSize < 2 && count($available) >= 2) {
+        // 若無所需技能且非 1 人模式，team size 至少 2
+        if (empty($requiredSkills) && $maxEng > 1 && $teamSize < 2 && count($available) >= 2) {
             $teamSize = 2;
         }
 
@@ -1322,6 +1323,26 @@ class ScheduleModel
             $ratio = count($prevTeam) > 0 ? $overlap / count($prevTeam) : 0;
             $breakdown['continuity'] = round($ratio * 15);
         }
+
+        // ---- 可帶隊分散 ----
+        // 多位 can_lead 在同一組會扣分（應分散到不同組帶不同隊）
+        $leadCount = 0;
+        foreach ($team as $eng) {
+            if (!empty($eng['can_lead'])) $leadCount++;
+        }
+        if ($leadCount > 1) {
+            $breakdown['lead_penalty'] = -10 * ($leadCount - 1);
+        }
+
+        // ---- 工程師等級加分 ----
+        $levelMap = array('probation' => 0, 'junior' => 1, 'regular' => 2, 'senior' => 3, 'expert' => 4);
+        $levelSum = 0;
+        foreach ($team as $eng) {
+            $lvl = isset($eng['engineer_level']) ? $eng['engineer_level'] : 'regular';
+            $levelSum += isset($levelMap[$lvl]) ? $levelMap[$lvl] : 2;
+        }
+        $avgLevel = count($team) > 0 ? $levelSum / count($team) : 2;
+        $breakdown['level'] = round($avgLevel * 2.5); // 最高 10 分
 
         $total = 0;
         foreach ($breakdown as $v) {
