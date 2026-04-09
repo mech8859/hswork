@@ -8,16 +8,41 @@ require_once __DIR__ . '/../modules/inventory/StockModel.php';
 
 $canManage = Auth::hasPermission('inventory.manage');
 $canView = Auth::hasPermission('inventory.view');
+$action = isset($_GET['action']) ? $_GET['action'] : 'list';
+
+// 庫存權限檢查：view action 允許案件關聯的唯讀存取
+$soReadonly = false;
 if (!$canManage && !$canView) {
-    Session::flash('error', '無權限');
-    redirect('/index.php');
+    if ($action === 'view') {
+        // 檢查此出庫單是否透過報價單關聯到使用者可存取的案件
+        $_soId = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        if ($_soId > 0) {
+            $_db = Database::getInstance();
+            $_check = $_db->prepare("
+                SELECT 1 FROM stock_outs so
+                JOIN quotations q ON so.source_type = 'quotation' AND so.source_id = q.id
+                JOIN cases c ON q.case_id = c.id
+                WHERE so.id = ?
+                LIMIT 1
+            ");
+            $_check->execute(array($_soId));
+            if ($_check->fetchColumn()) {
+                $soReadonly = true; // 允許唯讀
+                $canView = true;   // 暫時給 view 權限讓後續程式不擋
+            }
+        }
+    }
+    if (!$canView) {
+        Session::flash('error', '無權限');
+        redirect('/index.php');
+    }
 }
 
 $model = new StockModel();
-$action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 switch ($action) {
     case 'list':
+        if (!$canManage && !Auth::hasPermission('inventory.view')) { Session::flash('error', '無權限'); redirect('/index.php'); }
         $filters = array(
             'month'        => isset($_GET['month']) ? $_GET['month'] : (isset($_GET['keyword']) || isset($_GET['status']) ? '' : date('Y-m')),
             'status'       => isset($_GET['status']) ? $_GET['status'] : '',

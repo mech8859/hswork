@@ -59,7 +59,13 @@ $canEdit = $canManage && in_array($record['status'], array('待確認', 'pending
         ?></small>
         <?php endif; ?>
     </div>
-    <div class="d-flex gap-1 flex-wrap" id="actionBtnBar">
+    <?php if (!empty($soReadonly)): ?>
+    <div class="d-flex gap-1 flex-wrap">
+        <span class="badge" style="background:#fff3e0;color:#e65100;padding:6px 12px;font-size:.85rem">唯讀檢視</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="history.back()">← 返回</button>
+    </div>
+    <?php endif; ?>
+    <div class="d-flex gap-1 flex-wrap" id="actionBtnBar"<?= !empty($soReadonly) ? ' style="display:none"' : '' ?>>
         <?php if ($canManage && $isPending && $hasUnconfirmed): ?>
         <a href="/stock_outs.php?action=reserve&id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="return confirm('確認預扣庫存？將從可用庫存扣除。')">預扣庫存</a>
         <?php endif; ?>
