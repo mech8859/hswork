@@ -224,8 +224,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
                             <tr>
                                 <td class="row-num"><?= $iIdx + 1 ?></td>
                                 <td>
-                                    <input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][item_name]" class="form-control item-name" value="<?= e($item['item_name'] ?? '') ?>" placeholder="品名（可手動輸入）" style="font-weight:600;font-size:.85rem">
+                                    <input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][item_name]" class="form-control item-name" value="<?= e($item['item_name'] ?? '') ?>" placeholder="品名（可手動輸入）" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)">
                                     <input type="hidden" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][product_id]" value="<?= e($item['product_id'] ?? '') ?>">
+                                    <div class="manual-warn" style="display:<?= (!empty($item['item_name']) && empty($item['product_id'])) ? 'block' : 'none' ?>;color:#c62828;font-size:.7rem;margin-top:2px">⚠ 請用分類挑選或關鍵字搜尋，否則無法產生出庫單</div>
                                 </td>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][model_number]" class="form-control item-model" value="<?= e($item['model_number'] ?? '') ?>" placeholder="型號" style="font-size:.8rem;color:#1565c0"></td>
                                 <td><input type="number" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][quantity]" class="form-control item-qty" value="<?= e($item['quantity'] ?? 1) ?>" step="0.01" min="0" oninput="calcRow(this)"></td>
@@ -505,7 +506,7 @@ function buildItemRow(sidx, iidx) {
     var colSpan = canManage ? 9 : 8;
     return '<tr>' +
         '<td class="row-num">' + (iidx + 1) + '</td>' +
-        '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][item_name]" class="form-control item-name" value="" placeholder="\u54c1\u540d\uff08\u53ef\u624b\u52d5\u8f38\u5165\uff09" style="font-weight:600;font-size:.85rem"><input type="hidden" name="sections[' + sidx + '][items][' + iidx + '][product_id]" value=""></td>' +
+        '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][item_name]" class="form-control item-name" value="" placeholder="\u54c1\u540d\uff08\u53ef\u624b\u52d5\u8f38\u5165\uff09" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)"><input type="hidden" name="sections[' + sidx + '][items][' + iidx + '][product_id]" value=""><div class="manual-warn" style="display:none;color:#c62828;font-size:.7rem;margin-top:2px">\u26a0 \u8acb\u7528\u5206\u985e\u6311\u9078\u6216\u95dc\u9375\u5b57\u641c\u5c0b\uff0c\u5426\u5247\u7121\u6cd5\u7522\u751f\u51fa\u5eab\u55ae</div></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][model_number]" class="form-control item-model" value="" placeholder="\u578b\u865f" style="font-size:.8rem;color:#1565c0"></td>' +
         '<td><input type="number" name="sections[' + sidx + '][items][' + iidx + '][quantity]" class="form-control item-qty" value="1" step="0.01" min="0" oninput="calcRow(this)"></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][unit]" class="form-control item-unit" value="式"></td>' +
@@ -559,6 +560,13 @@ function reindexSection(section) {
     }
 }
 
+function checkManualInput(inp) {
+    var td = inp.closest('td');
+    var pid = td.querySelector('input[name*="product_id"]');
+    var warn = td.querySelector('.manual-warn');
+    if (!warn) return;
+    warn.style.display = (inp.value.trim() !== '' && (!pid || !pid.value)) ? 'block' : 'none';
+}
 function calcRow(el) {
     var row = el.closest('tr');
     var qty = parseFloat(row.querySelector('.item-qty').value) || 0;
@@ -736,6 +744,8 @@ function onProductSelect(select) {
     // 填入第一排
     dataRow.querySelector('input[name*="product_id"]').value = opt.getAttribute('data-id');
     dataRow.querySelector('.item-name').value = name;
+    var mw = dataRow.querySelector('.manual-warn');
+    if (mw) mw.style.display = 'none';
     var modelInput = dataRow.querySelector('.item-model');
     if (modelInput) modelInput.value = model;
     dataRow.querySelector('.item-unit').value = opt.getAttribute('data-unit');
@@ -820,6 +830,8 @@ function selectProduct(el) {
 
     dataRow.querySelector('input[name*="product_id"]').value = el.getAttribute('data-id');
     dataRow.querySelector('.item-name').value = name;
+    var mw2 = dataRow.querySelector('.manual-warn');
+    if (mw2) mw2.style.display = 'none';
     var modelInput = dataRow.querySelector('.item-model');
     if (modelInput) modelInput.value = model;
     dataRow.querySelector('.item-unit').value = el.getAttribute('data-unit');
