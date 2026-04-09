@@ -299,17 +299,44 @@ switch ($action) {
             $wh = $db->query("SELECT id FROM warehouses ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
             $warehouseId = $wh ? (int)$wh['id'] : 0;
 
-            // 收集所有品項
+            // 預先載入被排除的分類 ID（含子分類繼承父分類的旗標）
+            $excludedCatIds = array();
+            $_ecStmt = $db->query("SELECT id, parent_id, exclude_from_stockout FROM product_categories");
+            $_ecAll = $_ecStmt->fetchAll(PDO::FETCH_ASSOC);
+            $_ecMap = array();
+            foreach ($_ecAll as $_ec) { $_ecMap[(int)$_ec['id']] = $_ec; }
+            foreach ($_ecMap as $_ecId => $_ec) {
+                // 自身有旗標，或任一上層分類有旗標 → 排除
+                $cid = $_ecId;
+                while ($cid) {
+                    if (!empty($_ecMap[$cid]['exclude_from_stockout'])) { $excludedCatIds[$_ecId] = true; break; }
+                    $cid = !empty($_ecMap[$cid]['parent_id']) ? (int)$_ecMap[$cid]['parent_id'] : 0;
+                }
+            }
+
+            // 收集品項（排除「不進出庫單」分類 + 無 product_id 的工程項）
             $items = array();
             $totalQty = 0;
+            $skippedCount = 0;
             if (!empty($quote['sections'])) {
                 foreach ($quote['sections'] as $sec) {
                     if (!empty($sec['items'])) {
                         foreach ($sec['items'] as $item) {
                             $qty = (float)($item['quantity'] ?? 0);
                             if ($qty <= 0) continue;
+                            $pid = !empty($item['product_id']) ? (int)$item['product_id'] : null;
+
+                            // 無 product_id → 跳過（手動輸入的工程項）
+                            if (!$pid) { $skippedCount++; continue; }
+
+                            // 查該產品的分類是否被排除
+                            $catId = $db->prepare("SELECT category_id FROM products WHERE id = ?");
+                            $catId->execute(array($pid));
+                            $pCatId = (int)$catId->fetchColumn();
+                            if ($pCatId && isset($excludedCatIds[$pCatId])) { $skippedCount++; continue; }
+
                             $items[] = array(
-                                'product_id' => !empty($item['product_id']) ? (int)$item['product_id'] : null,
+                                'product_id' => $pid,
                                 'product_name' => $item['item_name'] ?? '',
                                 'model' => $item['model_number'] ?? '',
                                 'unit' => $item['unit'] ?? '式',
@@ -324,7 +351,9 @@ switch ($action) {
             }
 
             if (empty($items)) {
-                Session::flash('error', '報價單無品項，無法建立出庫單');
+                $msg = '報價單無可出庫品項';
+                if ($skippedCount > 0) $msg .= '（已排除 ' . $skippedCount . ' 項工程項次/非庫存品）';
+                Session::flash('error', $msg);
                 redirect('/quotations.php?action=view&id=' . $qId);
             }
 

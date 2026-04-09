@@ -42,5 +42,24 @@ foreach ($siteNewCols as $name => $info) {
     }
 }
 
-echo "<br><b>完成！新增 {$added} 個欄位</b><br>";
-echo "<br><a href='/cases.php'>回案件管理</a>";
+echo "<br><b>case_site_conditions 新增 {$added} 個欄位</b><br>";
+
+// 檢查 product_categories 表
+echo "<h3>product_categories 表</h3>";
+$pcCols = array();
+$pcStmt = $db->query("SHOW COLUMNS FROM product_categories");
+while ($row = $pcStmt->fetch(PDO::FETCH_ASSOC)) {
+    $pcCols[] = $row['Field'];
+}
+if (!in_array('exclude_from_stockout', $pcCols)) {
+    try {
+        $db->exec("ALTER TABLE product_categories ADD COLUMN `exclude_from_stockout` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '不進出庫單' AFTER `sort`");
+        echo "新增 exclude_from_stockout ✓<br>";
+    } catch (Exception $ex) {
+        echo "失敗: " . $ex->getMessage() . "<br>";
+    }
+} else {
+    echo "exclude_from_stockout 已存在 ✓<br>";
+}
+
+echo "<br><a href='/cases.php'>回案件管理</a> | <a href='/products.php?action=categories'>產品分類</a>";

@@ -52,7 +52,8 @@
                     <td class="text-right"><?= (int)$cat['product_count'] ?></td>
                     <td>
                         <div class="d-flex gap-1">
-                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"])) ?>)'>編輯</button>
+                            <?php if (!empty($cat['exclude_from_stockout'])): ?><span class="badge" style="background:#ffebee;color:#c62828;font-size:.7rem;padding:2px 6px;margin-right:4px">不進出庫單</span><?php endif; ?>
+                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"], "exclude_from_stockout" => (int)($cat["exclude_from_stockout"] ?? 0))) ?>)'>編輯</button>
                             <?php if ((int)$cat['child_count'] === 0 && (int)$cat['product_count'] === 0): ?>
                             <form method="POST" action="/products.php?action=category_delete" style="display:inline" onsubmit="return confirm('確認刪除分類「<?= e($cat['name']) ?>」？')">
                                 <?= csrf_field() ?>
@@ -140,6 +141,14 @@
 
             <input type="hidden" name="name" id="catName">
 
+            <div class="form-group" style="margin-top:8px">
+                <label class="checkbox-label" style="cursor:pointer">
+                    <input type="checkbox" name="exclude_from_stockout" id="catExcludeStockout" value="1">
+                    <span style="color:#c62828;font-weight:600">不進出庫單</span>
+                </label>
+                <small style="color:#888;display:block;margin-top:2px">勾選後，此分類下的產品從報價單建立出庫單時會自動排除</small>
+            </div>
+
             <div class="d-flex gap-1">
                 <button type="submit" class="btn btn-primary" onclick="return prepareSave()">儲存</button>
                 <button type="button" class="btn btn-outline" onclick="closeCatModal()">取消</button>
@@ -156,7 +165,7 @@
 <script>
 // 分類資料（用 PHP 輸出成 JS）
 var allCats = <?= json_encode(array_map(function($c) {
-    return array('id' => $c['id'], 'name' => $c['name'], 'parent_id' => $c['parent_id']);
+    return array('id' => $c['id'], 'name' => $c['name'], 'parent_id' => $c['parent_id'], 'exclude_from_stockout' => (int)($c['exclude_from_stockout'] ?? 0));
 }, $allCategories), JSON_UNESCAPED_UNICODE) ?>;
 
 function getCatsByParent(parentId) {
@@ -327,6 +336,7 @@ function openCatModal(data) {
     document.getElementById('catId').value = '';
     document.getElementById('catName').value = '';
     document.getElementById('catParent').value = '';
+    document.getElementById('catExcludeStockout').checked = false;
     document.getElementById('catLevel0').value = '';
     document.getElementById('catLevel0New').value = '';
     document.getElementById('catLevel0New').style.display = 'none';
@@ -342,6 +352,7 @@ function openCatModal(data) {
         document.getElementById('catId').value = data.id;
         document.getElementById('catName').value = data.name;
         document.getElementById('catParent').value = data.parent_id || '';
+        document.getElementById('catExcludeStockout').checked = !!data.exclude_from_stockout;
 
         // 根據深度設定對應欄位
         var depth = getCatDepth(data.id);
