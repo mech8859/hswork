@@ -238,11 +238,24 @@
         </div>
     </div>
 
+    <?php if (empty($receiptReadonly)): ?>
     <div class="d-flex gap-1 mt-2">
         <button type="submit" class="btn btn-primary"><?= $isEdit ? '更新收款單' : '建立收款單' ?></button>
         <a href="/receipts.php" class="btn btn-outline">取消</a>
     </div>
+    <?php else: ?>
+    <div class="d-flex gap-1 mt-2">
+        <span class="badge" style="background:#fff3e0;color:#e65100;padding:6px 12px;font-size:.85rem">唯讀檢視</span>
+        <button type="button" class="btn btn-outline" onclick="history.back()">← 返回</button>
+    </div>
+    <?php endif; ?>
 </form>
+<?php if (!empty($receiptReadonly)): ?>
+<style>
+.card input, .card select, .card textarea { pointer-events:none; background:#f5f5f5 !important; }
+.card button[type="button"]:not(.btn-outline) { display:none; }
+</style>
+<?php endif; ?>
 
 <style>
 .form-row { display: flex; flex-wrap: wrap; gap: 12px; }

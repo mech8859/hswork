@@ -4,15 +4,31 @@
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
+$action = !empty($_GET['action']) ? $_GET['action'] : 'list';
+$receiptReadonly = false;
+
 if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('finance.view')) {
-    Session::flash('error', '無權限存取');
-    redirect('/');
+    // 無財務權限：僅允許檢視自己案件的收款單（唯讀）
+    if ($action === 'edit' && !empty($_GET['id'])) {
+        $_db = Database::getInstance();
+        $_rCheck = $_db->prepare("SELECT sales_id FROM receipts WHERE id = ?");
+        $_rCheck->execute(array((int)$_GET['id']));
+        $_rSalesId = $_rCheck->fetchColumn();
+        if ($_rSalesId && (int)$_rSalesId === (int)Auth::id()) {
+            $receiptReadonly = true; // 自己的案件，允許唯讀
+        } else {
+            Session::flash('error', '無權限存取');
+            redirect('/');
+        }
+    } else {
+        Session::flash('error', '無權限存取');
+        redirect('/');
+    }
 }
 require_once __DIR__ . '/../modules/finance/FinanceModel.php';
 require_once __DIR__ . '/../modules/notifications/NotificationModel.php';
 
 $model = new FinanceModel();
-$action = !empty($_GET['action']) ? $_GET['action'] : 'list';
 $branchIds = Auth::getAccessibleBranchIds();
 $userId = Session::getUser()['id'];
 $isBoss = Auth::hasPermission('all');
