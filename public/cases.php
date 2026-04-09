@@ -823,15 +823,32 @@ switch ($action) {
             !empty($_POST['invoice_number']) ? trim($_POST['invoice_number']) : null,
             !empty($_POST['note']) ? trim($_POST['note']) : null,
         );
+        // 處理附件上傳
+        $attachPath = null;
+        if (!empty($_FILES['bi_attachment']['tmp_name']) && $_FILES['bi_attachment']['error'] === UPLOAD_ERR_OK) {
+            $dir = __DIR__ . '/uploads/cases/' . $caseId . '/billing';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            $ext = strtolower(pathinfo($_FILES['bi_attachment']['name'], PATHINFO_EXTENSION));
+            $fname = 'bi_' . date('Ymd_His') . '_' . mt_rand(100, 999) . '.' . $ext;
+            if (move_uploaded_file($_FILES['bi_attachment']['tmp_name'], $dir . '/' . $fname)) {
+                $attachPath = 'uploads/cases/' . $caseId . '/billing/' . $fname;
+            }
+        }
+
         if ($biId) {
-            $db->prepare("UPDATE case_billing_items SET payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=? WHERE id=? AND case_id=?")
-                ->execute(array_merge($biData, array($biId, $caseId)));
+            $sql = "UPDATE case_billing_items SET payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=?";
+            $params = array_merge($biData);
+            if ($attachPath) { $sql .= ", attachment_path=?"; $params[] = $attachPath; }
+            $sql .= " WHERE id=? AND case_id=?";
+            $params[] = $biId;
+            $params[] = $caseId;
+            $db->prepare($sql)->execute($params);
         } else {
             $maxSeq = $db->prepare("SELECT COALESCE(MAX(seq_no),0) FROM case_billing_items WHERE case_id=?");
             $maxSeq->execute(array($caseId));
             $seqNo = (int)$maxSeq->fetchColumn() + 1;
-            $db->prepare("INSERT INTO case_billing_items (case_id, seq_no, payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute(array_merge(array($caseId, $seqNo), $biData, array(Auth::id())));
+            $db->prepare("INSERT INTO case_billing_items (case_id, seq_no, payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, attachment_path, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute(array_merge(array($caseId, $seqNo), $biData, array($attachPath, Auth::id())));
         }
         echo json_encode(array('success' => true));
         break;

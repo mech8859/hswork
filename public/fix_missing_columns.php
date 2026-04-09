@@ -62,4 +62,22 @@ if (!in_array('exclude_from_stockout', $pcCols)) {
     echo "exclude_from_stockout 已存在 ✓<br>";
 }
 
+// 檢查 case_billing_items 表
+echo "<h3>case_billing_items 表</h3>";
+$biCols = array();
+$biStmt = $db->query("SHOW COLUMNS FROM case_billing_items");
+while ($row = $biStmt->fetch(PDO::FETCH_ASSOC)) {
+    $biCols[] = $row['Field'];
+}
+if (!in_array('attachment_path', $biCols)) {
+    try {
+        $db->exec("ALTER TABLE case_billing_items ADD COLUMN `attachment_path` VARCHAR(500) DEFAULT NULL COMMENT '附件路徑(JSON)' AFTER `note`");
+        echo "新增 attachment_path ✓<br>";
+    } catch (Exception $ex) {
+        echo "失敗: " . $ex->getMessage() . "<br>";
+    }
+} else {
+    echo "attachment_path 已存在 ✓<br>";
+}
+
 echo "<br><a href='/cases.php'>回案件管理</a> | <a href='/products.php?action=categories'>產品分類</a>";
