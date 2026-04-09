@@ -213,6 +213,43 @@ switch ($action) {
                 $params[] = $salesName;
             }
             $sql .= " ORDER BY r.deposit_date DESC";
+        } elseif ($type === 'realtime_status') {
+            // 即時：業務 × 案件狀態(sub_status) 鑽取
+            $statusVal = isset($_GET['status_val']) ? $_GET['status_val'] : '';
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, DATE(c.created_at) AS created_date,
+                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)
+                      AND c.status NOT IN ('closed','cancelled','已完工結案','客戶取消')";
+            if ($statusVal) { $sql .= " AND c.sub_status = ?"; $params[] = $statusVal; }
+            if ($salesName) { $sql .= " AND u.real_name = ?"; $params[] = $salesName; }
+            $sql .= " ORDER BY c.created_at DESC LIMIT 500";
+        } elseif ($type === 'realtime_progress') {
+            // 即時：業務 × 案件進度(status) 鑽取
+            $statusVal = isset($_GET['status_val']) ? $_GET['status_val'] : '';
+            // status_val 傳入的是中文，需反查英文
+            $_pgReverseMap = array(
+                '待追蹤'=>'tracking','未完工'=>'incomplete','完工未收款'=>'unpaid',
+                '已完工待簽核'=>'completed_pending','已完工結案'=>'closed','未成交'=>'lost',
+                '保養案件'=>'maint_case','毀約'=>'breach','已排工/已排行事曆'=>'scheduled',
+                '已進場/需再安排'=>'needs_reschedule','待安排派工查修'=>'awaiting_dispatch',
+                '客戶取消'=>'customer_cancel',
+            );
+            $statusEng = isset($_pgReverseMap[$statusVal]) ? $_pgReverseMap[$statusVal] : $statusVal;
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, DATE(c.created_at) AS created_date,
+                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)
+                      AND c.status NOT IN ('closed','cancelled','已完工結案','客戶取消')";
+            if ($statusEng) { $sql .= " AND c.status = ?"; $params[] = $statusEng; }
+            if ($salesName) { $sql .= " AND u.real_name = ?"; $params[] = $salesName; }
+            $sql .= " ORDER BY c.created_at DESC LIMIT 500";
         } else {
             echo json_encode(array('cases' => array()));
             exit;

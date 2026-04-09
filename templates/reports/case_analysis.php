@@ -898,7 +898,7 @@ sort($_pgAllProgress);
             <thead><tr>
                 <th style="text-align:left;min-width:80px">業務</th>
                 <?php foreach ($_ssAllStatuses as $_s): ?>
-                <th style="font-size:.75rem;writing-mode:vertical-rl;text-orientation:mixed;height:80px;padding:4px 2px"><?= e($_s) ?></th>
+                <th style="font-size:.7rem;white-space:nowrap;padding:4px 6px;text-align:center"><?= e($_s) ?></th>
                 <?php endforeach; ?>
                 <th style="font-weight:700">合計</th>
             </tr></thead>
@@ -909,9 +909,9 @@ sort($_pgAllProgress);
                 <tr>
                     <td style="text-align:left;font-weight:600;white-space:nowrap"><?= e($_name) ?></td>
                     <?php foreach ($_ssAllStatuses as $_s): ?>
-                    <td><?= isset($_data[$_s]) && $_data[$_s] > 0 ? $_data[$_s] : '' ?></td>
+                    <td><?php if (isset($_data[$_s]) && $_data[$_s] > 0): ?><span class="drillable" onclick="drillDown('realtime_status','','<?= e($_name) ?>','<?= e($_name) ?> - <?= e($_s) ?>','<?= e($_s) ?>')"><?= $_data[$_s] ?></span><?php endif; ?></td>
                     <?php endforeach; ?>
-                    <td style="font-weight:700"><?= $_total ?></td>
+                    <td style="font-weight:700"><span class="drillable" onclick="drillDown('realtime_status','','<?= e($_name) ?>','<?= e($_name) ?> - 全部','')"><?= $_total ?></span></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -927,7 +927,7 @@ sort($_pgAllProgress);
             <thead><tr>
                 <th style="text-align:left;min-width:80px">業務</th>
                 <?php foreach ($_pgAllProgress as $_p): ?>
-                <th style="font-size:.75rem;writing-mode:vertical-rl;text-orientation:mixed;height:80px;padding:4px 2px"><?= e($_p) ?></th>
+                <th style="font-size:.7rem;white-space:nowrap;padding:4px 6px;text-align:center"><?= e($_p) ?></th>
                 <?php endforeach; ?>
                 <th style="font-weight:700">合計</th>
             </tr></thead>
@@ -938,9 +938,9 @@ sort($_pgAllProgress);
                 <tr>
                     <td style="text-align:left;font-weight:600;white-space:nowrap"><?= e($_name) ?></td>
                     <?php foreach ($_pgAllProgress as $_p): ?>
-                    <td><?= isset($_data[$_p]) && $_data[$_p] > 0 ? $_data[$_p] : '' ?></td>
+                    <td><?php if (isset($_data[$_p]) && $_data[$_p] > 0): ?><span class="drillable" onclick="drillDown('realtime_progress','','<?= e($_name) ?>','<?= e($_name) ?> - <?= e($_p) ?>','<?= e($_p) ?>')"><?= $_data[$_p] ?></span><?php endif; ?></td>
                     <?php endforeach; ?>
-                    <td style="font-weight:700"><?= $_total ?></td>
+                    <td style="font-weight:700"><span class="drillable" onclick="drillDown('realtime_progress','','<?= e($_name) ?>','<?= e($_name) ?> - 全部','')"><?= $_total ?></span></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -994,8 +994,9 @@ sort($_pgAllProgress);
 .rank-1 td { background: #fff8e1; }
 .rank-2 td { background: #f5f5f5; }
 .rank-3 td { background: #fbe9e7; }
-td.drillable { cursor: pointer; position: relative; }
-td.drillable:hover { background: #e3f2fd !important; text-decoration: underline; }
+td.drillable, .drillable { cursor: pointer; position: relative; }
+td.drillable:hover, td:has(> .drillable):hover { background: #e3f2fd !important; }
+.drillable:hover { text-decoration: underline; color: var(--primary); }
 </style>
 
 <script>
