@@ -337,6 +337,8 @@ switch ($action) {
                 'source_id' => $qId,
                 'source_number' => $quote['quotation_number'],
                 'warehouse_id' => $warehouseId,
+                'customer_name' => $quote['customer_name'] ?? null,
+                'customer_id' => $quote['customer_id'] ?? null,
                 'note' => '報價單 ' . $quote['quotation_number'] . ' 自動產生',
                 'total_qty' => $totalQty,
                 'created_by' => Auth::id(),
