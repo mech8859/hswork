@@ -466,8 +466,16 @@ switch ($action) {
         if (strlen($keyword) < 1) { echo json_encode(array()); break; }
         $db = Database::getInstance();
         $kw = '%' . $keyword . '%';
-        $stmt = $db->prepare("SELECT id, customer_no, name, site_address FROM customers WHERE is_active = 1 AND (name LIKE ? OR customer_no LIKE ?) ORDER BY name LIMIT 15");
-        $stmt->execute(array($kw, $kw));
+        // 搜尋案件管理（案件編號、案件名稱、施工地址）
+        $stmt = $db->prepare("
+            SELECT c.id, c.case_number, c.title AS name, c.customer_id, c.address AS site_address,
+                   c.status, c.sub_status
+            FROM cases c
+            WHERE c.case_number LIKE ? OR c.title LIKE ? OR c.address LIKE ?
+            ORDER BY c.created_at DESC
+            LIMIT 15
+        ");
+        $stmt->execute(array($kw, $kw, $kw));
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
 

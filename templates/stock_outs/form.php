@@ -53,8 +53,8 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
         </div>
         <div class="form-row">
             <div class="form-group" style="position:relative">
-                <label>客戶名稱</label>
-                <input type="text" name="customer_name" id="customerName" class="form-control" autocomplete="off" placeholder="輸入客戶名稱或編號搜尋..." oninput="searchCustomer(this)">
+                <label>客戶名稱 <small style="color:#888;font-weight:normal">(搜尋案件)</small></label>
+                <input type="text" name="customer_name" id="customerName" class="form-control" autocomplete="off" placeholder="輸入案件編號或客戶名稱搜尋..." oninput="searchCustomer(this)">
                 <div id="customerDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
             </div>
             <div class="form-group">
@@ -68,7 +68,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
             </div>
             <div class="form-group">
                 <label>來源單號</label>
-                <input type="text" name="source_number" class="form-control" placeholder="選填" value="">
+                <input type="text" name="source_number" id="sourceNumber" class="form-control" placeholder="選填" value="">
             </div>
             <div class="form-group" style="flex:2">
                 <label>備註</label>
@@ -146,17 +146,18 @@ function searchCustomer(inp) {
         xhr.open('GET', '/stock_outs.php?action=ajax_search_customer&keyword=' + encodeURIComponent(q));
         xhr.onload = function(){
             try { var list = JSON.parse(xhr.responseText); } catch(e) { return; }
-            if (!list.length) { dd.innerHTML = '<div style="padding:8px;color:#999;font-size:.85rem">無符合客戶</div>'; dd.style.display = 'block'; return; }
+            if (!list.length) { dd.innerHTML = '<div style="padding:8px;color:#999;font-size:.85rem">無符合案件</div>'; dd.style.display = 'block'; return; }
             var html = '';
             for (var i = 0; i < list.length; i++) {
+                var statusText = (list[i].status || '') + (list[i].sub_status ? ' / ' + list[i].sub_status : '');
                 html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" '
-                    + 'data-id="' + (list[i].id||'') + '" '
+                    + 'data-id="' + (list[i].customer_id||'') + '" '
                     + 'data-name="' + (list[i].name||'').replace(/"/g,'&quot;') + '" '
+                    + 'data-case-number="' + (list[i].case_number||'') + '" '
                     + 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">'
-                    + '<div style="font-weight:600">' + (list[i].name||'') + '</div>'
+                    + '<div style="font-weight:600">' + (list[i].case_number||'') + ' - ' + (list[i].name||'') + '</div>'
                     + '<div style="font-size:.75rem;color:#888">'
-                    + (list[i].customer_no ? list[i].customer_no + ' | ' : '')
-                    + (list[i].site_address || '')
+                    + (list[i].site_address || '') + (statusText ? ' | ' + statusText : '')
                     + '</div></div>';
             }
             dd.innerHTML = html;
@@ -171,6 +172,14 @@ document.addEventListener('click', function(e) {
         document.getElementById('customerName').value = item.dataset.name;
         document.getElementById('customerId').value = item.dataset.id;
         document.getElementById('customerDropdown').style.display = 'none';
+        // 自動帶入來源類型 + 來源單號
+        var caseNum = item.dataset.caseNumber;
+        if (caseNum) {
+            var srcType = document.getElementById('sourceType');
+            if (srcType) { srcType.value = 'case'; }
+            var srcNum = document.getElementById('sourceNumber');
+            if (srcNum) { srcNum.value = caseNum; }
+        }
         return;
     }
     if (e.target.id !== 'customerName') {
