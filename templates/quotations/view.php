@@ -37,10 +37,15 @@ foreach ($approvalStatus['flows'] as $af) {
             <?php endif; ?>
 
             <?php if ($quote['status'] === 'customer_accepted'): ?>
-            <?php if (!empty($_GET['show_force_stock_out'])): ?>
-            <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&force=1&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="return confirm('已有出庫單，確定要再次建立？')">確認再次建立出庫單</a>
+            <?php if (!empty($relatedStockOuts)): ?>
+                <?php $_latestSo = $relatedStockOuts[0]; ?>
+                <a href="/stock_outs.php?action=view&id=<?= $_latestSo['id'] ?>" class="btn btn-sm" style="background:var(--success);color:#fff" title="點選前往出庫單 <?= e($_latestSo['so_number']) ?>">✓ 出庫單已建立</a>
+                <?php if (!empty($_GET['show_force_stock_out'])): ?>
+                <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&force=1&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="return confirm('已有出庫單，確定要再次建立？')">確認再次建立出庫單</a>
+                <?php endif; ?>
+            <?php else: ?>
+                <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('從此報價單建立出庫單？')">建立出庫單</a>
             <?php endif; ?>
-            <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('從此報價單建立出庫單？')">建立出庫單</a>
             <?php endif; ?>
 
             <a href="/quotations.php?action=duplicate&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-outline btn-sm" onclick="return confirm('確定複製？')">複製</a>
@@ -80,6 +85,25 @@ foreach ($approvalStatus['flows'] as $af) {
 </div>
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
+
+<!-- 已建立的出庫單 -->
+<?php if (!empty($relatedStockOuts)): ?>
+<div class="card mb-2" style="border-left:4px solid var(--success)">
+    <div class="card-header" style="padding:8px 12px;font-size:.85rem;display:flex;align-items:center;gap:8px">
+        <span>📦 已建立出庫單</span>
+        <span class="text-muted" style="font-size:.8rem;font-weight:normal">(共 <?= count($relatedStockOuts) ?> 筆)</span>
+    </div>
+    <div style="padding:8px 12px">
+        <?php foreach ($relatedStockOuts as $_so): ?>
+        <div style="padding:4px 0;font-size:.9rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <a href="/stock_outs.php?action=view&id=<?= $_so['id'] ?>" style="font-weight:600;color:var(--primary)"><?= e($_so['so_number']) ?></a>
+            <span class="badge" style="background:var(--gray-100);color:var(--gray-700)"><?= e($_so['status']) ?></span>
+            <span class="text-muted" style="font-size:.8rem"><?= e($_so['so_date']) ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- 簽核紀錄 -->
 <?php if (!empty($approvalStatus['flows'])): ?>

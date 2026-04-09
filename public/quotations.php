@@ -148,6 +148,12 @@ switch ($action) {
         $editingLockModule = 'quotations';
         $editingLockRecordId = $id;
 
+        // 查詢此報價單已建立的出庫單
+        $_db = Database::getInstance();
+        $_so = $_db->prepare("SELECT id, so_number, status, so_date FROM stock_outs WHERE source_type = 'quotation' AND source_id = ? ORDER BY id DESC");
+        $_so->execute(array($id));
+        $relatedStockOuts = $_so->fetchAll(PDO::FETCH_ASSOC);
+
         $pageTitle = '報價單 ' . $quote['quotation_number'];
         $currentPage = 'quotations';
         require __DIR__ . '/../templates/layouts/header.php';
