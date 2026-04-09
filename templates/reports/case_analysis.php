@@ -821,6 +821,133 @@ $grandClosed = array_sum($typeTotalsClosed);
     </div>
     <div style="padding:8px 16px;font-size:.75rem;color:#888;">* 點擊數字可查看該批案件明細</div>
 </div>
+
+<?php
+// ===== 業務 × 狀態 / 業務 × 進度 即時分析 =====
+$_db = Database::getInstance();
+$_bph = implode(',', array_fill(0, count($branchIds), '?'));
+
+// 業務 × 狀態(sub_status) 即時
+$_ssStmt = $_db->prepare("
+    SELECT u.real_name AS sales_name, c.sub_status, COUNT(*) AS cnt
+    FROM cases c
+    LEFT JOIN users u ON c.sales_id = u.id
+    WHERE c.branch_id IN ({$_bph})
+      AND c.sub_status IS NOT NULL AND c.sub_status != ''
+      AND c.status NOT IN ('closed','cancelled','已完工結案','客戶取消')
+    GROUP BY c.sales_id, c.sub_status
+    ORDER BY u.real_name, c.sub_status
+");
+$_ssStmt->execute($branchIds);
+$_ssRows = $_ssStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 整理成 [業務][狀態] = 數量
+$_ssBySales = array();
+$_ssAllStatuses = array();
+foreach ($_ssRows as $_r) {
+    $name = $_r['sales_name'] ?: '(未指派)';
+    $ss = $_r['sub_status'];
+    if (!isset($_ssBySales[$name])) $_ssBySales[$name] = array();
+    $_ssBySales[$name][$ss] = (int)$_r['cnt'];
+    $_ssAllStatuses[$ss] = true;
+}
+$_ssAllStatuses = array_keys($_ssAllStatuses);
+sort($_ssAllStatuses);
+
+// 業務 × 進度(status) 即時
+$_pgStmt = $_db->prepare("
+    SELECT u.real_name AS sales_name, c.status, COUNT(*) AS cnt
+    FROM cases c
+    LEFT JOIN users u ON c.sales_id = u.id
+    WHERE c.branch_id IN ({$_bph})
+      AND c.status IS NOT NULL AND c.status != ''
+      AND c.status NOT IN ('closed','cancelled','已完工結案','客戶取消')
+    GROUP BY c.sales_id, c.status
+    ORDER BY u.real_name, c.status
+");
+$_pgStmt->execute($branchIds);
+$_pgRows = $_pgStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$_pgLabelMap = array(
+    'tracking'=>'待追蹤','incomplete'=>'未完工','unpaid'=>'完工未收款',
+    'completed_pending'=>'已完工待簽核','closed'=>'已完工結案','lost'=>'未成交',
+    'maint_case'=>'保養案件','breach'=>'毀約','scheduled'=>'已排工/已排行事曆',
+    'needs_reschedule'=>'已進場/需再安排','awaiting_dispatch'=>'待安排派工查修',
+    'customer_cancel'=>'客戶取消','maintenance_case'=>'保養案件',
+);
+$_pgBySales = array();
+$_pgAllProgress = array();
+foreach ($_pgRows as $_r) {
+    $name = $_r['sales_name'] ?: '(未指派)';
+    $pg = $_r['status'];
+    $pgLabel = isset($_pgLabelMap[$pg]) ? $_pgLabelMap[$pg] : $pg;
+    if (!isset($_pgBySales[$name])) $_pgBySales[$name] = array();
+    if (!isset($_pgBySales[$name][$pgLabel])) $_pgBySales[$name][$pgLabel] = 0;
+    $_pgBySales[$name][$pgLabel] += (int)$_r['cnt'];
+    $_pgAllProgress[$pgLabel] = true;
+}
+$_pgAllProgress = array_keys($_pgAllProgress);
+sort($_pgAllProgress);
+?>
+
+<!-- 十六、業務 × 狀態 即時統計 -->
+<div class="card">
+    <div class="card-header analysis-header">十六、業務 × 案件狀態 即時統計<small style="opacity:.7;margin-left:8px">（排除已完工結案/客戶取消）</small></div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th style="text-align:left;min-width:80px">業務</th>
+                <?php foreach ($_ssAllStatuses as $_s): ?>
+                <th style="font-size:.75rem;writing-mode:vertical-rl;text-orientation:mixed;height:80px;padding:4px 2px"><?= e($_s) ?></th>
+                <?php endforeach; ?>
+                <th style="font-weight:700">合計</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($_ssBySales as $_name => $_data):
+                $_total = array_sum($_data);
+            ?>
+                <tr>
+                    <td style="text-align:left;font-weight:600;white-space:nowrap"><?= e($_name) ?></td>
+                    <?php foreach ($_ssAllStatuses as $_s): ?>
+                    <td><?= isset($_data[$_s]) && $_data[$_s] > 0 ? $_data[$_s] : '' ?></td>
+                    <?php endforeach; ?>
+                    <td style="font-weight:700"><?= $_total ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 十七、業務 × 案件進度 即時統計 -->
+<div class="card">
+    <div class="card-header analysis-header">十七、業務 × 案件進度 即時統計<small style="opacity:.7;margin-left:8px">（排除已完工結案/客戶取消）</small></div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th style="text-align:left;min-width:80px">業務</th>
+                <?php foreach ($_pgAllProgress as $_p): ?>
+                <th style="font-size:.75rem;writing-mode:vertical-rl;text-orientation:mixed;height:80px;padding:4px 2px"><?= e($_p) ?></th>
+                <?php endforeach; ?>
+                <th style="font-weight:700">合計</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($_pgBySales as $_name => $_data):
+                $_total = array_sum($_data);
+            ?>
+                <tr>
+                    <td style="text-align:left;font-weight:600;white-space:nowrap"><?= e($_name) ?></td>
+                    <?php foreach ($_pgAllProgress as $_p): ?>
+                    <td><?= isset($_data[$_p]) && $_data[$_p] > 0 ? $_data[$_p] : '' ?></td>
+                    <?php endforeach; ?>
+                    <td style="font-weight:700"><?= $_total ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 進度交叉分析明細 -->
 <div id="progressDrillPanel" style="display:none">
     <div class="card" style="margin-top:-8px;border-top:3px solid var(--primary);background:#fafbff">
