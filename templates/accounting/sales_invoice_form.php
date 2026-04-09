@@ -191,9 +191,19 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
             </div>
             <div class="form-group">
                 <label>關聯單據編號</label>
+                <?php
+                // 如果關聯類型是案件，顯示案件編號而非 DB ID
+                $_refDisplay = ($isEdit && !empty($record['reference_id'])) ? $record['reference_id'] : '';
+                if ($isEdit && !empty($record['reference_type']) && $record['reference_type'] === 'case' && !empty($record['reference_id'])) {
+                    $_refCase = Database::getInstance()->prepare("SELECT case_number FROM cases WHERE id = ?");
+                    $_refCase->execute(array($record['reference_id']));
+                    $_cn = $_refCase->fetchColumn();
+                    if ($_cn) $_refDisplay = $_cn;
+                }
+                ?>
                 <input type="text" name="reference_id" class="form-control"
-                       value="<?= e($isEdit && !empty($record['reference_id']) ? $record['reference_id'] : '') ?>"
-                       placeholder="選填">
+                       value="<?= e($_refDisplay) ?>"
+                       placeholder="選填" readonly style="background:#f5f5f5">
             </div>
         </div>
     </div>
