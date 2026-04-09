@@ -939,7 +939,7 @@ function saveNewCustomer() {
     });
 
     function parseNum(v) { return parseInt(String(v).replace(/,/g, '')) || 0; }
-    function fmtNum(n) { return n ? n.toLocaleString('en-US') : ''; }
+    function fmtNum(n) { return (n !== null && n !== undefined && n !== '') ? Number(n).toLocaleString('en-US') : ''; }
     function setNum(el, n) { if (!el) return; el.value = fmtNum(n); el.dataset.raw = n || ''; }
     function recalcFinance() {
         var deal = parseNum(dealInput.value);
@@ -972,6 +972,8 @@ function saveNewCustomer() {
 
     taxSelect.addEventListener('change', recalcFinance);
     dealInput.addEventListener('input', recalcFinance);
+    // 頁面載入時自動校正一次（修正 DB 存了不一致的值）
+    recalcFinance();
 })();
 
 // ===== 帳務交易 Modal =====

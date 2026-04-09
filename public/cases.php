@@ -164,6 +164,14 @@ switch ($action) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/cases.php?action=edit&id=' . $id);
             }
+            // 後端校正：未稅(不開發票) → 強制清除稅金/含稅金額，尾款用成交金額算
+            if (isset($_POST['is_tax_included']) && $_POST['is_tax_included'] === '未稅(不開發票)') {
+                $_POST['tax_amount'] = '0';
+                $_POST['total_amount'] = $_POST['deal_amount'] ?? '0';
+                $deal = (int)str_replace(',', '', $_POST['deal_amount'] ?? '0');
+                $collected = (int)str_replace(',', '', $_POST['total_collected'] ?? '0');
+                $_POST['balance_amount'] = (string)($deal - $collected);
+            }
             try {
                 $model->update($id, $_POST);
             } catch (\RuntimeException $e) {
