@@ -295,14 +295,23 @@ switch ($action) {
         $dateFrom   = trim($_GET['date_from'] ?? '');
         $dateTo     = trim($_GET['date_to'] ?? '');
         if ($vendorName === '') { echo json_encode(array()); break; }
-        $where = 'vendor_name = ?';
+        $where = 'gr.vendor_name = ?';
         $params = array($vendorName);
-        if ($dateFrom !== '') { $where .= ' AND gr_date >= ?'; $params[] = $dateFrom; }
-        if ($dateTo !== '')   { $where .= ' AND gr_date <= ?'; $params[] = $dateTo; }
-        $sql = "SELECT id, gr_number, gr_date, vendor_name, branch_name, total_amount, total_qty, status, paid_amount
-                FROM goods_receipts
+        if ($dateFrom !== '') { $where .= ' AND gr.gr_date >= ?'; $params[] = $dateFrom; }
+        if ($dateTo !== '')   { $where .= ' AND gr.gr_date <= ?'; $params[] = $dateTo; }
+        // total_amount 以 items 即時計算為準（含稅 = 未稅 * 1.05）
+        // 若 items 全無金額（舊 Ragic 入庫資料），回退使用原儲存值
+        $sql = "SELECT gr.id, gr.gr_number, gr.gr_date, gr.vendor_name, gr.branch_name,
+                       CASE WHEN COALESCE(ic.calc_subtotal, 0) > 0 THEN ROUND(ic.calc_subtotal * 1.05, 0) ELSE gr.total_amount END AS total_amount,
+                       CASE WHEN COALESCE(ic.calc_qty, 0) > 0 THEN ic.calc_qty ELSE gr.total_qty END AS total_qty,
+                       gr.status, gr.paid_amount
+                FROM goods_receipts gr
+                LEFT JOIN (
+                    SELECT goods_receipt_id, SUM(received_qty) AS calc_qty, SUM(amount) AS calc_subtotal
+                    FROM goods_receipt_items GROUP BY goods_receipt_id
+                ) ic ON ic.goods_receipt_id = gr.id
                 WHERE $where
-                ORDER BY gr_date DESC, id DESC
+                ORDER BY gr.gr_date DESC, gr.id DESC
                 LIMIT 200";
         $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute($params);

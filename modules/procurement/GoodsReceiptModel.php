@@ -95,12 +95,12 @@ class GoodsReceiptModel
 
         $offset = ($page - 1) * $perPage;
         // total_qty / total_amount 以 goods_receipt_items 即時計算為準（含稅 = 未稅 * 1.05）
-        // 避免 list 顯示的儲存值與 view 計算值不一致
+        // 若 items 全無金額（舊 Ragic 入庫資料），回退使用原儲存值
         $stmt = $this->db->prepare("
             SELECT gr.*, w.name AS warehouse_name,
                    u.real_name AS created_by_name,
-                   COALESCE(ic.calc_qty, 0) AS total_qty,
-                   ROUND(COALESCE(ic.calc_subtotal, 0) * 1.05, 0) AS total_amount,
+                   CASE WHEN COALESCE(ic.calc_qty, 0) > 0 THEN ic.calc_qty ELSE gr.total_qty END AS total_qty,
+                   CASE WHEN COALESCE(ic.calc_subtotal, 0) > 0 THEN ROUND(ic.calc_subtotal * 1.05, 0) ELSE gr.total_amount END AS total_amount,
                    gr.total_amount AS stored_total_amount
             FROM goods_receipts gr
             LEFT JOIN warehouses w ON gr.warehouse_id = w.id
