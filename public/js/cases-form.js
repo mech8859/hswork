@@ -953,6 +953,7 @@ function saveNewCustomer() {
             setNum(taxInput, tax);
             setNum(totalInput, total);
             if (taxRow) taxRow.style.display = '';
+            if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
             setNum(balanceInput, deal > 0 ? (total - collected) : 0);
         } else if (taxVal === '含稅(免開發票)') {
             var total = deal;
@@ -961,11 +962,15 @@ function saveNewCustomer() {
             setNum(taxInput, tax);
             setNum(totalInput, total);
             if (taxRow) taxRow.style.display = '';
+            if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
             setNum(balanceInput, deal > 0 ? (total - collected) : 0);
         } else {
+            // 未稅(不開發票) 或未選擇：清除稅金，隱藏稅金列
             setNum(taxInput, 0);
             setNum(totalInput, 0);
             if (taxRow) taxRow.style.display = 'none';
+            // 保險：直接找 taxInput/totalInput 的父列隱藏
+            if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = 'none';
             setNum(balanceInput, deal > 0 ? (deal - collected) : 0);
         }
     }

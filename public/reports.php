@@ -215,10 +215,14 @@ switch ($action) {
             $sql .= " ORDER BY r.deposit_date DESC";
         } elseif ($type === 'realtime_status') {
             // 即時：業務 × 案件狀態(sub_status) 鑽取
+            // 成交類狀態取 deal_amount，其他取 total_amount
             $statusVal = isset($_GET['status_val']) ? $_GET['status_val'] : '';
             $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
                         u.real_name AS sales_name, DATE(c.created_at) AS created_date,
-                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.deal_date,
+                        CASE WHEN c.sub_status IN ('已成交','跨月成交','現簽','電話報價成交')
+                             THEN COALESCE(c.deal_amount, 0)
+                             ELSE COALESCE(c.total_amount, 0) END AS total_amount,
                         c.sub_status, c.status, c.case_type
                     FROM cases c
                     LEFT JOIN users u ON c.sales_id = u.id
@@ -230,7 +234,6 @@ switch ($action) {
         } elseif ($type === 'realtime_progress') {
             // 即時：業務 × 案件進度(status) 鑽取
             $statusVal = isset($_GET['status_val']) ? $_GET['status_val'] : '';
-            // status_val 傳入的是中文，需反查英文
             $_pgReverseMap = array(
                 '待追蹤'=>'tracking','未完工'=>'incomplete','完工未收款'=>'unpaid',
                 '已完工待簽核'=>'completed_pending','已完工結案'=>'closed','未成交'=>'lost',
@@ -241,7 +244,8 @@ switch ($action) {
             $statusEng = isset($_pgReverseMap[$statusVal]) ? $_pgReverseMap[$statusVal] : $statusVal;
             $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
                         u.real_name AS sales_name, DATE(c.created_at) AS created_date,
-                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.deal_date,
+                        GREATEST(COALESCE(c.deal_amount, 0) - COALESCE(c.total_collected, 0), 0) AS total_amount,
                         c.sub_status, c.status, c.case_type
                     FROM cases c
                     LEFT JOIN users u ON c.sales_id = u.id
