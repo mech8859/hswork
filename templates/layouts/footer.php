@@ -147,19 +147,22 @@ document.addEventListener('click', function(e) {
 // ===== 全站圖片壓縮 =====
 // 壓縮單張圖片：compressImage(file, maxSize, quality) → Promise<File>
 function compressImage(file, maxSize, quality) {
-    maxSize = maxSize || 1920;
-    quality = quality || 0.8;
+    maxSize = maxSize || 1600;
+    quality = quality || 0.7;
     return new Promise(function(resolve) {
-        // 非圖片直接回傳
+        // 非圖片直接回傳（含 HEIC 等不支援格式）
         if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp|bmp)$/i)) {
             resolve(file);
             return;
         }
-        // 小於 500KB 不壓縮
-        if (file.size < 500 * 1024) {
+        // 小於 300KB 不壓縮
+        if (file.size < 300 * 1024) {
             resolve(file);
             return;
         }
+        // 超時保護：5 秒內壓不完就用原檔
+        var done = false;
+        var timer = setTimeout(function() { if (!done) { done = true; resolve(file); } }, 5000);
         var reader = new FileReader();
         reader.onload = function(e) {
             var img = new Image();
@@ -176,6 +179,8 @@ function compressImage(file, maxSize, quality) {
                 var ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
                 canvas.toBlob(function(blob) {
+                    if (done) return;
+                    done = true; clearTimeout(timer);
                     if (!blob) { resolve(file); return; }
                     // 壓縮後更大就用原檔
                     if (blob.size >= file.size) { resolve(file); return; }
@@ -183,10 +188,10 @@ function compressImage(file, maxSize, quality) {
                     resolve(compressed);
                 }, 'image/jpeg', quality);
             };
-            img.onerror = function() { resolve(file); };
+            img.onerror = function() { if (!done) { done = true; clearTimeout(timer); resolve(file); } };
             img.src = e.target.result;
         };
-        reader.onerror = function() { resolve(file); };
+        reader.onerror = function() { if (!done) { done = true; clearTimeout(timer); resolve(file); } };
         reader.readAsDataURL(file);
     });
 }

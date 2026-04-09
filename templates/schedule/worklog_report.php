@@ -364,10 +364,32 @@ document.querySelector('form[method="POST"][enctype]').addEventListener('submit'
         for (var i = 0; i < compressed.length; i++) {
             fd.append('photos[]', compressed[i]);
         }
+        btn.textContent = '上傳中...';
         var xhr = new XMLHttpRequest();
         xhr.open('POST', form.action || window.location.href);
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round(e.loaded / e.total * 100);
+                btn.textContent = '上傳中 ' + pct + '%...';
+            }
+        };
         xhr.onload = function() { location.reload(); };
+        xhr.onerror = function() {
+            btn.disabled = false;
+            btn.textContent = '儲存回報';
+            alert('上傳失敗，請檢查網路連線後重試');
+        };
+        xhr.ontimeout = function() {
+            btn.disabled = false;
+            btn.textContent = '儲存回報';
+            alert('上傳逾時，照片可能太大，請減少張數後重試');
+        };
+        xhr.timeout = 120000; // 2 分鐘逾時
         xhr.send(fd);
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = '儲存回報';
+        alert('圖片壓縮失敗，請重試');
     });
 });
 </script>
