@@ -721,8 +721,18 @@ class ScheduleModel
         }
 
         // 6. 批次載入日期範圍內的排工和請假
-        $startDate = date('Y-m-d', strtotime('+1 day'));
-        $endDate = date('Y-m-d', strtotime('+' . $days . ' days'));
+        // 如果案件有預計施工日且在未來，從該日開始搜尋
+        $plannedDate = !empty($case['planned_start_date']) ? $case['planned_start_date'] : null;
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+        if ($plannedDate && $plannedDate >= $tomorrow) {
+            // 從預計施工日前1天開始，確保涵蓋該日
+            $startDate = date('Y-m-d', strtotime('-1 day', strtotime($plannedDate)));
+            if ($startDate < $tomorrow) $startDate = $tomorrow;
+        } else {
+            $startDate = $tomorrow;
+            $plannedDate = null; // 過去的日期不列入考量
+        }
+        $endDate = date('Y-m-d', strtotime('+' . $days . ' days', strtotime($startDate)));
 
         // 已排工人員工時 (by date) — 用 estimated_hours 計算每人每日已用時數
         $defaultHours = self::DEFAULT_ESTIMATED_HOURS;
@@ -850,6 +860,21 @@ class ScheduleModel
                     $team, $requiredSkills, $pairs, $prevTeam, $weeklyLoad,
                     $bestVehicle, $teamSize
                 );
+
+                // 預計施工日加分：當天 +30，前後1天 +15，前後2天 +5
+                if ($plannedDate) {
+                    $daysDiff = abs((strtotime($date) - strtotime($plannedDate)) / 86400);
+                    if ($daysDiff == 0) {
+                        $score['total'] += 30;
+                        $score['breakdown']['date_match'] = 30;
+                    } elseif ($daysDiff <= 1) {
+                        $score['total'] += 15;
+                        $score['breakdown']['date_match'] = 15;
+                    } elseif ($daysDiff <= 2) {
+                        $score['total'] += 5;
+                        $score['breakdown']['date_match'] = 5;
+                    }
+                }
 
                 $teamIds = [];
                 $teamNames = [];
