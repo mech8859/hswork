@@ -94,12 +94,21 @@ class GoodsReceiptModel
         $total = (int)$countStmt->fetchColumn();
 
         $offset = ($page - 1) * $perPage;
+        // total_qty / total_amount 以 goods_receipt_items 即時計算為準（含稅 = 未稅 * 1.05）
+        // 避免 list 顯示的儲存值與 view 計算值不一致
         $stmt = $this->db->prepare("
             SELECT gr.*, w.name AS warehouse_name,
-                   u.real_name AS created_by_name
+                   u.real_name AS created_by_name,
+                   COALESCE(ic.calc_qty, 0) AS total_qty,
+                   ROUND(COALESCE(ic.calc_subtotal, 0) * 1.05, 0) AS total_amount,
+                   gr.total_amount AS stored_total_amount
             FROM goods_receipts gr
             LEFT JOIN warehouses w ON gr.warehouse_id = w.id
             LEFT JOIN users u ON gr.created_by = u.id
+            LEFT JOIN (
+                SELECT goods_receipt_id, SUM(received_qty) AS calc_qty, SUM(amount) AS calc_subtotal
+                FROM goods_receipt_items GROUP BY goods_receipt_id
+            ) ic ON ic.goods_receipt_id = gr.id
             WHERE {$where}
             ORDER BY gr.gr_date DESC, gr.id DESC
             LIMIT {$perPage} OFFSET {$offset}
@@ -162,6 +171,8 @@ class GoodsReceiptModel
     public function create($data)
     {
         $number = $this->generateNumber();
+        // 從 items 自動計算 total_qty / total_amount（含稅），忽略 POST 傳入的值
+        $calc = $this->calcTotalsFromItems($data['items'] ?? array());
         $stmt = $this->db->prepare("
             INSERT INTO goods_receipts
                 (gr_number, gr_date, status, po_id, po_number, vendor_id, vendor_name,
@@ -182,8 +193,8 @@ class GoodsReceiptModel
             !empty($data['branch_name']) ? $data['branch_name'] : null,
             !empty($data['receiver_name']) ? $data['receiver_name'] : null,
             !empty($data['note']) ? $data['note'] : null,
-            !empty($data['total_qty']) ? $data['total_qty'] : 0,
-            !empty($data['total_amount']) ? $data['total_amount'] : 0,
+            $calc['total_qty'],
+            $calc['total_amount'],
             !empty($data['paid_amount']) ? $data['paid_amount'] : null,
             !empty($data['paid_date']) ? $data['paid_date'] : null,
             $data['created_by'],
@@ -198,6 +209,32 @@ class GoodsReceiptModel
         return $grId;
     }
 
+    /**
+     * 從 items 陣列計算 total_qty（數量合計）+ total_amount（含稅總計）
+     * 規則：total_amount = ROUND(SUM(items.amount) * 1.05)
+     */
+    private function calcTotalsFromItems($items)
+    {
+        $totalQty = 0;
+        $subtotal = 0;
+        if (is_array($items)) {
+            foreach ($items as $it) {
+                $qty = isset($it['received_qty']) ? (float)$it['received_qty'] : 0;
+                $amount = isset($it['amount']) ? (float)$it['amount'] : 0;
+                // 若未帶 amount，從單價 x 數量算
+                if (!$amount && isset($it['unit_price']) && $qty) {
+                    $amount = round((float)$it['unit_price'] * $qty, 2);
+                }
+                $totalQty += $qty;
+                $subtotal += $amount;
+            }
+        }
+        return array(
+            'total_qty' => $totalQty,
+            'total_amount' => (int)round($subtotal * 1.05),
+        );
+    }
+
     // ============================================================
     // 更新
     // ============================================================
@@ -209,6 +246,15 @@ class GoodsReceiptModel
      */
     public function update($id, $data)
     {
+        // 從 items 自動計算 total_qty / total_amount（含稅）
+        // 若 $data['items'] 未傳，則用資料庫現有的 items 重算
+        if (isset($data['items'])) {
+            $calc = $this->calcTotalsFromItems($data['items']);
+        } else {
+            $existing = $this->getItems($id);
+            $calc = $this->calcTotalsFromItems($existing);
+        }
+
         $stmt = $this->db->prepare("
             UPDATE goods_receipts SET
                 gr_date = ?, status = ?, po_id = ?, po_number = ?,
@@ -227,8 +273,8 @@ class GoodsReceiptModel
             !empty($data['warehouse_id']) ? $data['warehouse_id'] : null,
             !empty($data['receiver_name']) ? $data['receiver_name'] : null,
             !empty($data['note']) ? $data['note'] : null,
-            !empty($data['total_qty']) ? $data['total_qty'] : 0,
-            !empty($data['total_amount']) ? $data['total_amount'] : 0,
+            $calc['total_qty'],
+            $calc['total_amount'],
             !empty($data['updated_by']) ? $data['updated_by'] : null,
             $id,
         ));
@@ -236,6 +282,10 @@ class GoodsReceiptModel
         // 重新儲存明細
         if (isset($data['items'])) {
             $this->saveItems($id, $data['items']);
+            // saveItems 後，items 已更新 → 重算一次以確保 total 對齊（insert/delete 順序保險起見）
+            $recalc = $this->calcTotalsFromItems($this->getItems($id));
+            $this->db->prepare("UPDATE goods_receipts SET total_qty = ?, total_amount = ? WHERE id = ?")
+                ->execute(array($recalc['total_qty'], $recalc['total_amount'], $id));
         }
     }
 
