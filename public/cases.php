@@ -200,6 +200,22 @@ switch ($action) {
         $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
 
+        // 查詢該案件的報價單與出庫單狀態（純顯示用）
+        $caseStockOutStatus = array('quote_count' => 0, 'stockout_count' => 0);
+        $_csoStmt = Database::getInstance()->prepare("
+            SELECT COUNT(DISTINCT q.id) AS quote_count,
+                   COUNT(DISTINCT so.id) AS stockout_count
+            FROM quotations q
+            LEFT JOIN stock_outs so ON so.source_type = 'quotation' AND so.source_id = q.id
+            WHERE q.case_id = ?
+        ");
+        $_csoStmt->execute(array($id));
+        $_csoRow = $_csoStmt->fetch(PDO::FETCH_ASSOC);
+        if ($_csoRow) {
+            $caseStockOutStatus['quote_count'] = (int)$_csoRow['quote_count'];
+            $caseStockOutStatus['stockout_count'] = (int)$_csoRow['stockout_count'];
+        }
+
         // 編輯鎖定（多人同時編輯提醒，純警示不阻擋）
         require_once __DIR__ . '/../includes/EditingLock.php';
         $_curUser = Auth::user();

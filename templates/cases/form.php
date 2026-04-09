@@ -38,6 +38,15 @@
         ?>
         <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?></span>
         <?php endif; } ?>
+        <?php
+        // 出庫單狀態（純顯示）
+        if (!empty($caseStockOutStatus) && $caseStockOutStatus['quote_count'] > 0):
+            if ($caseStockOutStatus['stockout_count'] > 0):
+        ?>
+        <span style="color:var(--success);font-size:.85rem;font-weight:600;margin-left:12px">✓ 出庫單已建立</span>
+        <?php else: ?>
+        <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">⚠ 出庫單尚未建立</span>
+        <?php endif; endif; ?>
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
