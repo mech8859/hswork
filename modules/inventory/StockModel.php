@@ -443,8 +443,10 @@ class StockModel
         if (!$row) return null;
 
         // Also load items
+        // 注意：用 db_ 前綴 alias 避免與 stock_out_items 自身欄位 product_name/unit 衝突
+        // （以前用 p.name AS product_name 會在 product_id=null 時覆蓋 soi 的實際值為 NULL）
         $itemStmt = $this->db->prepare("
-            SELECT soi.*, p.name AS product_name, p.model AS product_model, p.unit
+            SELECT soi.*, p.name AS db_product_name, p.model AS db_model, p.unit AS db_unit
             FROM stock_out_items soi
             LEFT JOIN products p ON soi.product_id = p.id
             WHERE soi.stock_out_id = ?

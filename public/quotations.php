@@ -314,7 +314,7 @@ switch ($action) {
                                 'model' => $item['model_number'] ?? '',
                                 'unit' => $item['unit'] ?? '式',
                                 'quantity' => $qty,
-                                'unit_price' => (float)($item['unit_cost'] ?? 0),
+                                'unit_price' => (float)($item['unit_price'] ?? 0),
                                 'note' => $item['remark'] ?? '',
                             );
                             $totalQty += $qty;
