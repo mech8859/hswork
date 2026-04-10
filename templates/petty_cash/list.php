@@ -29,11 +29,15 @@
             </div>
             <div class="form-group">
                 <label>有無發票</label>
-                <select name="has_invoice" class="form-control">
+                <select name="has_invoice" id="pcHasInvoice" class="form-control" onchange="toggleInvoiceInfo()">
                     <option value="">-</option>
                     <option value="有發票">有發票</option>
                     <option value="無發票">無發票</option>
                 </select>
+            </div>
+            <div class="form-group" id="pcInvoiceInfoGroup" style="display:none">
+                <label>發票號碼</label>
+                <input type="text" name="invoice_info" class="form-control" placeholder="發票號碼">
             </div>
             <div class="form-group">
                 <label>用途說明</label>
@@ -212,5 +216,10 @@
 function toggleAddForm() {
     var el = document.getElementById('addFormCard');
     el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+function toggleInvoiceInfo() {
+    var sel = document.getElementById('pcHasInvoice');
+    var grp = document.getElementById('pcInvoiceInfoGroup');
+    grp.style.display = (sel && sel.value === '有發票') ? '' : 'none';
 }
 </script>

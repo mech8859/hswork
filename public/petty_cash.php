@@ -145,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'entry_date'  => !empty($_POST['entry_date']) ? $_POST['entry_date'] : date('Y-m-d'),
         'amount'      => !empty($_POST['amount']) ? $_POST['amount'] : 0,
         'has_invoice'  => !empty($_POST['has_invoice']) ? $_POST['has_invoice'] : null,
+        'invoice_info' => !empty($_POST['invoice_info']) ? $_POST['invoice_info'] : null,
         'description'  => !empty($_POST['description']) ? $_POST['description'] : null,
         'branch_id'    => !empty($_POST['branch_id']) ? $_POST['branch_id'] : null,
         'registrar'    => $user ? $user['real_name'] : null,

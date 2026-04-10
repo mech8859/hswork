@@ -1639,8 +1639,8 @@ class FinanceModel
 
         $stmt = $this->db->prepare("
             INSERT INTO petty_cash (entry_number, entry_date, type, income_amount, expense_amount,
-                has_invoice, description, branch_id, registrar, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                has_invoice, invoice_info, description, branch_id, registrar, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute(array(
             $number,
@@ -1649,6 +1649,7 @@ class FinanceModel
             $income,
             $expense,
             !empty($data['has_invoice']) ? $data['has_invoice'] : null,
+            !empty($data['invoice_info']) ? $data['invoice_info'] : null,
             !empty($data['description']) ? $data['description'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
             !empty($data['registrar']) ? $data['registrar'] : null,

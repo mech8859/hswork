@@ -66,6 +66,54 @@ class ScheduleModel
             $s['dispatch_workers'] = $dwStmt->fetchAll();
         }
 
+        // 批量查詢 worklog 狀態（用於行事曆顯示細化）
+        $scheduleIds = array_column($schedules, 'id');
+        $wlSummary = array();
+        if (!empty($scheduleIds)) {
+            $wlPh = implode(',', array_fill(0, count($scheduleIds), '?'));
+            $wlStmt = $this->db->prepare("
+                SELECT schedule_id,
+                       MAX(arrival_time IS NOT NULL) as has_arrival,
+                       MAX(departure_time IS NOT NULL) as has_departure,
+                       MAX(work_description IS NOT NULL AND work_description != '') as has_report,
+                       MAX(COALESCE(is_completed, 0)) as is_completed,
+                       MAX(COALESCE(next_visit_needed, 0)) as next_visit_needed
+                FROM work_logs
+                WHERE schedule_id IN ($wlPh)
+                GROUP BY schedule_id
+            ");
+            $wlStmt->execute($scheduleIds);
+            foreach ($wlStmt->fetchAll() as $row) {
+                $wlSummary[(int)$row['schedule_id']] = $row;
+            }
+        }
+
+        // 計算 display_status
+        $now = date('H');
+        foreach ($schedules as &$s) {
+            $wl = isset($wlSummary[(int)$s['id']]) ? $wlSummary[(int)$s['id']] : null;
+            if ($s['status'] === 'in_progress' && $wl) {
+                if ($wl['has_report'] && $wl['next_visit_needed']) {
+                    $s['display_status'] = 'needs_revisit';
+                } elseif ($wl['has_report'] && $wl['is_completed']) {
+                    // 已回報完工但 schedule 還沒轉 completed（罕見，通常會同步）
+                    $s['display_status'] = 'completed';
+                } elseif ($wl['has_departure'] && !$wl['has_report']) {
+                    // 已下工但未回報
+                    if ((int)$now >= 17 && $s['schedule_date'] <= date('Y-m-d')) {
+                        $s['display_status'] = 'no_report';
+                    } else {
+                        $s['display_status'] = 'checked_out';
+                    }
+                } else {
+                    $s['display_status'] = 'in_progress';
+                }
+            } else {
+                $s['display_status'] = $s['status'];
+            }
+        }
+        unset($s);
+
         return $schedules;
     }
 

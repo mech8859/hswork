@@ -232,7 +232,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                 $shown++;
                 $isMine = in_array($currentUserId, array_column($ds['engineers'], 'user_id'));
             ?>
-            <a href="/schedule.php?action=view&id=<?= $ds['id'] ?>" class="cal-event cal-event-<?= $ds['status'] ?> <?= $isMine ? 'cal-event-mine' : '' ?>">
+            <a href="/schedule.php?action=view&id=<?= $ds['id'] ?>" class="cal-event cal-event-<?= isset($ds['display_status']) ? $ds['display_status'] : $ds['status'] ?> <?= $isMine ? 'cal-event-mine' : '' ?>">
                 <?php
                 $schedTime = '';
                 if (!empty($ds['designated_time'])) {
@@ -258,7 +258,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                     $engNames = array();
                     foreach ($ds['engineers'] as $eng) $engNames[] = $eng['real_name'];
                 ?>
-                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>"></div>
+                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= isset($ds['display_status']) ? e($ds['display_status']) : e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>" data-case-number="<?= e($ds['case_number'] ?: '') ?>"></div>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
@@ -677,6 +677,9 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 .cal-event-planned { background: #e8eaed; color: #333; }
 .cal-event-confirmed { background: var(--info); }
 .cal-event-in_progress { background: var(--warning); color: #333; }
+.cal-event-checked_out { background: #8b5cf6; }
+.cal-event-needs_revisit { background: #f97316; }
+.cal-event-no_report { background: #ef4444; }
 .cal-event-completed { background: var(--success); }
 .cal-event-cancelled { background: var(--gray-500); }
 .cal-event-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -803,8 +806,8 @@ function showSchedulePopup(dateStr) {
     var d = new Date(dateStr);
     var weekdays = ['日','一','二','三','四','五','六'];
     document.getElementById('schPopupTitle').textContent = (d.getMonth()+1) + '/' + d.getDate() + ' (' + weekdays[d.getDay()] + ') ' + items.length + ' 筆排工';
-    var statusColors = {planned:'#3b82f6',confirmed:'#2563eb',in_progress:'#f59e0b',completed:'#22c55e',cancelled:'#ef4444'};
-    var statusLabels = {planned:'已排',confirmed:'已確認',in_progress:'施工中',completed:'完工',cancelled:'取消'};
+    var statusColors = {planned:'#3b82f6',confirmed:'#2563eb',in_progress:'#f59e0b',checked_out:'#8b5cf6',needs_revisit:'#f97316',no_report:'#ef4444',completed:'#22c55e',cancelled:'#6b7280'};
+    var statusLabels = {planned:'已排',confirmed:'已確認',in_progress:'施工中',checked_out:'已下工',needs_revisit:'需再施工',no_report:'未回報',completed:'已完工',cancelled:'取消'};
     var html = '';
     for (var i = 0; i < items.length; i++) {
         var it = items[i];
@@ -814,14 +817,15 @@ function showSchedulePopup(dateStr) {
         var plate = it.getAttribute('data-plate');
         var engineers = it.getAttribute('data-engineers');
         var count = it.getAttribute('data-count');
+        var caseNo = it.getAttribute('data-case-number') || '';
         var color = statusColors[status] || '#3b82f6';
         var label = statusLabels[status] || status;
         html += '<a href="/schedule.php?action=view&id=' + id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
             ' onmouseover="this.style.background=\'#eef1f5\'" onmouseout="this.style.background=\'#f8f9fa\'">' +
             '<div style="font-weight:600;font-size:.95rem">' + title + '</div>' +
-            '<div style="display:flex;gap:8px;font-size:.8rem;color:#888;margin-top:2px">' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem;color:#888;margin-top:2px">' +
             '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + color + ';color:#fff;font-size:.7rem">' + label + '</span>' +
-            (plate ? '<span>' + plate + '</span>' : '') +
+            (caseNo ? '<span>' + caseNo + '</span>' : '') +
             '<span>' + count + '人</span>' +
             '</div>' +
             '<div style="font-size:.8rem;color:#666;margin-top:2px">' + engineers + '</div>' +

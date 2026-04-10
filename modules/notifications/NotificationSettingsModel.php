@@ -126,7 +126,7 @@ class NotificationSettingsModel
                     'status_changed' => '狀態變更',
                 ),
                 'condition_fields' => array(
-                    'status' => array('label' => '狀態', 'values' => array('待收款', '已收款', '已入帳', '作廢')),
+                    'status' => array('label' => '狀態', 'values' => array('已收款', '已收待查資料', '預收待查', '保留款', '待收款', '已入帳', '退款', '取消', '拋轉待確認')),
                 ),
                 'record_fields' => array('sales_id' => '承辦業務'),
             ),
