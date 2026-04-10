@@ -53,16 +53,16 @@ switch ($action) {
         $caseId = (int)($_GET['case_id'] ?? 0);
         if (!$caseId) { Session::flash('error', '缺少案件ID'); redirect('/worklog.php'); }
 
-        // 找該案件最近的排工
+        // 找該案件最近的未完成排工（排除 completed/cancelled）
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id FROM schedules WHERE case_id = ? ORDER BY schedule_date DESC LIMIT 1');
+        $stmt = $db->prepare("SELECT id FROM schedules WHERE case_id = ? AND status NOT IN ('completed','cancelled') ORDER BY schedule_date DESC LIMIT 1");
         $stmt->execute(array($caseId));
         $scheduleId = $stmt->fetchColumn();
 
         if ($scheduleId) {
-            // 有排工 → 找現有未完成 worklog 或建新的
-            $existStmt = $db->prepare('SELECT id FROM work_logs WHERE schedule_id = ? AND work_description IS NULL AND arrival_time IS NULL ORDER BY id DESC LIMIT 1');
-            $existStmt->execute(array($scheduleId));
+            // 有排工 → 找「目前使用者」的未完成 worklog 或建新的
+            $existStmt = $db->prepare('SELECT id FROM work_logs WHERE schedule_id = ? AND user_id = ? AND work_description IS NULL AND arrival_time IS NULL ORDER BY id DESC LIMIT 1');
+            $existStmt->execute(array($scheduleId, $userId));
             $existId = $existStmt->fetchColumn();
             if ($existId) {
                 $wlId = (int)$existId;
