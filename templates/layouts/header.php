@@ -12,6 +12,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="stylesheet" href="/css/style.css?v=20260403b">
+    <script src="/js/panzoom.min.js"></script>
     <?php if (!empty($extraCss)): ?>
         <?php foreach ($extraCss as $css): ?>
             <link rel="stylesheet" href="<?= e($css) ?>">

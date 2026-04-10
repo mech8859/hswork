@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Panzoom Test</title>
+<script src="/js/panzoom.min.js"></script>
+<style>
+body { margin:0; background:#000; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
+#wrap { width:100%; height:80vh; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.back { position:fixed; top:12px; left:12px; color:#fff; background:rgba(0,0,0,.5); padding:8px 16px; border-radius:20px; text-decoration:none; font-size:14px; z-index:10; }
+.hint { position:fixed; bottom:20px; left:0; right:0; text-align:center; color:#fff; font-size:14px; }
+#status { position:fixed; top:12px; right:12px; color:#0f0; font-size:12px; background:rgba(0,0,0,.7); padding:4px 8px; border-radius:4px; }
+</style>
+</head>
+<body>
+<a class="back" href="javascript:history.back()">← 返回</a>
+<div id="status">載入中...</div>
+<div id="wrap">
+    <div id="testBox" style="width:280px;height:280px;background:linear-gradient(135deg,#ff6b6b,#4ecdc4,#45b7d1,#f9ca24);border-radius:20px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:bold;text-shadow:0 2px 4px rgba(0,0,0,.3)">雙指放大我</div>
+</div>
+<div class="hint">雙指縮放 · 單指拖曳</div>
+<script>
+var el = document.getElementById('testBox');
+var status = document.getElementById('status');
+try {
+    var pz = Panzoom(el, { maxScale: 6, minScale: 1, contain: 'outside' });
+    document.getElementById('wrap').addEventListener('wheel', pz.zoomWithWheel);
+    status.textContent = 'Panzoom OK';
+    el.addEventListener('panzoomchange', function(e) {
+        status.textContent = 'scale: ' + e.detail.scale.toFixed(2);
+    });
+} catch(e) {
+    status.textContent = 'ERROR: ' + e.message;
+    status.style.color = 'red';
+}
+</script>
+</body>
+</html>

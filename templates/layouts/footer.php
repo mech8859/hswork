@@ -330,7 +330,7 @@ function validateInvoiceNumber(el) {
     <span id="hsLbClose" style="position:absolute;top:16px;right:16px;color:#fff;font-size:2.5rem;cursor:pointer;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);border-radius:50%;line-height:1;z-index:100000">&times;</span>
     <span id="hsLbPrev" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);color:#fff;font-size:2.5rem;cursor:pointer;padding:16px 12px;background:rgba(0,0,0,.4);border-radius:8px;user-select:none;z-index:100000">&lsaquo;</span>
     <span id="hsLbNext" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);color:#fff;font-size:2.5rem;cursor:pointer;padding:16px 12px;background:rgba(0,0,0,.4);border-radius:8px;user-select:none;z-index:100000">&rsaquo;</span>
-    <img id="hsLbImg" src="" alt="預覽" style="max-width:90%;max-height:90%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
+    <div id="hsLbImgWrap" style="display:flex;align-items:center;justify-content:center;width:90%;height:90%;overflow:hidden"><img id="hsLbImg" src="" alt="預覽" style="max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5)"></div>
     <span id="hsLbCounter" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:.9rem;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;z-index:100000"></span>
 </div>
 <div id="hsFileModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:99999;flex-direction:column">
@@ -367,19 +367,57 @@ function validateInvoiceNumber(el) {
         if (images.length === 0) images = [src];
         idx = images.indexOf(src);
         if (idx < 0) idx = 0;
+
+        // 手機：跳到獨立檢視頁（支援雙指縮放）
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            var params = 'idx=' + idx + '&images=' + encodeURIComponent(JSON.stringify(images)) + '&back=' + encodeURIComponent(location.href);
+            location.href = '/photo_view.php?' + params;
+            return;
+        }
+
+        // 電腦：維持原有 lightbox
         showImage();
         document.getElementById('hsLightbox').style.display = 'flex';
+        lbPzInit();
     };
     window.hsCloseImage = function() {
+        lbPzDestroy();
         document.getElementById('hsLightbox').style.display = 'none';
         document.getElementById('hsLbImg').src = '';
     };
     window.hsLbNav = function(dir) {
+        lbPzDestroy();
         idx += dir;
         if (idx < 0) idx = images.length - 1;
         if (idx >= images.length) idx = 0;
         showImage();
+        lbPzInit();
     };
+
+    // Panzoom 初始化/銷毀
+    var lbPzInstance = null;
+    function lbPzInit() {
+        if (typeof Panzoom === 'undefined') return;
+        var img = document.getElementById('hsLbImg');
+        // 等圖片載入完成後才初始化 panzoom
+        if (img.complete && img.naturalWidth > 0) {
+            lbPzCreate(img);
+        } else {
+            img.onload = function() { lbPzCreate(img); };
+        }
+    }
+    function lbPzCreate(img) {
+        if (lbPzInstance) return;
+        lbPzInstance = Panzoom(img, { maxScale: 6, minScale: 1, contain: 'outside', cursor: 'default' });
+        var wrap = document.getElementById('hsLbImgWrap');
+        wrap.addEventListener('wheel', lbPzInstance.zoomWithWheel);
+    }
+    function lbPzDestroy() {
+        var img = document.getElementById('hsLbImg');
+        if (img) img.onload = null;
+        if (lbPzInstance) { try { lbPzInstance.reset(); lbPzInstance.destroy(); } catch(e) {} lbPzInstance = null; }
+    }
+
     function showImage() {
         document.getElementById('hsLbImg').src = images[idx];
         var c = document.getElementById('hsLbCounter');
@@ -397,6 +435,16 @@ function validateInvoiceNumber(el) {
     }
 
     window.hsOpenFile = function(src, name) {
+        // 手機 + 圖片檔：跳到獨立檢視頁（支援雙指縮放）
+        var isMobile = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        var imgExts = ['.jpg','.jpeg','.png','.gif','.webp','.bmp'];
+        var ext = src.toLowerCase().split('?')[0];
+        var isImg = false;
+        for (var i = 0; i < imgExts.length; i++) { if (ext.indexOf(imgExts[i]) !== -1) { isImg = true; break; } }
+        if (isMobile && isImg) {
+            location.href = '/photo_view.php?src=' + encodeURIComponent(src) + '&back=' + encodeURIComponent(location.href);
+            return;
+        }
         document.getElementById('hsFileTitle').textContent = name || '檔案';
         document.getElementById('hsFileDownload').href = src;
         document.getElementById('hsFileFrame').src = src;
