@@ -929,6 +929,56 @@ require __DIR__ . '/../_readonly_form_helper.php';
     </div>
     <?php endif; ?>
 
+    <!-- 金額異動紀錄 -->
+    <?php if ($case):
+        $amtChanges = isset($case['amount_changes']) ? $case['amount_changes'] : array();
+        $amtFieldLabels = array(
+            'deal_amount'     => '成交金額',
+            'total_amount'    => '含稅金額',
+            'tax_amount'      => '稅金',
+            'total_collected' => '總收款',
+            'balance_amount'  => '尾款',
+        );
+        $amtSourceLabels = array(
+            'manual_edit'    => '手動編輯',
+            'payment_add'    => '新增收款',
+            'payment_edit'   => '編輯收款',
+            'payment_delete' => '刪除收款',
+        );
+    ?>
+    <div class="card" id="sec-amount-changes">
+        <div class="card-header">金額異動紀錄</div>
+        <?php if (empty($amtChanges)): ?>
+        <p class="text-muted text-center" style="padding:20px">尚無金額異動紀錄</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table" style="font-size:.85rem">
+                <thead><tr>
+                    <th style="width:140px">異動日期</th>
+                    <th style="width:80px">欄位</th>
+                    <th class="text-right" style="width:110px">原金額</th>
+                    <th class="text-right" style="width:110px">新金額</th>
+                    <th style="width:90px">異動來源</th>
+                    <th style="width:80px">異動人</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($amtChanges as $ac): ?>
+                <tr>
+                    <td><?= e(substr($ac['created_at'], 0, 16)) ?></td>
+                    <td><?= isset($amtFieldLabels[$ac['field_name']]) ? $amtFieldLabels[$ac['field_name']] : e($ac['field_name']) ?></td>
+                    <td class="text-right">$<?= number_format($ac['old_value']) ?></td>
+                    <td class="text-right" style="font-weight:600;color:<?= $ac['new_value'] > $ac['old_value'] ? '#2e7d32' : '#c62828' ?>">$<?= number_format($ac['new_value']) ?></td>
+                    <td><span class="badge"><?= isset($amtSourceLabels[$ac['change_source']]) ? $amtSourceLabels[$ac['change_source']] : e($ac['change_source']) ?></span></td>
+                    <td><?= e($ac['changed_by_name']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- 請款資訊 -->
     <div class="card <?= ($canEdit['finance'] ?? false) ? '' : 'section-readonly' ?>" id="sec-billing-info">
         <div class="card-header">請款資訊</div>

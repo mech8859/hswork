@@ -7,9 +7,29 @@ $model = new CaseModel();
 $action = $_GET['action'] ?? 'list';
 $branchIds = Auth::getAccessibleBranchIds();
 
+// 金額異動紀錄寫入（表不存在時靜默跳過）
+function logAmountChange($caseId, $field, $oldVal, $newVal, $source) {
+    if ((int)$oldVal === (int)$newVal) return;
+    try {
+        $db = Database::getInstance();
+        $chk = $db->query("SHOW TABLES LIKE 'case_amount_changes'");
+        if (!$chk || $chk->rowCount() === 0) return;
+        $user = Session::getUser();
+        $db->prepare("INSERT INTO case_amount_changes (case_id, field_name, old_value, new_value, change_source, changed_by, changed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            ->execute(array($caseId, $field, (int)$oldVal, (int)$newVal, $source, $user ? $user['id'] : 0, $user ? $user['real_name'] : 'system'));
+    } catch (Exception $e) {}
+}
+
 // 帳款交易合計回寫 total_collected + 訂金金額/方式 + balance_amount(尾款)
-function updateTotalCollected($caseId) {
+function updateTotalCollected($caseId, $changeSource = 'payment') {
     $db = Database::getInstance();
+    // 先讀舊值（用於異動紀錄）
+    $oldStmt = $db->prepare("SELECT total_collected, balance_amount FROM cases WHERE id = ?");
+    $oldStmt->execute(array($caseId));
+    $oldRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+    $oldCollected = $oldRow ? (int)$oldRow['total_collected'] : 0;
+    $oldBalance   = $oldRow ? (int)$oldRow['balance_amount'] : 0;
+
     // 總收款
     $stmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
     $stmt->execute(array($caseId));
@@ -35,6 +55,10 @@ function updateTotalCollected($caseId) {
     $balance = $base > 0 ? max(0, $base - $total) : null;
     $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ?, balance_amount = ? WHERE id = ?")
         ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $balance, $caseId));
+
+    // 記錄異動
+    logAmountChange($caseId, 'total_collected', $oldCollected, $total, $changeSource);
+    logAmountChange($caseId, 'balance_amount', $oldBalance, (int)$balance, $changeSource);
 }
 
 switch ($action) {
@@ -172,11 +196,22 @@ switch ($action) {
                 $collected = (int)str_replace(',', '', $_POST['total_collected'] ?? '0');
                 $_POST['balance_amount'] = (string)($deal - $collected);
             }
+            // 金額異動紀錄：存檔前讀舊值
+            $oldCase = $model->getById($id);
             try {
                 $model->update($id, $_POST);
             } catch (\RuntimeException $e) {
                 Session::flash('error', $e->getMessage());
                 redirect('/cases.php?action=edit&id=' . $id);
+            }
+            // 金額異動紀錄：比對新舊值
+            if ($oldCase) {
+                $amtFields = array('deal_amount', 'total_amount', 'tax_amount');
+                foreach ($amtFields as $af) {
+                    $ov = (int)str_replace(',', '', isset($oldCase[$af]) ? $oldCase[$af] : '0');
+                    $nv = (int)str_replace(',', '', isset($_POST[$af]) ? $_POST[$af] : '0');
+                    logAmountChange($id, $af, $ov, $nv, 'manual_edit');
+                }
             }
             $model->updateReadiness($id, $_POST);
             $model->updateSiteConditions($id, $_POST);
@@ -451,7 +486,18 @@ switch ($action) {
             }
         }
 
-        updateTotalCollected($caseId);
+        updateTotalCollected($caseId, 'payment_add');
+
+        // 通知派發：自動建立的收款單也發通知
+        if ($generatedReceiptNo && isset($receiptData) && isset($receiptId)) {
+            try {
+                require_once __DIR__ . '/../modules/notifications/NotificationDispatcher.php';
+                $receiptData['id'] = $receiptId;
+                $receiptData['receipt_number'] = $generatedReceiptNo;
+                NotificationDispatcher::dispatch('receipts', 'created', $receiptData, Auth::id());
+            } catch (Exception $ne) {}
+        }
+
         echo json_encode(array('success' => true, 'receipt_number' => $generatedReceiptNo));
         } catch (Exception $e) {
             echo json_encode(array('success' => false, 'error' => $e->getMessage()));
@@ -513,7 +559,7 @@ switch ($action) {
             }
             $db->prepare('UPDATE case_payments SET image_path = ? WHERE id = ?')->execute(array(json_encode($existing), $pid));
         }
-        updateTotalCollected((int)$pay['case_id']);
+        updateTotalCollected((int)$pay['case_id'], 'payment_edit');
         echo json_encode(array('success' => true));
         } catch (Exception $e) {
             echo json_encode(array('success' => false, 'error' => $e->getMessage()));
@@ -561,7 +607,7 @@ switch ($action) {
         }
 
         $db->prepare('DELETE FROM case_payments WHERE id = ?')->execute(array($pid));
-        if ($delCaseId) updateTotalCollected($delCaseId);
+        if ($delCaseId) updateTotalCollected($delCaseId, 'payment_delete');
         echo json_encode(array('success' => true));
         break;
 

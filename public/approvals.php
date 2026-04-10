@@ -10,7 +10,9 @@ $model = new ApprovalModel();
 $action = $_GET['action'] ?? 'pending';
 
 $canManageRules = Auth::user()['role'] === 'boss';
-$canViewApprovals = Auth::hasPermission('approvals.view') || Auth::hasPermission('approvals.manage') || Auth::hasPermission('all');
+// 有簽核權限，或本人有待簽項目，都可進入待簽核頁面
+$myPendingCount = $model->getPendingCount(Auth::id());
+$canViewApprovals = $myPendingCount > 0 || Auth::hasPermission('approvals.view') || Auth::hasPermission('approvals.manage') || Auth::hasPermission('all');
 
 switch ($action) {
     // ---- 待簽核清單 ----

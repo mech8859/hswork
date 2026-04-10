@@ -207,6 +207,17 @@ class CaseModel
             $case['billing_items'] = array();
         }
 
+        // 金額異動紀錄（表可能尚未建立）
+        $case['amount_changes'] = array();
+        try {
+            $chkTbl = $this->db->query("SHOW TABLES LIKE 'case_amount_changes'");
+            if ($chkTbl && $chkTbl->rowCount() > 0) {
+                $stmt = $this->db->prepare('SELECT * FROM case_amount_changes WHERE case_id = ? ORDER BY created_at DESC LIMIT 50');
+                $stmt->execute(array($id));
+                $case['amount_changes'] = $stmt->fetchAll();
+            }
+        } catch (Exception $e) {}
+
         // 該案件已開立的銷項發票
         try {
             $stmt = $this->db->prepare("SELECT id, invoice_number, invoice_date, total_amount, status FROM sales_invoices WHERE reference_type = 'case' AND reference_id = ? ORDER BY invoice_date DESC, id DESC");
