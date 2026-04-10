@@ -125,7 +125,7 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
         <div class="photo-grid-upload">
             <?php foreach (($worklog['photos'] ?? array()) as $photo): ?>
             <div class="photo-grid-item" id="photo-<?= $photo['id'] ?>">
-                <img src="<?= e($photo['file_path']) ?>" alt="<?= e($photo['caption'] ?? '') ?>" onclick="openPhotoModal(this.src)">
+                <img src="<?= e($photo['file_path']) ?>" alt="<?= e($photo['caption'] ?? '') ?>" onclick="location.href='/photo_view.php?src='+encodeURIComponent(this.src)">
                 <button type="button" class="photo-grid-delete" onclick="deletePhoto(<?= $photo['id'] ?>)">&times;</button>
             </div>
             <?php endforeach; ?>
@@ -373,7 +373,11 @@ document.querySelector('form[method="POST"][enctype]').addEventListener('submit'
                 btn.textContent = '上傳中 ' + pct + '%...';
             }
         };
-        xhr.onload = function() { location.reload(); };
+        xhr.onload = function() {
+            btn.textContent = '儲存成功 ✓';
+            btn.style.background = '#22c55e';
+            setTimeout(function() { location.reload(); }, 800);
+        };
         xhr.onerror = function() {
             btn.disabled = false;
             btn.textContent = '儲存回報';
@@ -394,13 +398,103 @@ document.querySelector('form[method="POST"][enctype]').addEventListener('submit'
 });
 </script>
 
-<!-- 照片預覽彈窗 -->
-<div id="photoModal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
-    <div style="max-width:90vw;max-height:90vh;position:relative">
-        <img id="photoModalImg" src="" style="max-width:90vw;max-height:85vh;border-radius:8px">
-        <span class="modal-close" onclick="document.getElementById('photoModal').classList.add('hidden')" style="position:absolute;top:-10px;right:-10px;background:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">&times;</span>
+<!-- 照片預覽彈窗（支援雙指縮放+拖曳） -->
+<div id="photoModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:10000">
+    <div id="photoModalWrap" style="width:100%;height:100%;overflow:hidden;touch-action:none">
+        <img id="photoModalImg" src="" style="display:block;border-radius:4px">
     </div>
+    <span onclick="closePhotoModal()" style="position:fixed;top:12px;right:16px;color:#fff;font-size:2rem;cursor:pointer;z-index:10001;background:rgba(0,0,0,.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;line-height:1">&times;</span>
+    <div style="position:fixed;bottom:16px;left:0;right:0;text-align:center;color:rgba(255,255,255,.5);font-size:.75rem;z-index:10001">雙指縮放 · 單指拖曳 · 雙擊還原</div>
 </div>
+<script>
+(function() {
+    var modal = document.getElementById('photoModal');
+    var wrap = document.getElementById('photoModalWrap');
+    var img = document.getElementById('photoModalImg');
+    var S = 1, TX = 0, TY = 0; // scale, translateX, translateY
+    var imgW = 0, imgH = 0;
+
+    window.openPhotoModal = function(src) {
+        S = 1; TX = 0; TY = 0;
+        img.src = src;
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = function() {
+            imgW = Math.min(img.naturalWidth, window.innerWidth * 0.94);
+            imgH = imgW / img.naturalWidth * img.naturalHeight;
+            if (imgH > window.innerHeight * 0.88) { imgH = window.innerHeight * 0.88; imgW = imgH / img.naturalHeight * img.naturalWidth; }
+            img.style.width = imgW + 'px';
+            img.style.height = imgH + 'px';
+            TX = (window.innerWidth - imgW) / 2;
+            TY = (window.innerHeight - imgH) / 2;
+            apply();
+        };
+    };
+    window.closePhotoModal = function() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        img.src = '';
+    };
+    function apply() {
+        img.style.transform = 'translate3d(' + TX + 'px,' + TY + 'px,0) scale(' + S + ')';
+        img.style.transformOrigin = '0 0';
+    }
+    function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+
+    var t0 = {}, pinching = false, dragging = false;
+
+    wrap.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+            pinching = true; dragging = false;
+            t0.dist = dist(e.touches[0], e.touches[1]);
+            t0.scale = S;
+            t0.mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            t0.my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            t0.tx = TX; t0.ty = TY;
+        } else if (e.touches.length === 1) {
+            dragging = true; pinching = false;
+            t0.x = e.touches[0].clientX; t0.y = e.touches[0].clientY;
+            t0.tx = TX; t0.ty = TY;
+        }
+    }, { passive: false });
+
+    wrap.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        if (pinching && e.touches.length === 2) {
+            var d = dist(e.touches[0], e.touches[1]);
+            S = Math.max(0.5, Math.min(10, t0.scale * d / t0.dist));
+            var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            var my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            TX = t0.tx + (mx - t0.mx);
+            TY = t0.ty + (my - t0.my);
+            apply();
+        } else if (dragging && e.touches.length === 1) {
+            TX = t0.tx + (e.touches[0].clientX - t0.x);
+            TY = t0.ty + (e.touches[0].clientY - t0.y);
+            apply();
+        }
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', function(e) {
+        if (e.touches.length === 0) { pinching = false; dragging = false; }
+        else if (e.touches.length === 1) { pinching = false; }
+    });
+
+    // 雙擊還原 or 放大2x
+    var lastTap = 0;
+    wrap.addEventListener('click', function(e) {
+        if (e.target === wrap) { closePhotoModal(); return; }
+        var now = Date.now();
+        if (now - lastTap < 300) {
+            if (S > 1.2) { S = 1; TX = (window.innerWidth - imgW) / 2; TY = (window.innerHeight - imgH) / 2; }
+            else { S = 2.5; TX = window.innerWidth / 2 - e.clientX * 2.5 + e.clientX; TY = window.innerHeight / 2 - e.clientY * 2.5 + e.clientY; }
+            apply();
+        }
+        lastTap = now;
+    });
+})();
+</script>
 
 <style>
 .worklog-time-display { display: flex; gap: 20px; font-size: .9rem; flex-wrap: wrap; }
@@ -565,11 +659,6 @@ document.addEventListener('click', function(e) {
         document.querySelectorAll('.product-suggestions').forEach(function(el) { el.style.display = 'none'; });
     }
 });
-
-function openPhotoModal(src) {
-    document.getElementById('photoModalImg').src = src;
-    document.getElementById('photoModal').classList.remove('hidden');
-}
 
 function deletePhoto(photoId) {
     if (!confirm('確定刪除此照片?')) return;

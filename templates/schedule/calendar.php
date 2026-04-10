@@ -287,7 +287,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
         $items[] = array(
             'id' => $ds['id'], 'title' => $ds['case_title'],
             'case_number' => isset($ds['case_number']) ? $ds['case_number'] : '',
-            'status' => $ds['status'], 'address' => $ds['address'] ?: '',
+            'status' => isset($ds['display_status']) ? $ds['display_status'] : $ds['status'], 'address' => $ds['address'] ?: '',
             'plate' => $ds['plate_number'] ?: '',
             'engineers' => implode(', ', array_column($ds['engineers'], 'real_name')),
             'engCount' => count($ds['engineers']),
@@ -329,7 +329,8 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                 if ($shown >= $showMax) break;
                 $shown++;
                 $isMine = in_array($currentUserId, array_column($ds['engineers'], 'user_id'));
-                $barClass = $ds['status'] === 'completed' ? 'mg-bar-done' : ($isMine ? 'mg-bar-mine' : 'mg-bar-default');
+                $_dstat = isset($ds['display_status']) ? $ds['display_status'] : $ds['status'];
+                $barClass = ($_dstat === 'completed') ? 'mg-bar-done' : ($_dstat === 'no_report' ? 'mg-bar-noreport' : ($_dstat === 'needs_revisit' ? 'mg-bar-revisit' : ($_dstat === 'checked_out' ? 'mg-bar-checkout' : ($isMine ? 'mg-bar-mine' : 'mg-bar-default'))));
             ?>
             <div class="mg-bar <?= $barClass ?>"><?= e(mb_substr($ds['case_title'], 0, 5)) ?></div>
             <?php endforeach; ?>
@@ -400,10 +401,13 @@ function openMobileDay(dateStr) {
 
     for (var i = 0; i < items.length; i++) {
         var s = items[i];
-        var borderColor = s.status === 'completed' ? '#34a853' : (s.isMine ? 'var(--primary)' : 'var(--gray-300)');
+        var mStatusColors = {planned:'#3b82f6',confirmed:'#2563eb',in_progress:'#f59e0b',checked_out:'#8b5cf6',needs_revisit:'#f97316',no_report:'#ef4444',completed:'#22c55e',cancelled:'#6b7280'};
+        var borderColor = mStatusColors[s.status] || (s.isMine ? 'var(--primary)' : 'var(--gray-300)');
         html += '<div class="mday-item" style="border-left-color:' + borderColor + '" onclick="location.href=\'/schedule.php?action=view&id=' + s.id + '\'">';
         html += '<div class="mday-item-title">' + mEsc(s.title) + (s.time ? ' <span style="color:#e65100;font-size:.8rem;font-weight:600">' + s.time + '</span>' : '') + '</div>';
+        var mStatusLabels = {planned:'已排',confirmed:'已確認',in_progress:'施工中',checked_out:'已下工',needs_revisit:'需再施工',no_report:'未回報',completed:'已完工',cancelled:'取消'};
         html += '<div class="mday-item-meta">';
+        html += '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + borderColor + ';color:#fff;font-size:.7rem">' + (mStatusLabels[s.status] || s.status) + '</span>';
         if (s.engineers) html += '<span>&#x1F477; ' + mEsc(s.engineers) + '</span>';
         if (s.plate) html += '<span>&#x1F697; ' + mEsc(s.plate) + '</span>';
         if (s.visit) html += '<span>第' + s.visit + '次</span>';
@@ -465,7 +469,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             'title' => $ds['case_title'],
             'case_number' => isset($ds['case_number']) ? $ds['case_number'] : '',
             'case_type' => isset($ds['case_type']) ? $ds['case_type'] : '',
-            'status' => $ds['status'],
+            'status' => isset($ds['display_status']) ? $ds['display_status'] : $ds['status'],
             'address' => $ds['address'] ?: '',
             'plate' => $ds['plate_number'] ?: '',
             'engineers' => implode(', ', array_column($ds['engineers'], 'real_name')),
@@ -725,6 +729,9 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 .mg-bar-default { background:#4285f4; }
 .mg-bar-mine { background:#1565c0; }
 .mg-bar-done { background:#34a853; }
+.mg-bar-checkout { background:#8b5cf6; }
+.mg-bar-revisit { background:#f97316; }
+.mg-bar-noreport { background:#ef4444; }
 .mg-more { font-size:.62rem; color:var(--gray-400); padding:0 3px; }
 .mg-leave-dot { position:absolute; top:1px; right:2px; font-size:.65rem; line-height:1; }
 .mg-leave-dot::before { content:'🏖️'; }
