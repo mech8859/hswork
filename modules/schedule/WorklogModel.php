@@ -332,33 +332,37 @@ class WorklogModel
     private function markCaseCompletedPending($worklogId)
     {
         $stmt = $this->db->prepare('
-            SELECT s.case_id FROM work_logs wl
+            SELECT s.case_id, wl.schedule_id FROM work_logs wl
             JOIN schedules s ON wl.schedule_id = s.id
             WHERE wl.id = ?
         ');
         $stmt->execute([$worklogId]);
-        $caseId = $stmt->fetchColumn();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) return;
 
-        if ($caseId) {
-            $this->db->prepare("UPDATE cases SET progress = 'completed_pending' WHERE id = ?")
-                     ->execute([$caseId]);
+        $caseId = $row['case_id'];
+        $scheduleId = $row['schedule_id'];
 
-            // 更新排工狀態為已完成
-            $stmt2 = $this->db->prepare('SELECT schedule_id FROM work_logs WHERE id = ?');
-            $stmt2->execute([$worklogId]);
-            $scheduleId = $stmt2->fetchColumn();
-            if ($scheduleId) {
-                $this->db->prepare("UPDATE schedules SET status = 'completed' WHERE id = ?")->execute([$scheduleId]);
-            }
+        // 更新案件狀態
+        $this->db->prepare("UPDATE cases SET status = 'completed_pending' WHERE id = ? AND status NOT IN ('completed_pending','closed')")
+                 ->execute([$caseId]);
 
-            // 送簽核給工程主管（level 1）
-            try {
-                require_once __DIR__ . '/../approvals/ApprovalModel.php';
-                $approvalModel = new ApprovalModel();
+        // 更新排工狀態為已完成
+        if ($scheduleId) {
+            $this->db->prepare("UPDATE schedules SET status = 'completed' WHERE id = ?")->execute([$scheduleId]);
+        }
+
+        // 送簽核：如果已有 pending flow 就不重複送
+        try {
+            require_once __DIR__ . '/../approvals/ApprovalModel.php';
+            $approvalModel = new ApprovalModel();
+            $existPending = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module = 'case_completion' AND target_id = ? AND status = 'pending'");
+            $existPending->execute([$caseId]);
+            if ((int)$existPending->fetchColumn() === 0) {
                 $approvalModel->submitCaseCompletion($caseId, Auth::id());
-            } catch (Exception $e) {
-                // 簽核模組尚未設定規則時不中斷
             }
+        } catch (Exception $e) {
+            // 簽核模組尚未設定規則時不中斷
         }
     }
 

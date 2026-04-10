@@ -683,9 +683,10 @@ class ApprovalModel
         // 確保有 case_completion 規則，沒有就自動建立
         $this->ensureCaseCompletionRules();
 
-        // 清除舊的 pending 記錄
-        $this->db->prepare("DELETE FROM approval_flows WHERE module = 'case_completion' AND target_id = ? AND status = 'pending'")
-            ->execute(array($caseId));
+        // 如果已有 pending 記錄就不重複建立（由呼叫端檢查，這裡做保險）
+        $chk = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module = 'case_completion' AND target_id = ? AND status = 'pending'");
+        $chk->execute(array($caseId));
+        if ((int)$chk->fetchColumn() > 0) return array('already_pending' => true);
 
         // 只送 level 1（工程主管）
         $stmt = $this->db->prepare("

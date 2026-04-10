@@ -274,7 +274,11 @@ switch ($action) {
     case 'report':
         $id = (int)($_GET['id'] ?? 0);
         $worklog = $model->getWorklog($id);
-        if (!$worklog || $worklog['user_id'] != $userId) {
+        if (!$worklog) {
+            Session::flash('error', '找不到此施工回報紀錄');
+            redirect(!empty($_GET['from_case']) ? '/cases.php?action=edit&id=' . (int)$_GET['from_case'] . '#sec-worklog' : '/worklog.php');
+        }
+        if ($worklog['user_id'] != $userId) {
             if (!Auth::hasPermission('schedule.manage') && !Auth::hasPermission('all')) {
                 Session::flash('error', '無權限');
                 redirect('/worklog.php');
