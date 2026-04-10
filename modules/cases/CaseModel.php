@@ -88,8 +88,8 @@ class CaseModel
         }
 
         // 計算總數與金額合計
-        // 尾款即時算：deal_amount - total_collected（不讀 balance_amount 舊值）
-        $countStmt = $this->db->prepare("SELECT COUNT(*), COALESCE(SUM(GREATEST(COALESCE(c.deal_amount,0) - COALESCE(c.total_collected,0), 0)),0), COALESCE(SUM(c.deal_amount),0) FROM cases c LEFT JOIN users u ON c.sales_id = u.id WHERE $where");
+        // 尾款即時算：(含稅金額 or 成交金額) - total_collected，與 updateTotalCollected() 一致
+        $countStmt = $this->db->prepare("SELECT COUNT(*), COALESCE(SUM(GREATEST(COALESCE(CASE WHEN c.total_amount > 0 THEN c.total_amount ELSE c.deal_amount END, 0) - COALESCE(c.total_collected,0), 0)),0), COALESCE(SUM(c.deal_amount),0) FROM cases c LEFT JOIN users u ON c.sales_id = u.id WHERE $where");
         $countStmt->execute($params);
         $countRow = $countStmt->fetch(PDO::FETCH_NUM);
         $total = (int)$countRow[0];

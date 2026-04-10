@@ -956,6 +956,7 @@ function saveNewCustomer() {
             if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
             setNum(balanceInput, deal > 0 ? (total - collected) : 0);
         } else if (taxVal === '含稅(免開發票)') {
+            // 成交金額已含稅，含稅金額=成交金額，稅金由含稅回算
             var total = deal;
             var untaxed = Math.round(deal / 1.05);
             var tax = deal - untaxed;

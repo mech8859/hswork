@@ -90,7 +90,7 @@ $wipDb = Database::getInstance();
 $wipYear = $analysis['year'];
 $wipBranches = implode(',', array_map('intval', $branchIds));
 
-// 未完工：依成交月份統計未收餘額（用 balance_amount，不限年份）
+// 未完工：依成交月份統計未收餘額（即時算：含稅金額或成交金額 - total_collected，與 updateTotalCollected() 一致）
 $wipMonthly = array();
 $unpaidMonthly = array();
 foreach ($months as $m) {
@@ -103,7 +103,7 @@ $unpaidBefore = array('cnt' => 0, 'balance' => 0);
 
 $wipMStmt = $wipDb->query("
     SELECT DATE_FORMAT(deal_date, '%Y-%m') as ym, COUNT(*) as cnt,
-           COALESCE(SUM(balance_amount), 0) as balance
+           COALESCE(SUM(GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0)), 0) as balance
     FROM cases WHERE status = 'incomplete' AND branch_id IN ({$wipBranches})
     AND deal_date IS NOT NULL
     GROUP BY ym
@@ -119,7 +119,7 @@ foreach ($wipMStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 
 $unpaidMStmt = $wipDb->query("
     SELECT DATE_FORMAT(deal_date, '%Y-%m') as ym, COUNT(*) as cnt,
-           COALESCE(SUM(balance_amount), 0) as balance
+           COALESCE(SUM(GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0)), 0) as balance
     FROM cases WHERE status = 'unpaid' AND branch_id IN ({$wipBranches})
     AND deal_date IS NOT NULL
     GROUP BY ym
@@ -134,8 +134,8 @@ foreach ($unpaidMStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 }
 
 // 無成交日期的
-$wipNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(balance_amount), 0) as balance FROM cases WHERE status = 'incomplete' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
-$unpaidNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(balance_amount), 0) as balance FROM cases WHERE status = 'unpaid' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
+$wipNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0)), 0) as balance FROM cases WHERE status = 'incomplete' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
+$unpaidNoDate = $wipDb->query("SELECT COUNT(*) as cnt, COALESCE(SUM(GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0)), 0) as balance FROM cases WHERE status = 'unpaid' AND branch_id IN ({$wipBranches}) AND (deal_date IS NULL OR deal_date = '')")->fetch(PDO::FETCH_ASSOC);
 ?>
 <div class="card">
     <div class="card-header analysis-header">未完工 與 完工未收款 未收餘額</div>
