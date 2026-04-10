@@ -549,24 +549,36 @@ require __DIR__ . '/../_readonly_form_helper.php';
     </div>
     <?php endif; ?>
 
+    <?php
+    // 預先查詢報價單，決定按鈕顯示
+    $caseQuotes = array();
+    try {
+        $qStmt = Database::getInstance()->prepare("SELECT id, quotation_number AS quote_number, customer_name, total_amount, status, created_at FROM quotations WHERE case_id = ? ORDER BY created_at DESC");
+        $qStmt->execute(array($case['id']));
+        $caseQuotes = $qStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
+    $latestQuote = !empty($caseQuotes) ? $caseQuotes[0] : null;
+    $_qStatusMap = array('draft'=>'草稿','pending_approval'=>'待簽核','approved'=>'已核准','rejected_internal'=>'退回修改','sent'=>'已送客戶','accepted'=>'已接受','rejected'=>'已拒絕','customer_accepted'=>'客戶已接受','customer_rejected'=>'客戶已拒絕','revision_needed'=>'待修改');
+    $_qBadgeMap = array('draft'=>'warning','pending_approval'=>'info','approved'=>'primary','rejected_internal'=>'danger','sent'=>'primary','accepted'=>'success','rejected'=>'danger','customer_accepted'=>'success','customer_rejected'=>'danger','revision_needed'=>'warning');
+    ?>
     <div class="card" id="sec-quote-drawing">
         <div class="card-header d-flex justify-between align-center">
             <span>報價單 / 圖面</span>
             <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
-            <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_name'] ?? '') ?>&phone=<?= urlencode($case['contact_phone'] ?? '') ?>"
-               class="btn btn-primary btn-sm">+ 建立報價單</a>
+                <?php if (!$latestQuote): ?>
+                <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_name'] ?? '') ?>&phone=<?= urlencode($case['contact_phone'] ?? '') ?>"
+                   class="btn btn-primary btn-sm">+ 建立報價單</a>
+                <?php elseif ($latestQuote['status'] === 'customer_accepted'): ?>
+                <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>"
+                   class="btn btn-outline btn-sm">檢視報價單</a>
+                <?php else: ?>
+                <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>"
+                   class="btn btn-primary btn-sm">編輯報價單</a>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 
         <!-- 已關聯的報價單 -->
-        <?php
-        $caseQuotes = array();
-        try {
-            $qStmt = Database::getInstance()->prepare("SELECT id, quote_number, customer_name, total_amount, status, created_at FROM quotations WHERE case_id = ? ORDER BY created_at DESC");
-            $qStmt->execute(array($case['id']));
-            $caseQuotes = $qStmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {}
-        ?>
         <?php if (!empty($caseQuotes)): ?>
         <div class="table-responsive mb-2">
             <table class="table" style="font-size:.85rem">
@@ -577,7 +589,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <td><a href="/quotations.php?action=view&id=<?= $q['id'] ?>"><?= e($q['quote_number'] ?: "Q-{$q['id']}") ?></a></td>
                     <td><?= e($q['customer_name']) ?></td>
                     <td>$<?= number_format($q['total_amount'] ?? 0) ?></td>
-                    <td><span class="badge"><?= e($q['status'] ?? '-') ?></span></td>
+                    <td><span class="badge badge-<?= isset($_qBadgeMap[$q['status']]) ? $_qBadgeMap[$q['status']] : '' ?>"><?= e(isset($_qStatusMap[$q['status']]) ? $_qStatusMap[$q['status']] : $q['status']) ?></span></td>
                     <td><?= e(substr($q['created_at'], 0, 10)) ?></td>
                     <td><a href="/quotations.php?action=view&id=<?= $q['id'] ?>" class="btn btn-sm btn-outline">查看</a></td>
                 </tr>
@@ -1545,6 +1557,123 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <input type="hidden" name="has_site_photos" value="<?= $autoSitePhotos ? '1' : '0' ?>">
         <input type="hidden" name="has_amount_confirmed" value="<?= $autoAmount ? '1' : '0' ?>">
         <input type="hidden" name="has_site_info" value="<?= $autoSiteInfo ? '1' : '0' ?>">
+    </div>
+    <?php endif; ?>
+
+    <!-- 案件利潤分析表 -->
+    <?php if ($case && !empty($caseProfitAnalysis) && Auth::hasPermission('cases.manage')):
+        $_pa = $caseProfitAnalysis;
+        $_deal = $_pa['deal_amount'];
+        $_opRate = $_pa['op_rate'];
+        $_opCost = round($_deal * $_opRate / 100);
+        // 報價預估
+        $_qMatCost = $_pa['q_material_cost'];
+        $_qCableCost = $_pa['est_cable_cost'];
+        $_qLaborCost = $_pa['q_labor_cost'];
+        $_qTotalCost = $_qMatCost + $_qCableCost + $_qLaborCost + $_opCost;
+        $_qProfit = $_deal - $_qTotalCost;
+        $_qProfitRate = $_deal > 0 ? round($_qProfit / $_deal * 100, 1) : 0;
+        // 實際數據
+        $_aEquip = $_pa['actual_equipment'];
+        $_aCable = $_pa['actual_cable'];
+        $_aConsum = $_pa['actual_consumable'];
+        $_aMatTotal = $_aEquip + $_aCable + $_aConsum;
+        $_aTotalCost = $_aMatTotal + $_qLaborCost + $_opCost;
+        $_aProfit = $_deal - $_aTotalCost;
+        $_aProfitRate = $_deal > 0 ? round($_aProfit / $_deal * 100, 1) : 0;
+        // 工時
+        $_qHours = $_pa['q_labor_hours'];
+        $_aMinutes = $_pa['actual_total_minutes'];
+        $_aHours = round($_aMinutes / 60, 1);
+    ?>
+    <div class="card" id="sec-profit-analysis">
+        <div class="card-header">案件利潤分析表</div>
+        <?php if (!$_deal && !$_pa['has_quotation']): ?>
+        <div style="padding:16px;color:#888;text-align:center">尚無成交金額與報價單數據</div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="profit-table">
+                <thead>
+                    <tr>
+                        <th style="min-width:140px">項目</th>
+                        <th style="width:160px;text-align:right">報價預估</th>
+                        <th style="width:160px;text-align:right">實際數據</th>
+                        <th style="width:120px;text-align:right">差異</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="profit-row-highlight">
+                        <td><strong>成交金額</strong></td>
+                        <td class="text-right" colspan="3"><strong>$<?= number_format($_deal) ?></strong></td>
+                    </tr>
+                    <tr>
+                        <td>器材成本</td>
+                        <td class="text-right"><?= $_pa['has_quotation'] ? '$' . number_format($_qMatCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?= $_aEquip ? '$' . number_format($_aEquip) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?php if ($_pa['has_quotation'] && $_aEquip): $d = $_aEquip - $_qMatCost; ?>
+                            <span style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                    <tr>
+                        <td>線材預估成本</td>
+                        <td class="text-right"><?= $_qCableCost ? '$' . number_format($_qCableCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?= $_aCable ? '$' . number_format($_aCable) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?php if ($_qCableCost && $_aCable): $d = $_aCable - $_qCableCost; ?>
+                            <span style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                    <tr>
+                        <td>耗材</td>
+                        <td class="text-right"><span class="text-muted">-</span></td>
+                        <td class="text-right"><?= $_aConsum ? '$' . number_format($_aConsum) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><span class="text-muted">-</span></td>
+                    </tr>
+                    <tr>
+                        <td>人力總工時</td>
+                        <td class="text-right"><?= $_qHours ? $_qHours . ' 小時' : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?= $_aHours ? $_aHours . ' 小時' : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?php if ($_qHours && $_aHours): $d = round($_aHours - $_qHours, 1); ?>
+                            <span style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . $d ?> 小時</span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                    <tr>
+                        <td>人力成本</td>
+                        <td class="text-right"><?= $_qLaborCost ? '$' . number_format($_qLaborCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right" colspan="2"><span class="text-muted">同報價預估</span></td>
+                    </tr>
+                    <tr>
+                        <td>營運成本 (<?= $_opRate ?>%)</td>
+                        <td class="text-right">$<?= number_format($_opCost) ?></td>
+                        <td class="text-right" colspan="2"><span class="text-muted">同報價預估</span></td>
+                    </tr>
+                    <tr class="profit-row-highlight">
+                        <td><strong>總成本</strong></td>
+                        <td class="text-right"><strong>$<?= number_format($_qTotalCost) ?></strong></td>
+                        <td class="text-right"><strong><?= $_aMatTotal ? '$' . number_format($_aTotalCost) : '-' ?></strong></td>
+                        <td class="text-right"><?php if ($_aMatTotal): $d = $_aTotalCost - $_qTotalCost; ?>
+                            <strong style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></strong>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                    <tr class="profit-row-result">
+                        <td><strong>利潤金額</strong></td>
+                        <td class="text-right"><strong style="color:<?= $_qProfit >= 0 ? '#137333' : '#c5221f' ?>">$<?= number_format($_qProfit) ?></strong></td>
+                        <td class="text-right"><strong style="color:<?= $_aProfit >= 0 ? '#137333' : '#c5221f' ?>"><?= $_aMatTotal ? '$' . number_format($_aProfit) : '-' ?></strong></td>
+                        <td class="text-right"><?php if ($_aMatTotal): $d = $_aProfit - $_qProfit; ?>
+                            <strong style="color:<?= $d >= 0 ? '#137333' : '#c5221f' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></strong>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                    <tr class="profit-row-result">
+                        <td><strong>利潤率</strong></td>
+                        <td class="text-right"><strong style="color:<?= $_qProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><?= $_qProfitRate ?>%</strong></td>
+                        <td class="text-right"><strong style="color:<?= $_aProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><?= $_aMatTotal ? $_aProfitRate . '%' : '-' ?></strong></td>
+                        <td class="text-right"><?php if ($_aMatTotal): $d = round($_aProfitRate - $_qProfitRate, 1); ?>
+                            <strong style="color:<?= $d >= 0 ? '#137333' : '#c5221f' ?>"><?= ($d > 0 ? '+' : '') . $d ?>%</strong>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 

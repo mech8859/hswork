@@ -57,7 +57,7 @@ switch ($action) {
         $record = null;
         // 表單載入「所有 active 工程人員」（跨分公司支援，避免漏掉支援師傅）
         $engineers = $model->getAllActiveEngineerOptions();
-        $branches = $model->getBranchOptions($branchIds);
+        $branches = $model->getAllBranches();
         $nextNumber = peek_next_doc_number('five_star_reviews');
 
         $pageTitle = '新增五星評價';
@@ -81,7 +81,7 @@ switch ($action) {
         }
         // 表單載入「所有 active 工程人員」（跨分公司支援，避免漏掉支援師傅）
         $engineers = $model->getAllActiveEngineerOptions();
-        $branches = $model->getBranchOptions($branchIds);
+        $branches = $model->getAllBranches();
 
         $pageTitle = '編輯五星評價';
         $currentPage = 'reviews';

@@ -532,7 +532,7 @@ function grVendorAutoSearch(inp) {
     if (q.length < 1) { dd.style.display = 'none'; return; }
     grVendorTimer = setTimeout(function() {
         var xhr = new XMLHttpRequest();
-        xhr.open('GET', '/payments_out.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
+        xhr.open('GET', '/goods_receipts.php?action=ajax_vendor_search&q=' + encodeURIComponent(q));
         xhr.onload = function() {
             try { var list = JSON.parse(xhr.responseText); } catch(e) { return; }
             if (!list.length) {

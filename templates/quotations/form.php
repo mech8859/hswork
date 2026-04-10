@@ -295,6 +295,57 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <input type="hidden" name="has_discount" id="hasDiscountHidden" value="<?= !empty($quote['has_discount']) ? '1' : '0' ?>">
     </div>
 
+    <!-- 預計使用線材與配件（僅管理者，統計分析用） -->
+    <?php if ($canManage):
+        $qEstMaterials = array();
+        if ($isEdit && !empty($quote['case_id'])) {
+            $caseModelEst = new CaseModel();
+            $qEstMaterials = $caseModelEst->getMaterialEstimates($quote['case_id']);
+        }
+    ?>
+    <div class="card" id="estMaterialsCard" style="<?= ($isEdit && !empty($quote['case_id'])) ? '' : 'display:none' ?>">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>預計使用線材與配件（統計分析用，不顯示在報價單）</span>
+            <?php if (!$readOnly): ?>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addQEstMaterial()">+ 新增材料</button>
+            <?php endif; ?>
+        </div>
+        <div class="table-responsive" style="overflow:visible">
+            <table class="table" style="font-size:.9rem;margin:0;overflow:visible">
+                <thead><tr>
+                    <th style="min-width:220px">品名</th>
+                    <th style="width:150px">型號</th>
+                    <th style="width:70px">單位</th>
+                    <th style="width:90px">預估數量</th>
+                    <?php if (!$readOnly): ?><th style="width:40px"></th><?php endif; ?>
+                </tr></thead>
+                <tbody id="qEstMaterialsContainer">
+                <?php
+                $qEstIdx = 0;
+                foreach ($qEstMaterials as $qem):
+                ?>
+                <tr class="q-est-row" data-idx="<?= $qEstIdx ?>">
+                    <td style="position:relative">
+                        <input type="text" name="est_materials[<?= $qEstIdx ?>][material_name]" class="form-control q-est-name"
+                               value="<?= e($qem['material_name']) ?>" placeholder="搜尋產品..."
+                               autocomplete="off" oninput="searchQEstProduct(this,<?= $qEstIdx ?>)">
+                        <input type="hidden" name="est_materials[<?= $qEstIdx ?>][product_id]" value="<?= e($qem['product_id'] ?: '') ?>">
+                        <div class="q-est-suggestions" id="q-est-sug-<?= $qEstIdx ?>"></div>
+                    </td>
+                    <td><input type="text" name="est_materials[<?= $qEstIdx ?>][model_number]" class="form-control" value="<?= e($qem['model_number'] ?: '') ?>" placeholder="型號"></td>
+                    <td><input type="text" name="est_materials[<?= $qEstIdx ?>][unit]" class="form-control" value="<?= e($qem['unit'] ?: '') ?>" placeholder="單位"></td>
+                    <td><input type="number" name="est_materials[<?= $qEstIdx ?>][estimated_qty]" class="form-control" value="<?= e($qem['estimated_qty'] ?: '') ?>" min="0" step="0.1"></td>
+                    <?php if (!$readOnly): ?>
+                    <td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest('tr').remove()">✕</button></td>
+                    <?php endif; ?>
+                </tr>
+                <?php $qEstIdx++; endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- 內部成本（僅管理者可見） -->
     <?php if ($canManage): ?>
     <div class="card">
@@ -398,6 +449,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
 .psel-controls .psel-keyword { flex:0 0 100px; }
 .psel-model-display, .psel-stock-display { white-space:nowrap; }
 .psel-row td { padding-top:0 !important; }
+
+/* 預估線材 autocomplete */
+.q-est-suggestions { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.15); max-height:250px; overflow-y:auto; z-index:200; }
+.q-est-sug-item { padding:8px 12px; cursor:pointer; font-size:.85rem; border-bottom:1px solid #f5f5f5; }
+.q-est-sug-item:hover { background:#e3f2fd; }
+.q-est-sug-item:last-child { border-bottom:none; }
 
 @media (max-width: 768px) {
     .quote-items-table { font-size: .75rem; }
@@ -972,6 +1029,128 @@ function loadCat1Options() {
         if (!dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
     });
 })();
+
+// ===== 預計使用線材與配件 =====
+var qEstMatIndex = <?= isset($qEstIdx) ? $qEstIdx : 0 ?>;
+var qEstSearchTimer = null;
+
+function addQEstMaterial() {
+    var idx = qEstMatIndex++;
+    var html = '<tr class="q-est-row" data-idx="' + idx + '">' +
+        '<td style="position:relative">' +
+        '<input type="text" name="est_materials[' + idx + '][material_name]" class="form-control q-est-name" placeholder="搜尋產品..." autocomplete="off" oninput="searchQEstProduct(this,' + idx + ')">' +
+        '<input type="hidden" name="est_materials[' + idx + '][product_id]" value="">' +
+        '<div class="q-est-suggestions" id="q-est-sug-' + idx + '"></div>' +
+        '</td>' +
+        '<td><input type="text" name="est_materials[' + idx + '][model_number]" class="form-control" placeholder="型號"></td>' +
+        '<td><input type="text" name="est_materials[' + idx + '][unit]" class="form-control" placeholder="單位"></td>' +
+        '<td><input type="number" name="est_materials[' + idx + '][estimated_qty]" class="form-control" min="0" step="0.1"></td>' +
+        '<td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest(\'tr\').remove()">✕</button></td>' +
+        '</tr>';
+    var container = document.getElementById('qEstMaterialsContainer');
+    if (container) container.insertAdjacentHTML('beforeend', html);
+}
+
+function searchQEstProduct(input, idx) {
+    clearTimeout(qEstSearchTimer);
+    var q = input.value.trim();
+    var sugDiv = document.getElementById('q-est-sug-' + idx);
+    if (!sugDiv) return;
+    if (q.length < 1) { sugDiv.innerHTML = ''; sugDiv.style.display = 'none'; return; }
+    qEstSearchTimer = setTimeout(function() {
+        fetch('/cases.php?action=search_products&q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data || !data.length) {
+                sugDiv.innerHTML = '<div class="q-est-sug-item" style="color:#999;cursor:default">無符合產品</div>';
+                sugDiv.style.display = 'block';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                html += '<div class="q-est-sug-item" onclick="selectQEstProduct(' + idx + ',' + data[i].id + ',\'' + escHtml(data[i].name).replace(/'/g, "\\'") + '\',\'' + escHtml(data[i].model_number || '').replace(/'/g, "\\'") + '\',\'' + escHtml(data[i].unit || '').replace(/'/g, "\\'") + '\')">' +
+                    '<strong>' + escHtml(data[i].name) + '</strong>' +
+                    (data[i].model_number ? ' <span style="color:#1565c0">' + escHtml(data[i].model_number) + '</span>' : '') +
+                    '</div>';
+            }
+            sugDiv.innerHTML = html;
+            sugDiv.style.display = 'block';
+        });
+    }, 300);
+}
+
+function selectQEstProduct(idx, productId, name, model, unit) {
+    var row = document.querySelector('tr.q-est-row[data-idx="' + idx + '"]');
+    if (!row) return;
+    row.querySelector('input[name*="[material_name]"]').value = name;
+    row.querySelector('input[name*="[product_id]"]').value = productId;
+    row.querySelector('input[name*="[model_number]"]').value = model;
+    row.querySelector('input[name*="[unit]"]').value = unit;
+    var sugDiv = document.getElementById('q-est-sug-' + idx);
+    if (sugDiv) { sugDiv.innerHTML = ''; sugDiv.style.display = 'none'; }
+}
+
+function loadEstMaterials(caseId) {
+    var container = document.getElementById('qEstMaterialsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    qEstMatIndex = 0;
+    fetch('/quotations.php?action=ajax_est_materials&case_id=' + encodeURIComponent(caseId))
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+        if (resp.success && resp.data && resp.data.length > 0) {
+            for (var i = 0; i < resp.data.length; i++) {
+                var d = resp.data[i];
+                var idx = qEstMatIndex++;
+                var html = '<tr class="q-est-row" data-idx="' + idx + '">' +
+                    '<td style="position:relative">' +
+                    '<input type="text" name="est_materials[' + idx + '][material_name]" class="form-control q-est-name" value="' + escHtml(d.material_name || '') + '" placeholder="搜尋產品..." autocomplete="off" oninput="searchQEstProduct(this,' + idx + ')">' +
+                    '<input type="hidden" name="est_materials[' + idx + '][product_id]" value="' + (d.product_id || '') + '">' +
+                    '<div class="q-est-suggestions" id="q-est-sug-' + idx + '"></div>' +
+                    '</td>' +
+                    '<td><input type="text" name="est_materials[' + idx + '][model_number]" class="form-control" value="' + escHtml(d.model_number || '') + '" placeholder="型號"></td>' +
+                    '<td><input type="text" name="est_materials[' + idx + '][unit]" class="form-control" value="' + escHtml(d.unit || '') + '" placeholder="單位"></td>' +
+                    '<td><input type="number" name="est_materials[' + idx + '][estimated_qty]" class="form-control" value="' + (d.estimated_qty || '') + '" min="0" step="0.1"></td>' +
+                    '<td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest(\'tr\').remove()">✕</button></td>' +
+                    '</tr>';
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
+}
+
+// 案件切換時載入/隱藏預估線材
+(function() {
+    var caseSelect = document.getElementById('qCaseId');
+    var estCard = document.getElementById('estMaterialsCard');
+    if (!caseSelect || !estCard) return;
+    caseSelect.addEventListener('change', function() {
+        var caseId = this.value;
+        if (!caseId) {
+            estCard.style.display = 'none';
+            return;
+        }
+        estCard.style.display = '';
+        loadEstMaterials(caseId);
+    });
+    // 頁面載入時若已選案件，顯示卡片並載入資料（新增時透過 GET 預選）
+    if (caseSelect.value) {
+        estCard.style.display = '';
+        // 編輯模式已由 PHP 預載，新增模式需 AJAX 載入
+        var hasRows = document.querySelectorAll('#qEstMaterialsContainer .q-est-row').length;
+        if (!hasRows) {
+            loadEstMaterials(caseSelect.value);
+        }
+    }
+})();
+
+// 關閉預估線材搜尋下拉
+document.addEventListener('click', function(e) {
+    if (!e.target.classList.contains('q-est-name')) {
+        var sugs = document.querySelectorAll('.q-est-suggestions');
+        for (var i = 0; i < sugs.length; i++) { sugs[i].innerHTML = ''; sugs[i].style.display = 'none'; }
+    }
+});
 
 // 初始計算
 document.addEventListener('DOMContentLoaded', function() {

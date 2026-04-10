@@ -220,6 +220,38 @@ foreach ($approvalStatus['flows'] as $af) {
     </div>
 </div>
 
+<!-- 預計使用線材與配件（僅管理者，統計分析用） -->
+<?php
+if ($canManage && !empty($quote['case_id'])) {
+    $viewCaseModel = new CaseModel();
+    $viewEstMaterials = $viewCaseModel->getMaterialEstimates($quote['case_id']);
+    if (!empty($viewEstMaterials)):
+?>
+<div class="card">
+    <div class="card-header">預計使用線材與配件（統計分析用）</div>
+    <div class="table-responsive">
+        <table class="table" style="font-size:.85rem;margin:0">
+            <thead><tr>
+                <th>品名</th><th>型號</th><th>單位</th><th style="text-align:right">預估數量</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($viewEstMaterials as $vem): ?>
+            <tr>
+                <td><?= e($vem['material_name']) ?></td>
+                <td><?= e($vem['model_number'] ?: '-') ?></td>
+                <td><?= e($vem['unit'] ?: '-') ?></td>
+                <td style="text-align:right"><?= $vem['estimated_qty'] ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php
+    endif;
+}
+?>
+
 <!-- 內部成本（僅管理者可見） -->
 <?php if ($canManage): ?>
 <div class="card">

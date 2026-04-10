@@ -186,6 +186,12 @@ class ReviewModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getAllBranches()
+    {
+        $stmt = $this->db->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY id");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     /**
      * 將 JSON id 陣列展開為人員名稱陣列
      */

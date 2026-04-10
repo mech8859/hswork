@@ -266,6 +266,86 @@ switch ($action) {
         $caseStockOutStatus['stockouts'] = $_soStmt->fetchAll(PDO::FETCH_ASSOC);
         $caseStockOutStatus['stockout_count'] = count($caseStockOutStatus['stockouts']);
 
+        // ===== 案件利潤分析 =====
+        $_paDb = Database::getInstance();
+        $caseProfitAnalysis = array(
+            'has_quotation' => false,
+            'deal_amount' => (int)($case['deal_amount'] ?? 0),
+            // 報價預估
+            'q_material_cost' => 0, 'q_labor_hours' => 0, 'q_labor_cost' => 0,
+            'q_labor_days' => 0, 'q_labor_people' => 0,
+            // 線材預估
+            'est_cable_cost' => 0,
+            // 實際數據
+            'actual_equipment' => 0, 'actual_cable' => 0, 'actual_consumable' => 0,
+            'actual_total_minutes' => 0,
+            // 營運成本比例
+            'op_rate' => 10,
+        );
+        try {
+            // 1) 報價單成本數據
+            $_qStmt = $_paDb->prepare("
+                SELECT labor_days, labor_people, labor_hours, labor_cost_total,
+                       total_cost, profit_amount, profit_rate, subtotal
+                FROM quotations WHERE case_id = ? AND status NOT IN ('draft')
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $_qStmt->execute(array($id));
+            $_qData = $_qStmt->fetch(PDO::FETCH_ASSOC);
+            if ($_qData) {
+                $caseProfitAnalysis['has_quotation'] = true;
+                $caseProfitAnalysis['q_material_cost'] = (int)($_qData['total_cost'] ?? 0) - (int)($_qData['labor_cost_total'] ?? 0);
+                $caseProfitAnalysis['q_labor_hours'] = (float)($_qData['labor_hours'] ?? 0);
+                $caseProfitAnalysis['q_labor_cost'] = (int)($_qData['labor_cost_total'] ?? 0);
+                $caseProfitAnalysis['q_labor_days'] = (float)($_qData['labor_days'] ?? 0);
+                $caseProfitAnalysis['q_labor_people'] = (int)($_qData['labor_people'] ?? 0);
+            }
+            // 2) 實際材料成本（by type）
+            $_muStmt = $_paDb->prepare("
+                SELECT mu.material_type, SUM(mu.used_qty * mu.unit_cost) AS actual_cost
+                FROM material_usage mu
+                JOIN work_logs wl ON mu.work_log_id = wl.id
+                JOIN schedules s ON wl.schedule_id = s.id
+                WHERE s.case_id = ?
+                GROUP BY mu.material_type
+            ");
+            $_muStmt->execute(array($id));
+            foreach ($_muStmt->fetchAll(PDO::FETCH_ASSOC) as $_mu) {
+                $t = $_mu['material_type'];
+                $c = (int)$_mu['actual_cost'];
+                if ($t === 'equipment') $caseProfitAnalysis['actual_equipment'] = $c;
+                elseif ($t === 'cable') $caseProfitAnalysis['actual_cable'] = $c;
+                elseif ($t === 'consumable') $caseProfitAnalysis['actual_consumable'] = $c;
+            }
+            // 3) 實際工時
+            $_whStmt = $_paDb->prepare("
+                SELECT SUM(TIMESTAMPDIFF(MINUTE, wl.arrival_time, wl.departure_time)) AS total_minutes
+                FROM work_logs wl
+                JOIN schedules s ON wl.schedule_id = s.id
+                WHERE s.case_id = ? AND wl.arrival_time IS NOT NULL AND wl.departure_time IS NOT NULL
+            ");
+            $_whStmt->execute(array($id));
+            $caseProfitAnalysis['actual_total_minutes'] = (int)$_whStmt->fetchColumn();
+            // 4) 線材預估成本
+            $_ecStmt = $_paDb->prepare("
+                SELECT SUM(cme.estimated_qty * COALESCE(p.cost, 0)) AS est_cable_cost
+                FROM case_material_estimates cme
+                LEFT JOIN products p ON cme.product_id = p.id
+                WHERE cme.case_id = ?
+            ");
+            $_ecStmt->execute(array($id));
+            $caseProfitAnalysis['est_cable_cost'] = (int)$_ecStmt->fetchColumn();
+            // 5) 營運成本比例（from system_settings，預設 10%）
+            $_opStmt = $_paDb->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
+            $_opStmt->execute();
+            $_opVal = $_opStmt->fetchColumn();
+            if ($_opVal !== false && $_opVal !== null) {
+                $caseProfitAnalysis['op_rate'] = (float)$_opVal;
+            }
+        } catch (Exception $e) {
+            // 查詢失敗不影響頁面
+        }
+
         // 編輯鎖定（多人同時編輯提醒，純警示不阻擋）
         require_once __DIR__ . '/../includes/EditingLock.php';
         $_curUser = Auth::user();

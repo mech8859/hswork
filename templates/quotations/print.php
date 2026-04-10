@@ -162,13 +162,13 @@ if (!empty($quote['case_id'])) {
 <table class="items-table">
     <thead>
         <tr>
-            <th style="width:25px">序</th>
-            <th>品名/型號</th>
-            <th style="width:55px">數量</th>
-            <th style="width:35px">單位</th>
-            <th style="width:70px">單價</th>
-            <th style="width:80px">小計</th>
-            <th style="width:80px">備註</th>
+            <th style="width:22px">序</th>
+            <th style="width:315px">品名/型號</th>
+            <th style="width:40px">數量</th>
+            <th style="width:40px">單位</th>
+            <th style="width:58px">單價</th>
+            <th style="width:65px">小計</th>
+            <th style="width:140px">備註</th>
         </tr>
     </thead>
     <tbody>

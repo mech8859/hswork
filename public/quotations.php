@@ -5,6 +5,7 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
 require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
+require_once __DIR__ . '/../modules/cases/CaseModel.php';
 
 // 權限檢查
 $canManage = Auth::hasPermission('quotations.manage');
@@ -51,6 +52,12 @@ switch ($action) {
                 $model->saveLaborCost($quoteId, $_POST);
             }
             $model->syncCaseQuoteAmount($quoteId);
+            // 儲存預估線材到 case_material_estimates
+            $createCaseId = (int)($_POST['case_id'] ?? 0);
+            if ($createCaseId > 0 && isset($_POST['est_materials'])) {
+                $caseModel = new CaseModel();
+                $caseModel->saveMaterialEstimates($createCaseId, $_POST['est_materials']);
+            }
             Session::flash('success', '報價單已建立');
             redirect('/quotations.php?action=view&id=' . $quoteId);
         }
@@ -109,6 +116,12 @@ switch ($action) {
                 $model->saveLaborCost($id, $_POST);
             }
             $model->syncCaseQuoteAmount($id);
+            // 儲存預估線材到 case_material_estimates
+            $editCaseId = (int)($_POST['case_id'] ?? 0);
+            if ($editCaseId > 0 && isset($_POST['est_materials'])) {
+                $caseModel = new CaseModel();
+                $caseModel->saveMaterialEstimates($editCaseId, $_POST['est_materials']);
+            }
             Session::flash('success', '報價單已更新');
             redirect('/quotations.php?action=view&id=' . $id);
         }
@@ -474,6 +487,17 @@ switch ($action) {
             header('Content-Type: application/json');
             echo '{}';
         }
+        exit;
+
+    case 'ajax_est_materials':
+        header('Content-Type: application/json');
+        $estCaseId = (int)($_GET['case_id'] ?? 0);
+        if ($estCaseId <= 0) {
+            echo json_encode(array('success' => true, 'data' => array()));
+            exit;
+        }
+        $caseModel = new CaseModel();
+        echo json_encode(array('success' => true, 'data' => $caseModel->getMaterialEstimates($estCaseId)));
         exit;
 
     default:

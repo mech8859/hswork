@@ -268,6 +268,24 @@ switch ($action) {
         break;
     // ADMIN_TOOL_BLOCK_END
 
+    // ---- 廠商搜尋 AJAX（獨立 endpoint，不依賴 finance 權限）----
+    case 'ajax_vendor_search':
+        header('Content-Type: application/json');
+        $q = trim($_GET['q'] ?? '');
+        if (strlen($q) < 1) { echo '[]'; exit; }
+        $kw = '%' . $q . '%';
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT id, vendor_code, name, contact_person, phone, tax_id, fax, email, address FROM vendors WHERE (name LIKE ? OR vendor_code LIKE ? OR contact_person LIKE ?) AND is_active = 1 ORDER BY name LIMIT 10");
+        $stmt->execute(array($kw, $kw, $kw));
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($results)) {
+            $stmt2 = $db->prepare("SELECT id, '' as vendor_code, name, contact_person, phone FROM outsource_vendors WHERE name LIKE ? AND is_active = 1 ORDER BY name LIMIT 10");
+            $stmt2->execute(array($kw));
+            $results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        }
+        echo json_encode($results);
+        exit;
+
     default:
         redirect('/goods_receipts.php');
         break;
