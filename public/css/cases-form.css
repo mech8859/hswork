@@ -10,8 +10,14 @@
 .section-readonly { position:relative; }
 .section-readonly::after { content:'唯讀'; position:absolute; top:10px; right:14px; background:#ef5350; color:#fff; font-size:.7rem; padding:2px 8px; border-radius:10px; font-weight:600; }
 .section-readonly input, .section-readonly select, .section-readonly textarea { pointer-events:none; background:#f5f5f5 !important; color:#757575 !important; }
-.section-readonly .checkbox-label, .section-readonly .atc-add-btn, .section-readonly .atc-del, .section-readonly button { pointer-events:none; opacity:.5; }
+.section-readonly .checkbox-label, .section-readonly .atc-add-btn, .section-readonly .atc-del, .section-readonly button:not(.btn-approval) { pointer-events:none; opacity:.5; }
 .section-readonly input[type="checkbox"], .section-readonly input[type="radio"] { pointer-events:none; }
+/* 簽核區不受唯讀限制 */
+.section-readonly .approval-zone input,
+.section-readonly .approval-zone select,
+.section-readonly .approval-zone textarea,
+.section-readonly .approval-zone input[type="checkbox"],
+.section-readonly .approval-zone input[type="radio"] { pointer-events:auto !important; background:#fff !important; color:#333 !important; }
 
 /* 固定底部儲存列 */
 .form-actions { position:sticky; bottom:0; background:#fff; padding:12px 16px; border-top:1px solid var(--gray-200); display:flex; gap:8px; z-index:50; border-radius:0 0 8px 8px; box-shadow:0 -2px 6px rgba(0,0,0,.06); margin-top:16px; }

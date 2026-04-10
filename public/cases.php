@@ -889,6 +889,18 @@ switch ($action) {
             }
         }
 
+        // 讀取舊值（用於通知比對）
+        $oldBi = null;
+        if ($biId) {
+            $oldBiStmt = $db->prepare("SELECT customer_billable, customer_paid, is_billed FROM case_billing_items WHERE id=? AND case_id=?");
+            $oldBiStmt->execute(array($biId, $caseId));
+            $oldBi = $oldBiStmt->fetch(PDO::FETCH_ASSOC);
+        }
+        // 新值
+        $newBillable = !empty($_POST['customer_billable']) ? 1 : 0;
+        $newPaid = !empty($_POST['customer_paid']) ? 1 : 0;
+        $newBilled = !empty($_POST['is_billed']) ? 1 : 0;
+
         if ($biId) {
             $sql = "UPDATE case_billing_items SET payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=?";
             $params = array_merge($biData);
@@ -903,7 +915,38 @@ switch ($action) {
             $seqNo = (int)$maxSeq->fetchColumn() + 1;
             $db->prepare("INSERT INTO case_billing_items (case_id, seq_no, payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, attachment_path, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 ->execute(array_merge(array($caseId, $seqNo), $biData, array($attachPath, Auth::id())));
+            $biId = (int)$db->lastInsertId();
         }
+
+        // 通知：偵測三個勾選變更（從 0→1 才發）
+        try {
+            require_once __DIR__ . '/../modules/notifications/NotificationDispatcher.php';
+            $caseStmt = $db->prepare("SELECT case_number, customer_name, branch_id FROM cases WHERE id = ?");
+            $caseStmt->execute(array($caseId));
+            $caseInfo = $caseStmt->fetch(PDO::FETCH_ASSOC);
+            $notifData = array(
+                'id' => $biId,
+                'case_id' => $caseId,
+                'case_number' => $caseInfo ? $caseInfo['case_number'] : '',
+                'customer_name' => $caseInfo ? $caseInfo['customer_name'] : '',
+                'branch_id' => $caseInfo ? $caseInfo['branch_id'] : null,
+                'payment_category' => !empty($_POST['payment_category']) ? $_POST['payment_category'] : '',
+                'total_amount' => !empty($_POST['total_amount']) ? (int)str_replace(',', '', $_POST['total_amount']) : 0,
+            );
+            $biChecks = array(
+                'customer_billable' => 'customer_billable_changed',
+                'customer_paid'     => 'customer_paid_changed',
+                'is_billed'         => 'is_billed_changed',
+            );
+            $biNewVals = array('customer_billable' => $newBillable, 'customer_paid' => $newPaid, 'is_billed' => $newBilled);
+            foreach ($biChecks as $field => $event) {
+                $wasOn = $oldBi ? (int)$oldBi[$field] : 0;
+                if (!$wasOn && $biNewVals[$field]) {
+                    NotificationDispatcher::dispatch('billing_items', $event, $notifData, Auth::id());
+                }
+            }
+        } catch (Exception $ne) {}
+
         echo json_encode(array('success' => true));
         break;
 

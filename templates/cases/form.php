@@ -1046,20 +1046,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <?php endif; ?>
 
             <?php if ($_myFlow): ?>
-            <div style="background:#fff;padding:10px;border-radius:4px;border:1px solid #1565c0">
+            <div class="approval-zone" style="background:#fff;padding:10px;border-radius:4px;border:1px solid #1565c0">
                 <strong>✋ 您要簽核：第 <?= (int)$_myFlow['level_order'] ?> 關 (<?= e($_levelLabels[$_myFlow['level_order']] ?? '') ?>)</strong>
-                <form method="POST" action="/approvals.php?action=approve" style="margin-top:8px" onsubmit="return confirm('確定核准？');">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="flow_id" value="<?= (int)$_myFlow['id'] ?>">
-                    <input type="hidden" name="module" value="case_completion">
-                    <input type="hidden" name="target_id" value="<?= (int)$case['id'] ?>">
-                    <input type="hidden" name="redirect" value="/cases.php?action=edit&id=<?= (int)$case['id'] ?>#sec-billing">
-
+                <div style="margin-top:8px">
                     <?php if ($_myFlow['level_order'] == 2): ?>
                     <!-- Level 2 行政人員：勾選有無收款 -->
                     <div style="margin:6px 0">
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-                            <input type="checkbox" name="has_payment" value="1" <?= $_autoHasPayment ? 'checked' : '' ?>>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;pointer-events:auto !important">
+                            <input type="checkbox" id="compHasPayment" value="1" <?= $_autoHasPayment ? 'checked' : '' ?> style="pointer-events:auto !important">
                             <span>有收款（依目前總收款金額自動帶入：$<?= number_format((float)($case['total_collected'] ?? 0)) ?>，可手動勾消）</span>
                         </label>
                         <small style="color:#666">勾起 → 進入第 3 關（會計確認入帳）<br>不勾 → 案件直接進入「完工未收款」狀態</small>
@@ -1067,8 +1061,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <?php elseif ($_myFlow['level_order'] == 3): ?>
                     <!-- Level 3 會計人員：勾款項已入帳 -->
                     <div style="margin:6px 0">
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-                            <input type="checkbox" name="payment_received" value="1" required>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;pointer-events:auto !important">
+                            <input type="checkbox" id="compPaymentReceived" value="1" style="pointer-events:auto !important">
                             <span>款項已入帳（必勾才能結案）</span>
                         </label>
                         <?php if ($_balance !== 0): ?>
@@ -1082,13 +1076,48 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <?php endif; ?>
 
                     <div style="margin-top:6px">
-                        <input type="text" name="comment" class="form-control" placeholder="備註（選填）" style="font-size:.85rem">
+                        <input type="text" id="compApproveComment" class="form-control" placeholder="備註（選填）" style="font-size:.85rem;pointer-events:auto !important;background:#fff !important;color:#333 !important">
                     </div>
                     <div style="display:flex;gap:6px;margin-top:8px">
-                        <button type="submit" class="btn btn-success btn-sm" <?= ($_myFlow['level_order'] == 3 && $_balance !== 0) ? 'disabled' : '' ?>>✓ 核准</button>
-                        <button type="button" class="btn btn-danger btn-sm" onclick="completionRejectShow(<?= (int)$_myFlow['id'] ?>, <?= (int)$case['id'] ?>)">✗ 駁回</button>
+                        <button type="button" class="btn btn-success btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionApproveSubmit()" <?= ($_myFlow['level_order'] == 3 && $_balance !== 0) ? 'disabled' : '' ?>>✓ 核准</button>
+                        <button type="button" class="btn btn-danger btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionRejectShow(<?= (int)$_myFlow['id'] ?>, <?= (int)$case['id'] ?>)">✗ 駁回</button>
                     </div>
-                </form>
+                </div>
+                <script>
+                function completionApproveSubmit() {
+                    if (!confirm('確定核准？')) return;
+                    <?php if ($_myFlow['level_order'] == 3): ?>
+                    var prEl = document.getElementById('compPaymentReceived');
+                    if (!prEl || !prEl.checked) { alert('請勾選「款項已入帳」才能核准'); return; }
+                    <?php endif; ?>
+                    var f = document.createElement('form');
+                    f.method = 'POST';
+                    f.action = '/approvals.php?action=approve';
+                    f.style.display = 'none';
+                    var fields = {
+                        'csrf_token': '<?= e(Session::getCsrfToken()) ?>',
+                        'flow_id': '<?= (int)$_myFlow['id'] ?>',
+                        'module': 'case_completion',
+                        'target_id': '<?= (int)$case['id'] ?>',
+                        'redirect': '/cases.php?action=edit&id=<?= (int)$case['id'] ?>#sec-billing',
+                        'comment': document.getElementById('compApproveComment').value
+                    };
+                    <?php if ($_myFlow['level_order'] == 2): ?>
+                    var hp = document.getElementById('compHasPayment');
+                    if (hp && hp.checked) fields['has_payment'] = '1';
+                    <?php endif; ?>
+                    <?php if ($_myFlow['level_order'] == 3): ?>
+                    fields['payment_received'] = '1';
+                    <?php endif; ?>
+                    for (var k in fields) {
+                        var inp = document.createElement('input');
+                        inp.type = 'hidden'; inp.name = k; inp.value = fields[k];
+                        f.appendChild(inp);
+                    }
+                    document.body.appendChild(f);
+                    f.submit();
+                }
+                </script>
             </div>
             <?php endif; ?>
         </div>
@@ -2172,9 +2201,9 @@ var CASE_DATA = {
                 <div class="form-group"><label>總金額 *</label><input type="text" name="total_amount" id="biTotal" class="form-control" placeholder="0" required></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label><input type="checkbox" name="customer_billable" id="biBillable" value="1"> 客戶通知可請款</label></div>
-                <div class="form-group"><label><input type="checkbox" name="customer_paid" id="biPaid" value="1"> 客戶通知已付款</label></div>
-                <div class="form-group"><label><input type="checkbox" name="is_billed" id="biBilled" value="1"> 已請款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="customer_billable" id="biBillable" value="1" onchange="biExclusive('biBillable')"> 客戶通知可請款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="customer_paid" id="biPaid" value="1" onchange="biExclusive('biPaid')"> 客戶通知已付款</label></div>
+                <div class="form-group"><label><input type="checkbox" name="is_billed" id="biBilled" value="1" onchange="biExclusive('biBilled')"> 已請款</label></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label>付款資訊</label><input type="text" name="customer_paid_info" id="biPaidInfo" class="form-control" placeholder="付款資訊說明"></div>
@@ -2197,6 +2226,16 @@ var CASE_DATA = {
     </div>
 </div>
 <script>
+// 請款流程三個勾選互斥（單選）
+function biExclusive(checkedId) {
+    var ids = ['biBillable', 'biPaid', 'biBilled'];
+    var el = document.getElementById(checkedId);
+    if (el && el.checked) {
+        for (var i = 0; i < ids.length; i++) {
+            if (ids[i] !== checkedId) document.getElementById(ids[i]).checked = false;
+        }
+    }
+}
 function addBillingItem() {
     document.getElementById('biModalTitle').textContent = '新增請款項目';
     document.getElementById('biForm').reset();

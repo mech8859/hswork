@@ -50,6 +50,31 @@ switch ($action) {
         echo json_encode(array('success' => true));
         break;
 
+    // 刪除單筆通知
+    case 'delete':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('error' => '方法不允許'));
+            break;
+        }
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        if ($id) {
+            $db = Database::getInstance();
+            $db->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?")->execute(array($id, $userId));
+        }
+        echo json_encode(array('success' => true));
+        break;
+
+    // 全部刪除
+    case 'delete_all':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('error' => '方法不允許'));
+            break;
+        }
+        $db = Database::getInstance();
+        $db->prepare("DELETE FROM notifications WHERE user_id = ?")->execute(array($userId));
+        echo json_encode(array('success' => true));
+        break;
+
     default:
         echo json_encode(array('error' => '未知操作'));
         break;

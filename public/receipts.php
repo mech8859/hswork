@@ -8,14 +8,18 @@ $action = !empty($_GET['action']) ? $_GET['action'] : 'list';
 $receiptReadonly = false;
 
 if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('finance.view')) {
-    // 無財務權限：僅允許檢視自己案件的收款單（唯讀）
+    // 無財務權限：僅允許檢視自己案件的收款單 或 收到通知的收款單（唯讀）
     if ($action === 'edit' && !empty($_GET['id'])) {
         $_db = Database::getInstance();
+        $_rid = (int)$_GET['id'];
         $_rCheck = $_db->prepare("SELECT sales_id FROM receipts WHERE id = ?");
-        $_rCheck->execute(array((int)$_GET['id']));
+        $_rCheck->execute(array($_rid));
         $_rSalesId = $_rCheck->fetchColumn();
-        if ($_rSalesId && (int)$_rSalesId === (int)Auth::id()) {
-            $receiptReadonly = true; // 自己的案件，允許唯讀
+        // 自己的案件 或 有該收款單的通知 → 允許唯讀
+        $_hasNotif = $_db->prepare("SELECT 1 FROM notifications WHERE user_id = ? AND related_type = 'receipts' AND related_id = ? LIMIT 1");
+        $_hasNotif->execute(array(Auth::id(), $_rid));
+        if (($_rSalesId && (int)$_rSalesId === (int)Auth::id()) || $_hasNotif->fetchColumn()) {
+            $receiptReadonly = true;
         } else {
             Session::flash('error', '無權限存取');
             redirect('/');

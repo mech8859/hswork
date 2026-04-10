@@ -45,7 +45,7 @@ function toggleNotifDropdown() {
 }
 function loadNotifications() {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/notifications.php?action=unread');
+    xhr.open('GET', '/notifications.php?action=all');
     xhr.onload = function() {
         try {
             var res = JSON.parse(xhr.responseText);
@@ -60,10 +60,12 @@ function loadNotifications() {
             for (var i = 0; i < res.data.length; i++) {
                 var n = res.data[i];
                 var timeAgo = formatTimeAgo(n.created_at);
-                html += '<div class="notif-item" data-id="' + n.id + '" onclick="clickNotif(' + n.id + ',\'' + (n.link || '').replace(/'/g, "\\'") + '\')" style="padding:12px 16px;border-bottom:1px solid var(--gray-100);cursor:pointer;background:' + (n.is_read ? '#fff' : '#f0f7ff') + '">';
-                html += '<div style="font-weight:' + (n.is_read ? 'normal' : '600') + ';font-size:.9rem">' + escHtml(n.title) + '</div>';
-                if (n.message) html += '<div style="color:var(--gray-500);font-size:.8rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(n.message) + '</div>';
+                var link = (n.link || '').replace(/'/g, "\\'");
+                html += '<div class="notif-item" data-id="' + n.id + '" style="position:relative;padding:12px 32px 12px 16px;border-bottom:1px solid var(--gray-100);cursor:pointer;background:' + (n.is_read ? '#fff' : '#f0f7ff') + '">';
+                html += '<div onclick="clickNotif(' + n.id + ',\'' + link + '\')" style="font-weight:' + (n.is_read ? 'normal' : '600') + ';font-size:.9rem">' + escHtml(n.title) + '</div>';
+                if (n.message) html += '<div onclick="clickNotif(' + n.id + ',\'' + link + '\')" style="color:var(--gray-500);font-size:.8rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(n.message) + '</div>';
                 html += '<div style="color:var(--gray-400);font-size:.75rem;margin-top:4px">' + timeAgo + (n.sender_name ? ' · ' + escHtml(n.sender_name) : '') + '</div>';
+                html += '<button onclick="event.stopPropagation();deleteNotif(' + n.id + ')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;line-height:1;padding:2px" title="刪除">&times;</button>';
                 html += '</div>';
             }
             list.innerHTML = html;
@@ -78,9 +80,28 @@ function clickNotif(id, link) {
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '/notifications.php?action=read');
     xhr.onload = function() {
-        if (link) window.location = link;
-        else { loadNotifications(); refreshNotifCount(); }
+        if (link) window.open(link, '_blank');
+        loadNotifications();
+        refreshNotifCount();
     };
+    xhr.send(fd);
+}
+function deleteNotif(id) {
+    var fd = new FormData();
+    fd.append('id', id);
+    fd.append('csrf_token', getCSRF());
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/notifications.php?action=delete');
+    xhr.onload = function() { loadNotifications(); refreshNotifCount(); };
+    xhr.send(fd);
+}
+function deleteAllNotif() {
+    if (!confirm('確定刪除全部通知？')) return;
+    var fd = new FormData();
+    fd.append('csrf_token', getCSRF());
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/notifications.php?action=delete_all');
+    xhr.onload = function() { loadNotifications(); refreshNotifCount(); };
     xhr.send(fd);
 }
 function markAllNotifRead() {

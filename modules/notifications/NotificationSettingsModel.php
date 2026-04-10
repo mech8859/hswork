@@ -118,6 +118,16 @@ class NotificationSettingsModel
     public function getModuleRegistry()
     {
         return array(
+            'billing_items' => array(
+                'label' => '請款項目',
+                'events' => array(
+                    'customer_billable_changed' => '客戶通知可請款',
+                    'customer_paid_changed' => '客戶通知已付款',
+                    'is_billed_changed' => '已請款',
+                ),
+                'condition_fields' => array(),
+                'record_fields' => array(),
+            ),
             'receipts' => array(
                 'label' => '收款單',
                 'events' => array(

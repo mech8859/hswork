@@ -33,7 +33,8 @@ class NotificationModel
     {
         $sql = "SELECT id FROM users WHERE role = ? AND is_active = 1";
         $params = array($role);
-        if ($branchId) {
+        // boss / accountant 不受分公司限制（管理者看全部、會計屬管理處但管所有分公司帳）
+        if ($branchId && !in_array($role, array('boss', 'accountant'))) {
             $sql .= " AND branch_id = ?";
             $params[] = $branchId;
         }

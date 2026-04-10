@@ -40,7 +40,10 @@
         <div class="notif-dropdown" id="notifDropdown" style="display:none;position:absolute;right:10px;top:48px;width:360px;max-height:400px;overflow-y:auto;background:#fff;color:#333;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:1100">
             <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--gray-200)">
                 <strong>通知</strong>
-                <button type="button" onclick="markAllNotifRead()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:.85rem">全部已讀</button>
+                <span>
+                    <button type="button" onclick="markAllNotifRead()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:.85rem">全部已讀</button>
+                    <button type="button" onclick="deleteAllNotif()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.85rem">全部刪除</button>
+                </span>
             </div>
             <div id="notifList" style="padding:0">
                 <div style="padding:20px;text-align:center;color:var(--gray-400)">載入中...</div>
