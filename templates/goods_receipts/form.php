@@ -120,6 +120,31 @@
         <?php endif; ?>
     </div>
 
+    <!-- AI 辨識 -->
+    <div class="card" id="aiRecognizeCard">
+        <div class="card-header d-flex justify-between align-center">
+            <span>AI 辨識進貨單</span>
+            <small style="color:#888">拍照或上傳進貨單圖片，自動辨識填入</small>
+        </div>
+        <div style="padding:12px">
+            <div class="d-flex gap-1 align-center" style="flex-wrap:wrap">
+                <input type="file" id="aiImageInput" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="aiStartRecognize()">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('aiImageInput').click()" id="aiUploadBtn">
+                    📷 拍照 / 選擇圖片
+                </button>
+                <span id="aiFileName" style="color:#888;font-size:.85rem"></span>
+            </div>
+            <!-- 預覽 -->
+            <div id="aiPreview" style="display:none;margin-top:10px">
+                <img id="aiPreviewImg" style="max-width:300px;max-height:200px;border:1px solid #ddd;border-radius:6px">
+            </div>
+            <!-- 辨識狀態 -->
+            <div id="aiStatus" style="display:none;margin-top:10px;padding:10px;border-radius:6px;font-size:.9rem"></div>
+            <!-- 辨識結果摘要 -->
+            <div id="aiResultSummary" style="display:none;margin-top:10px;padding:12px;background:#f0f7ff;border-radius:6px;font-size:.85rem"></div>
+        </div>
+    </div>
+
     <!-- 進貨明細 -->
     <div class="card">
         <div class="card-header d-flex justify-between align-center">
@@ -131,12 +156,12 @@
                 <thead>
                     <tr>
                         <th style="width:40px">序號</th>
-                        <th>型號</th>
+                        <th style="min-width:100px">型號</th>
                         <th>品名</th>
                         <th>規格</th>
                         <th>單位</th>
                         <th style="width:80px">採購數量</th>
-                        <th style="width:80px">收貨數量</th>
+                        <th style="width:100px">收貨數量</th>
                         <th style="width:100px">單價</th>
                         <th style="width:100px">金額</th>
                         <th style="width:40px"></th>
@@ -566,4 +591,182 @@ document.addEventListener('click', function(e) {
     var inp = document.getElementById('vendor_name');
     if (dd && !dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
 });
+
+// ===== AI 辨識 =====
+function aiStartRecognize() {
+    var fileInput = document.getElementById('aiImageInput');
+    var file = fileInput.files[0];
+    if (!file) return;
+
+    // 顯示檔名
+    document.getElementById('aiFileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + 'KB)';
+
+    // 預覽圖片
+    if (file.type.startsWith('image/')) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('aiPreviewImg').src = e.target.result;
+            document.getElementById('aiPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('aiPreview').style.display = 'none';
+    }
+
+    // 顯示辨識中
+    var statusEl = document.getElementById('aiStatus');
+    statusEl.style.display = 'block';
+    statusEl.style.background = '#fff3e0';
+    statusEl.style.color = '#e65100';
+    statusEl.innerHTML = '⏳ AI 辨識中，請稍候（約 10~30 秒）...';
+    document.getElementById('aiResultSummary').style.display = 'none';
+    document.getElementById('aiUploadBtn').disabled = true;
+
+    // 透過 PHP 代理呼叫 AI 服務
+    var formData = new FormData();
+    formData.append('image', file);
+
+    fetch('/goods_receipts.php?action=ajax_ai_recognize', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        document.getElementById('aiUploadBtn').disabled = false;
+        if (!data.success) {
+            statusEl.style.background = '#ffebee';
+            statusEl.style.color = '#c62828';
+            statusEl.innerHTML = '❌ 辨識失敗：' + (data.error || '未知錯誤');
+            return;
+        }
+        statusEl.style.background = '#e8f5e9';
+        statusEl.style.color = '#2e7d32';
+        statusEl.innerHTML = '✅ 辨識完成！';
+        aiApplyResult(data);
+    })
+    .catch(function(err) {
+        document.getElementById('aiUploadBtn').disabled = false;
+        statusEl.style.background = '#ffebee';
+        statusEl.style.color = '#c62828';
+        statusEl.innerHTML = '❌ 連線失敗：' + err.message;
+    });
+}
+
+function aiApplyResult(data) {
+    // 1) 廠商
+    var vendorInfo = data.vendor || {};
+    var summaryParts = [];
+
+    if (vendorInfo.matched_id) {
+        document.getElementById('vendor_id').value = vendorInfo.matched_id;
+        document.getElementById('vendor_name').value = vendorInfo.matched_name || vendorInfo.name;
+        document.getElementById('grVendorWarning').style.display = 'none';
+        summaryParts.push('廠商：' + (vendorInfo.matched_name || vendorInfo.name) + ' (信心度 ' + Math.round((vendorInfo.confidence || 0) * 100) + '%)');
+    } else if (vendorInfo.name) {
+        document.getElementById('vendor_name').value = vendorInfo.name;
+        document.getElementById('vendor_id').value = '';
+        summaryParts.push('⚠ 廠商「' + vendorInfo.name + '」未比對到系統，請手動選擇');
+    }
+
+    // 2) 日期
+    if (data.date) {
+        var dateInput = document.querySelector('input[name="gr_date"]');
+        if (dateInput) {
+            dateInput.value = data.date;
+            summaryParts.push('日期：' + data.date);
+        }
+    }
+
+    // 3) 品項
+    var items = data.items || [];
+    if (items.length > 0) {
+        // 清空現有空白列
+        var tbody = document.getElementById('itemBody');
+        var existingRows = tbody.querySelectorAll('tr:not(.total-row)');
+        var hasData = false;
+        existingRows.forEach(function(row) {
+            var model = row.querySelector('input[name*="[model]"]');
+            var name = row.querySelector('input[name*="[product_name]"]');
+            if (model && !model.value && name && !name.value) {
+                row.remove();
+            } else if (model && model.value) {
+                hasData = true;
+            }
+        });
+
+        // 填入辨識的品項
+        var feeCount = 0;
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            addItemRow();
+            var rows = tbody.querySelectorAll('tr:not(.total-row)');
+            var lastRow = rows[rows.length - 1];
+
+            // 運費等非產品項目標記
+            if (item.is_fee) {
+                lastRow.style.background = '#fff8e1';
+                feeCount++;
+            }
+
+            // 型號
+            var modelInput = lastRow.querySelector('input[name*="[model]"]');
+            if (modelInput) modelInput.value = item.model || item.ai_model || '';
+
+            // 品名（運費項目加前綴）
+            var nameInput = lastRow.querySelector('input[name*="[product_name]"]');
+            var displayName = item.product_name || item.ai_name || '';
+            if (item.is_fee && displayName.indexOf('運費') === -1 && displayName.indexOf('費') === -1) {
+                displayName = '【費用】' + displayName;
+            }
+            if (nameInput) nameInput.value = displayName;
+
+            // product_id (如果有比對到)
+            var pidInput = lastRow.querySelector('input[name*="[product_id]"]');
+            if (pidInput && item.product_id) pidInput.value = item.product_id;
+
+            // 規格
+            var specInput = lastRow.querySelector('input[name*="[spec]"]');
+            if (specInput && item.spec) specInput.value = item.spec;
+
+            // 單位
+            var unitInput = lastRow.querySelector('input[name*="[unit]"]');
+            if (unitInput) unitInput.value = item.unit || '';
+
+            // 收貨數量
+            var qtyInput = lastRow.querySelector('.item-qty');
+            if (qtyInput) qtyInput.value = item.quantity || item.qty || 0;
+
+            // 單價
+            var priceInput = lastRow.querySelector('.item-price');
+            if (priceInput) priceInput.value = item.unit_price || 0;
+
+            // 金額
+            calcRowAmount(lastRow);
+        }
+        calcTotals();
+        summaryParts.push('品項：' + items.length + ' 筆' + (feeCount > 0 ? '（含 ' + feeCount + ' 筆費用）' : ''));
+
+        // 比對狀態
+        var matchedCount = 0;
+        for (var j = 0; j < items.length; j++) {
+            if (items[j].product_id) matchedCount++;
+        }
+        if (matchedCount > 0) {
+            summaryParts.push('已比對：' + matchedCount + '/' + items.length + ' 筆');
+        }
+    }
+
+    // 4) 總金額
+    if (data.total) {
+        summaryParts.push('原始金額：$' + Number(data.total).toLocaleString());
+    }
+    if (data.invoice_number) {
+        summaryParts.push('發票號碼：' + data.invoice_number);
+    }
+
+    // 顯示摘要
+    var summaryEl = document.getElementById('aiResultSummary');
+    summaryEl.innerHTML = '<b>辨識結果</b><br>' + summaryParts.join('<br>');
+    summaryEl.style.display = 'block';
+}
 </script>

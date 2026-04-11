@@ -268,6 +268,156 @@ switch ($action) {
         break;
     // ADMIN_TOOL_BLOCK_END
 
+    // ---- AI 辨識代理 ----
+    case 'ajax_ai_recognize':
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('success' => false, 'error' => 'POST only'));
+            exit;
+        }
+        if (empty($_FILES['image'])) {
+            echo json_encode(array('success' => false, 'error' => '請上傳圖片'));
+            exit;
+        }
+
+        $aiServiceUrl = 'http://114.35.174.204:1500/api/recognize/test';
+        $aiToken = 'hswork-ai-2026';
+
+        $file = $_FILES['image'];
+        $tmpPath = $file['tmp_name'];
+        $mimeType = !empty($file['type']) ? $file['type'] : 'image/jpeg';
+        $fileName = !empty($file['name']) ? $file['name'] : 'image.jpg';
+
+        // 用 cURL 轉發到 ai-service（純辨識模式）
+        $ch = curl_init();
+        if (function_exists('curl_file_create')) {
+            $cFile = curl_file_create($tmpPath, $mimeType, $fileName);
+        } else {
+            $cFile = '@' . realpath($tmpPath) . ';type=' . $mimeType . ';filename=' . $fileName;
+        }
+        curl_setopt_array($ch, array(
+            CURLOPT_URL => $aiServiceUrl,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => array('image' => $cFile),
+            CURLOPT_HTTPHEADER => array('X-AI-Token: ' . $aiToken),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ));
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            echo json_encode(array('success' => false, 'error' => 'AI 服務連線失敗：' . $curlError));
+            exit;
+        }
+        if ($httpCode !== 200) {
+            $err = json_decode($response, true);
+            echo json_encode(array('success' => false, 'error' => 'AI 服務錯誤 (HTTP ' . $httpCode . ')', 'detail' => !empty($err['error']) ? $err['error'] : $response));
+            exit;
+        }
+
+        // 解析 AI 辨識結果，在 PHP 端做廠商/產品比對
+        $aiData = json_decode($response, true);
+        if (empty($aiData['success']) || empty($aiData['result'])) {
+            echo $response;
+            exit;
+        }
+
+        $raw = $aiData['result'];
+        $db = Database::getInstance();
+
+        // 廠商比對
+        $vendorName = !empty($raw['vendor_name']) ? $raw['vendor_name'] : '';
+        $vendorMatch = null;
+        if ($vendorName) {
+            // 精確比對
+            $stmt = $db->prepare("SELECT id, vendor_code, name FROM vendors WHERE name = ? AND is_active = 1 LIMIT 1");
+            $stmt->execute(array($vendorName));
+            $vendorMatch = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$vendorMatch) {
+                // 模糊比對
+                $stmt = $db->prepare("SELECT id, vendor_code, name FROM vendors WHERE (name LIKE ? OR short_name LIKE ?) AND is_active = 1 LIMIT 1");
+                $kw = '%' . $vendorName . '%';
+                $stmt->execute(array($kw, $kw));
+                $vendorMatch = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+            if (!$vendorMatch) {
+                // 前4字比對
+                $prefix = mb_substr($vendorName, 0, 4);
+                $stmt = $db->prepare("SELECT id, vendor_code, name FROM vendors WHERE name LIKE ? AND is_active = 1 LIMIT 1");
+                $stmt->execute(array($prefix . '%'));
+                $vendorMatch = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+        }
+
+        // 品項比對（用 vendor_products 或 products 表）
+        $items = !empty($raw['items']) ? $raw['items'] : array();
+        $matchedItems = array();
+        $vendorId = $vendorMatch ? $vendorMatch['id'] : null;
+
+        foreach ($items as $item) {
+            $matched = $item;
+            $matched['product_id'] = null;
+            $matched['match_source'] = null;
+            $aiModel = !empty($item['model']) ? $item['model'] : '';
+            $aiName = !empty($item['product_name']) ? $item['product_name'] : '';
+
+            if ($vendorId && $aiModel) {
+                // 先查 vendor_products
+                $stmt = $db->prepare("SELECT vp.product_id, vp.vendor_model, vp.vendor_name, p.name as product_name, p.model as product_model
+                    FROM vendor_products vp LEFT JOIN products p ON vp.product_id = p.id
+                    WHERE vp.vendor_id = ? AND vp.vendor_model LIKE ? LIMIT 1");
+                $stmt->execute(array($vendorId, '%' . $aiModel . '%'));
+                $vpMatch = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($vpMatch) {
+                    $matched['product_id'] = $vpMatch['product_id'];
+                    $matched['product_name'] = $vpMatch['product_name'] ? $vpMatch['product_name'] : $aiName;
+                    $matched['model'] = $vpMatch['product_model'] ? $vpMatch['product_model'] : $aiModel;
+                    $matched['match_source'] = 'vendor_products';
+                }
+            }
+
+            if (!$matched['product_id'] && $aiModel) {
+                // 查 products 表 by model
+                $stmt = $db->prepare("SELECT id, name, model, unit FROM products WHERE model LIKE ? AND is_active = 1 LIMIT 1");
+                $stmt->execute(array('%' . $aiModel . '%'));
+                $pMatch = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($pMatch) {
+                    $matched['product_id'] = $pMatch['id'];
+                    $matched['product_name'] = $pMatch['name'];
+                    $matched['model'] = $pMatch['model'];
+                    if (!empty($pMatch['unit'])) $matched['unit'] = $pMatch['unit'];
+                    $matched['match_source'] = 'products_model';
+                }
+            }
+
+            $matchedItems[] = $matched;
+        }
+
+        // 組合回傳
+        $result = array(
+            'success' => true,
+            'vendor' => array(
+                'name' => $vendorName,
+                'matched_id' => $vendorMatch ? $vendorMatch['id'] : null,
+                'matched_name' => $vendorMatch ? $vendorMatch['name'] : null,
+                'matched_code' => $vendorMatch ? $vendorMatch['vendor_code'] : null,
+                'confidence' => $vendorMatch ? 0.9 : 0,
+            ),
+            'date' => !empty($raw['date']) ? $raw['date'] : '',
+            'invoice_number' => !empty($raw['invoice_number']) ? $raw['invoice_number'] : '',
+            'items' => $matchedItems,
+            'subtotal' => !empty($raw['subtotal']) ? $raw['subtotal'] : 0,
+            'tax' => !empty($raw['tax']) ? $raw['tax'] : 0,
+            'total' => !empty($raw['total']) ? $raw['total'] : 0,
+        );
+
+        echo json_encode($result);
+        exit;
+
     // ---- 廠商搜尋 AJAX（獨立 endpoint，不依賴 finance 權限）----
     case 'ajax_vendor_search':
         header('Content-Type: application/json');
