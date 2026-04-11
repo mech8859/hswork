@@ -1566,6 +1566,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_deal = $_pa['deal_amount'];
         $_opRate = $_pa['op_rate'];
         $_opCost = round($_deal * $_opRate / 100);
+        $_hourlyCost = !empty($_pa['labor_hourly_cost']) ? $_pa['labor_hourly_cost'] : 361;
         // 報價預估
         $_qMatCost = $_pa['q_material_cost'];
         $_qCableCost = $_pa['est_cable_cost'];
@@ -1577,14 +1578,23 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_aEquip = $_pa['actual_equipment'];
         $_aCable = $_pa['actual_cable'];
         $_aConsum = $_pa['actual_consumable'];
+        $_aStockout = !empty($_pa['actual_stockout_cost']) ? $_pa['actual_stockout_cost'] : 0;
         $_aMatTotal = $_aEquip + $_aCable + $_aConsum;
-        $_aTotalCost = $_aMatTotal + $_qLaborCost + $_opCost;
+        // 如果有出庫成本且無施工回報材料，用出庫成本
+        if ($_aMatTotal == 0 && $_aStockout > 0) $_aMatTotal = $_aStockout;
+        // 實際人力成本 = 實際工時 × 時薪
+        $_aMinutes = $_pa['actual_total_minutes'];
+        $_aHours = round($_aMinutes / 60, 1);
+        $_aLaborCost = round($_aHours * $_hourlyCost);
+        // 實際總成本
+        $_aTotalCost = $_aMatTotal + $_aLaborCost + $_opCost;
         $_aProfit = $_deal - $_aTotalCost;
         $_aProfitRate = $_deal > 0 ? round($_aProfit / $_deal * 100, 1) : 0;
         // 工時
         $_qHours = $_pa['q_labor_hours'];
-        $_aMinutes = $_pa['actual_total_minutes'];
-        $_aHours = round($_aMinutes / 60, 1);
+        // 收款
+        $_totalCollected = !empty($_pa['total_collected']) ? $_pa['total_collected'] : 0;
+        $_balance = $_deal - $_totalCollected;
     ?>
     <div class="card" id="sec-profit-analysis">
         <div class="card-header">案件利潤分析表</div>
@@ -1637,9 +1647,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr>
-                        <td>人力成本</td>
+                        <td>人力成本 <small style="color:#888">($<?= number_format($_hourlyCost) ?>/時)</small></td>
                         <td class="text-right"><?= $_qLaborCost ? '$' . number_format($_qLaborCost) : '<span class="text-muted">-</span>' ?></td>
-                        <td class="text-right" colspan="2"><span class="text-muted">同報價預估</span></td>
+                        <td class="text-right"><?= $_aLaborCost ? '$' . number_format($_aLaborCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?php if ($_qLaborCost && $_aLaborCost): $d = $_aLaborCost - $_qLaborCost; ?>
+                            <span style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr>
                         <td>營運成本 (<?= $_opRate ?>%)</td>
@@ -1649,8 +1662,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <tr class="profit-row-highlight">
                         <td><strong>總成本</strong></td>
                         <td class="text-right"><strong>$<?= number_format($_qTotalCost) ?></strong></td>
-                        <td class="text-right"><strong><?= $_aMatTotal ? '$' . number_format($_aTotalCost) : '-' ?></strong></td>
-                        <td class="text-right"><?php if ($_aMatTotal): $d = $_aTotalCost - $_qTotalCost; ?>
+                        <td class="text-right"><strong><?= ($_aMatTotal || $_aLaborCost) ? '$' . number_format($_aTotalCost) : '-' ?></strong></td>
+                        <td class="text-right"><?php if ($_aMatTotal || $_aLaborCost): $d = $_aTotalCost - $_qTotalCost; ?>
                             <strong style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></strong>
                         <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
@@ -1665,11 +1678,31 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <tr class="profit-row-result">
                         <td><strong>利潤率</strong></td>
                         <td class="text-right"><strong style="color:<?= $_qProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><?= $_qProfitRate ?>%</strong></td>
-                        <td class="text-right"><strong style="color:<?= $_aProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><?= $_aMatTotal ? $_aProfitRate . '%' : '-' ?></strong></td>
-                        <td class="text-right"><?php if ($_aMatTotal): $d = round($_aProfitRate - $_qProfitRate, 1); ?>
+                        <td class="text-right"><strong style="color:<?= $_aProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><?= ($_aMatTotal || $_aLaborCost) ? $_aProfitRate . '%' : '-' ?></strong></td>
+                        <td class="text-right"><?php if ($_aMatTotal || $_aLaborCost): $d = round($_aProfitRate - $_qProfitRate, 1); ?>
                             <strong style="color:<?= $d >= 0 ? '#137333' : '#c5221f' ?>"><?= ($d > 0 ? '+' : '') . $d ?>%</strong>
                         <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
+                    <?php if ($_deal > 0): ?>
+                    <tr style="border-top:2px solid #e0e0e0">
+                        <td><strong>已收款</strong></td>
+                        <td class="text-right" colspan="2">
+                            <strong style="color:<?= $_totalCollected >= $_deal ? '#137333' : '#e65100' ?>">$<?= number_format($_totalCollected) ?></strong>
+                            <?php if ($_deal > 0): ?>
+                            <small style="color:#888">(<?= round($_totalCollected / $_deal * 100) ?>%)</small>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-right">
+                            <?php if ($_balance > 0): ?>
+                            <span style="color:#c5221f">尾款 $<?= number_format($_balance) ?></span>
+                            <?php elseif ($_balance == 0): ?>
+                            <span style="color:#137333">已收清</span>
+                            <?php else: ?>
+                            <span style="color:#1565c0">溢收 $<?= number_format(abs($_balance)) ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

@@ -267,62 +267,124 @@ function prepareSave() {
     if (id) {
         // 編輯模式：從 UI 取得最新值
         var depth = getCatDepth(id);
+        var editName = '';
         if (depth === 0) {
-            document.getElementById('catName').value = document.getElementById('catLevel0New').value.trim();
+            editName = document.getElementById('catLevel0New').value.trim();
         } else if (depth === 1) {
-            document.getElementById('catName').value = document.getElementById('catLevel1New').value.trim();
+            editName = document.getElementById('catLevel1New').value.trim();
         } else {
-            document.getElementById('catName').value = document.getElementById('catLevel2Name').value.trim();
+            editName = document.getElementById('catLevel2Name').value.trim();
         }
-        if (!document.getElementById('catName').value) {
+        if (!editName) {
             alert('請輸入分類名稱');
             return false;
+        }
+        document.getElementById('catName').value = editName;
+
+        // 編輯模式下，如果有填新的子層級，也一併建立
+        var csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        if (depth === 0 && l1 === '__new__' && l1New) {
+            var fd1 = new FormData();
+            fd1.append('csrf_token', csrfToken);
+            fd1.append('name', l1New);
+            fd1.append('parent_id', id);
+            var xhr1 = new XMLHttpRequest();
+            xhr1.open('POST', '/products.php?action=ajax_category_create', false);
+            xhr1.send(fd1);
+            try {
+                var res1 = JSON.parse(xhr1.responseText);
+                if (res1.success && l2 === '__new__' && l2Name) {
+                    var fd2 = new FormData();
+                    fd2.append('csrf_token', csrfToken);
+                    fd2.append('name', l2Name);
+                    fd2.append('parent_id', res1.id);
+                    var xhr2 = new XMLHttpRequest();
+                    xhr2.open('POST', '/products.php?action=ajax_category_create', false);
+                    xhr2.send(fd2);
+                }
+            } catch(e) {}
+        } else if (depth === 1 && l2 === '__new__' && l2Name) {
+            var fd2 = new FormData();
+            fd2.append('csrf_token', csrfToken);
+            fd2.append('name', l2Name);
+            fd2.append('parent_id', id);
+            var xhr2 = new XMLHttpRequest();
+            xhr2.open('POST', '/products.php?action=ajax_category_create', false);
+            xhr2.send(fd2);
         }
         return true;
     }
 
     // 新增模式：從最深的層級往上判斷
-    if (l2 === '__new__' && l2Name) {
-        // 新增細分類
-        var parentId = l1;
+    var csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+    // 先確保主分類存在
+    var level0Id = l0;
+    if (l0 === '__new__' && l0New) {
+        var fd0 = new FormData();
+        fd0.append('csrf_token', csrfToken);
+        fd0.append('name', l0New);
+        var xhr0 = new XMLHttpRequest();
+        xhr0.open('POST', '/products.php?action=ajax_category_create', false);
+        xhr0.send(fd0);
+        var res0 = JSON.parse(xhr0.responseText);
+        if (!res0.success) { alert(res0.error || '主分類建立失敗'); return false; }
+        level0Id = res0.id;
+    }
+    if (!level0Id || level0Id === '__new__') {
+        alert('請選擇或輸入主分類');
+        return false;
+    }
+
+    // 如果沒有子分類要建，就直接存主分類
+    if ((!l1 || l1 === '') && l0 === '__new__') {
+        document.getElementById('catName').value = l0New;
+        document.getElementById('catParent').value = '';
+        // 主分類已透過 AJAX 建好，不需再 POST
+        alert('分類已新增');
+        location.reload();
+        return false;
+    }
+
+    // 確保子分類存在
+    var level1Id = l1;
+    if (l1 === '__new__' && l1New) {
+        var fd1 = new FormData();
+        fd1.append('csrf_token', csrfToken);
+        fd1.append('name', l1New);
+        fd1.append('parent_id', level0Id);
+        var xhr1 = new XMLHttpRequest();
+        xhr1.open('POST', '/products.php?action=ajax_category_create', false);
+        xhr1.send(fd1);
+        var res1 = JSON.parse(xhr1.responseText);
+        if (!res1.success) { alert(res1.error || '子分類建立失敗'); return false; }
+        level1Id = res1.id;
+    }
+
+    // 如果沒有細分類要建
+    if ((!l2 || l2 === '') && !l2Name) {
         if (l1 === '__new__' && l1New) {
-            // 同時新增子分類 + 細分類
-            if (l0 === '__new__') { alert('請先儲存主分類'); return false; }
-            if (!l0) { alert('請選擇主分類'); return false; }
-            // AJAX 建子分類（用 JSON endpoint）
-            var fd = new FormData();
-            fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
-            fd.append('name', l1New);
-            fd.append('parent_id', l0);
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/products.php?action=ajax_category_create', false);
-            xhr.send(fd);
-            var res = JSON.parse(xhr.responseText);
-            if (!res.success) { alert(res.error || '子分類建立失敗'); return false; }
-            parentId = res.id;
+            // 子分類已透過 AJAX 建好
+            alert('分類已新增');
+            location.reload();
+            return false;
         }
-        if (!parentId || parentId === '__new__') {
-            alert('請選擇子分類');
+        alert('請輸入分類名稱');
+        return false;
+    }
+
+    // 建細分類（透過表單 POST）
+    if (l2 === '__new__' && l2Name) {
+        if (!level1Id || level1Id === '__new__') {
+            alert('請選擇或輸入子分類');
             return false;
         }
         document.getElementById('catName').value = l2Name;
-        document.getElementById('catParent').value = parentId;
-    } else if (l1 === '__new__' && l1New) {
-        // 新增子分類
-        if (l0 === '__new__') {
-            alert('請先儲存主分類，再新增子分類');
-            return false;
-        }
-        if (!l0) {
-            alert('請選擇主分類');
-            return false;
-        }
-        document.getElementById('catName').value = l1New;
-        document.getElementById('catParent').value = l0;
-    } else if (l0 === '__new__' && l0New) {
-        // 新增主分類
-        document.getElementById('catName').value = l0New;
-        document.getElementById('catParent').value = '';
+        document.getElementById('catParent').value = level1Id;
+    } else if (l2 && l2 !== '__new__') {
+        // 選了既有細分類，沒什麼要做
+        alert('請輸入新分類名稱');
+        return false;
     } else {
         alert('請輸入分類名稱');
         return false;

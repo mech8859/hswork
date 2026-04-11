@@ -352,6 +352,24 @@ switch ($action) {
             if ($_opVal !== false && $_opVal !== null) {
                 $caseProfitAnalysis['op_rate'] = (float)$_opVal;
             }
+            // 6) 人力時薪（from system_settings，預設 361）
+            $_hrStmt = $_paDb->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
+            $_hrStmt->execute();
+            $_hrVal = $_hrStmt->fetchColumn();
+            $caseProfitAnalysis['labor_hourly_cost'] = ($_hrVal !== false && $_hrVal !== null) ? (int)$_hrVal : 404;
+            // 7) 收款單已收金額
+            $_rcStmt = $_paDb->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM receipts WHERE case_id = ? AND status != '作廢'");
+            $_rcStmt->execute(array($id));
+            $caseProfitAnalysis['total_collected'] = (int)$_rcStmt->fetchColumn();
+            // 8) 採購/進貨成本（從出庫單或進貨單關聯）
+            $_poStmt = $_paDb->prepare("
+                SELECT COALESCE(SUM(soi.qty * soi.unit_cost), 0)
+                FROM stockout_items soi
+                JOIN stockouts so ON soi.stockout_id = so.id
+                WHERE so.case_id = ? AND so.status != '已取消'
+            ");
+            $_poStmt->execute(array($id));
+            $caseProfitAnalysis['actual_stockout_cost'] = (int)$_poStmt->fetchColumn();
         } catch (Exception $e) {
             // 查詢失敗不影響頁面
         }
