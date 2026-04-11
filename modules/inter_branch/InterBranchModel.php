@@ -216,11 +216,11 @@ class InterBranchModel
     public function getEngineers(array $branchIds = array())
     {
         if (empty($branchIds)) {
-            $stmt = $this->db->query("SELECT id, real_name, branch_id FROM users WHERE is_active = 1 AND is_engineer = 1 ORDER BY real_name");
+            $stmt = $this->db->query("SELECT id, real_name, branch_id FROM users WHERE is_active = 1 AND is_engineer = 1 AND employment_status IN ('active','probation') AND employee_id IS NOT NULL AND employee_id != '' ORDER BY real_name");
             return $stmt->fetchAll();
         }
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
-        $stmt = $this->db->prepare("SELECT id, real_name, branch_id FROM users WHERE is_active = 1 AND is_engineer = 1 AND branch_id IN ($ph) ORDER BY real_name");
+        $stmt = $this->db->prepare("SELECT id, real_name, branch_id FROM users WHERE is_active = 1 AND is_engineer = 1 AND employment_status IN ('active','probation') AND employee_id IS NOT NULL AND employee_id != '' AND branch_id IN ($ph) ORDER BY real_name");
         $stmt->execute($branchIds);
         return $stmt->fetchAll();
     }

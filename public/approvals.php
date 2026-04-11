@@ -145,11 +145,11 @@ switch ($action) {
                         Session::flash('error', $advance['error']);
                     } elseif ($advStatus === 'closed') {
                         // 全部簽完 + 尾款=0 → 案件結案
-                        $db->prepare("UPDATE cases SET status = 'closed', progress = 'closed' WHERE id = ?")->execute(array($targetId));
+                        $db->prepare("UPDATE cases SET status = 'closed', sub_status = '已完工結案' WHERE id = ?")->execute(array($targetId));
                         Session::flash('success', '已核准，案件已完工結案');
                     } elseif ($advStatus === 'unpaid') {
                         // Level 2 勾無收款 → 完工未收款
-                        $db->prepare("UPDATE cases SET status = 'unpaid', progress = 'unpaid' WHERE id = ?")->execute(array($targetId));
+                        $db->prepare("UPDATE cases SET status = 'unpaid', sub_status = '完工未收款' WHERE id = ?")->execute(array($targetId));
                         Session::flash('success', '已核准 (勾選無收款)，案件狀態：完工未收款');
                     } elseif ($advStatus === 'pending_next') {
                         // 送下一關 → 通知

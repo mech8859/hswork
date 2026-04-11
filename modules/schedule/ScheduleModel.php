@@ -434,6 +434,8 @@ class ScheduleModel
             FROM users u
             JOIN branches b ON u.branch_id = b.id
             WHERE u.branch_id IN ($ph) AND u.is_engineer = 1 AND u.is_active = 1
+              AND u.employment_status IN ('active','probation')
+              AND u.employee_id IS NOT NULL AND u.employee_id != ''
             ORDER BY u.branch_id, u.real_name
         ");
         $engStmt->execute($branchIds);
@@ -575,7 +577,7 @@ class ScheduleModel
     public function getTotalEngineers(array $branchIds)
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM users WHERE branch_id IN ($ph) AND is_engineer = 1 AND is_active = 1");
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM users WHERE branch_id IN ($ph) AND is_engineer = 1 AND is_active = 1 AND employment_status IN ('active','probation') AND employee_id IS NOT NULL AND employee_id != '' AND role = 'engineer'");
         $stmt->execute($branchIds);
         return (int)$stmt->fetchColumn();
     }
@@ -711,6 +713,9 @@ class ScheduleModel
                    u.engineer_level, u.can_lead, u.repair_priority, u.mentor_id, u.mentor_start_date
             FROM users u
             WHERE u.branch_id IN ($ph) AND u.is_engineer = 1 AND u.is_active = 1
+              AND u.employment_status IN ('active','probation')
+              AND u.employee_id IS NOT NULL AND u.employee_id != ''
+              AND u.role = 'engineer'
             ORDER BY u.real_name
         ");
         $engStmt->execute($branchIds);

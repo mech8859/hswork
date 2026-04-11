@@ -221,6 +221,8 @@ class StaffModel
             SELECT id, real_name, engineer_level
             FROM users
             WHERE is_engineer = 1 AND is_active = 1
+              AND employment_status IN ('active','probation')
+              AND employee_id IS NOT NULL AND employee_id != ''
               AND (engineer_level IN ('leader','senior','regular') OR engineer_level IS NULL)
               AND id != ?
             ORDER BY real_name
@@ -396,6 +398,8 @@ class StaffModel
             FROM users u
             JOIN branches b ON u.branch_id = b.id
             WHERE u.branch_id IN ($ph) AND u.is_engineer = 1 AND u.is_active = 1
+              AND u.employment_status IN ('active','probation')
+              AND u.employee_id IS NOT NULL AND u.employee_id != ''
             ORDER BY u.branch_id, u.real_name
         ");
         $stmt->execute($branchIds);

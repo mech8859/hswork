@@ -795,11 +795,11 @@ class ApprovalModel
         if ((int)$okStmt3->fetchColumn() === 0) {
             return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
         }
-        // 強制檢查尾款
-        $bal = $this->db->prepare("SELECT balance_amount FROM cases WHERE id = ?");
+        // 強制檢查尾款（即時計算：成交金額或含稅金額 - 已收款）
+        $bal = $this->db->prepare("SELECT GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0) AS real_balance FROM cases WHERE id = ?");
         $bal->execute(array($caseId));
         $balance = (int)$bal->fetchColumn();
-        if ($balance !== 0) {
+        if ($balance > 0) {
             return array(
                 'next_level' => null,
                 'status' => 'closed_blocked',
