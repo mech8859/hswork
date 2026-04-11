@@ -237,7 +237,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 $isBoss = Session::getUser() && Session::getUser()['role'] === 'boss';
                 $approvalStatuses = array('closed', 'completed_pending', 'unpaid');
                 ?>
-                <select name="status" class="form-control">
+                <select name="status" class="form-control" onchange="checkSalesNoteRequired()">
                     <?php foreach (CaseModel::progressOptions() as $v => $l):
                         $isProtected = in_array($v, $approvalStatuses) && $v !== $currentStatus && !$isBoss;
                     ?>
@@ -251,7 +251,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <div class="form-group">
                 <label>狀態</label>
                 <?php $defaultSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '未指派'; ?>
-                <select name="sub_status" id="subStatusSelect" class="form-control" onchange="toggleNewCustomerBtn()">
+                <select name="sub_status" id="subStatusSelect" class="form-control" onchange="toggleNewCustomerBtn();checkSalesNoteRequired()">
                     <option value="">請選擇</option>
                     <?php foreach (CaseModel::subStatusOptions() as $v => $l): ?>
                     <option value="<?= $v ?>" <?= $defaultSubStatus === $v ? 'selected' : '' ?>><?= e($l) ?></option>
@@ -393,8 +393,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <textarea name="notes" class="form-control" rows="2"><?= e($case['notes'] ?? '') ?></textarea>
         </div>
         <div class="form-group">
-            <label>業務備註 <small class="text-muted">（與業務行事曆雙向同步）</small></label>
-            <textarea name="sales_note" class="form-control" rows="2"><?= e($case['sales_note'] ?? '') ?></textarea>
+            <label>業務備註 <small class="text-muted">（與業務行事曆雙向同步）</small><span id="salesNoteRequired" style="display:none;color:#dc3545;font-weight:bold;margin-left:8px;">填寫未成交原因</span></label>
+            <textarea name="sales_note" id="salesNoteInput" class="form-control" rows="2" oninput="checkSalesNoteRequired()"><?= e($case['sales_note'] ?? '') ?></textarea>
         </div>
 
         <!-- 登記人 -->
@@ -2079,7 +2079,7 @@ var CASE_DATA = {
 };
 </script>
 <script src="/js/tw_districts.js"></script>
-<script src="/js/cases-form.js?v=20260409b"></script>
+<script src="/js/cases-form.js?v=20260411a"></script>
 
 <!-- 新增客戶 Modal -->
 <div id="newCustomerModal" class="modal-overlay" style="display:none">
@@ -2824,6 +2824,16 @@ function validateCaseForm() {
         alert('請填寫市話或手機，至少填一個');
         document.getElementById('customerPhoneInput').focus();
         return false;
+    }
+    // 未成交狀態 → 業務備註必填
+    if (typeof isSalesNoteLostCase === 'function' && isSalesNoteLostCase()) {
+        var note = document.getElementById('salesNoteInput');
+        if (note && !note.value.trim()) {
+            alert('此案件狀態需填寫業務備註（未成交原因）');
+            note.focus();
+            note.style.borderColor = '#dc3545';
+            return false;
+        }
     }
     return true;
 }

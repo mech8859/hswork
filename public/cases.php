@@ -196,6 +196,16 @@ switch ($action) {
                 $collected = (int)str_replace(',', '', $_POST['total_collected'] ?? '0');
                 $_POST['balance_amount'] = (string)($deal - $collected);
             }
+            // 未成交狀態 → 業務備註必填
+            $lostStatuses = array('lost', 'breach', 'customer_cancel');
+            $lostSubStatuses = array('已報價無意願', '無效', '客戶毀約');
+            $postStatus = isset($_POST['status']) ? $_POST['status'] : '';
+            $postSubStatus = isset($_POST['sub_status']) ? $_POST['sub_status'] : '';
+            $postSalesNote = isset($_POST['sales_note']) ? trim($_POST['sales_note']) : '';
+            if ((in_array($postStatus, $lostStatuses) || in_array($postSubStatus, $lostSubStatuses)) && $postSalesNote === '') {
+                Session::flash('error', '此案件狀態需填寫業務備註（未成交原因）');
+                redirect('/cases.php?action=edit&id=' . $id);
+            }
             // 金額異動紀錄：存檔前讀舊值
             $oldCase = $model->getById($id);
             try {

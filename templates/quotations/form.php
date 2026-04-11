@@ -237,7 +237,11 @@ require __DIR__ . '/../_readonly_form_helper.php';
                                 <?php if ($canManage): ?>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][unit_cost]" class="form-control item-cost" value="<?= e($item['unit_cost'] ?? 0) ?>" readonly style="background:#f5f5f5;color:#666;min-width:100px;width:100%"></td>
                                 <?php endif; ?>
-                                <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>
+                                <td style="white-space:nowrap">
+                                    <button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemUp(this)" title="上移">▲</button>
+                                    <button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemDown(this)" title="下移">▼</button>
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button>
+                                </td>
                             </tr>
                             <!-- 第二排：選擇工具列 -->
                             <tr class="psel-row" data-parent="<?= $iIdx ?>">
@@ -534,6 +538,40 @@ function addItem(btn) {
     calcSectionSubtotal(section);
 }
 
+function moveItemUp(btn) {
+    var dataRow = btn.closest('tr');
+    var pselRow = dataRow.nextElementSibling;
+    if (!pselRow || !pselRow.classList.contains('psel-row')) return;
+    // 找上方的一對（data + psel）
+    var prevPsel = dataRow.previousElementSibling;
+    if (!prevPsel || !prevPsel.classList.contains('psel-row')) return;
+    var prevData = prevPsel.previousElementSibling;
+    if (!prevData) return;
+    // 把當前一對移到上方一對前面
+    var tbody = dataRow.closest('tbody');
+    tbody.insertBefore(dataRow, prevData);
+    tbody.insertBefore(pselRow, prevData);
+    var section = dataRow.closest('.quote-section');
+    reindexSection(section);
+}
+
+function moveItemDown(btn) {
+    var dataRow = btn.closest('tr');
+    var pselRow = dataRow.nextElementSibling;
+    if (!pselRow || !pselRow.classList.contains('psel-row')) return;
+    // 找下方的一對（data + psel）
+    var nextData = pselRow.nextElementSibling;
+    if (!nextData || nextData.classList.contains('psel-row')) return;
+    var nextPsel = nextData.nextElementSibling;
+    if (!nextPsel || !nextPsel.classList.contains('psel-row')) return;
+    // 把下方一對移到當前一對前面
+    var tbody = dataRow.closest('tbody');
+    tbody.insertBefore(nextData, dataRow);
+    tbody.insertBefore(nextPsel, dataRow);
+    var section = dataRow.closest('.quote-section');
+    reindexSection(section);
+}
+
 function removeItem(btn) {
     var row = btn.closest('tr');
     var section = row.closest('.quote-section');
@@ -571,7 +609,7 @@ function buildItemRow(sidx, iidx) {
         '<td class="item-amount text-right">0</td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][remark]" class="form-control"></td>' +
         costTh +
-        '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>' +
+        '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemUp(this)" title="上移">▲</button><button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemDown(this)" title="下移">▼</button><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>' +
     '</tr>' +
     '<tr class="psel-row">' +
         '<td></td>' +

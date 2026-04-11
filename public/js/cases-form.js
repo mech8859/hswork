@@ -493,6 +493,28 @@ function deleteWorklog(id) {
 }
 
 // ===== 表單驗證 =====
+// ===== 未成交原因必填檢查 =====
+var LOST_STATUSES = ['lost', 'breach', 'customer_cancel'];
+var LOST_SUB_STATUSES = ['已報價無意願', '無效', '客戶毀約'];
+function isSalesNoteLostCase() {
+    var statusSel = document.querySelector('select[name="status"]');
+    var subSel = document.getElementById('subStatusSelect');
+    if (!statusSel) return false;
+    var st = statusSel.value;
+    var sub = subSel ? subSel.value : '';
+    return LOST_STATUSES.indexOf(st) !== -1 || LOST_SUB_STATUSES.indexOf(sub) !== -1;
+}
+function checkSalesNoteRequired() {
+    var hint = document.getElementById('salesNoteRequired');
+    var input = document.getElementById('salesNoteInput');
+    if (!hint) return;
+    var needed = isSalesNoteLostCase();
+    hint.style.display = needed ? 'inline' : 'none';
+    if (input) {
+        input.style.borderColor = needed && !input.value.trim() ? '#dc3545' : '';
+    }
+}
+
 function validateCaseForm() {
     var phone = document.getElementById('customerPhoneInput').value.trim();
     var mobile = document.getElementById('customerMobileInput').value.trim();
@@ -500,6 +522,16 @@ function validateCaseForm() {
         alert('請填寫市話或手機，至少填一個');
         document.getElementById('customerPhoneInput').focus();
         return false;
+    }
+    // 未成交狀態 → 業務備註必填
+    if (isSalesNoteLostCase()) {
+        var note = document.getElementById('salesNoteInput');
+        if (note && !note.value.trim()) {
+            alert('此案件狀態需填寫業務備註（未成交原因）');
+            note.focus();
+            note.style.borderColor = '#dc3545';
+            return false;
+        }
     }
     return true;
 }
@@ -848,9 +880,10 @@ function toggleNewCustomerBtn() {
     btn.style.display = DEAL_STATUSES.indexOf(sel.value) !== -1 ? '' : 'none';
 }
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', toggleNewCustomerBtn);
+    document.addEventListener('DOMContentLoaded', function() { toggleNewCustomerBtn(); checkSalesNoteRequired(); });
 } else {
     toggleNewCustomerBtn();
+    checkSalesNoteRequired();
 }
 
 // ===== 新增客戶 Modal =====
