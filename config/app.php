@@ -122,6 +122,7 @@ return [
         'finance_summary'       => '帳務綜合分析',
         'inter_branch_monthly'  => '跨點點工費月結',
         'sales_personal'        => '業務個人分析',
+        'branch_monthly'        => '分公司月報',
     ],
 
     // 假別

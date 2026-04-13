@@ -104,6 +104,93 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 分公司月報 ----
+    case 'branch_monthly':
+        $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+        $user = Auth::user();
+        $isBoss = in_array($user['role'], array('boss', 'vice_president', 'manager'));
+        $userBranchId = $user['branch_id'];
+
+        // 分公司選擇：管理者可選全部，其他人只能看自己
+        if ($isBoss && !empty($_GET['branch_id'])) {
+            $viewBranchId = (int)$_GET['branch_id'];
+        } else {
+            $viewBranchId = $isBoss ? 0 : (int)$userBranchId;
+        }
+
+        $db = Database::getInstance();
+        $allBranches = $db->query("SELECT id, name FROM branches ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 月份列表
+        $bmMonths = array();
+        for ($mi = 1; $mi <= 12; $mi++) {
+            $start = sprintf('%04d-%02d-01', $year, $mi);
+            $end = date('Y-m-t', mktime(0, 0, 0, $mi, 1, $year));
+            if ($start > date('Y-m-d')) break;
+            $bmMonths[] = array('month' => $mi, 'start' => $start, 'end' => $end);
+        }
+
+        // 收款：依 branch_id + deposit_date
+        $bmRecv = array();
+        foreach ($bmMonths as $bm) {
+            $rWhere = "r.deposit_date BETWEEN '{$bm['start']}' AND '{$bm['end']}' AND r.status != '作廢'";
+            if ($viewBranchId > 0) $rWhere .= " AND r.branch_id = {$viewBranchId}";
+            $r = $db->query("SELECT COALESCE(SUM(total_amount), 0) FROM receipts r WHERE {$rWhere}")->fetchColumn();
+            $bmRecv[$bm['month']] = (int)$r;
+        }
+
+        // 付款：依 payment_out_branches.branch_id + payments_out.payment_date
+        $bmPay = array();
+        foreach ($bmMonths as $bm) {
+            $pWhere = "p.payment_date BETWEEN '{$bm['start']}' AND '{$bm['end']}' AND p.status != '取消'";
+            if ($viewBranchId > 0) {
+                $p = $db->query("SELECT COALESCE(SUM(pob.amount), 0) FROM payment_out_branches pob JOIN payments_out p ON pob.payment_out_id = p.id WHERE {$pWhere} AND pob.branch_id = {$viewBranchId}")->fetchColumn();
+            } else {
+                $p = $db->query("SELECT COALESCE(SUM(p.total_amount), 0) FROM payments_out p WHERE {$pWhere}")->fetchColumn();
+            }
+            $bmPay[$bm['month']] = (int)$p;
+        }
+
+        $pageTitle = '分公司月報';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/branch_monthly.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 分公司月報 AJAX 明細 ----
+    case 'branch_monthly_detail':
+        header('Content-Type: application/json; charset=utf-8');
+        $year = (int)($_GET['year'] ?? date('Y'));
+        $month = (int)($_GET['month'] ?? 1);
+        $branchId = (int)($_GET['branch_id'] ?? 0);
+        $start = sprintf('%04d-%02d-01', $year, $month);
+        $end = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
+
+        $db = Database::getInstance();
+
+        // 收款明細
+        $rWhere = "r.deposit_date BETWEEN ? AND ? AND r.status != '作廢'";
+        $rParams = array($start, $end);
+        if ($branchId > 0) { $rWhere .= " AND r.branch_id = ?"; $rParams[] = $branchId; }
+        $rStmt = $db->prepare("SELECT r.receipt_number, r.deposit_date, r.customer_name, r.total_amount, r.status, r.receipt_method FROM receipts r WHERE {$rWhere} ORDER BY r.deposit_date");
+        $rStmt->execute($rParams);
+        $recvList = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 付款明細
+        $pParams = array($start, $end);
+        if ($branchId > 0) {
+            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, pob.amount, p.main_category, p.status FROM payment_out_branches pob JOIN payments_out p ON pob.payment_out_id = p.id WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' AND pob.branch_id = ? ORDER BY p.payment_date");
+            $pParams[] = $branchId;
+        } else {
+            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, p.total_amount AS amount, p.main_category, p.status FROM payments_out p WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' ORDER BY p.payment_date");
+        }
+        $pStmt->execute($pParams);
+        $payList = $pStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(array('success' => true, 'recv' => $recvList, 'pay' => $payList), JSON_UNESCAPED_UNICODE);
+        exit;
+
     // ---- AJAX 報表鑽取明細 ----
     case 'drill_down':
         header('Content-Type: application/json; charset=utf-8');

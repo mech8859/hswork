@@ -20,6 +20,8 @@ switch ($action) {
             'status'        => !empty($_GET['status']) ? $_GET['status'] : '',
             'main_category' => !empty($_GET['main_category']) ? $_GET['main_category'] : '',
             'keyword'       => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
+            'branch_id'     => !empty($_GET['branch_id']) ? $_GET['branch_id'] : '',
+            'date_type'     => !empty($_GET['date_type']) ? $_GET['date_type'] : 'create',
             'date_from'     => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
             'date_to'       => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
             'sort'          => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',
@@ -27,6 +29,8 @@ switch ($action) {
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getPaymentsOut($filters, $page);
         $records = $result['data'];
+        $db = Database::getInstance();
+        $branches = $db->query("SELECT id, name FROM branches ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 
         $pageTitle = '付款單';
         $currentPage = 'payments_out';

@@ -417,7 +417,8 @@ class QuotationModel
         $stmt = $this->db->prepare("
             SELECT id, real_name, role FROM users
             WHERE branch_id IN ($ph) AND is_active = 1
-              AND role IN ('boss','manager','sales_manager','sales','sales_assistant')
+              AND (role IN ('boss','manager','sales_manager','sales','sales_assistant','vice_president') OR is_sales = 1)
+              AND employee_id IS NOT NULL AND employee_id != ''
             ORDER BY real_name
         ");
         $stmt->execute($branchIds);

@@ -63,6 +63,7 @@
         array('key' => 'finance_summary', 'action' => 'finance_analysis', 'icon' => '&#128181;', 'title' => '帳務綜合分析', 'desc' => '資金總覽、收支差額、銀行餘額、現金月報'),
         array('key' => 'inter_branch_monthly', 'action' => 'inter_branch', 'icon' => '&#128176;', 'title' => '跨點點工費月結', 'desc' => '各據點互相支援費用明細'),
         array('key' => 'sales_personal', 'action' => 'sales_personal', 'icon' => '&#128100;', 'title' => '業務個人分析', 'desc' => '個人進件/成交/金額/案別統計與團隊比較'),
+        array('key' => 'branch_monthly', 'action' => 'branch_monthly', 'icon' => '&#127970;', 'title' => '分公司月報', 'desc' => '各分公司每月收款/付款統計與明細'),
     );
     ?>
     <div class="report-links">

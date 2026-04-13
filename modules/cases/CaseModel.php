@@ -846,7 +846,8 @@ class CaseModel
         $stmt = $this->db->prepare("
             SELECT id, real_name, branch_id, is_active FROM users
             WHERE branch_id IN ($placeholders)
-              AND role IN ('sales','sales_manager','sales_assistant','boss')
+              AND (role IN ('sales','sales_manager','sales_assistant','boss','vice_president','manager') OR is_sales = 1)
+              AND employee_id IS NOT NULL AND employee_id != ''
               AND is_active = 1
             ORDER BY real_name
         ");
@@ -1264,7 +1265,7 @@ class CaseModel
      */
     public function getSalespeople()
     {
-        $stmt = $this->db->query("SELECT id, real_name, is_active FROM users WHERE role IN ('sales','sales_manager','sales_assistant','boss') ORDER BY is_active DESC, real_name");
+        $stmt = $this->db->query("SELECT id, real_name, is_active FROM users WHERE (role IN ('sales','sales_manager','sales_assistant','boss','vice_president','manager') OR is_sales = 1) AND employee_id IS NOT NULL AND employee_id != '' ORDER BY is_active DESC, real_name");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

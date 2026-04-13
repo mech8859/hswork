@@ -36,8 +36,24 @@ $statusBadgeMap = array(
                 </select>
             </div>
             <div class="form-group">
+                <label>分公司</label>
+                <select name="branch_id" class="form-control">
+                    <option value="">全部</option>
+                    <?php foreach ($branches as $b): ?>
+                    <option value="<?= $b['id'] ?>" <?= (!empty($filters['branch_id']) && $filters['branch_id'] == $b['id']) ? 'selected' : '' ?>><?= e($b['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>關鍵字</label>
                 <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="廠商名/單號／$金額" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>日期類型</label>
+                <select name="date_type" class="form-control">
+                    <option value="create" <?= ($filters['date_type'] ?? 'create') === 'create' ? 'selected' : '' ?>>建立日期</option>
+                    <option value="payment" <?= ($filters['date_type'] ?? '') === 'payment' ? 'selected' : '' ?>>付款日期</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>起始日期</label>

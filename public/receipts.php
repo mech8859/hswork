@@ -44,6 +44,7 @@ switch ($action) {
         $filters = array(
             'status'    => !empty($_GET['status']) ? $_GET['status'] : '',
             'keyword'   => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
+            'date_type' => !empty($_GET['date_type']) ? $_GET['date_type'] : 'register',
             'date_from' => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
             'date_to'   => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
             'sort'      => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',

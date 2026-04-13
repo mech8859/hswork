@@ -215,6 +215,151 @@ function pivotRowTotal2($data, $months) {
     </div>
 </div>
 
+<!-- 二之一、資金月份統計（各月底餘額）-->
+<?php
+$fmDb = Database::getInstance();
+$fmYear = $analysis['year'];
+$fmBaseDate = ($fmYear - 1) . '-12-31'; // 114年12月31日 = 2025-12-31
+$fmMonths = array($fmBaseDate);
+$fmHeaders = array('12/31');
+for ($mi = 1; $mi <= 12; $mi++) {
+    $fmEndDate = date('Y-m-t', mktime(0, 0, 0, $mi, 1, $fmYear));
+    if ($fmEndDate > date('Y-m-d')) break; // 未來不顯示
+    $fmMonths[] = $fmEndDate;
+    $fmHeaders[] = $mi . '月底';
+}
+
+// 12/31 基準值（114年底帳）
+$fmBaseline = array(
+    'bank' => array('政遠企業' => 198342, '彰化銀行' => 9736507, '中國信託' => 5405378, '富邦銀行' => 6765277),
+    'weekly' => 4517368,
+    'petty' => array(1 => 2612, 3 => 11744, 2 => 16966, 4 => 1029),
+    'reserve' => 10000,
+    'cash' => 2386641,
+);
+
+// 銀行帳戶
+$fmBankAccounts = $fmDb->query("SELECT DISTINCT bank_account FROM bank_transactions WHERE bank_account IS NOT NULL ORDER BY bank_account")->fetchAll(PDO::FETCH_COLUMN);
+$fmBankNames = array();
+foreach ($fmBankAccounts as $ba) {
+    $sn = $ba;
+    if (strpos($ba, '中國信託') !== false && strpos($ba, '政遠') === false) $sn = '中國信託';
+    elseif (strpos($ba, '彰化銀行') !== false) $sn = '彰化銀行';
+    elseif (strpos($ba, '富邦') !== false) $sn = '富邦銀行';
+    elseif (strpos($ba, '政遠') !== false) $sn = '政遠企業';
+    $fmBankNames[$ba] = $sn;
+}
+
+// 零用金分公司
+$fmPettyBranches = array(1 => '潭子分公司', 3 => '員林分公司', 2 => '清水分公司', 4 => '東區電子鎖');
+$fmWeeklyFund = 4517368; // 週轉金固定
+
+// 計算各月底餘額
+$fmRows = array(); // key => array of balances per month
+$fmCategories = array(); // key => array(label, icon)
+
+// 銀行：12/31 用基準值，之後取 DB 最後一筆 balance
+foreach ($fmBankAccounts as $ba) {
+    $key = 'bank_' . $ba;
+    $shortName = $fmBankNames[$ba];
+    $fmCategories[$key] = array('label' => $shortName, 'icon' => '🏦');
+    $fmRows[$key] = array();
+    $baseVal = isset($fmBaseline['bank'][$shortName]) ? $fmBaseline['bank'][$shortName] : 0;
+    foreach ($fmMonths as $idx => $endDate) {
+        if ($idx === 0) {
+            $fmRows[$key][] = $baseVal;
+        } else {
+            $st = $fmDb->prepare("SELECT balance FROM bank_transactions WHERE bank_account = ? AND transaction_date <= ? ORDER BY transaction_date DESC, id DESC LIMIT 1");
+            $st->execute(array($ba, $endDate));
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            $fmRows[$key][] = $r ? (float)$r['balance'] : $baseVal;
+        }
+    }
+}
+
+// 週轉金
+$fmCategories['weekly'] = array('label' => '週轉金', 'icon' => '🔄');
+$fmRows['weekly'] = array_fill(0, count($fmMonths), $fmWeeklyFund);
+
+// 零用金：12/31 用基準值，之後取 DB 實際累計
+foreach ($fmPettyBranches as $bid => $bname) {
+    $key = 'petty_' . $bid;
+    $fmCategories[$key] = array('label' => '零用金-' . str_replace(array('分公司'), array(''), $bname), 'icon' => '🪙');
+    $fmRows[$key] = array();
+    $baseVal = isset($fmBaseline['petty'][$bid]) ? $fmBaseline['petty'][$bid] : 0;
+    foreach ($fmMonths as $idx => $endDate) {
+        if ($idx === 0) {
+            $fmRows[$key][] = $baseVal;
+        } else {
+            $st = $fmDb->prepare("SELECT COALESCE(SUM(income_amount - expense_amount), 0) FROM petty_cash WHERE branch_id = ? AND COALESCE(expense_date, entry_date) <= ?");
+            $st->execute(array($bid, $endDate));
+            $fmRows[$key][] = (float)$st->fetchColumn();
+        }
+    }
+}
+
+// 備用金：12/31 用基準值，之後取 DB 實際累計
+$fmCategories['reserve'] = array('label' => '備用金', 'icon' => '💼');
+$fmRows['reserve'] = array();
+foreach ($fmMonths as $idx => $endDate) {
+    if ($idx === 0) {
+        $fmRows['reserve'][] = $fmBaseline['reserve'];
+    } else {
+        $st = $fmDb->prepare("SELECT COALESCE(SUM(income_amount - expense_amount), 0) FROM reserve_fund WHERE COALESCE(expense_date, entry_date) <= ?");
+        $st->execute(array($endDate));
+        $fmRows['reserve'][] = (float)$st->fetchColumn();
+    }
+}
+
+// 現金：12/31 用基準值，之後取 DB 實際累計
+$fmCategories['cash'] = array('label' => '現金', 'icon' => '💵');
+$fmRows['cash'] = array();
+foreach ($fmMonths as $idx => $endDate) {
+    if ($idx === 0) {
+        $fmRows['cash'][] = $fmBaseline['cash'];
+    } else {
+        $st = $fmDb->prepare("SELECT COALESCE(SUM(income_amount - expense_amount), 0) FROM cash_details WHERE COALESCE(transaction_date, register_date) <= ?");
+        $st->execute(array($endDate));
+        $fmRows['cash'][] = (float)$st->fetchColumn();
+    }
+}
+
+// 計算合計
+$fmTotals = array_fill(0, count($fmMonths), 0);
+foreach ($fmRows as $vals) {
+    for ($i = 0; $i < count($vals); $i++) {
+        $fmTotals[$i] += $vals[$i];
+    }
+}
+?>
+<div class="card">
+    <div class="card-header analysis-header">資金月份統計（各月底餘額）</div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>資金類別</th>
+                <?php foreach ($fmHeaders as $h): ?><th class="text-right"><?= $h ?></th><?php endforeach; ?>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($fmCategories as $key => $cat): ?>
+                <tr>
+                    <td><?= $cat['icon'] ?> <?= e($cat['label']) ?></td>
+                    <?php foreach ($fmRows[$key] as $val): ?>
+                    <td class="text-right <?= $val < 0 ? 'text-red' : '' ?>"><?= number_format($val) ?></td>
+                    <?php endforeach; ?>
+                </tr>
+            <?php endforeach; ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <?php foreach ($fmTotals as $t): ?>
+                    <td class="text-right"><?= number_format($t) ?></td>
+                    <?php endforeach; ?>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 三、各分公司月別收款金額 -->
 <?php if (!empty($analysis['recv_pivot'])): ?>
 <div class="card">

@@ -521,12 +521,13 @@ class FinanceModel
                 $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
+        $rDateCol = (!empty($filters['date_type']) && $filters['date_type'] === 'deposit') ? 'r.deposit_date' : 'r.register_date';
         if (!empty($filters['date_from'])) {
-            $where .= ' AND r.register_date >= ?';
+            $where .= " AND {$rDateCol} >= ?";
             $params[] = $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $where .= ' AND r.register_date <= ?';
+            $where .= " AND {$rDateCol} <= ?";
             $params[] = $filters['date_to'];
         }
 
@@ -951,12 +952,17 @@ class FinanceModel
                 $params[] = $kw; $params[] = $kw;
             }
         }
+        if (!empty($filters['branch_id'])) {
+            $where .= ' AND EXISTS (SELECT 1 FROM payment_out_branches pob WHERE pob.payment_out_id = p.id AND pob.branch_id = ?)';
+            $params[] = (int)$filters['branch_id'];
+        }
+        $dateCol = (!empty($filters['date_type']) && $filters['date_type'] === 'payment') ? 'p.payment_date' : 'p.create_date';
         if (!empty($filters['date_from'])) {
-            $where .= ' AND p.create_date >= ?';
+            $where .= " AND {$dateCol} >= ?";
             $params[] = $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $where .= ' AND p.create_date <= ?';
+            $where .= " AND {$dateCol} <= ?";
             $params[] = $filters['date_to'];
         }
 

@@ -21,6 +21,13 @@
                 <input type="text" name="keyword" class="form-control" placeholder="收款單號/客戶名稱／$金額" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>">
             </div>
             <div class="form-group">
+                <label>日期類型</label>
+                <select name="date_type" class="form-control">
+                    <option value="register" <?= ($filters['date_type'] ?? 'register') === 'register' ? 'selected' : '' ?>>登記日期</option>
+                    <option value="deposit" <?= ($filters['date_type'] ?? '') === 'deposit' ? 'selected' : '' ?>>入帳日期</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>起始日期</label>
                 <input type="date" name="date_from" class="form-control" value="<?= e($filters['date_from'] ?? '') ?>">
             </div>

@@ -1140,27 +1140,32 @@ require __DIR__ . '/../_readonly_form_helper.php';
 
         <!-- 完工駁回對話框 -->
         <?php if (!empty($_myFlow)): ?>
-        <div id="completionRejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center">
-            <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%">
-                <h3 style="margin-top:0">駁回完工簽核</h3>
+        <div id="completionRejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center;pointer-events:auto">
+            <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%;pointer-events:auto">
+                <h3 style="margin-top:0;color:#333">駁回完工簽核</h3>
                 <form method="POST" action="/approvals.php?action=reject">
                     <?= csrf_field() ?>
-                    <input type="hidden" name="flow_id" id="completionRejectFlowId">
-                    <input type="hidden" name="module" value="case_completion">
-                    <input type="hidden" name="target_id" id="completionRejectCaseId">
-                    <input type="hidden" name="redirect" id="completionRejectRedirect">
+                    <input type="hidden" name="flow_id" id="completionRejectFlowId" style="pointer-events:auto">
+                    <input type="hidden" name="module" value="case_completion" style="pointer-events:auto">
+                    <input type="hidden" name="target_id" id="completionRejectCaseId" style="pointer-events:auto">
+                    <input type="hidden" name="redirect" id="completionRejectRedirect" style="pointer-events:auto">
                     <div style="margin-bottom:12px">
-                        <label style="font-size:.85rem;font-weight:600">駁回原因</label>
-                        <textarea name="comment" class="form-control" rows="3" placeholder="請輸入駁回原因" required></textarea>
+                        <label style="font-size:.85rem;font-weight:600;color:#333">駁回原因</label>
+                        <textarea name="comment" class="form-control" rows="3" placeholder="請輸入駁回原因" required style="pointer-events:auto !important;background:#fff !important;color:#333 !important"></textarea>
                     </div>
-                    <div style="display:flex;gap:8px;justify-content:flex-end">
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('completionRejectModal').style.display='none'">取消</button>
-                        <button type="submit" class="btn btn-danger">確定駁回</button>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('completionRejectModal').style.display='none'" style="min-width:80px;pointer-events:auto !important;opacity:1 !important">取消</button>
+                        <button type="submit" class="btn btn-danger" style="min-width:100px;pointer-events:auto !important;opacity:1 !important">確定駁回</button>
                     </div>
                 </form>
             </div>
         </div>
         <script>
+        // 把駁回 modal 搬到 body 下，脫離 section-readonly
+        (function() {
+            var m = document.getElementById('completionRejectModal');
+            if (m) document.body.appendChild(m);
+        })();
         function completionRejectShow(flowId, caseId) {
             document.getElementById('completionRejectFlowId').value = flowId;
             document.getElementById('completionRejectCaseId').value = caseId;
