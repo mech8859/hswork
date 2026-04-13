@@ -1384,13 +1384,33 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <th style="width:150px">型號</th>
                     <th style="width:70px">單位</th>
                     <th style="width:90px">預估數量</th>
+                    <th style="width:90px" class="text-right">單位成本</th>
+                    <th style="width:100px" class="text-right">成本小計</th>
                     <th style="width:40px"></th>
                 </tr></thead>
                 <tbody id="estMaterialsContainer">
                 <?php
                 $estMaterials = $case['material_estimates'] ?: array();
                 $estIdx = 0;
+                $estCostTotal = 0;
                 foreach ($estMaterials as $em):
+                    $emUnitCost = 0;
+                    if (!empty($em['product_id'])) {
+                        $emCostStmt = Database::getInstance()->prepare("SELECT cost, pack_qty, cost_per_unit FROM products WHERE id = ?");
+                        $emCostStmt->execute(array($em['product_id']));
+                        $emCostRow = $emCostStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($emCostRow) {
+                            if (!empty($emCostRow['cost_per_unit'])) {
+                                $emUnitCost = (float)$emCostRow['cost_per_unit'];
+                            } elseif (!empty($emCostRow['pack_qty']) && $emCostRow['pack_qty'] > 0) {
+                                $emUnitCost = (float)$emCostRow['cost'] / (float)$emCostRow['pack_qty'];
+                            } else {
+                                $emUnitCost = (float)$emCostRow['cost'];
+                            }
+                        }
+                    }
+                    $emLineCost = $emUnitCost * (float)($em['estimated_qty'] ?: 0);
+                    $estCostTotal += $emLineCost;
                 ?>
                 <tr class="est-material-row" data-idx="<?= $estIdx ?>">
                     <td style="position:relative">
@@ -1403,9 +1423,18 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <td><input type="text" name="est_materials[<?= $estIdx ?>][model_number]" class="form-control" value="<?= e($em['model_number'] ?: '') ?>" placeholder="型號"></td>
                     <td><input type="text" name="est_materials[<?= $estIdx ?>][unit]" class="form-control" value="<?= e($em['unit'] ?: '') ?>" placeholder="單位"></td>
                     <td><input type="number" name="est_materials[<?= $estIdx ?>][estimated_qty]" class="form-control" value="<?= e($em['estimated_qty'] ?: '') ?>" min="0" step="0.1"></td>
+                    <td class="text-right" style="color:var(--gray-500);font-size:.85rem"><?= $emUnitCost > 0 ? '$' . number_format($emUnitCost, 1) : '-' ?></td>
+                    <td class="text-right" style="font-weight:600;font-size:.85rem"><?= $emLineCost > 0 ? '$' . number_format(round($emLineCost)) : '-' ?></td>
                     <td><button type="button" class="btn btn-sm" style="background:#e53935;color:#fff;padding:4px 8px" onclick="this.closest('tr').remove()">✕</button></td>
                 </tr>
                 <?php $estIdx++; endforeach; ?>
+                <?php if ($estCostTotal > 0): ?>
+                <tr style="font-weight:600;border-top:2px solid var(--gray-300)">
+                    <td colspan="5" class="text-right">成本合計</td>
+                    <td class="text-right">$<?= number_format(round($estCostTotal)) ?></td>
+                    <td></td>
+                </tr>
+                <?php endif; ?>
                 </tbody>
             </table>
         </div>

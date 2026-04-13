@@ -144,7 +144,7 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
-                !empty($_POST['cost_per_unit']) ? (float)$_POST['cost_per_unit'] : null,
+                null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 (int)($_POST['stock'] ?? 0),
                 1,
@@ -152,6 +152,11 @@ switch ($action) {
                 $datasheetUrl,
             ));
             $newId = (int)$db->lastInsertId();
+            // 後端計算 cost_per_unit
+            $createCost = (float)($_POST['cost'] ?? 0);
+            $createPackQty = !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : 0;
+            $createCpu = $createPackQty > 0 ? round($createCost / $createPackQty, 4) : ($createCost > 0 ? $createCost : null);
+            $db->prepare("UPDATE products SET cost_per_unit = ? WHERE id = ?")->execute(array($createCpu, $newId));
             AuditLog::log('products', 'create', $newId, $_POST['name'] ?? '');
             Session::flash('success', '產品已新增');
             redirect('/products.php?action=view&id=' . $newId);
@@ -211,13 +216,18 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
-                !empty($_POST['cost_per_unit']) ? (float)$_POST['cost_per_unit'] : null,
+                null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 isset($_POST['is_active']) ? 1 : 0,
                 $imageUrl,
                 $datasheetUrl,
                 $id,
             ));
+            // 後端計算 cost_per_unit
+            $editCost = (float)($_POST['cost'] ?? 0);
+            $editPackQty = !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : 0;
+            $editCpu = $editPackQty > 0 ? round($editCost / $editPackQty, 4) : ($editCost > 0 ? $editCost : null);
+            $db->prepare("UPDATE products SET cost_per_unit = ? WHERE id = ?")->execute(array($editCpu, $id));
             AuditLog::logChange('products', $id, $product['name'], $oldProduct, $_POST, array('name','model','price','cost','category_id'));
 
             // 儲存歷史價格
