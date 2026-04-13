@@ -90,17 +90,19 @@ class ScheduleModel
 
         // 計算 display_status
         $now = date('H');
+        $today = date('Y-m-d');
         foreach ($schedules as &$s) {
             $wl = isset($wlSummary[(int)$s['id']]) ? $wlSummary[(int)$s['id']] : null;
+            $hasReport = $wl && !empty($wl['has_report']);
+
             if ($s['status'] === 'in_progress' && $wl) {
-                if ($wl['has_report'] && $wl['next_visit_needed']) {
+                if ($hasReport && $wl['next_visit_needed']) {
                     $s['display_status'] = 'needs_revisit';
-                } elseif ($wl['has_report'] && $wl['is_completed']) {
-                    // 已回報完工但 schedule 還沒轉 completed（罕見，通常會同步）
+                } elseif ($hasReport && $wl['is_completed']) {
                     $s['display_status'] = 'completed';
-                } elseif ($wl['has_departure'] && !$wl['has_report']) {
+                } elseif ($wl['has_departure'] && !$hasReport) {
                     // 已下工但未回報
-                    if ((int)$now >= 17 && $s['schedule_date'] <= date('Y-m-d')) {
+                    if ((int)$now >= 17 && $s['schedule_date'] <= $today) {
                         $s['display_status'] = 'no_report';
                     } else {
                         $s['display_status'] = 'checked_out';
@@ -108,6 +110,9 @@ class ScheduleModel
                 } else {
                     $s['display_status'] = 'in_progress';
                 }
+            } elseif (in_array($s['status'], array('planned', 'confirmed', 'in_progress')) && !$hasReport && (int)$now >= 17 && $s['schedule_date'] <= $today) {
+                // 當天17:00後，已排/已確認/施工中 且無回報 → 未回報
+                $s['display_status'] = 'no_report';
             } else {
                 $s['display_status'] = $s['status'];
             }

@@ -84,6 +84,68 @@ $newEntry = 0; $newClosed = 0;
     </div>
 </div>
 
+<!-- 一之1、依進件公司統計 進件數 -->
+<?php
+$compDb = Database::getInstance();
+$compBranches = implode(',', array_map('intval', $branchIds));
+$compStmt = $compDb->query("
+    SELECT COALESCE(NULLIF(company,''), '未填') AS comp,
+           DATE_FORMAT(created_at, '%Y-%m') AS ym,
+           COUNT(*) AS cnt
+    FROM cases
+    WHERE branch_id IN ({$compBranches})
+    AND case_type = 'new_install'
+    AND DATE_FORMAT(created_at, '%Y-%m') BETWEEN '{$months[0]}' AND '{$months[$nm-1]}'
+    GROUP BY comp, ym
+    ORDER BY comp, ym
+");
+$compData = array();
+$compTotals = array();
+foreach ($compStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $compData[$r['comp']][$r['ym']] = (int)$r['cnt'];
+    if (!isset($compTotals[$r['comp']])) $compTotals[$r['comp']] = 0;
+    $compTotals[$r['comp']] += (int)$r['cnt'];
+}
+arsort($compTotals);
+?>
+<div class="card">
+    <div class="card-header analysis-header">依進件公司統計 進件數</div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>公司</th>
+                <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+            </tr></thead>
+            <tbody>
+            <?php
+            $compGrandTotal = 0;
+            foreach ($compTotals as $comp => $total):
+                $compGrandTotal += $total;
+            ?>
+                <tr>
+                    <td><?= e($comp) ?></td>
+                    <?php foreach ($months as $m): $v = isset($compData[$comp][$m]) ? $compData[$comp][$m] : 0; ?>
+                    <td><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($total) ?></td>
+                </tr>
+            <?php endforeach; ?>
+                <tr class="row-highlight">
+                    <td>合計</td>
+                    <?php foreach ($months as $m):
+                        $mTotal = 0;
+                        foreach ($compData as $cd) { $mTotal += isset($cd[$m]) ? $cd[$m] : 0; }
+                    ?>
+                    <td><?= $mTotal ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($compGrandTotal) ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 一之二、未完工與完工未收款 未收餘額月份統計 -->
 <?php
 $wipDb = Database::getInstance();

@@ -136,6 +136,13 @@ $subStatusOptions = CaseModel::subStatusOptions();
             var qs = <?= json_encode((object)$baseQS4, JSON_UNESCAPED_UNICODE) ?>;
             location.href = '/cases.php?' + new URLSearchParams(qs).toString();
         }
+        function syncSalesBeforeSearch() {
+            var checks = document.querySelectorAll('.sales-check:checked');
+            var ids = [];
+            for (var i = 0; i < checks.length; i++) ids.push(checks[i].value);
+            var el = document.getElementById('searchSalesId');
+            if (el) el.value = ids.join(',');
+        }
         </script>
     </div>
 </div>
@@ -167,9 +174,9 @@ $subStatusOptions = CaseModel::subStatusOptions();
             <?php if ($filters['status']): ?><input type="hidden" name="status" value="<?= e($filters['status']) ?>"><?php endif; ?>
             <?php if ($filters['case_type']): ?><input type="hidden" name="case_type" value="<?= e($filters['case_type']) ?>"><?php endif; ?>
             <?php if ($filters['sub_status']): ?><input type="hidden" name="sub_status" value="<?= e($filters['sub_status']) ?>"><?php endif; ?>
-            <?php if ($filters['sales_id']): ?><input type="hidden" name="sales_id" value="<?= e($filters['sales_id']) ?>"><?php endif; ?>
+            <input type="hidden" name="sales_id" id="searchSalesId" value="<?= e($filters['sales_id']) ?>">
             <div class="form-group" style="align-self:flex-end;flex:0;display:flex;gap:6px;">
-                <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
+                <button type="submit" class="btn btn-primary btn-sm" onclick="syncSalesBeforeSearch()">搜尋</button>
                 <a href="/cases.php" class="btn btn-outline btn-sm">清除</a>
             </div>
         </div>

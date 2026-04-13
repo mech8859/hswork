@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" font-family="Microsoft JhengHei, PingFang TC, sans-serif">
+  <defs>
+    <style>
+      .wall { fill:none; stroke:#333; stroke-width:3; }
+      .wall-thin { fill:none; stroke:#666; stroke-width:1.5; stroke-dasharray:6,3; }
+      .room-label { font-size:16px; fill:#333; font-weight:bold; text-anchor:middle; }
+      .device-label { font-size:11px; fill:#1565C0; text-anchor:middle; }
+      .device-box { fill:#E3F2FD; stroke:#1565C0; stroke-width:1.5; rx:4; }
+      .camera { fill:#D32F2F; }
+      .camera-label { font-size:10px; fill:#D32F2F; text-anchor:middle; }
+      .title { font-size:20px; fill:#1a237e; font-weight:bold; }
+      .subtitle { font-size:12px; fill:#666; }
+      .logo { font-size:14px; fill:#1565C0; font-weight:bold; }
+    </style>
+    <!-- 攝影機圖示 -->
+    <g id="cam-icon">
+      <rect x="-8" y="-6" width="16" height="12" rx="2" fill="#D32F2F"/>
+      <polygon points="8,-4 14,0 8,4" fill="#D32F2F"/>
+      <circle cx="-2" cy="0" r="3" fill="#fff" opacity="0.6"/>
+    </g>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="800" height="600" fill="#FAFAFA"/>
+
+  <!-- 標題 -->
+  <text x="400" y="35" class="title" text-anchor="middle">監控系統架構圖</text>
+  <text x="400" y="55" class="subtitle" text-anchor="middle">禾順監視數位科技</text>
+
+  <!-- ===== 1F 主建築 ===== -->
+  <rect x="80" y="80" width="520" height="420" class="wall"/>
+
+  <!-- 分隔線：上下區域 -->
+  <line x1="80" y1="320" x2="600" y2="320" stroke="#666" stroke-width="2"/>
+
+  <!-- 後陽台 -->
+  <rect x="80" y="80" width="400" height="80" fill="#FFF9C4" fill-opacity="0.4"/>
+  <text x="280" y="128" class="room-label">後陽台</text>
+
+  <!-- 雨棚 -->
+  <rect x="500" y="80" width="100" height="100" fill="#E0F2F1" fill-opacity="0.5"/>
+  <rect x="500" y="80" width="100" height="100" class="wall"/>
+  <text x="550" y="135" class="room-label">雨棚</text>
+
+  <!-- 1F 室內 -->
+  <text x="400" y="250" class="room-label" font-size="22">1F 室內</text>
+
+  <!-- WiFi -->
+  <rect x="300" y="175" width="80" height="30" class="device-box"/>
+  <text x="340" y="195" class="device-label">📶 WiFi AP</text>
+
+  <!-- 設備區（左側）-->
+  <rect x="95" y="220" width="150" height="85" fill="#E8EAF6" fill-opacity="0.5" rx="6"/>
+  <text x="170" y="240" class="device-label" font-weight="bold">設備區</text>
+  <rect x="105" y="248" width="130" height="20" class="device-box"/>
+  <text x="170" y="262" class="device-label">📺 TV / NVR</text>
+  <rect x="105" y="272" width="130" height="20" class="device-box"/>
+  <text x="170" y="286" class="device-label">🔌 配電箱 / Switch</text>
+
+  <!-- 對講機（左側）-->
+  <rect x="105" y="168" width="100" height="22" class="device-box" fill="#FFF3E0" stroke="#E65100"/>
+  <text x="155" y="183" class="device-label" fill="#E65100">📞 對講機</text>
+
+  <!-- 車庫 -->
+  <rect x="80" y="320" width="520" height="180" fill="#EFEBE9" fill-opacity="0.3"/>
+  <text x="340" y="420" class="room-label" font-size="22">車庫</text>
+
+  <!-- ===== 攝影機位置 ===== -->
+  <!-- Q1 - 車庫入口左 -->
+  <use href="#cam-icon" x="100" y="340" transform="rotate(0,100,340)"/>
+  <text x="100" y="365" class="camera-label">Q1</text>
+
+  <!-- Q2 - 左下角 -->
+  <use href="#cam-icon" x="100" y="490" transform="rotate(0,100,490)"/>
+  <text x="100" y="480" class="camera-label">Q2</text>
+
+  <!-- 對講機（右下）-->
+  <rect x="520" y="475" width="100" height="22" class="device-box" fill="#FFF3E0" stroke="#E65100"/>
+  <text x="570" y="490" class="device-label" fill="#E65100">📞 對講機</text>
+
+  <!-- ===== 圖例 ===== -->
+  <rect x="630" y="80" width="150" height="120" fill="#fff" stroke="#ccc" stroke-width:1 rx="6"/>
+  <text x="705" y="102" class="device-label" font-size="13" font-weight="bold" fill="#333">圖例</text>
+  <use href="#cam-icon" x="660" y="125"/>
+  <text x="720" y="129" class="device-label" fill="#333" text-anchor="start">攝影機</text>
+  <rect x="648" y="148" width="20" height="14" class="device-box"/>
+  <text x="678" y="159" class="device-label" fill="#333" text-anchor="start">網路設備</text>
+  <rect x="648" y="172" width="20" height="14" fill="#FFF3E0" stroke="#E65100" rx="2"/>
+  <text x="678" y="183" class="device-label" fill="#333" text-anchor="start">對講機</text>
+</svg>
