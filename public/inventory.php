@@ -225,7 +225,8 @@ switch ($action) {
                 redirect('/inventory.php?action=stocktake_list');
             }
             $stocktakerId = !empty($_POST['stocktaker_id']) ? (int)$_POST['stocktaker_id'] : null;
-            $id = $model->createStocktake($warehouseId, $note, Auth::id());
+            $includeZero = !empty($_POST['include_zero']);
+            $id = $model->createStocktake($warehouseId, $note, Auth::id(), $includeZero);
             // 儲存盤點人
             if ($stocktakerId && $id) {
                 $db = Database::getInstance();

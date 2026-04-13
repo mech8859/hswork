@@ -613,7 +613,7 @@ class InventoryModel
     /**
      * 建立盤點單
      */
-    public function createStocktake($warehouseId, $note, $userId)
+    public function createStocktake($warehouseId, $note, $userId, $includeZero = false)
     {
         $this->db->beginTransaction();
         try {
@@ -626,11 +626,12 @@ class InventoryModel
             $stmt->execute(array($number, $warehouseId, $note, $userId));
             $stocktakeId = $this->db->lastInsertId();
 
-            // 載入該倉庫所有庫存品項
+            // 載入該倉庫庫存品項
+            $qtyCondition = $includeZero ? '' : ' AND i.stock_qty != 0';
             $invStmt = $this->db->prepare("
                 SELECT i.product_id, i.stock_qty
                 FROM inventory i
-                WHERE i.warehouse_id = ? AND i.stock_qty != 0
+                WHERE i.warehouse_id = ?{$qtyCondition}
                 ORDER BY i.product_id
             ");
             $invStmt->execute(array($warehouseId));

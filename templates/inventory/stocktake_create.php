@@ -35,6 +35,13 @@
         </div>
 
         <div class="form-group">
+            <label class="d-flex align-center gap-1" style="cursor:pointer">
+                <input type="checkbox" name="include_zero" value="1">
+                <span>包含庫存數量為 0 的產品</span>
+            </label>
+        </div>
+
+        <div class="form-group">
             <label>備註</label>
             <textarea name="note" class="form-control" rows="2" placeholder="盤點說明（選填）"></textarea>
         </div>

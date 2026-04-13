@@ -952,10 +952,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
             'balance_amount'  => '尾款',
         );
         $amtSourceLabels = array(
-            'manual_edit'    => '手動編輯',
-            'payment_add'    => '新增收款',
-            'payment_edit'   => '編輯收款',
-            'payment_delete' => '刪除收款',
+            'manual_edit'            => '手動編輯',
+            'payment_add'            => '新增收款',
+            'payment_edit'           => '編輯收款',
+            'payment_delete'         => '刪除收款',
+            'worklog_payment'        => '施工回報收款',
+            'worklog_payment_cancel' => '施工回報取消收款',
+            'manual_fix'             => '系統修正',
         );
     ?>
     <div class="card" id="sec-amount-changes">
@@ -981,7 +984,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <td class="text-right">$<?= number_format($ac['old_value']) ?></td>
                     <td class="text-right" style="font-weight:600;color:<?= $ac['new_value'] > $ac['old_value'] ? '#2e7d32' : '#c62828' ?>">$<?= number_format($ac['new_value']) ?></td>
                     <td><span class="badge"><?= isset($amtSourceLabels[$ac['change_source']]) ? $amtSourceLabels[$ac['change_source']] : e($ac['change_source']) ?></span></td>
-                    <td><?= e($ac['changed_by_name']) ?></td>
+                    <td><?= $ac['changed_by_name'] === 'system' ? '系統' : e($ac['changed_by_name']) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>

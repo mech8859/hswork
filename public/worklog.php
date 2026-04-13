@@ -301,29 +301,125 @@ switch ($action) {
                     if ($wlCaseIdForPay > 0) {
                         $payDb = Database::getInstance();
                         $payRef = '施工回報收款 #' . $id;
-                        $chkStmt = $payDb->prepare("SELECT id FROM case_payments WHERE case_id = ? AND note = ? LIMIT 1");
+                        $payMethod = !empty($_POST['payment_method']) ? $_POST['payment_method'] : 'cash';
+                        $methodMap = array('cash' => '現金', 'transfer' => '匯款', 'check' => '支票');
+                        $transType = isset($methodMap[$payMethod]) ? $methodMap[$payMethod] : $payMethod;
+                        $payDate = isset($worklog['schedule_date']) ? $worklog['schedule_date'] : date('Y-m-d');
+                        $payAmount = $_POST['payment_amount'];
+
+                        $chkStmt = $payDb->prepare("SELECT id, amount FROM case_payments WHERE case_id = ? AND note = ? LIMIT 1");
                         $chkStmt->execute(array($wlCaseIdForPay, $payRef));
-                        if (!$chkStmt->fetchColumn()) {
-                            $payMethod = !empty($_POST['payment_method']) ? $_POST['payment_method'] : 'cash';
-                            $methodMap = array('cash' => '現金', 'transfer' => '匯款', 'check' => '支票');
-                            $transType = isset($methodMap[$payMethod]) ? $methodMap[$payMethod] : $payMethod;
-                            $payDate = isset($worklog['schedule_date']) ? $worklog['schedule_date'] : date('Y-m-d');
+                        $existingPay = $chkStmt->fetch(PDO::FETCH_ASSOC);
+
+                        $payChanged = false;
+                        if (!$existingPay) {
+                            // 新增
                             $payDb->prepare("INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, note, created_by, created_at) VALUES (?, ?, '其他', ?, ?, ?, ?, NOW())")
-                                  ->execute(array($wlCaseIdForPay, $payDate, $transType, $_POST['payment_amount'], $payRef, $userId));
+                                  ->execute(array($wlCaseIdForPay, $payDate, $transType, $payAmount, $payRef, $userId));
+                            $payChanged = true;
+                        } elseif ((int)$existingPay['amount'] !== (int)$payAmount) {
+                            // 金額有變更，更新
+                            $payDb->prepare("UPDATE case_payments SET amount = ?, transaction_type = ?, payment_date = ?, updated_at = NOW() WHERE id = ?")
+                                  ->execute(array($payAmount, $transType, $payDate, $existingPay['id']));
+                            $payChanged = true;
+                        }
+
+                        if ($payChanged) {
+                            // 讀舊值
+                            $oldStmt = $payDb->prepare("SELECT total_collected, balance_amount FROM cases WHERE id = ?");
+                            $oldStmt->execute(array($wlCaseIdForPay));
+                            $oldRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+                            $oldCollected = $oldRow ? (int)$oldRow['total_collected'] : 0;
+                            $oldBalance   = $oldRow ? (int)$oldRow['balance_amount'] : 0;
+
                             // 回寫案件帳務欄位
                             $syncStmt = $payDb->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
                             $syncStmt->execute(array($wlCaseIdForPay));
                             $syncTotal = (int)$syncStmt->fetchColumn();
-                            $syncStmt2 = $payDb->prepare("SELECT total_amount FROM cases WHERE id = ?");
+                            $syncStmt2 = $payDb->prepare("SELECT total_amount, deal_amount FROM cases WHERE id = ?");
                             $syncStmt2->execute(array($wlCaseIdForPay));
-                            $syncCaseTotal = (int)$syncStmt2->fetchColumn();
-                            $syncBalance = $syncCaseTotal > 0 ? ($syncCaseTotal - $syncTotal) : 0;
+                            $syncCaseRow = $syncStmt2->fetch(PDO::FETCH_ASSOC);
+                            $syncBase = (int)$syncCaseRow['total_amount'] > 0 ? (int)$syncCaseRow['total_amount'] : (int)$syncCaseRow['deal_amount'];
+                            $syncBalance = $syncBase > 0 ? max(0, $syncBase - $syncTotal) : 0;
                             $payDb->prepare("UPDATE cases SET total_collected = ?, balance_amount = ? WHERE id = ?")
                                   ->execute(array($syncTotal, $syncBalance, $wlCaseIdForPay));
+
+                            // 金額異動紀錄
+                            try {
+                                $chkTbl = $payDb->query("SHOW TABLES LIKE 'case_amount_changes'");
+                                if ($chkTbl && $chkTbl->rowCount() > 0) {
+                                    $user = Session::getUser();
+                                    $uId = $user ? $user['id'] : 0;
+                                    $uName = $user ? $user['real_name'] : 'system';
+                                    $changeSource = 'worklog_payment';
+                                    if ($oldCollected !== $syncTotal) {
+                                        $payDb->prepare("INSERT INTO case_amount_changes (case_id, field_name, old_value, new_value, change_source, changed_by, changed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                                              ->execute(array($wlCaseIdForPay, 'total_collected', $oldCollected, $syncTotal, $changeSource, $uId, $uName));
+                                    }
+                                    if ($oldBalance !== $syncBalance) {
+                                        $payDb->prepare("INSERT INTO case_amount_changes (case_id, field_name, old_value, new_value, change_source, changed_by, changed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                                              ->execute(array($wlCaseIdForPay, 'balance_amount', $oldBalance, $syncBalance, $changeSource, $uId, $uName));
+                                    }
+                                }
+                            } catch (Exception $e) {}
                         }
                     }
                 } catch (Exception $e) {
                     error_log('worklog payment sync error: ' . $e->getMessage());
+                }
+            }
+
+            // 取消收款時刪除對應交易紀錄
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['payment_collected']) && $worklog) {
+                try {
+                    $wlCaseIdForPay = isset($worklog['case_id']) ? (int)$worklog['case_id'] : 0;
+                    if ($wlCaseIdForPay > 0) {
+                        $payDb = Database::getInstance();
+                        $payRef = '施工回報收款 #' . $id;
+                        // 讀舊值
+                        $oldStmt = $payDb->prepare("SELECT total_collected, balance_amount FROM cases WHERE id = ?");
+                        $oldStmt->execute(array($wlCaseIdForPay));
+                        $oldRow = $oldStmt->fetch(PDO::FETCH_ASSOC);
+                        $oldCollected = $oldRow ? (int)$oldRow['total_collected'] : 0;
+                        $oldBalance   = $oldRow ? (int)$oldRow['balance_amount'] : 0;
+
+                        $delStmt = $payDb->prepare("DELETE FROM case_payments WHERE case_id = ? AND note = ?");
+                        $delStmt->execute(array($wlCaseIdForPay, $payRef));
+                        if ($delStmt->rowCount() > 0) {
+                            // 回寫案件帳務欄位
+                            $syncStmt = $payDb->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
+                            $syncStmt->execute(array($wlCaseIdForPay));
+                            $syncTotal = (int)$syncStmt->fetchColumn();
+                            $syncStmt2 = $payDb->prepare("SELECT total_amount, deal_amount FROM cases WHERE id = ?");
+                            $syncStmt2->execute(array($wlCaseIdForPay));
+                            $syncCaseRow = $syncStmt2->fetch(PDO::FETCH_ASSOC);
+                            $syncBase = (int)$syncCaseRow['total_amount'] > 0 ? (int)$syncCaseRow['total_amount'] : (int)$syncCaseRow['deal_amount'];
+                            $syncBalance = $syncBase > 0 ? max(0, $syncBase - $syncTotal) : 0;
+                            $payDb->prepare("UPDATE cases SET total_collected = ?, balance_amount = ? WHERE id = ?")
+                                  ->execute(array($syncTotal, $syncBalance, $wlCaseIdForPay));
+
+                            // 金額異動紀錄
+                            try {
+                                $chkTbl = $payDb->query("SHOW TABLES LIKE 'case_amount_changes'");
+                                if ($chkTbl && $chkTbl->rowCount() > 0) {
+                                    $user = Session::getUser();
+                                    $uId = $user ? $user['id'] : 0;
+                                    $uName = $user ? $user['real_name'] : 'system';
+                                    $changeSource = 'worklog_payment_cancel';
+                                    if ($oldCollected !== $syncTotal) {
+                                        $payDb->prepare("INSERT INTO case_amount_changes (case_id, field_name, old_value, new_value, change_source, changed_by, changed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                                              ->execute(array($wlCaseIdForPay, 'total_collected', $oldCollected, $syncTotal, $changeSource, $uId, $uName));
+                                    }
+                                    if ($oldBalance !== $syncBalance) {
+                                        $payDb->prepare("INSERT INTO case_amount_changes (case_id, field_name, old_value, new_value, change_source, changed_by, changed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                                              ->execute(array($wlCaseIdForPay, 'balance_amount', $oldBalance, $syncBalance, $changeSource, $uId, $uName));
+                                    }
+                                }
+                            } catch (Exception $e) {}
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log('worklog payment unsync error: ' . $e->getMessage());
                 }
             }
 
