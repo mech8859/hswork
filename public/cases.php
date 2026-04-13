@@ -129,7 +129,7 @@ switch ($action) {
         $caseSourceOptions = $ddModel->getOptions('case_source');
         $customerDemandOptions = $ddModel->getOptions('customer_demand');
         $systemTypeOptions = $ddModel->getOptions('system_type');
-        $extraCss = array('/css/cases-form.css?v=20260407d');
+        $extraCss = array('/css/cases-form.css?v=20260413c');
         $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:0,caseId:0};</script>';
 
@@ -206,6 +206,8 @@ switch ($action) {
                 Session::flash('error', '此案件狀態需填寫業務備註（未成交原因）');
                 redirect('/cases.php?action=edit&id=' . $id);
             }
+            // DEBUG: 記錄 POST 值到檔案
+            file_put_contents('/tmp/case_save_debug.txt', date('H:i:s') . ' id=' . $id . ' POST[tax_amount]=' . var_export($_POST['tax_amount'] ?? 'NOT_SET', true) . ' POST[total_amount]=' . var_export($_POST['total_amount'] ?? 'NOT_SET', true) . "\n", FILE_APPEND);
             // 金額異動紀錄：存檔前讀舊值
             $oldCase = $model->getById($id);
             try {
@@ -252,7 +254,7 @@ switch ($action) {
         $caseSourceOptions = $ddModel->getOptions('case_source');
         $customerDemandOptions = $ddModel->getOptions('customer_demand');
         $systemTypeOptions = $ddModel->getOptions('system_type');
-        $extraCss = array('/css/cases-form.css?v=20260407d');
+        $extraCss = array('/css/cases-form.css?v=20260413c');
         $extraJs = array('/js/tw_districts.js');
         $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . count($contacts) . ',caseId:' . $case['id'] . '};</script>';
 

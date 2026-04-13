@@ -25,6 +25,7 @@ class QuotationModel
             'customer_accepted' => '客戶已接受',
             'customer_rejected' => '客戶已拒絕',
             'revision_needed' => '待修改',
+            'pending_revision' => '變更簽核中',
         );
         return isset($map[$status]) ? $map[$status] : $status;
     }
@@ -42,6 +43,7 @@ class QuotationModel
             'customer_accepted' => 'success',
             'customer_rejected' => 'danger',
             'revision_needed' => 'warning',
+            'pending_revision' => 'warning',
         );
         return isset($map[$status]) ? $map[$status] : '';
     }
@@ -51,7 +53,7 @@ class QuotationModel
      */
     public static function canEdit($status)
     {
-        return in_array($status, array('draft', 'rejected_internal', 'revision_needed'));
+        return in_array($status, array('draft', 'rejected_internal', 'revision_needed', 'approved'));
     }
 
     public static function formatLabel($format)

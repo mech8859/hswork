@@ -122,7 +122,14 @@ switch ($action) {
                 $caseModel = new CaseModel();
                 $caseModel->saveMaterialEstimates($editCaseId, $_POST['est_materials']);
             }
-            Session::flash('success', '報價單已更新');
+            // 已核准狀態編輯後退回草稿，需重新送簽核
+            if ($quote['status'] === 'approved') {
+                $model->updateStatus($id, 'draft');
+                $db = Database::getInstance();
+                $db->prepare("DELETE FROM approval_flows WHERE module = 'quotations' AND target_id = ?")->execute(array($id));
+                AuditLog::log('quotations', 'revision_to_draft', $id, '已核准報價單修改後退回草稿');
+            }
+            Session::flash('success', '報價單已更新' . ($quote['status'] === 'approved' ? '（狀態已退回草稿，請重新送簽核）' : ''));
             redirect('/quotations.php?action=view&id=' . $id);
         }
         $salespeople = $model->getSalespeople($branchIds);
@@ -268,6 +275,43 @@ switch ($action) {
                 $model->updateStatus($id, 'pending_approval');
                 AuditLog::log('quotations', 'submit_approval', $id, '送出簽核');
                 Session::flash('success', '已送出簽核，等待主管審核');
+            }
+        }
+        redirect('/quotations.php?action=view&id=' . $id);
+        break;
+
+    // ---- 申請變更（已送客戶/客戶已接受 → 變更簽核 → 退回草稿）----
+    case 'request_revision':
+        $id = (int)($_GET['id'] ?? 0);
+        $quote = $model->getById($id);
+        if (!$quote) { Session::flash('error', '報價單不存在'); redirect('/quotations.php'); }
+        if (!in_array($quote['status'], array('sent', 'customer_accepted'))) {
+            Session::flash('error', '此報價單狀態無法申請變更');
+            redirect('/quotations.php?action=view&id=' . $id);
+            break;
+        }
+        if (verify_csrf()) {
+            require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+            $approvalModel = new ApprovalModel();
+            $amount = (float)$quote['total_amount'];
+            $profitRate = $quote['profit_rate'] ? (float)$quote['profit_rate'] : null;
+
+            $result = $approvalModel->submitForApproval('quotations', $id, $amount, $profitRate);
+
+            // 在 approval_flows 記錄這是變更簽核，以及原始狀態
+            $db = Database::getInstance();
+            $revPayload = json_encode(array('type' => 'revision', 'original_status' => $quote['status']));
+            $db->prepare("UPDATE approval_flows SET payload = ? WHERE module = 'quotations' AND target_id = ? AND status = 'pending'")
+               ->execute(array($revPayload, $id));
+
+            if (isset($result['auto_approved']) && $result['auto_approved']) {
+                $model->updateStatus($id, 'draft');
+                AuditLog::log('quotations', 'revision_auto_approved', $id, '變更申請自動核准，退回草稿');
+                Session::flash('success', '變更申請已自動核准，報價單已退回草稿可編輯');
+            } else {
+                $model->updateStatus($id, 'pending_revision');
+                AuditLog::log('quotations', 'request_revision', $id, '申請變更報價單（原狀態：' . $quote['status'] . '）');
+                Session::flash('success', '已送出變更申請，等待主管審核');
             }
         }
         redirect('/quotations.php?action=view&id=' . $id);

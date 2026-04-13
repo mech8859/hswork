@@ -182,7 +182,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <label>列印選項</label>
                 <div class="mt-1" style="display:flex;flex-wrap:wrap;gap:12px">
                     <label class="checkbox-label"><input type="checkbox" name="hide_model_on_print" value="1" <?= !empty($quote['hide_model_on_print']) ? 'checked' : '' ?>> 不顯示型號</label>
-                    <label class="checkbox-label"><input type="checkbox" name="tax_free" value="1" <?= !empty($quote['tax_free']) ? 'checked' : '' ?> onchange="recalcAll()"> 未稅(不開發票)</label>
+                    <label class="checkbox-label"><input type="checkbox" name="tax_free" value="1" <?= !empty($quote['tax_free']) ? 'checked' : '' ?> onchange="calcGrandTotal()"> 未稅(不開發票)</label>
                     <label class="checkbox-label"><input type="checkbox" name="has_discount" value="1" <?= !empty($quote['has_discount']) ? 'checked' : '' ?> onchange="toggleDiscount()"> 優惠價</label>
                 </div>
             </div>

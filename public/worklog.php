@@ -312,16 +312,100 @@ switch ($action) {
                         $existingPay = $chkStmt->fetch(PDO::FETCH_ASSOC);
 
                         $payChanged = false;
+                        $newPayId = null;
                         if (!$existingPay) {
                             // 新增
                             $payDb->prepare("INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, note, created_by, created_at) VALUES (?, ?, '其他', ?, ?, ?, ?, NOW())")
                                   ->execute(array($wlCaseIdForPay, $payDate, $transType, $payAmount, $payRef, $userId));
+                            $newPayId = $payDb->lastInsertId();
                             $payChanged = true;
+
+                            // 自動拋轉收款單
+                            try {
+                                $caseStmt = $payDb->prepare('SELECT case_number, customer_id, customer_no, customer_name, sales_id, branch_id FROM cases WHERE id = ?');
+                                $caseStmt->execute(array($wlCaseIdForPay));
+                                $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
+                                if ($caseRow) {
+                                    require_once __DIR__ . '/../modules/finance/FinanceModel.php';
+                                    $finModel = new FinanceModel();
+                                    $receiptData = array(
+                                        'register_date'    => $payDate,
+                                        'deposit_date'     => $payDate,
+                                        'customer_name'    => $caseRow['customer_name'],
+                                        'case_id'          => $wlCaseIdForPay,
+                                        'case_number'      => $caseRow['case_number'],
+                                        'customer_no'      => $caseRow['customer_no'],
+                                        'sales_id'         => $caseRow['sales_id'],
+                                        'branch_id'        => $caseRow['branch_id'],
+                                        'receipt_method'   => $transType,
+                                        'invoice_category' => '其他',
+                                        'status'           => '拋轉待確認',
+                                        'bank_ref'         => null,
+                                        'subtotal'         => 0,
+                                        'tax'              => 0,
+                                        'discount'         => 0,
+                                        'total_amount'     => $payAmount,
+                                        'note'             => '施工回報自動產生 - ' . $payRef,
+                                        'created_by'       => $userId,
+                                    );
+                                    $receiptId = $finModel->createReceipt($receiptData);
+                                    $rn = $payDb->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
+                                    $rn->execute(array($receiptId));
+                                    $generatedReceiptNo = $rn->fetchColumn();
+                                    if ($generatedReceiptNo && $newPayId) {
+                                        $payDb->prepare('UPDATE case_payments SET receipt_number = ? WHERE id = ?')
+                                              ->execute(array($generatedReceiptNo, $newPayId));
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                error_log('worklog auto create receipt failed: ' . $e->getMessage());
+                            }
                         } elseif ((int)$existingPay['amount'] !== (int)$payAmount) {
                             // 金額有變更，更新
                             $payDb->prepare("UPDATE case_payments SET amount = ?, transaction_type = ?, payment_date = ?, updated_at = NOW() WHERE id = ?")
                                   ->execute(array($payAmount, $transType, $payDate, $existingPay['id']));
                             $payChanged = true;
+
+                            // 金額變更時也拋轉新收款單（舊的由會計刪除）
+                            try {
+                                $caseStmt2 = $payDb->prepare('SELECT case_number, customer_id, customer_no, customer_name, sales_id, branch_id FROM cases WHERE id = ?');
+                                $caseStmt2->execute(array($wlCaseIdForPay));
+                                $caseRow2 = $caseStmt2->fetch(PDO::FETCH_ASSOC);
+                                if ($caseRow2) {
+                                    require_once __DIR__ . '/../modules/finance/FinanceModel.php';
+                                    $finModel2 = new FinanceModel();
+                                    $receiptData2 = array(
+                                        'register_date'    => $payDate,
+                                        'deposit_date'     => $payDate,
+                                        'customer_name'    => $caseRow2['customer_name'],
+                                        'case_id'          => $wlCaseIdForPay,
+                                        'case_number'      => $caseRow2['case_number'],
+                                        'customer_no'      => $caseRow2['customer_no'],
+                                        'sales_id'         => $caseRow2['sales_id'],
+                                        'branch_id'        => $caseRow2['branch_id'],
+                                        'receipt_method'   => $transType,
+                                        'invoice_category' => '其他',
+                                        'status'           => '拋轉待確認',
+                                        'bank_ref'         => null,
+                                        'subtotal'         => 0,
+                                        'tax'              => 0,
+                                        'discount'         => 0,
+                                        'total_amount'     => $payAmount,
+                                        'note'             => '施工回報金額更新 - ' . $payRef,
+                                        'created_by'       => $userId,
+                                    );
+                                    $receiptId2 = $finModel2->createReceipt($receiptData2);
+                                    $rn2 = $payDb->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
+                                    $rn2->execute(array($receiptId2));
+                                    $genNo2 = $rn2->fetchColumn();
+                                    if ($genNo2) {
+                                        $payDb->prepare('UPDATE case_payments SET receipt_number = ? WHERE id = ?')
+                                              ->execute(array($genNo2, $existingPay['id']));
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                error_log('worklog update receipt failed: ' . $e->getMessage());
+                            }
                         }
 
                         if ($payChanged) {

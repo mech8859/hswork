@@ -963,6 +963,8 @@ function saveNewCustomer() {
 
     if (!taxSelect || !dealInput || !taxInput || !totalInput) return;
 
+    var taxManualEdited = false; // 使用者是否手動改過稅金
+
     // 成交金額有值時，是否含稅才必填
     var taxMark = document.querySelector('.tax-required-mark');
     dealInput.addEventListener('input', function() {
@@ -974,22 +976,37 @@ function saveNewCustomer() {
     function parseNum(v) { return parseInt(String(v).replace(/,/g, '')) || 0; }
     function fmtNum(n) { return (n !== null && n !== undefined && n !== '') ? Number(n).toLocaleString('en-US') : ''; }
     function setNum(el, n) { if (!el) return; el.value = fmtNum(n); el.dataset.raw = n || ''; }
-    function recalcFinance() {
+
+    // 稅金手動修改時：標記手動、連動含稅金額
+    taxInput.addEventListener('input', function() {
+        taxManualEdited = true;
+        var deal = parseNum(dealInput.value);
+        var tax = parseNum(taxInput.value);
+        setNum(totalInput, deal + tax);
+        var collected = totalCollectedDisplay ? parseNum(totalCollectedDisplay.value) : 0;
+        var total = deal + tax;
+        setNum(balanceInput, total > 0 ? (total - collected) : 0);
+    });
+
+    function recalcFinance(resetTaxManual) {
+        if (resetTaxManual) taxManualEdited = false;
         var deal = parseNum(dealInput.value);
         var taxVal = taxSelect.value;
         var taxRow = document.getElementById('taxRow');
         var collected = totalCollectedDisplay ? parseNum(totalCollectedDisplay.value) : 0;
 
         if (taxVal === '含稅(需開發票)') {
-            var tax = Math.round(deal * 0.05);
+            if (!taxManualEdited) {
+                var tax = Math.round(deal * 0.05);
+                setNum(taxInput, tax);
+            }
+            var tax = parseNum(taxInput.value);
             var total = deal + tax;
-            setNum(taxInput, tax);
             setNum(totalInput, total);
             if (taxRow) taxRow.style.display = '';
             if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
             setNum(balanceInput, deal > 0 ? (total - collected) : 0);
         } else if (taxVal === '含稅(免開發票)') {
-            // 成交金額已含稅，含稅金額=成交金額，稅金由含稅回算
             var total = deal;
             var untaxed = Math.round(deal / 1.05);
             var tax = deal - untaxed;
@@ -998,21 +1015,31 @@ function saveNewCustomer() {
             if (taxRow) taxRow.style.display = '';
             if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
             setNum(balanceInput, deal > 0 ? (total - collected) : 0);
+            taxManualEdited = false; // 含稅(免開發票)不允許手動改稅金
         } else {
-            // 未稅(不開發票) 或未選擇：清除稅金，隱藏稅金列
             setNum(taxInput, 0);
             setNum(totalInput, 0);
             if (taxRow) taxRow.style.display = 'none';
-            // 保險：直接找 taxInput/totalInput 的父列隱藏
             if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = 'none';
             setNum(balanceInput, deal > 0 ? (deal - collected) : 0);
+            taxManualEdited = false;
         }
     }
 
-    taxSelect.addEventListener('change', recalcFinance);
-    dealInput.addEventListener('input', recalcFinance);
-    // 頁面載入時自動校正一次（修正 DB 存了不一致的值）
-    recalcFinance();
+    // 含稅方式改變 → 重算（重置手動旗標）
+    taxSelect.addEventListener('change', function() { recalcFinance(true); });
+    // 成交金額改變 → 重算（重置手動旗標，因為基數變了）
+    dealInput.addEventListener('input', function() { recalcFinance(true); });
+    // 頁面載入：只處理顯示/隱藏，不覆蓋 DB 的稅金值
+    var taxRow = document.getElementById('taxRow');
+    var taxVal = taxSelect.value;
+    if (taxVal === '未稅(不開發票)' || !taxVal) {
+        if (taxRow) taxRow.style.display = 'none';
+        if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = 'none';
+    } else {
+        if (taxRow) taxRow.style.display = '';
+        if (taxInput && taxInput.closest('.form-row')) taxInput.closest('.form-row').style.display = '';
+    }
 })();
 
 // ===== 帳務交易 Modal =====

@@ -408,7 +408,8 @@ function validateInvoiceNumber(el) {
     }
     function lbPzCreate(img) {
         if (lbPzInstance) return;
-        lbPzInstance = Panzoom(img, { maxScale: 6, minScale: 1, contain: 'outside', cursor: 'default' });
+        lbPzInstance = Panzoom(img, { maxScale: 6, minScale: 1, startScale: 1, startX: 0, startY: 0, contain: 'inside', cursor: 'default' });
+        lbPzInstance.reset();
         var wrap = document.getElementById('hsLbImgWrap');
         wrap.addEventListener('wheel', lbPzInstance.zoomWithWheel);
     }

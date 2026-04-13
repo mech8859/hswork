@@ -21,13 +21,18 @@ foreach ($approvalStatus['flows'] as $af) {
         <?php endif; ?>
 
         <?php if ($canManage): ?>
-            <?php if ($canEditQuote): ?>
+            <?php if ($canEditQuote && $quote['status'] !== 'approved'): ?>
             <a href="/quotations.php?action=edit&id=<?= $quote['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
             <a href="/quotations.php?action=submit_approval&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#2196F3;color:#fff" onclick="return confirm('確定送出簽核？')">送簽核</a>
             <?php endif; ?>
 
             <?php if ($quote['status'] === 'approved'): ?>
+            <a href="/quotations.php?action=edit&id=<?= $quote['id'] ?>" class="btn btn-primary btn-sm" onclick="return confirm('編輯後將退回草稿，需重新送簽核，確定？')">編輯</a>
             <a href="/quotations.php?action=status&id=<?= $quote['id'] ?>&status=sent&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="return confirm('確定送出給客戶？')">送客戶</a>
+            <?php endif; ?>
+
+            <?php if (in_array($quote['status'], array('sent', 'customer_accepted'))): ?>
+            <a href="/quotations.php?action=request_revision&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('申請變更將需要主管簽核，確定？')">申請變更</a>
             <?php endif; ?>
 
             <?php if ($quote['status'] === 'sent'): ?>
@@ -226,24 +231,42 @@ if ($canManage && !empty($quote['case_id'])) {
     $viewCaseModel = new CaseModel();
     $viewEstMaterials = $viewCaseModel->getMaterialEstimates($quote['case_id']);
     if (!empty($viewEstMaterials)):
+        $matCostTotal = 0;
 ?>
 <div class="card">
     <div class="card-header">預計使用線材與配件（統計分析用）</div>
     <div class="table-responsive">
         <table class="table" style="font-size:.85rem;margin:0">
             <thead><tr>
-                <th>品名</th><th>型號</th><th>單位</th><th style="text-align:right">預估數量</th>
+                <th>品名</th><th>型號</th><th>單位</th><th style="text-align:right">預估數量</th><th style="text-align:right">單位成本</th><th style="text-align:right">成本小計</th>
             </tr></thead>
             <tbody>
-            <?php foreach ($viewEstMaterials as $vem): ?>
+            <?php foreach ($viewEstMaterials as $vem):
+                $unitCost = 0;
+                if (!empty($vem['product_id'])) {
+                    $pCostStmt = Database::getInstance()->prepare("SELECT cost FROM products WHERE id = ?");
+                    $pCostStmt->execute(array($vem['product_id']));
+                    $unitCost = (float)$pCostStmt->fetchColumn();
+                }
+                $lineCost = $unitCost * (float)$vem['estimated_qty'];
+                $matCostTotal += $lineCost;
+            ?>
             <tr>
                 <td><?= e($vem['material_name']) ?></td>
                 <td><?= e($vem['model_number'] ?: '-') ?></td>
                 <td><?= e($vem['unit'] ?: '-') ?></td>
                 <td style="text-align:right"><?= $vem['estimated_qty'] ?></td>
+                <td style="text-align:right"><?= $unitCost > 0 ? '$' . number_format($unitCost) : '-' ?></td>
+                <td style="text-align:right"><?= $lineCost > 0 ? '$' . number_format($lineCost) : '-' ?></td>
             </tr>
             <?php endforeach; ?>
             </tbody>
+            <tfoot>
+                <tr style="font-weight:600;border-top:2px solid var(--gray-300)">
+                    <td colspan="5" style="text-align:right">成本合計</td>
+                    <td style="text-align:right">$<?= number_format($matCostTotal) ?></td>
+                </tr>
+            </tfoot>
         </table>
     </div>
 </div>

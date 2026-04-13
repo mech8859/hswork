@@ -211,7 +211,18 @@ switch ($action) {
                     if ($module === 'quotations') {
                         require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
                         $qm = new QuotationModel();
-                        $qm->updateStatus($targetId, 'approved');
+                        // 判斷是否為變更簽核
+                        $revFlow = $db->prepare("SELECT payload FROM approval_flows WHERE module = 'quotations' AND target_id = ? AND payload IS NOT NULL AND payload != '' LIMIT 1");
+                        $revFlow->execute(array($targetId));
+                        $revPayload = $revFlow->fetchColumn();
+                        $revData = $revPayload ? json_decode($revPayload, true) : null;
+                        if ($revData && isset($revData['type']) && $revData['type'] === 'revision') {
+                            // 變更簽核通過 → 退回草稿
+                            $qm->updateStatus($targetId, 'draft');
+                            AuditLog::log('quotations', 'revision_approved', $targetId, '變更簽核通過，退回草稿可編輯');
+                        } else {
+                            $qm->updateStatus($targetId, 'approved');
+                        }
                     } elseif ($module === 'purchases') {
                         require_once __DIR__ . '/../modules/procurement/ProcurementModel.php';
                         $pm = new ProcurementModel();
@@ -281,7 +292,19 @@ switch ($action) {
                     if ($module === 'quotations' && $targetId) {
                         require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
                         $qm = new QuotationModel();
-                        $qm->updateStatus($targetId, 'rejected_internal');
+                        // 判斷是否為變更簽核
+                        $revFlow2 = $db->prepare("SELECT payload FROM approval_flows WHERE module = 'quotations' AND target_id = ? AND payload IS NOT NULL AND payload != '' LIMIT 1");
+                        $revFlow2->execute(array($targetId));
+                        $revPayload2 = $revFlow2->fetchColumn();
+                        $revData2 = $revPayload2 ? json_decode($revPayload2, true) : null;
+                        if ($revData2 && isset($revData2['type']) && $revData2['type'] === 'revision') {
+                            // 變更簽核駁回 → 恢復原狀態
+                            $origStatus = isset($revData2['original_status']) ? $revData2['original_status'] : 'sent';
+                            $qm->updateStatus($targetId, $origStatus);
+                            AuditLog::log('quotations', 'revision_rejected', $targetId, '變更簽核駁回，恢復為' . QuotationModel::statusLabel($origStatus));
+                        } else {
+                            $qm->updateStatus($targetId, 'rejected_internal');
+                        }
                     } elseif ($module === 'purchases' && $targetId) {
                         require_once __DIR__ . '/../modules/procurement/ProcurementModel.php';
                         $pm = new ProcurementModel();
