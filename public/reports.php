@@ -142,7 +142,7 @@ switch ($action) {
         // 付款：依 payment_out_branches.branch_id + payments_out.payment_date
         $bmPay = array();
         foreach ($bmMonths as $bm) {
-            $pWhere = "p.payment_date BETWEEN '{$bm['start']}' AND '{$bm['end']}' AND p.status != '取消'";
+            $pWhere = "p.payment_date BETWEEN '{$bm['start']}' AND '{$bm['end']}' AND p.status != '取消' AND (p.exclude_from_branch_stats IS NULL OR p.exclude_from_branch_stats = 0)";
             if ($viewBranchId > 0) {
                 $p = $db->query("SELECT COALESCE(SUM(pob.amount), 0) FROM payment_out_branches pob JOIN payments_out p ON pob.payment_out_id = p.id WHERE {$pWhere} AND pob.branch_id = {$viewBranchId}")->fetchColumn();
             } else {
@@ -180,10 +180,10 @@ switch ($action) {
         // 付款明細
         $pParams = array($start, $end);
         if ($branchId > 0) {
-            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, pob.amount, p.main_category, p.status FROM payment_out_branches pob JOIN payments_out p ON pob.payment_out_id = p.id WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' AND pob.branch_id = ? ORDER BY p.payment_date");
+            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, pob.amount, p.main_category, p.status FROM payment_out_branches pob JOIN payments_out p ON pob.payment_out_id = p.id WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' AND (p.exclude_from_branch_stats IS NULL OR p.exclude_from_branch_stats = 0) AND pob.branch_id = ? ORDER BY p.payment_date");
             $pParams[] = $branchId;
         } else {
-            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, p.total_amount AS amount, p.main_category, p.status FROM payments_out p WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' ORDER BY p.payment_date");
+            $pStmt = $db->prepare("SELECT p.payment_number, p.payment_date, p.vendor_name, p.total_amount AS amount, p.main_category, p.status FROM payments_out p WHERE p.payment_date BETWEEN ? AND ? AND p.status != '取消' AND (p.exclude_from_branch_stats IS NULL OR p.exclude_from_branch_stats = 0) ORDER BY p.payment_date");
         }
         $pStmt->execute($pParams);
         $payList = $pStmt->fetchAll(PDO::FETCH_ASSOC);
