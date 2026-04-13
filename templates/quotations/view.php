@@ -244,9 +244,18 @@ if ($canManage && !empty($quote['case_id'])) {
             <?php foreach ($viewEstMaterials as $vem):
                 $unitCost = 0;
                 if (!empty($vem['product_id'])) {
-                    $pCostStmt = Database::getInstance()->prepare("SELECT cost FROM products WHERE id = ?");
+                    $pCostStmt = Database::getInstance()->prepare("SELECT cost, pack_qty, cost_per_unit FROM products WHERE id = ?");
                     $pCostStmt->execute(array($vem['product_id']));
-                    $unitCost = (float)$pCostStmt->fetchColumn();
+                    $pCostRow = $pCostStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($pCostRow) {
+                        if (!empty($pCostRow['cost_per_unit'])) {
+                            $unitCost = (float)$pCostRow['cost_per_unit'];
+                        } elseif (!empty($pCostRow['pack_qty']) && $pCostRow['pack_qty'] > 0) {
+                            $unitCost = (float)$pCostRow['cost'] / (float)$pCostRow['pack_qty'];
+                        } else {
+                            $unitCost = (float)$pCostRow['cost'];
+                        }
+                    }
                 }
                 $lineCost = $unitCost * (float)$vem['estimated_qty'];
                 $matCostTotal += $lineCost;

@@ -67,8 +67,20 @@ function pv($product, $field, $default = '') {
                 <input type="number" name="price" class="form-control" value="<?= (int)pv($product, 'price', '0') ?>" min="0">
             </div>
             <div class="form-group">
-                <label>成本</label>
-                <input type="number" name="cost" class="form-control" value="<?= (int)pv($product, 'cost', '0') ?>" min="0">
+                <label>成本 <span style="color:var(--gray-400);font-size:.8rem">(箱裝填整箱成本)</span></label>
+                <input type="number" name="cost" id="prodCost" class="form-control" value="<?= (int)pv($product, 'cost', '0') ?>" min="0" oninput="calcCostPerUnit()">
+            </div>
+        </div>
+
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label>每箱/每捲數量 <span style="color:var(--gray-400);font-size:.8rem">(如 305米/箱，非箱裝留空)</span></label>
+                <input type="number" name="pack_qty" id="prodPackQty" class="form-control" value="<?= pv($product, 'pack_qty') ? (float)pv($product, 'pack_qty') : '' ?>" min="0" step="0.01" placeholder="非箱裝留空" oninput="calcCostPerUnit()">
+            </div>
+            <div class="form-group">
+                <label>每單位成本 <span style="color:var(--gray-400);font-size:.8rem">(自動計算)</span></label>
+                <input type="text" id="prodCostPerUnit" class="form-control" value="<?= pv($product, 'cost_per_unit') ? number_format((float)pv($product, 'cost_per_unit'), 2) : '' ?>" readonly style="background:#f5f5f5">
+                <input type="hidden" name="cost_per_unit" id="prodCostPerUnitHidden" value="<?= pv($product, 'cost_per_unit') ?: '' ?>">
             </div>
         </div>
 
@@ -196,4 +208,19 @@ function addPriceRow() {
     tbody.appendChild(tr);
     phIndex++;
 }
+function calcCostPerUnit() {
+    var cost = parseFloat(document.getElementById('prodCost').value) || 0;
+    var packQty = parseFloat(document.getElementById('prodPackQty').value) || 0;
+    var display = document.getElementById('prodCostPerUnit');
+    var hidden = document.getElementById('prodCostPerUnitHidden');
+    if (packQty > 0) {
+        var cpu = cost / packQty;
+        display.value = '$' + cpu.toFixed(2) + ' / 單位';
+        hidden.value = cpu.toFixed(4);
+    } else {
+        display.value = cost > 0 ? '$' + cost.toFixed(2) + ' / 單位（非箱裝）' : '';
+        hidden.value = cost > 0 ? cost.toFixed(4) : '';
+    }
+}
+calcCostPerUnit();
 </script>

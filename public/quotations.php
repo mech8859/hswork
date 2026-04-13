@@ -490,6 +490,7 @@ switch ($action) {
 
         $stmt = $db->prepare("
             SELECT p.id, p.name, p.model, p.unit, p.price, p.cost, p.brand,
+                   p.pack_qty, p.cost_per_unit,
                    pc.name AS category_name,
                    COALESCE(inv.total_stock, 0) AS stock_qty
             FROM products p

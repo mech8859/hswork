@@ -816,7 +816,7 @@ function loadProducts(td, categoryId) {
                 'data-model="' + escHtml(data[i].model || '') + '" ' +
                 'data-unit="' + escHtml(data[i].unit || '式') + '" ' +
                 'data-price="' + (data[i].price || 0) + '" ' +
-                'data-cost="' + (data[i].cost || 0) + '" ' +
+                'data-cost="' + (data[i].cost_per_unit || (data[i].pack_qty > 0 ? Math.round(data[i].cost / data[i].pack_qty * 100) / 100 : data[i].cost) || 0) + '" ' +
                 'data-stock="' + (data[i].stock_qty || 0) + '">' +
                 escHtml(data[i].name) + (data[i].model ? ' ' + data[i].model : '') + stockLabel +
                 '</option>';
@@ -898,7 +898,7 @@ function keywordSearch(input) {
                     'data-model="' + escHtml(data[i].model || '') + '" ' +
                     'data-unit="' + escHtml(data[i].unit || '式') + '" ' +
                     'data-price="' + (data[i].price || 0) + '" ' +
-                    'data-cost="' + (data[i].cost || 0) + '" ' +
+                    'data-cost="' + (data[i].cost_per_unit || (data[i].pack_qty > 0 ? Math.round(data[i].cost / data[i].pack_qty * 100) / 100 : data[i].cost) || 0) + '" ' +
                     'data-stock="' + (data[i].stock_qty || 0) + '">' +
                     '<div style="font-weight:600">' + escHtml(data[i].name) + '</div>' +
                     '<div class="product-meta">' +
