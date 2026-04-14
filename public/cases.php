@@ -308,6 +308,8 @@ switch ($action) {
             'actual_total_minutes' => 0,
             // 營運成本比例
             'op_rate' => 10,
+            // 人力來源標記
+            'labor_source' => '',
         );
         try {
             // 1) 報價單成本數據
@@ -319,7 +321,7 @@ switch ($action) {
             ");
             $_qStmt->execute(array($id));
             $_qData = $_qStmt->fetch(PDO::FETCH_ASSOC);
-            if ($_qData) {
+            if ($_qData && (float)($_qData['labor_hours'] ?? 0) > 0) {
                 $caseProfitAnalysis['has_quotation'] = true;
                 $caseProfitAnalysis['q_cable_cost'] = (int)($_qData['cable_cost'] ?? 0);
                 $caseProfitAnalysis['q_material_cost'] = (int)($_qData['total_cost'] ?? 0) - (int)($_qData['labor_cost_total'] ?? 0) - (int)($_qData['cable_cost'] ?? 0);
@@ -327,6 +329,26 @@ switch ($action) {
                 $caseProfitAnalysis['q_labor_cost'] = (int)($_qData['labor_cost_total'] ?? 0);
                 $caseProfitAnalysis['q_labor_days'] = (float)($_qData['labor_days'] ?? 0);
                 $caseProfitAnalysis['q_labor_people'] = (int)($_qData['labor_people'] ?? 0);
+                $caseProfitAnalysis['labor_source'] = 'quotation';
+            } elseif ($_qData) {
+                // 有報價單但無人力數據，仍標記有報價單（材料成本等）
+                $caseProfitAnalysis['has_quotation'] = true;
+                $caseProfitAnalysis['q_cable_cost'] = (int)($_qData['cable_cost'] ?? 0);
+                $caseProfitAnalysis['q_material_cost'] = (int)($_qData['total_cost'] ?? 0) - (int)($_qData['labor_cost_total'] ?? 0) - (int)($_qData['cable_cost'] ?? 0);
+            }
+            // Fallback: 報價單無人力數據時，讀案件預估值
+            if ($caseProfitAnalysis['q_labor_hours'] == 0) {
+                $_estDays = (float)($case['est_labor_days'] ?? 0);
+                $_estPeople = (int)($case['est_labor_people'] ?? 0);
+                $_estHours = (float)($case['est_labor_hours'] ?? 0);
+                if ($_estHours > 0 || ($_estDays > 0 && $_estPeople > 0)) {
+                    if ($_estHours == 0) $_estHours = $_estDays * $_estPeople * 8;
+                    $caseProfitAnalysis['q_labor_hours'] = $_estHours;
+                    $caseProfitAnalysis['q_labor_days'] = $_estDays;
+                    $caseProfitAnalysis['q_labor_people'] = $_estPeople;
+                    // 人力成本稍後用系統時薪計算（讀完 labor_hourly_cost 後）
+                    $caseProfitAnalysis['labor_source'] = 'case';
+                }
             }
             // 2) 實際材料成本（by type）
             $_muStmt = $_paDb->prepare("
@@ -378,6 +400,10 @@ switch ($action) {
             $_hrStmt->execute();
             $_hrVal = $_hrStmt->fetchColumn();
             $caseProfitAnalysis['labor_hourly_cost'] = ($_hrVal !== false && $_hrVal !== null) ? (int)$_hrVal : 560;
+            // 6b) 案件預估人力成本補算（用系統時薪）
+            if ($caseProfitAnalysis['labor_source'] === 'case' && $caseProfitAnalysis['q_labor_cost'] == 0) {
+                $caseProfitAnalysis['q_labor_cost'] = (int)round($caseProfitAnalysis['q_labor_hours'] * $caseProfitAnalysis['labor_hourly_cost']);
+            }
             // 7) 收款單已收金額
             $_rcStmt = $_paDb->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM receipts WHERE case_id = ? AND status != '作廢'");
             $_rcStmt->execute(array($id));

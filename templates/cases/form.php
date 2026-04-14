@@ -1320,6 +1320,20 @@ require __DIR__ . '/../_readonly_form_helper.php';
         </div>
         <div class="form-row">
             <div class="form-group">
+                <label>預估施工天數</label>
+                <input type="number" name="est_labor_days" id="estLaborDays" class="form-control" value="<?= e($case['est_labor_days'] ?? '') ?>" step="0.5" min="0" placeholder="天" oninput="autoCalcCaseHours()">
+            </div>
+            <div class="form-group">
+                <label>預估施工人數</label>
+                <input type="number" name="est_labor_people" id="estLaborPeople" class="form-control" value="<?= e($case['est_labor_people'] ?? '') ?>" min="0" placeholder="人" oninput="autoCalcCaseHours()">
+            </div>
+            <div class="form-group">
+                <label>預估施工時數 <small style="color:#888;font-weight:normal">(自動=天×人×8)</small></label>
+                <input type="number" name="est_labor_hours" id="estLaborHours" class="form-control" value="<?= e($case['est_labor_hours'] ?? '') ?>" step="0.5" min="0" placeholder="時" oninput="caseHoursManual=true">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
                 <label>指定施工時間</label>
                 <?php
                 $pstHour = ''; $pstMin = '';
@@ -1626,6 +1640,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_opRate = $_pa['op_rate'];
         $_opMode = !empty($_pa['op_mode']) ? $_pa['op_mode'] : 'labor_ratio';
         $_hourlyCost = !empty($_pa['labor_hourly_cost']) ? $_pa['labor_hourly_cost'] : 560;
+        $_laborSource = !empty($_pa['labor_source']) ? $_pa['labor_source'] : '';
+        $_laborSourceLabel = $_laborSource === 'case' ? '案件預估' : ($_laborSource === 'quotation' ? '報價預估' : '');
         // 報價預估
         $_qMatCost = $_pa['q_material_cost'];
         $_qCableCostFromQuote = !empty($_pa['q_cable_cost']) ? $_pa['q_cable_cost'] : 0;
@@ -1720,7 +1736,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr>
-                        <td>人力成本 <small style="color:#888">($<?= number_format($_hourlyCost) ?>/時)</small></td>
+                        <td>人力成本 <small style="color:#888">($<?= number_format($_hourlyCost) ?>/時<?= $_laborSourceLabel ? '·' . $_laborSourceLabel : '' ?>)</small></td>
                         <td class="text-right"><?= $_qLaborCost ? '$' . number_format($_qLaborCost) : '<span class="text-muted">-</span>' ?></td>
                         <td class="text-right"><?= $_aLaborCost ? '$' . number_format($_aLaborCost) : '<span class="text-muted">-</span>' ?></td>
                         <td class="text-right"><?php if ($_qLaborCost && $_aLaborCost): $d = $_aLaborCost - $_qLaborCost; ?>
@@ -2665,6 +2681,20 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'ArrowLeft') lightboxNav(-1);
     if (e.key === 'ArrowRight') lightboxNav(1);
 });
+
+// 預估施工時數自動計算
+var caseHoursManual = false;
+function autoCalcCaseHours() {
+    if (caseHoursManual) return;
+    var days = parseFloat(document.getElementById('estLaborDays').value) || 0;
+    var people = parseFloat(document.getElementById('estLaborPeople').value) || 0;
+    var hoursInput = document.getElementById('estLaborHours');
+    if (days > 0 && people > 0) {
+        hoursInput.value = (days * people * 8);
+    } else if (days === 0 && people === 0) {
+        hoursInput.value = '';
+    }
+}
 
 var contactIndex = <?= count($contacts) ?>;
 function addContact() {

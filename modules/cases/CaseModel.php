@@ -304,8 +304,9 @@ class CaseModel
                              registrar, updated_by,
                              repair_report_date, repair_fault_reason, repair_by_sales, repair_equipment, repair_staff, repair_helper,
                              repair_result, repair_description, repair_original_case, repair_original_complete_date, repair_original_warranty_date,
-                             repair_is_charged, repair_no_charge_reason, sales_note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             repair_is_charged, repair_no_charge_reason, sales_note,
+                             est_labor_days, est_labor_people, est_labor_hours)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $data['branch_id'],
@@ -392,6 +393,9 @@ class CaseModel
             !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
             !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
             !empty($data['sales_note']) ? $data['sales_note'] : null,
+            !empty($data['est_labor_days']) ? $data['est_labor_days'] : null,
+            !empty($data['est_labor_people']) ? (int)$data['est_labor_people'] : null,
+            !empty($data['est_labor_hours']) ? $data['est_labor_hours'] : null,
         ]);
 
         $caseId = (int)$this->db->lastInsertId();
@@ -472,7 +476,8 @@ class CaseModel
                 repair_staff = ?, repair_helper = ?, repair_result = ?, repair_description = ?,
                 repair_original_case = ?, repair_original_complete_date = ?, repair_original_warranty_date = ?,
                 repair_is_charged = ?, repair_no_charge_reason = ?,
-                sales_note = ?
+                sales_note = ?,
+                est_labor_days = ?, est_labor_people = ?, est_labor_hours = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -557,6 +562,9 @@ class CaseModel
             !empty($data['repair_is_charged']) ? $data['repair_is_charged'] : null,
             !empty($data['repair_no_charge_reason']) ? $data['repair_no_charge_reason'] : null,
             !empty($data['sales_note']) ? $data['sales_note'] : null,
+            !empty($data['est_labor_days']) ? $data['est_labor_days'] : null,
+            !empty($data['est_labor_people']) ? (int)$data['est_labor_people'] : null,
+            !empty($data['est_labor_hours']) ? $data['est_labor_hours'] : null,
             $id,
         ]);
 
