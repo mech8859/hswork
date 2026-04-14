@@ -24,6 +24,7 @@ $refType = isset($record['reference_type']) ? $record['reference_type'] : (isset
 $refId = isset($record['reference_id']) ? $record['reference_id'] : (isset($record['source_id']) ? $record['source_id'] : '');
 $creatorName = isset($record['creator_name']) ? $record['creator_name'] : (isset($record['created_by_name']) ? $record['created_by_name'] : '-');
 $confirmedName = isset($record['confirmed_by_name']) ? $record['confirmed_by_name'] : '-';
+$isConfirmed = in_array($record['status'], array('已確認', 'confirmed'), true);
 $isPending = ($record['status'] === 'pending' || $record['status'] === '待確認');
 $isPartial = ($record['status'] === '部分出庫');
 $isPreReserved = ($record['status'] === '已預扣');
@@ -193,8 +194,15 @@ document.addEventListener('click', function(e) {
             <div class="form-static"><?= e($soNum) ?></div>
         </div>
         <div class="form-group">
-            <label>出庫日期</label>
+            <label><?= $isConfirmed ? '出庫日期' : '預計出庫日' ?></label>
+            <?php if (!$isConfirmed && $canManage): ?>
+            <div class="d-flex align-center gap-1">
+                <input type="date" id="soDateInput" class="form-control" value="<?= e($soDate) ?>" style="max-width:170px">
+                <button type="button" id="soDateSaveBtn" class="btn btn-outline btn-sm" style="display:none;padding:2px 10px;font-size:.8rem" onclick="saveSoDate()">儲存</button>
+            </div>
+            <?php else: ?>
             <div class="form-static"><?= e($soDate) ?></div>
+            <?php endif; ?>
         </div>
         <div class="form-group">
             <label>倉庫</label>
@@ -1283,6 +1291,48 @@ function confirmManualReturn() {
 }
 </script>
 <?php endif; ?>
+
+<script>
+// ===== 預計出庫日 inline 編輯 =====
+(function(){
+    var inp = document.getElementById('soDateInput');
+    if (!inp) return;
+    var origVal = inp.value;
+    var btn = document.getElementById('soDateSaveBtn');
+    inp.addEventListener('change', function(){
+        btn.style.display = (inp.value !== origVal) ? '' : 'none';
+    });
+})();
+function saveSoDate() {
+    var inp = document.getElementById('soDateInput');
+    var btn = document.getElementById('soDateSaveBtn');
+    var newDate = inp.value;
+    if (!newDate) return;
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/stock_outs.php?action=update_date&id=<?= (int)$record['id'] ?>');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('X-CSRF-TOKEN', '<?= Session::getCsrfToken() ?>');
+    xhr.onload = function(){
+        try { var res = JSON.parse(xhr.responseText); } catch(e) { alert('回應錯誤'); btn.disabled = false; btn.textContent = '儲存'; return; }
+        if (res.success) {
+            btn.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = '儲存';
+            inp.value = res.so_date;
+            // 更新原始值
+            inp.dataset.orig = res.so_date;
+        } else {
+            alert(res.error || '儲存失敗');
+            btn.disabled = false;
+            btn.textContent = '儲存';
+        }
+    };
+    xhr.onerror = function(){ alert('網路錯誤'); btn.disabled = false; btn.textContent = '儲存'; };
+    xhr.send(JSON.stringify({so_date: newDate}));
+}
+</script>
 
 <style>
 .form-row { display: flex; flex-wrap: wrap; gap: 12px; }

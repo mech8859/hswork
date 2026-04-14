@@ -58,6 +58,10 @@ switch ($action) {
                 $caseModel = new CaseModel();
                 $caseModel->saveMaterialEstimates($createCaseId, $_POST['est_materials']);
             }
+            // 自動同步線材成本
+            if ($createCaseId > 0) {
+                $model->syncCableCostFromEstimates($quoteId, $createCaseId);
+            }
             Session::flash('success', '報價單已建立');
             redirect('/quotations.php?action=view&id=' . $quoteId);
         }
@@ -122,6 +126,10 @@ switch ($action) {
                 $caseModel = new CaseModel();
                 $caseModel->saveMaterialEstimates($editCaseId, $_POST['est_materials']);
             }
+            // 自動同步線材成本
+            if ($editCaseId > 0) {
+                $model->syncCableCostFromEstimates($id, $editCaseId);
+            }
             // 已核准狀態編輯後退回草稿，需重新送簽核
             if ($quote['status'] === 'approved') {
                 $model->updateStatus($id, 'draft');
@@ -173,6 +181,56 @@ switch ($action) {
         $_so = $_db->prepare("SELECT id, so_number, status, so_date FROM stock_outs WHERE source_type = 'quotation' AND source_id = ? ORDER BY id DESC");
         $_so->execute(array($id));
         $relatedStockOuts = $_so->fetchAll(PDO::FETCH_ASSOC);
+
+        // 自動補算：施工時數/人力成本/線材成本（若 DB 未存但可算出）
+        if ($canManage) {
+            $needSync = false;
+            $syncDays   = (float)($quote['labor_days'] ?: 0);
+            $syncPeople = (int)($quote['labor_people'] ?: 0);
+            $syncHours  = (float)($quote['labor_hours'] ?: 0);
+            $syncLabor  = (int)($quote['labor_cost_total'] ?: 0);
+            $syncCable  = (int)($quote['cable_cost'] ?: 0);
+
+            // 自動算施工時數
+            if (!$syncHours && $syncDays > 0 && $syncPeople > 0) {
+                $syncHours = $syncDays * $syncPeople * 8;
+                $needSync = true;
+            }
+            // 自動算人力成本
+            if (!$syncLabor && $syncHours > 0) {
+                $_hrStmt = $_db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
+                $_hrStmt->execute();
+                $_hrCost = (int)$_hrStmt->fetchColumn() ?: 404;
+                $syncLabor = (int)round($syncHours * $_hrCost);
+                $needSync = true;
+            }
+            // 自動同步線材成本
+            if (!$syncCable && !empty($quote['case_id'])) {
+                $model->syncCableCostFromEstimates($id, $quote['case_id']);
+                $needSync = true;
+            }
+            if ($needSync) {
+                $model->saveLaborCost($id, array(
+                    'labor_days' => $syncDays ?: null,
+                    'labor_people' => $syncPeople ?: null,
+                    'labor_hours' => $syncHours ?: null,
+                    'labor_cost_total' => $syncLabor ?: null,
+                    'cable_cost' => $syncCable,
+                ));
+                // 重算利潤
+                $_matStmt = $_db->prepare("
+                    SELECT COALESCE(SUM(qi.unit_cost * qi.quantity), 0)
+                    FROM quotation_items qi
+                    JOIN quotation_sections qs ON qi.section_id = qs.id
+                    WHERE qs.quotation_id = ?
+                ");
+                $_matStmt->execute(array($id));
+                $_matCost = (int)$_matStmt->fetchColumn();
+                $model->recalcTotalsPublic($id, (int)$quote['subtotal'], $_matCost);
+                // 重新讀取
+                $quote = $model->getById($id);
+            }
+        }
 
         $pageTitle = '報價單 ' . $quote['quotation_number'];
         $currentPage = 'quotations';
@@ -425,7 +483,7 @@ switch ($action) {
                 'warehouse_id' => $warehouseId,
                 'customer_name' => $quote['customer_name'] ?? null,
                 'customer_id' => $quote['customer_id'] ?? null,
-                'note' => '報價單 ' . $quote['quotation_number'] . ' 自動產生',
+                'note' => '報價單 ' . $quote['quotation_number'] . ' 自動產生，' . date('Y-m-d') . '建立',
                 'total_qty' => $totalQty,
                 'created_by' => Auth::id(),
                 'items' => $items,

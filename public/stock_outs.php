@@ -378,6 +378,39 @@ switch ($action) {
         }
         exit;
 
+    // ---- 修改預計出庫日 AJAX ----
+    case 'update_date':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$canManage) { echo json_encode(array('error' => '無權限')); exit; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(array('error' => '方法錯誤')); exit; }
+        $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '';
+        if ($csrfHeader !== Session::getCsrfToken()) { echo json_encode(array('error' => '安全驗證失敗')); exit; }
+
+        $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+        $so = $model->getStockOutById($id);
+        if (!$so) { echo json_encode(array('error' => '出庫單不存在')); exit; }
+        // 已確認（已出庫）不可修改
+        if (in_array($so['status'], array('已確認', 'confirmed'), true)) {
+            echo json_encode(array('error' => '已出庫，不可修改出庫日期'));
+            exit;
+        }
+        $payload = json_decode(file_get_contents('php://input'), true);
+        $newDate = isset($payload['so_date']) ? trim($payload['so_date']) : '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $newDate)) {
+            echo json_encode(array('error' => '日期格式錯誤'));
+            exit;
+        }
+        try {
+            $db = Database::getInstance();
+            $db->prepare("UPDATE stock_outs SET so_date = ?, updated_by = ?, updated_at = NOW() WHERE id = ?")
+               ->execute(array($newDate, Auth::id(), $id));
+            AuditLog::log('stock_outs', 'update_date', $id, '預計出庫日改為 ' . $newDate);
+            echo json_encode(array('success' => true, 'so_date' => $newDate));
+        } catch (Exception $e) {
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+        exit;
+
     // ---- 新增備品 AJAX ----
     case 'ajax_add_spare':
         if (!$canManage) { header('Content-Type: application/json'); echo json_encode(array('error' => '無權限')); break; }

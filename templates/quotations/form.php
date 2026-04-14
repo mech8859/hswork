@@ -357,25 +357,33 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div class="form-row">
             <div class="form-group">
                 <label>施工天數</label>
-                <input type="number" name="labor_days" class="form-control" value="<?= e($quote['labor_days'] ?? '') ?>" step="0.5" min="0">
+                <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($quote['labor_days'] ?? '') ?>" step="0.5" min="0" oninput="autoCalcHours()">
             </div>
             <div class="form-group">
                 <label>施工人數</label>
-                <input type="number" name="labor_people" class="form-control" value="<?= e($quote['labor_people'] ?? '') ?>" min="0">
+                <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($quote['labor_people'] ?? '') ?>" min="0" oninput="autoCalcHours()">
             </div>
             <div class="form-group">
-                <label>施工時數</label>
-                <input type="number" name="labor_hours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="0">
+                <label>施工時數 <small style="color:#888;font-weight:normal">(自動=天數×人數×8)</small></label>
+                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="0" oninput="laborHoursManual=true">
             </div>
             <div class="form-group">
                 <label>人力成本</label>
                 <input type="number" name="labor_cost_total" id="laborCostTotal" class="form-control" value="<?= e($quote['labor_cost_total'] ?? '') ?>" min="0">
+            </div>
+            <div class="form-group">
+                <label>線材成本</label>
+                <input type="number" name="cable_cost" id="cableCost" class="form-control" value="<?= e($quote['cable_cost'] ?? '') ?>" min="0">
             </div>
         </div>
         <div class="form-row" style="background:#f8f9fa;padding:8px;border-radius:6px">
             <div class="form-group">
                 <label>器材總成本</label>
                 <div id="materialCost" style="font-weight:600;font-size:1.1rem">$0</div>
+            </div>
+            <div class="form-group">
+                <label>總成本</label>
+                <div id="totalCostDisplay" style="font-weight:600;font-size:1.1rem">$0</div>
             </div>
             <div class="form-group">
                 <label>利潤金額</label>
@@ -726,10 +734,12 @@ function calcGrandTotal() {
     // 內部成本計算
     if (canManage) {
         var laborCost = parseFloat(document.getElementById('laborCostTotal').value) || 0;
-        var totalCost = grandCost + laborCost;
+        var cableCost = parseFloat(document.getElementById('cableCost').value) || 0;
+        var totalCost = grandCost + laborCost + cableCost;
         var profit = grandSubtotal - totalCost;
         var profitPct = grandSubtotal > 0 ? (profit / grandSubtotal * 100).toFixed(1) : 0;
         document.getElementById('materialCost').textContent = '$' + grandCost.toLocaleString();
+        document.getElementById('totalCostDisplay').textContent = '$' + totalCost.toLocaleString();
         document.getElementById('profitAmount').textContent = '$' + profit.toLocaleString();
         document.getElementById('profitRate').textContent = profitPct + '%';
         document.getElementById('profitAmount').style.color = profit >= 0 ? '#137333' : '#c5221f';
@@ -960,9 +970,26 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// 人力成本輸入時重算
+// 人力成本、線材成本輸入時重算
 if (document.getElementById('laborCostTotal')) {
     document.getElementById('laborCostTotal').addEventListener('input', calcGrandTotal);
+}
+if (document.getElementById('cableCost')) {
+    document.getElementById('cableCost').addEventListener('input', calcGrandTotal);
+}
+
+// 施工時數自動計算（天數 × 人數 × 8）
+var laborHoursManual = false;
+function autoCalcHours() {
+    if (laborHoursManual) return;
+    var days = parseFloat(document.getElementById('laborDays').value) || 0;
+    var people = parseFloat(document.getElementById('laborPeople').value) || 0;
+    var hoursInput = document.getElementById('laborHours');
+    if (days > 0 && people > 0) {
+        hoursInput.value = (days * people * 8);
+    } else if (days === 0 && people === 0) {
+        hoursInput.value = '';
+    }
 }
 
 // 載入主分類

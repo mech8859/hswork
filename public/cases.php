@@ -285,7 +285,7 @@ switch ($action) {
             'deal_amount' => (int)($case['deal_amount'] ?? 0),
             // 報價預估
             'q_material_cost' => 0, 'q_labor_hours' => 0, 'q_labor_cost' => 0,
-            'q_labor_days' => 0, 'q_labor_people' => 0,
+            'q_labor_days' => 0, 'q_labor_people' => 0, 'q_cable_cost' => 0,
             // 線材預估
             'est_cable_cost' => 0,
             // 實際數據
@@ -297,7 +297,7 @@ switch ($action) {
         try {
             // 1) 報價單成本數據
             $_qStmt = $_paDb->prepare("
-                SELECT labor_days, labor_people, labor_hours, labor_cost_total,
+                SELECT labor_days, labor_people, labor_hours, labor_cost_total, cable_cost,
                        total_cost, profit_amount, profit_rate, subtotal
                 FROM quotations WHERE case_id = ? AND status NOT IN ('draft')
                 ORDER BY created_at DESC LIMIT 1
@@ -306,7 +306,8 @@ switch ($action) {
             $_qData = $_qStmt->fetch(PDO::FETCH_ASSOC);
             if ($_qData) {
                 $caseProfitAnalysis['has_quotation'] = true;
-                $caseProfitAnalysis['q_material_cost'] = (int)($_qData['total_cost'] ?? 0) - (int)($_qData['labor_cost_total'] ?? 0);
+                $caseProfitAnalysis['q_cable_cost'] = (int)($_qData['cable_cost'] ?? 0);
+                $caseProfitAnalysis['q_material_cost'] = (int)($_qData['total_cost'] ?? 0) - (int)($_qData['labor_cost_total'] ?? 0) - (int)($_qData['cable_cost'] ?? 0);
                 $caseProfitAnalysis['q_labor_hours'] = (float)($_qData['labor_hours'] ?? 0);
                 $caseProfitAnalysis['q_labor_cost'] = (int)($_qData['labor_cost_total'] ?? 0);
                 $caseProfitAnalysis['q_labor_days'] = (float)($_qData['labor_days'] ?? 0);

@@ -288,12 +288,38 @@ if ($canManage && !empty($quote['case_id'])) {
 <?php if ($canManage): ?>
 <div class="card">
     <div class="card-header">內部成本分析</div>
+    <?php
+    $viewLaborCost = (int)($quote['labor_cost_total'] ?: 0);
+    $viewCableCost = (int)($quote['cable_cost'] ?: 0);
+    // 若 cable_cost 未存但有線材預估，即時計算顯示
+    if ($viewCableCost == 0 && isset($matCostTotal) && $matCostTotal > 0) {
+        $viewCableCost = (int)$matCostTotal;
+    }
+    $viewMaterialCost = (int)$quote['total_cost'] - $viewLaborCost - (int)($quote['cable_cost'] ?: 0);
+    ?>
+    <?php
+    // 即時計算施工時數與人力成本（若DB未存但有天數人數）
+    $viewDays = (float)($quote['labor_days'] ?: 0);
+    $viewPeople = (int)($quote['labor_people'] ?: 0);
+    $viewHours = (float)($quote['labor_hours'] ?: 0);
+    if (!$viewHours && $viewDays > 0 && $viewPeople > 0) {
+        $viewHours = $viewDays * $viewPeople * 8;
+    }
+    if ($viewLaborCost == 0 && $viewHours > 0) {
+        $hrStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
+        $hrStmt->execute();
+        $hrVal = $hrStmt->fetchColumn();
+        $viewHourlyCost = ($hrVal !== false && $hrVal !== null) ? (int)$hrVal : 404;
+        $viewLaborCost = (int)round($viewHours * $viewHourlyCost);
+    }
+    ?>
     <div class="info-grid">
-        <div><span class="info-label">施工天數</span><span><?= $quote['labor_days'] ?: '-' ?></span></div>
-        <div><span class="info-label">施工人數</span><span><?= $quote['labor_people'] ?: '-' ?></span></div>
-        <div><span class="info-label">施工時數</span><span><?= $quote['labor_hours'] ?: '-' ?></span></div>
-        <div><span class="info-label">人力成本</span><span>$<?= number_format($quote['labor_cost_total'] ?: 0) ?></span></div>
-        <div><span class="info-label">器材成本</span><span>$<?= number_format($quote['total_cost'] - ($quote['labor_cost_total'] ?: 0)) ?></span></div>
+        <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
+        <div><span class="info-label">施工人數</span><span><?= $viewPeople ?: '-' ?></span></div>
+        <div><span class="info-label">施工時數</span><span><?= $viewHours ? $viewHours : '-' ?></span></div>
+        <div><span class="info-label">人力成本</span><span>$<?= number_format($viewLaborCost) ?></span></div>
+        <div><span class="info-label">器材成本</span><span>$<?= number_format($viewMaterialCost) ?></span></div>
+        <div><span class="info-label">線材成本</span><span>$<?= number_format($viewCableCost) ?></span></div>
         <div><span class="info-label">總成本</span><span>$<?= number_format($quote['total_cost']) ?></span></div>
         <div><span class="info-label">利潤</span><span style="color:<?= $quote['profit_amount'] >= 0 ? '#137333' : '#c5221f' ?>">$<?= number_format($quote['profit_amount']) ?></span></div>
         <div><span class="info-label">利潤率</span><span style="color:<?= $quote['profit_rate'] >= 0 ? '#137333' : '#c5221f' ?>"><?= $quote['profit_rate'] ?>%</span></div>

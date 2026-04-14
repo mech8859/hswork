@@ -224,17 +224,72 @@ class QuotationModel
      */
     public function saveLaborCost($id, array $data)
     {
+        $days   = !empty($data['labor_days']) ? (float)$data['labor_days'] : null;
+        $people = !empty($data['labor_people']) ? (int)$data['labor_people'] : null;
+        $hours  = !empty($data['labor_hours']) ? (float)$data['labor_hours'] : null;
+        $laborCost = !empty($data['labor_cost_total']) ? (int)$data['labor_cost_total'] : null;
+
+        // 自動算施工時數（天數 × 人數 × 8），若使用者未手動填
+        if (!$hours && $days && $people) {
+            $hours = $days * $people * 8;
+        }
+        // 自動算人力成本（時數 × 時薪），若使用者未手動填
+        if (!$laborCost && $hours) {
+            $hrStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
+            $hrStmt->execute();
+            $hourlyCost = (int)$hrStmt->fetchColumn() ?: 404;
+            $laborCost = (int)round($hours * $hourlyCost);
+        }
+
         $stmt = $this->db->prepare('
-            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_hours = ?, labor_cost_total = ?
+            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_hours = ?, labor_cost_total = ?, cable_cost = ?
             WHERE id = ?
         ');
         $stmt->execute(array(
-            $data['labor_days'] ?: null,
-            $data['labor_people'] ?: null,
-            $data['labor_hours'] ?: null,
-            $data['labor_cost_total'] ?: null,
+            $days, $people, $hours, $laborCost,
+            $data['cable_cost'] ?: 0,
             $id,
         ));
+    }
+
+    /**
+     * 從 case_material_estimates 自動同步線材成本到報價單
+     */
+    public function syncCableCostFromEstimates($quotationId, $caseId)
+    {
+        $stmt = $this->db->prepare("
+            SELECT COALESCE(SUM(cme.estimated_qty * COALESCE(
+                CASE
+                    WHEN p.cost_per_unit > 0 THEN p.cost_per_unit
+                    WHEN p.pack_qty > 0 THEN p.cost / p.pack_qty
+                    ELSE p.cost
+                END, 0
+            )), 0) AS cable_total
+            FROM case_material_estimates cme
+            LEFT JOIN products p ON cme.product_id = p.id
+            WHERE cme.case_id = ?
+        ");
+        $stmt->execute(array($caseId));
+        $cableTotal = (int)$stmt->fetchColumn();
+
+        $this->db->prepare("UPDATE quotations SET cable_cost = ? WHERE id = ?")
+                 ->execute(array($cableTotal, $quotationId));
+
+        // 重算利潤（取最新 subtotal 與 material_cost）
+        $qStmt = $this->db->prepare("SELECT subtotal FROM quotations WHERE id = ?");
+        $qStmt->execute(array($quotationId));
+        $q = $qStmt->fetch();
+        if ($q) {
+            $matStmt = $this->db->prepare("
+                SELECT COALESCE(SUM(qi.unit_cost * qi.quantity), 0)
+                FROM quotation_items qi
+                JOIN quotation_sections qs ON qi.section_id = qs.id
+                WHERE qs.quotation_id = ?
+            ");
+            $matStmt->execute(array($quotationId));
+            $materialCost = (int)$matStmt->fetchColumn();
+            $this->recalcTotals($quotationId, (int)$q['subtotal'], $materialCost);
+        }
     }
 
     /**
@@ -324,20 +379,29 @@ class QuotationModel
     }
 
     /**
+     * 公開重算（供 controller 呼叫）
+     */
+    public function recalcTotalsPublic($quotationId, $subtotal, $materialCost)
+    {
+        $this->recalcTotals($quotationId, $subtotal, $materialCost);
+    }
+
+    /**
      * 重算報價單金額
      */
     private function recalcTotals($quotationId, $subtotal, $materialCost)
     {
-        $stmt = $this->db->prepare('SELECT tax_rate, labor_cost_total, tax_free FROM quotations WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT tax_rate, labor_cost_total, cable_cost, tax_free FROM quotations WHERE id = ?');
         $stmt->execute(array($quotationId));
         $q = $stmt->fetch();
         $taxRate = $q ? (float)$q['tax_rate'] : 5.0;
         $laborCost = $q ? (int)$q['labor_cost_total'] : 0;
+        $cableCost = $q ? (int)$q['cable_cost'] : 0;
         $isTaxFree = $q ? (int)$q['tax_free'] : 0;
 
         $taxAmount = $isTaxFree ? 0 : (int)round($subtotal * $taxRate / 100);
         $totalAmount = $subtotal + $taxAmount;
-        $totalCost = $materialCost + $laborCost;
+        $totalCost = $materialCost + $laborCost + $cableCost;
         $profitAmount = $subtotal - $totalCost;
         $profitRate = ($subtotal > 0) ? round($profitAmount / $subtotal * 100, 2) : 0;
 
@@ -387,6 +451,7 @@ class QuotationModel
             'labor_people' => $orig['labor_people'],
             'labor_hours' => $orig['labor_hours'],
             'labor_cost_total' => $orig['labor_cost_total'],
+            'cable_cost' => $orig['cable_cost'],
         ));
 
         return $newId;

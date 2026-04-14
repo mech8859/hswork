@@ -1606,7 +1606,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_hourlyCost = !empty($_pa['labor_hourly_cost']) ? $_pa['labor_hourly_cost'] : 361;
         // 報價預估
         $_qMatCost = $_pa['q_material_cost'];
-        $_qCableCost = $_pa['est_cable_cost'];
+        $_qCableCostFromQuote = !empty($_pa['q_cable_cost']) ? $_pa['q_cable_cost'] : 0;
+        $_qCableCostFromEst = $_pa['est_cable_cost'];
+        $_qCableCost = $_qCableCostFromQuote > 0 ? $_qCableCostFromQuote : $_qCableCostFromEst;
         $_qLaborCost = $_pa['q_labor_cost'];
         $_qTotalCost = $_qMatCost + $_qCableCost + $_qLaborCost + $_opCost;
         $_qProfit = $_deal - $_qTotalCost;
