@@ -46,6 +46,19 @@ class NotificationDispatcher
                 : null;
             $recordId = isset($record['id']) ? $record['id'] : null;
 
+            // 查詢支援分公司（案件相關通知也發給支援分公司）
+            $supportBranchIds = array();
+            if ($rule['branch_scope'] === 'same' && $branchId) {
+                $caseId = isset($record['case_id']) ? $record['case_id'] : (isset($record['id']) && $module === 'cases' ? $record['id'] : null);
+                if ($caseId) {
+                    try {
+                        $sbStmt = Database::getInstance()->prepare('SELECT branch_id FROM case_branch_support WHERE case_id = ?');
+                        $sbStmt->execute(array($caseId));
+                        $supportBranchIds = array_column($sbStmt->fetchAll(PDO::FETCH_ASSOC), 'branch_id');
+                    } catch (Exception $e) {}
+                }
+            }
+
             // 支援多目標（逗號分隔）
             $targets = explode(',', $rule['notify_target']);
             foreach ($targets as $target) {
@@ -65,6 +78,11 @@ class NotificationDispatcher
                         $actorId
                     );
                     $sentIds = array_merge($sentIds, $ids);
+                    // 也通知支援分公司的同角色人員
+                    foreach ($supportBranchIds as $sbId) {
+                        $ids2 = $notifModel->sendToRole($target, (int)$sbId, $type, $title, $message, $link, $module, $recordId, $actorId);
+                        $sentIds = array_merge($sentIds, $ids2);
+                    }
                 } elseif ($rule['notify_type'] === 'field') {
                     $targetUserId = isset($record[$target]) ? (int)$record[$target] : 0;
                     if ($targetUserId > 0 && $targetUserId != $actorId) {

@@ -23,7 +23,7 @@ class ScheduleModel
     public function getByDateRange(array $branchIds, string $startDate, string $endDate): array
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
-        $params = array_merge($branchIds, [$startDate, $endDate]);
+        $params = array_merge($branchIds, $branchIds, [$startDate, $endDate]);
 
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
@@ -35,7 +35,7 @@ class ScheduleModel
             JOIN cases c ON s.case_id = c.id
             JOIN branches b ON c.branch_id = b.id
             LEFT JOIN vehicles v ON s.vehicle_id = v.id
-            WHERE c.branch_id IN ($ph)
+            WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
               AND s.schedule_date BETWEEN ? AND ?
             ORDER BY s.schedule_date ASC, COALESCE(s.designated_time, s.start_time, '23:59') ASC
         ");
@@ -410,14 +410,16 @@ class ScheduleModel
     public function getVisitWarnings(array $branchIds): array
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = array_merge($branchIds, $branchIds);
         $stmt = $this->db->prepare("
             SELECT svc.*, c.case_number, c.title AS case_title
             FROM schedule_visit_check svc
             JOIN cases c ON svc.case_id = c.id
-            WHERE c.branch_id IN ($ph) AND svc.is_same_team = 0 AND svc.notified = 0
+            WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
+              AND svc.is_same_team = 0 AND svc.notified = 0
             ORDER BY svc.created_at DESC
         ");
-        $stmt->execute($branchIds);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -426,14 +428,20 @@ class ScheduleModel
      */
     public function getAvailableEngineers(string $date, int $caseId, array $branchIds): array
     {
-        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        // 擴充分公司範圍：含案件的支援分公司
+        $supportStmt = $this->db->prepare('SELECT branch_id FROM case_branch_support WHERE case_id = ?');
+        $supportStmt->execute(array($caseId));
+        $supportBids = array_column($supportStmt->fetchAll(PDO::FETCH_ASSOC), 'branch_id');
+        $allBranchIds = array_unique(array_merge($branchIds, array_map('intval', $supportBids)));
+
+        $ph = implode(',', array_fill(0, count($allBranchIds), '?'));
 
         // 取得案件所需技能
         $reqStmt = $this->db->prepare('SELECT skill_id, min_proficiency FROM case_required_skills WHERE case_id = ?');
         $reqStmt->execute([$caseId]);
         $requiredSkills = $reqStmt->fetchAll();
 
-        // 取得所有工程師
+        // 取得所有工程師（含支援分公司）
         $engStmt = $this->db->prepare("
             SELECT u.id, u.real_name, u.branch_id, b.name AS branch_name
             FROM users u
@@ -443,7 +451,7 @@ class ScheduleModel
               AND u.employee_id IS NOT NULL AND u.employee_id != ''
             ORDER BY u.branch_id, u.real_name
         ");
-        $engStmt->execute($branchIds);
+        $engStmt->execute($allBranchIds);
         $engineers = $engStmt->fetchAll();
 
         // 取得當日已排工人員的工時

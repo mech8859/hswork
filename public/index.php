@@ -57,13 +57,16 @@ if ($user['role'] === 'boss') {
     }
 }
 $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+$branchCond = "(branch_id IN ($placeholders) OR id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($placeholders)))";
+$branchCondC = "(c.branch_id IN ($placeholders) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($placeholders)))";
+$branchParams2 = array_merge($branchIds, $branchIds); // 兩倍 params
 
 // 統計資料
 $stats = array();
 
 // 案件統計
-$stmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM cases WHERE branch_id IN ($placeholders) GROUP BY status");
-$stmt->execute($branchIds);
+$stmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM cases WHERE $branchCond GROUP BY status");
+$stmt->execute($branchParams2);
 $caseStats = array();
 foreach ($stmt->fetchAll() as $row) {
     $caseStats[$row['status']] = $row['cnt'];
@@ -73,33 +76,33 @@ $stats['total_cases'] = array_sum($caseStats);
 // 待排工：status 為「未完工」或「待安排派工查修」，且沒有未來排程
 $stmt = $db->prepare("
     SELECT COUNT(*) FROM cases c
-    WHERE c.branch_id IN ($placeholders)
+    WHERE $branchCondC
       AND c.status IN ('incomplete', 'awaiting_dispatch')
       AND NOT EXISTS (
           SELECT 1 FROM schedules s
           WHERE s.case_id = c.id AND s.schedule_date >= CURDATE()
       )
 ");
-$stmt->execute($branchIds);
+$stmt->execute($branchParams2);
 $stats['pending_cases'] = (int)$stmt->fetchColumn();
 
 $stats['in_progress_cases'] = isset($caseStats['incomplete']) ? $caseStats['incomplete'] : 0;
 
 // 未指派案件
-$stmt = $db->prepare("SELECT COUNT(*) FROM cases WHERE branch_id IN ($placeholders) AND sub_status = '未指派'");
-$stmt->execute($branchIds);
+$stmt = $db->prepare("SELECT COUNT(*) FROM cases WHERE $branchCond AND sub_status = '未指派'");
+$stmt->execute($branchParams2);
 $stats['unassigned'] = (int)$stmt->fetchColumn();
 
 // 今日排工數
-$stmt = $db->prepare("SELECT COUNT(*) FROM schedules s JOIN cases c ON s.case_id = c.id WHERE c.branch_id IN ($placeholders) AND s.schedule_date = CURDATE()");
-$stmt->execute($branchIds);
+$stmt = $db->prepare("SELECT COUNT(*) FROM schedules s JOIN cases c ON s.case_id = c.id WHERE $branchCondC AND s.schedule_date = CURDATE()");
+$stmt->execute($branchParams2);
 $stats['today_schedules'] = $stmt->fetchColumn();
 
 // 本月排程率 (有排工天數 / 工作天數)
 $monthStart = date('Y-m-01');
 $monthEnd = date('Y-m-t');
-$stmt = $db->prepare("SELECT COUNT(DISTINCT schedule_date) FROM schedules s JOIN cases c ON s.case_id = c.id WHERE c.branch_id IN ($placeholders) AND s.schedule_date BETWEEN ? AND ?");
-$params = array_merge($branchIds, array($monthStart, $monthEnd));
+$stmt = $db->prepare("SELECT COUNT(DISTINCT schedule_date) FROM schedules s JOIN cases c ON s.case_id = c.id WHERE $branchCondC AND s.schedule_date BETWEEN ? AND ?");
+$params = array_merge($branchParams2, array($monthStart, $monthEnd));
 $stmt->execute($params);
 $scheduledDays = (int)$stmt->fetchColumn();
 // 計算本月工作天（排除週末）
@@ -119,7 +122,7 @@ $stmt = $db->prepare("
     FROM schedule_engineers se
     JOIN schedules s ON se.schedule_id = s.id
     JOIN cases c ON s.case_id = c.id
-    WHERE c.branch_id IN ($placeholders) AND s.schedule_date BETWEEN ? AND ?
+    WHERE $branchCondC AND s.schedule_date BETWEEN ? AND ?
 ");
 $stmt->execute($params);
 $engUsage = (int)$stmt->fetchColumn();

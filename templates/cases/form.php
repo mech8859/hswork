@@ -19,6 +19,16 @@
         <span class="badge <?= CaseModel::statusBadge($case['status']) ?>"><?= e(CaseModel::statusLabel($case['status'])) ?></span>
         <span class="badge badge-primary"><?= e(CaseModel::typeLabel($case['case_type'])) ?></span>
         <span class="text-muted" style="font-size:.85rem"><?= e($case['branch_name'] ?? '') ?></span>
+        <?php
+        if (!empty($case['id'])) {
+            $_sbStmt = Database::getInstance()->prepare('SELECT b.name FROM case_branch_support cbs JOIN branches b ON cbs.branch_id = b.id WHERE cbs.case_id = ? ORDER BY b.name');
+            $_sbStmt->execute(array($case['id']));
+            $_sbList = $_sbStmt->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($_sbList as $_sbName): ?>
+            <span class="badge" style="background:#ede9fe;color:#6366f1;font-size:.78rem">支援：<?= e($_sbName) ?></span>
+            <?php endforeach;
+        }
+        ?>
         <?php if (!empty($case['updated_at'])): ?>
         <?php
         $caseUpdaterName = '';
@@ -1165,21 +1175,17 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div id="completionRejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;align-items:center;justify-content:center;pointer-events:auto">
             <div style="background:#fff;border-radius:8px;padding:20px;max-width:480px;width:90%;pointer-events:auto">
                 <h3 style="margin-top:0;color:#333">駁回完工簽核</h3>
-                <form method="POST" action="/approvals.php?action=reject">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="flow_id" id="completionRejectFlowId" style="pointer-events:auto">
-                    <input type="hidden" name="module" value="case_completion" style="pointer-events:auto">
-                    <input type="hidden" name="target_id" id="completionRejectCaseId" style="pointer-events:auto">
-                    <input type="hidden" name="redirect" id="completionRejectRedirect" style="pointer-events:auto">
-                    <div style="margin-bottom:12px">
-                        <label style="font-size:.85rem;font-weight:600;color:#333">駁回原因</label>
-                        <textarea name="comment" class="form-control" rows="3" placeholder="請輸入駁回原因" required style="pointer-events:auto !important;background:#fff !important;color:#333 !important"></textarea>
-                    </div>
-                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('completionRejectModal').style.display='none'" style="min-width:80px;pointer-events:auto !important;opacity:1 !important">取消</button>
-                        <button type="submit" class="btn btn-danger" style="min-width:100px;pointer-events:auto !important;opacity:1 !important">確定駁回</button>
-                    </div>
-                </form>
+                <input type="hidden" id="completionRejectFlowId">
+                <input type="hidden" id="completionRejectCaseId">
+                <input type="hidden" id="completionRejectRedirect">
+                <div style="margin-bottom:12px">
+                    <label style="font-size:.85rem;font-weight:600;color:#333">駁回原因</label>
+                    <textarea id="completionRejectComment" class="form-control" rows="3" placeholder="請輸入駁回原因" style="pointer-events:auto !important;background:#fff !important;color:#333 !important"></textarea>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('completionRejectModal').style.display='none'" style="min-width:80px;pointer-events:auto !important;opacity:1 !important">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="submitCompletionReject()" style="min-width:100px;pointer-events:auto !important;opacity:1 !important">確定駁回</button>
+                </div>
             </div>
         </div>
         <script>
@@ -1192,7 +1198,32 @@ require __DIR__ . '/../_readonly_form_helper.php';
             document.getElementById('completionRejectFlowId').value = flowId;
             document.getElementById('completionRejectCaseId').value = caseId;
             document.getElementById('completionRejectRedirect').value = '/cases.php?action=edit&id=' + caseId + '#sec-billing';
+            document.getElementById('completionRejectComment').value = '';
             document.getElementById('completionRejectModal').style.display = 'flex';
+        }
+        function submitCompletionReject() {
+            var comment = document.getElementById('completionRejectComment').value.trim();
+            if (!comment) { alert('請輸入駁回原因'); return; }
+            var btn = document.querySelector('#completionRejectModal .btn-danger');
+            btn.disabled = true; btn.textContent = '處理中...';
+            var params = 'csrf_token=<?= urlencode(Session::getCsrfToken()) ?>'
+                + '&flow_id=' + encodeURIComponent(document.getElementById('completionRejectFlowId').value)
+                + '&module=case_completion'
+                + '&target_id=' + encodeURIComponent(document.getElementById('completionRejectCaseId').value)
+                + '&redirect=' + encodeURIComponent(document.getElementById('completionRejectRedirect').value)
+                + '&comment=' + encodeURIComponent(comment);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/approvals.php?action=reject');
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function(){
+                // 不管 server 回什麼，直接跳轉
+                var redir = document.getElementById('completionRejectRedirect').value || '/approvals.php';
+                window.location.href = redir;
+            };
+            xhr.onerror = function(){
+                window.location.href = document.getElementById('completionRejectRedirect').value || '/approvals.php';
+            };
+            xhr.send(params);
         }
         </script>
         <?php endif; ?>

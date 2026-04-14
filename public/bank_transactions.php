@@ -265,8 +265,9 @@ switch ($action) {
                 INSERT INTO bank_transactions
                 (sys_number, upload_number, bank_account, transaction_date, posting_date, transaction_time,
                  cash_transfer, summary, currency, debit_amount, credit_amount, balance,
-                 note, transfer_account, bank_code, counter_account, remark, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 note, transfer_account, bank_code, counter_account, remark, description,
+                 upload_no, remittance_code, counterparty_account, memo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($dataRows as $row) {
@@ -285,9 +286,14 @@ switch ($action) {
                 $credit = (int)str_replace(',', '', ExcelReader::getVal($row, $colMap, 'credit_amount') ?: '0');
                 $balance = (int)str_replace(',', '', ExcelReader::getVal($row, $colMap, 'balance') ?: '0');
 
+                $valUploadNo = ExcelReader::getVal($row, $colMap, 'upload_number') ?: null;
+                $valBankCode = ExcelReader::getVal($row, $colMap, 'bank_code') ?: null;
+                $valCounterAcct = ExcelReader::getVal($row, $colMap, 'counter_account') ?: null;
+                $valRemark = ExcelReader::getVal($row, $colMap, 'remark') ?: null;
+
                 $stmt->execute(array(
                     ExcelReader::getVal($row, $colMap, 'sys_number') ?: null,
-                    ExcelReader::getVal($row, $colMap, 'upload_number') ?: null,
+                    $valUploadNo,
                     ExcelReader::getVal($row, $colMap, 'bank_account') ?: '',
                     $txDate,
                     $postDate ?: null,
@@ -300,10 +306,15 @@ switch ($action) {
                     $balance,
                     ExcelReader::getVal($row, $colMap, 'note') ?: null,
                     ExcelReader::getVal($row, $colMap, 'transfer_account') ?: null,
-                    ExcelReader::getVal($row, $colMap, 'bank_code') ?: null,
-                    ExcelReader::getVal($row, $colMap, 'counter_account') ?: null,
-                    ExcelReader::getVal($row, $colMap, 'remark') ?: null,
+                    $valBankCode,
+                    $valCounterAcct,
+                    $valRemark,
                     ExcelReader::getVal($row, $colMap, 'description') ?: null,
+                    // 同步寫入新欄位
+                    $valUploadNo,          // upload_no
+                    $valBankCode,          // remittance_code
+                    $valCounterAcct,       // counterparty_account
+                    $valRemark,            // memo
                 ));
                 $imported++;
             }

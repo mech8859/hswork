@@ -436,13 +436,13 @@ class WorklogModel
             JOIN cases c ON s.case_id = c.id
             JOIN users u ON se.user_id = u.id
             LEFT JOIN work_logs wl ON wl.schedule_id = s.id AND wl.user_id = se.user_id
-            WHERE c.branch_id IN ($ph)
+            WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
               AND s.schedule_date = ?
               AND s.status != 'cancelled'
               AND (wl.id IS NULL OR wl.arrival_time IS NULL OR wl.departure_time IS NULL OR wl.work_description IS NULL OR wl.work_description = '')
             ORDER BY u.real_name
         ");
-        $params = array_merge($branchIds, array($date));
+        $params = array_merge($branchIds, $branchIds, array($date));
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

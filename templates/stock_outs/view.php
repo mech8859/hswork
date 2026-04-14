@@ -1315,16 +1315,16 @@ function saveSoDate() {
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('X-CSRF-TOKEN', '<?= Session::getCsrfToken() ?>');
     xhr.onload = function(){
-        try { var res = JSON.parse(xhr.responseText); } catch(e) { alert('回應錯誤'); btn.disabled = false; btn.textContent = '儲存'; return; }
+        try { var res = JSON.parse(xhr.responseText); } catch(e) { alert('回應錯誤: ' + xhr.responseText); btn.disabled = false; btn.textContent = '儲存'; return; }
         if (res.success) {
             btn.style.display = 'none';
             btn.disabled = false;
             btn.textContent = '儲存';
             inp.value = res.so_date;
-            // 更新原始值
-            inp.dataset.orig = res.so_date;
+            btn.insertAdjacentHTML('afterend', '<span style="color:#2e7d32;font-size:.8rem;margin-left:6px" id="soDateOk">已儲存 ✓</span>');
+            setTimeout(function(){ var ok = document.getElementById('soDateOk'); if(ok) ok.remove(); }, 3000);
         } else {
-            alert(res.error || '儲存失敗');
+            alert('儲存失敗: ' + (res.error || '未知錯誤'));
             btn.disabled = false;
             btn.textContent = '儲存';
         }
