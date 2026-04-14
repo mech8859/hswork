@@ -88,9 +88,9 @@ $currentKeyword = isset($filters['keyword']) ? $filters['keyword'] : '';
     border-radius: 3px; color: #fff; font-weight: 500;
 }
 /* 手機版月曆格子（共用 mg-* 樣式） */
-.mg-grid { display:grid; grid-template-columns:repeat(7,1fr); background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; width:100%; }
+.mg-grid { display:grid; grid-template-columns:repeat(7,1fr); background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; width:100%; max-width:100vw; box-sizing:border-box; }
 .mg-dow { font-size:.75rem; color:var(--gray-500); padding:8px 0; text-align:center; font-weight:600; border-bottom:1px solid var(--gray-100); }
-.mg-cell { min-height:88px; padding:3px; border-bottom:1px solid var(--gray-100); cursor:pointer; position:relative; background:#fff; }
+.mg-cell { min-height:88px; padding:3px; border-bottom:1px solid var(--gray-100); cursor:pointer; position:relative; background:#fff; overflow:hidden; min-width:0; }
 .mg-cell:active { background:var(--gray-50); }
 .mg-empty { background:var(--gray-50); min-height:88px; }
 .mg-today { background:#e8f0fe; }
@@ -106,10 +106,16 @@ $currentKeyword = isset($filters['keyword']) ? $filters['keyword'] : '';
 .calendar-mobile { display: none; }
 .calendar-desktop { display: block; }
 @media (max-width: 767px) {
-    .calendar-mobile { display: flex !important; flex-direction:column; gap:4px; }
+    .calendar-mobile { display: flex !important; flex-direction:column; gap:4px; overflow:hidden; }
     .calendar-desktop { display: none !important; }
     .hide-mobile { display: none !important; }
     .bc-filter-bar { flex-direction: column; align-items: stretch; }
+    .mg-grid { max-width: 100%; }
+    .mg-cell { padding: 2px 1px; min-height: 78px; }
+    .mg-bar { font-size: .55rem; padding: 1px 2px; }
+    .mg-daynum { font-size: .72rem; }
+    .mg-dow { font-size: .68rem; padding: 6px 0; }
+    .mg-more { font-size: .55rem; }
 }
 </style>
 
@@ -306,8 +312,8 @@ $bcFP = '';
 if ($currentRegion) $bcFP .= '&region=' . urlencode($currentRegion);
 if ($currentStaff) $bcFP .= '&staff_id=' . urlencode($currentStaff);
 ?>
-<div class="calendar-mobile" style="flex-direction:column">
-    <div class="mg-grid" style="width:100%">
+<div class="calendar-mobile" style="flex-direction:column;overflow:hidden;max-width:100vw">
+    <div class="mg-grid" style="width:100%;table-layout:fixed">
         <div class="mg-dow">日</div><div class="mg-dow">一</div><div class="mg-dow">二</div>
         <div class="mg-dow">三</div><div class="mg-dow">四</div><div class="mg-dow">五</div><div class="mg-dow">六</div>
         <?php for ($i = 0; $i < $startWeekday; $i++): ?><div class="mg-cell mg-empty"></div><?php endfor; ?>

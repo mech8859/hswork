@@ -36,9 +36,10 @@ body { font-family: "Microsoft JhengHei", "微軟正黑體", Arial, sans-serif; 
 .header h1 { font-size: 22px; font-weight: bold; margin: 0; }
 .header .subtitle { font-size: 11px; color: #666; margin-bottom: 6px; }
 
-.info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 12px; }
-.info-table td { padding: 3px 5px; vertical-align: top; }
-.info-table .label { color: #666; white-space: nowrap; }
+.info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 12px; table-layout: fixed; }
+.info-table td { padding: 3px 5px; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
+.info-table .label { color: #666; white-space: nowrap; width: 70px; }
+.info-table .info-right.label { width: 70px; }
 .info-right { text-align: right; }
 
 .items-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 10.5px; }
@@ -116,37 +117,40 @@ if (!empty($quote['case_id'])) {
 }
 ?>
 <table class="info-table">
+    <colgroup>
+        <col style="width:10%"><col style="width:23%"><col style="width:10%"><col style="width:23%"><col style="width:10%"><col style="width:24%">
+    </colgroup>
     <tr>
         <td class="label">客戶名稱：</td>
         <td><?= e($quote['customer_name']) ?></td>
         <td class="label">發票資訊</td>
         <td></td>
-        <td class="info-right label">報價日期：</td>
-        <td class="info-right"><?= e($quote['quote_date']) ?></td>
+        <td class="label">報價日期：</td>
+        <td><?= e($quote['quote_date']) ?></td>
     </tr>
     <tr>
         <td class="label">客戶編號：</td>
         <td><?= e($printCustNo) ?></td>
         <td class="label">抬　頭：</td>
         <td><?= e($quote['invoice_title'] ?: '') ?></td>
-        <td class="info-right label">有效日期：</td>
-        <td class="info-right"><?= e($quote['valid_date']) ?></td>
+        <td class="label">有效日期：</td>
+        <td><?= e($quote['valid_date']) ?></td>
     </tr>
     <tr>
         <td class="label">連絡對象：</td>
         <td><?= e($quote['contact_person'] ?: '') ?></td>
         <td class="label">統　編：</td>
         <td><?= e($quote['invoice_tax_id'] ?: '') ?></td>
-        <td class="info-right label">承辦業務：</td>
-        <td class="info-right"><?= e($salesName) ?></td>
+        <td class="label">承辦業務：</td>
+        <td><?= e($salesName) ?></td>
     </tr>
     <tr>
         <td class="label">連絡電話：</td>
         <td><?= e($quote['contact_phone'] ?: '') ?></td>
         <td class="label">進件編號：</td>
         <td><?= e($printCaseNo) ?></td>
-        <td class="info-right label">服務專線：</td>
-        <td class="info-right"><?= e(isset($qs['quote_service_phone']) && $qs['quote_service_phone'] ? $qs['quote_service_phone'] : '0800-008-859') ?></td>
+        <td class="label">服務專線：</td>
+        <td><?= e(isset($qs['quote_service_phone']) && $qs['quote_service_phone'] ? $qs['quote_service_phone'] : '0800-008-859') ?></td>
     </tr>
     <tr>
         <td class="label">案場名稱：</td>

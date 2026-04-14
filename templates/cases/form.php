@@ -598,7 +598,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <span>報價單 / 圖面</span>
             <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
                 <?php if (!$latestQuote): ?>
-                <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_name'] ?? '') ?>&phone=<?= urlencode($case['contact_phone'] ?? '') ?>"
+                <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_person'] ?? '') ?>&phone=<?= urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? '')) ?>"
                    class="btn btn-primary btn-sm">+ 建立報價單</a>
                 <?php elseif ($latestQuote['status'] === 'customer_accepted'): ?>
                 <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>"
@@ -2528,6 +2528,8 @@ function addBillingItem() {
     document.getElementById('biAttachmentPreview').innerHTML = '';
     document.getElementById('biSubmitBtn').disabled = false;
     document.getElementById('biSubmitBtn').textContent = '儲存';
+    document.getElementById('biTotal').readOnly = false;
+    document.getElementById('biTax').readOnly = false;
     document.getElementById('biModal').style.display = 'flex';
 }
 function editBillingItem(bi) {
@@ -2584,6 +2586,50 @@ function closeBiModal() {
         document.removeEventListener('mousemove', onDrag);
         document.removeEventListener('mouseup', stopDrag);
     }
+})();
+// 未稅金額自動計算稅金與總金額
+(function(){
+    var untaxed = document.getElementById('biUntaxed');
+    var tax = document.getElementById('biTax');
+    var total = document.getElementById('biTotal');
+    var taxIncl = document.getElementById('biTaxIncluded');
+    if (!untaxed || !tax || !total) return;
+
+    function calcFromUntaxed() {
+        var amt = parseInt(untaxed.value.replace(/,/g, ''), 10) || 0;
+        if (amt > 0) {
+            var t = Math.round(amt * 0.05);
+            tax.value = t;
+            total.value = amt + t;
+            total.readOnly = true;
+            tax.readOnly = true;
+        } else {
+            tax.value = '';
+            total.value = '';
+            total.readOnly = false;
+            tax.readOnly = false;
+        }
+    }
+
+    function calcFromTotal() {
+        // 只在未稅為空時，手動輸入總金額
+        if (untaxed.value && parseInt(untaxed.value.replace(/,/g, ''), 10) > 0) return;
+        var t = parseInt(total.value.replace(/,/g, ''), 10) || 0;
+        if (taxIncl.checked && t > 0) {
+            var amt = Math.round(t / 1.05);
+            var tx = t - amt;
+            untaxed.value = amt;
+            tax.value = tx;
+        }
+    }
+
+    untaxed.addEventListener('input', calcFromUntaxed);
+    total.addEventListener('input', calcFromTotal);
+    taxIncl.addEventListener('change', function() {
+        var amt = parseInt(untaxed.value.replace(/,/g, ''), 10) || 0;
+        if (amt > 0) calcFromUntaxed();
+        else calcFromTotal();
+    });
 })();
 function saveBillingItem() {
     var form = document.getElementById('biForm');
