@@ -516,10 +516,10 @@ class InvoiceModel
         $startMonth = $parsed['start'];
         $endMonth = $parsed['end'];
 
-        // 銷項 - 應稅銷售額 & 稅額
+        // 銷項 - 應稅銷售額 & 稅額（invoice_type: 應稅/三聯式/二聯式 皆為應稅）
         $sql = "SELECT
-                    COALESCE(SUM(CASE WHEN invoice_type IN ('三聯式','二聯式') AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_taxable_amount,
-                    COALESCE(SUM(CASE WHEN invoice_type IN ('三聯式','二聯式') AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS sales_tax,
+                    COALESCE(SUM(CASE WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_taxable_amount,
+                    COALESCE(SUM(CASE WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS sales_tax,
                     COALESCE(SUM(CASE WHEN invoice_type = '免稅' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_exempt_amount,
                     COALESCE(SUM(CASE WHEN status != 'voided' THEN total_amount ELSE 0 END), 0) AS sales_total,
                     COUNT(CASE WHEN status != 'voided' THEN 1 END) AS sales_count,

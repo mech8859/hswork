@@ -66,7 +66,8 @@ class CaseModel
             }
         }
         if (!empty($filters['branch_id'])) {
-            $where .= ' AND c.branch_id = ?';
+            $where .= ' AND (c.branch_id = ? OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))';
+            $params[] = $filters['branch_id'];
             $params[] = $filters['branch_id'];
         }
         if (!empty($filters['sales_id'])) {
@@ -1000,7 +1001,8 @@ class CaseModel
             $params[] = $filters['stage'];
         }
         if (!empty($filters['branch_id'])) {
-            $where .= " AND c.branch_id = ?";
+            $where .= " AND (c.branch_id = ? OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))";
+            $params[] = $filters['branch_id'];
             $params[] = $filters['branch_id'];
         }
         if (!empty($filters['case_type'])) {
@@ -1051,7 +1053,8 @@ class CaseModel
             $params[] = $filters['sales_id'];
         }
         if (!empty($filters['branch_id'])) {
-            $where .= " AND branch_id = ?";
+            $where .= " AND (branch_id = ? OR id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))";
+            $params[] = $filters['branch_id'];
             $params[] = $filters['branch_id'];
         }
 
@@ -1088,7 +1091,8 @@ class CaseModel
             $params[] = $filters['stage'];
         }
         if (!empty($filters['branch_id'])) {
-            $where .= " AND c.branch_id = ?";
+            $where .= " AND (c.branch_id = ? OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))";
+            $params[] = $filters['branch_id'];
             $params[] = $filters['branch_id'];
         }
         if (!empty($filters['case_type'])) {
@@ -1128,7 +1132,8 @@ class CaseModel
             $params[] = $filters['engineer_id'];
         }
         if (!empty($filters['branch_id'])) {
-            $where .= " AND branch_id = ?";
+            $where .= " AND (branch_id = ? OR id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))";
+            $params[] = $filters['branch_id'];
             $params[] = $filters['branch_id'];
         }
 
@@ -1155,7 +1160,8 @@ class CaseModel
             $paramsAd[] = $filters['engineer_id'];
         }
         if (!empty($filters['branch_id'])) {
-            $sqlAd .= " AND branch_id = ?";
+            $sqlAd .= " AND (branch_id = ? OR id IN (SELECT case_id FROM case_branch_support WHERE branch_id = ?))";
+            $paramsAd[] = $filters['branch_id'];
             $paramsAd[] = $filters['branch_id'];
         }
         $stmtAd = $this->db->prepare($sqlAd);
