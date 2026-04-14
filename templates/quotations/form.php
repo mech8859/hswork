@@ -376,10 +376,22 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <input type="number" name="cable_cost" id="cableCost" class="form-control" value="<?= e($quote['cable_cost'] ?? '') ?>" min="0">
             </div>
         </div>
+        <?php
+        $_qfOpModeStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");
+        $_qfOpModeStmt->execute();
+        $_qfOpMode = $_qfOpModeStmt->fetchColumn() ?: 'labor_ratio';
+        $_qfOpRateStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
+        $_qfOpRateStmt->execute();
+        $_qfOpRate = (float)($_qfOpRateStmt->fetchColumn() ?: 128);
+        ?>
         <div class="form-row" style="background:#f8f9fa;padding:8px;border-radius:6px">
             <div class="form-group">
                 <label>器材總成本</label>
                 <div id="materialCost" style="font-weight:600;font-size:1.1rem">$0</div>
+            </div>
+            <div class="form-group">
+                <label>營運成本 <small style="color:#999;font-weight:normal">(人力×<?= $_qfOpRate ?>%)</small></label>
+                <div id="opsCostDisplay" style="font-weight:600;font-size:1.1rem;color:#e65100">$0</div>
             </div>
             <div class="form-group">
                 <label>總成本</label>
@@ -731,18 +743,23 @@ function calcGrandTotal() {
     var hf = document.getElementById('taxFreeHidden');
     if (hf) hf.value = taxFree ? '1' : '0';
 
-    // 內部成本計算
+    // 內部成本計算（含營運成本）
     if (canManage) {
         var laborCost = parseFloat(document.getElementById('laborCostTotal').value) || 0;
         var cableCost = parseFloat(document.getElementById('cableCost').value) || 0;
-        var totalCost = grandCost + laborCost + cableCost;
+        var opsRate = <?= isset($_qfOpRate) ? $_qfOpRate : 128 ?>;
+        var opsCost = Math.round(laborCost * opsRate / 100);
+        var totalCost = grandCost + laborCost + cableCost + opsCost;
         var profit = grandSubtotal - totalCost;
         var profitPct = grandSubtotal > 0 ? (profit / grandSubtotal * 100).toFixed(1) : 0;
         document.getElementById('materialCost').textContent = '$' + grandCost.toLocaleString();
+        var opsEl = document.getElementById('opsCostDisplay');
+        if (opsEl) opsEl.textContent = '$' + opsCost.toLocaleString();
         document.getElementById('totalCostDisplay').textContent = '$' + totalCost.toLocaleString();
         document.getElementById('profitAmount').textContent = '$' + profit.toLocaleString();
         document.getElementById('profitRate').textContent = profitPct + '%';
         document.getElementById('profitAmount').style.color = profit >= 0 ? '#137333' : '#c5221f';
+        document.getElementById('profitRate').style.color = profit >= 0 ? '#137333' : '#c5221f';
     }
 }
 

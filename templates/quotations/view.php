@@ -309,9 +309,25 @@ if ($canManage && !empty($quote['case_id'])) {
         $hrStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
         $hrStmt->execute();
         $hrVal = $hrStmt->fetchColumn();
-        $viewHourlyCost = ($hrVal !== false && $hrVal !== null) ? (int)$hrVal : 404;
+        $viewHourlyCost = ($hrVal !== false && $hrVal !== null) ? (int)$hrVal : 560;
         $viewLaborCost = (int)round($viewHours * $viewHourlyCost);
     }
+    // 營運成本
+    $_vOpModeStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");
+    $_vOpModeStmt->execute();
+    $_vOpMode = $_vOpModeStmt->fetchColumn() ?: 'labor_ratio';
+    $_vOpRateStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
+    $_vOpRateStmt->execute();
+    $_vOpRate = (float)($_vOpRateStmt->fetchColumn() ?: 128);
+    if ($_vOpMode === 'labor_ratio') {
+        $viewOpCost = round($viewLaborCost * $_vOpRate / 100);
+    } else {
+        $viewOpCost = round((float)$quote['subtotal'] * $_vOpRate / 100);
+    }
+    // 含營運成本的真實利潤
+    $viewRealTotalCost = (int)$quote['total_cost'] + $viewOpCost;
+    $viewRealProfit = (float)$quote['subtotal'] - $viewRealTotalCost;
+    $viewRealProfitRate = (float)$quote['subtotal'] > 0 ? round($viewRealProfit / (float)$quote['subtotal'] * 100, 1) : 0;
     ?>
     <div class="info-grid">
         <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
@@ -320,9 +336,10 @@ if ($canManage && !empty($quote['case_id'])) {
         <div><span class="info-label">人力成本</span><span>$<?= number_format($viewLaborCost) ?></span></div>
         <div><span class="info-label">器材成本</span><span>$<?= number_format($viewMaterialCost) ?></span></div>
         <div><span class="info-label">線材成本</span><span>$<?= number_format($viewCableCost) ?></span></div>
-        <div><span class="info-label">總成本</span><span>$<?= number_format($quote['total_cost']) ?></span></div>
-        <div><span class="info-label">利潤</span><span style="color:<?= $quote['profit_amount'] >= 0 ? '#137333' : '#c5221f' ?>">$<?= number_format($quote['profit_amount']) ?></span></div>
-        <div><span class="info-label">利潤率</span><span style="color:<?= $quote['profit_rate'] >= 0 ? '#137333' : '#c5221f' ?>"><?= $quote['profit_rate'] ?>%</span></div>
+        <div><span class="info-label">營運成本 <small style="color:#999">(人力×<?= $_vOpRate ?>%)</small></span><span style="color:#e65100">$<?= number_format($viewOpCost) ?></span></div>
+        <div><span class="info-label">總成本</span><span><strong>$<?= number_format($viewRealTotalCost) ?></strong></span></div>
+        <div><span class="info-label">利潤</span><span style="color:<?= $viewRealProfit >= 0 ? '#137333' : '#c5221f' ?>"><strong>$<?= number_format($viewRealProfit) ?></strong></span></div>
+        <div><span class="info-label">利潤率</span><span style="color:<?= $viewRealProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><strong><?= $viewRealProfitRate ?>%</strong></span></div>
     </div>
 </div>
 <?php endif; ?>

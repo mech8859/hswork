@@ -237,7 +237,7 @@ class QuotationModel
         if (!$laborCost && $hours) {
             $hrStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
             $hrStmt->execute();
-            $hourlyCost = (int)$hrStmt->fetchColumn() ?: 404;
+            $hourlyCost = (int)$hrStmt->fetchColumn() ?: 560;
             $laborCost = (int)round($hours * $hourlyCost);
         }
 

@@ -130,17 +130,24 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <label>進件日期</label>
                 <input type="text" class="form-control" value="<?= e($case ? substr($case['created_at'], 0, 10) : date('Y-m-d')) ?>" readonly style="background:#f0f7ff;color:var(--gray-600)">
             </div>
+            <?php
+            // 預填客戶資料（從客戶管理帶入）
+            $pCustId = $case['customer_id'] ?? (isset($prefillCustomer) && $prefillCustomer ? $prefillCustomer['id'] : '');
+            $pCustNo = $case ? ($case['linked_customer_no'] ?? $case['customer_no'] ?? '') : (isset($prefillCustomer) && $prefillCustomer ? $prefillCustomer['customer_no'] : '');
+            $pCustName = $case['customer_name'] ?? (isset($prefillCustomer) && $prefillCustomer ? $prefillCustomer['name'] : '');
+            $pCustCat = $case['customer_category'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['category'] ?? '') : '');
+            ?>
             <div class="form-group" style="flex:0 0 100px">
                 <label>客戶編號</label>
-                <input type="text" id="customerNoDisplay" class="form-control" value="<?= e($case ? ($case['linked_customer_no'] ?? $case['customer_no'] ?? '') : '') ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
+                <input type="text" id="customerNoDisplay" class="form-control" value="<?= e($pCustNo) ?>" readonly style="background:#f0f7ff;font-weight:600;color:var(--primary)">
             </div>
             <div class="form-group" style="flex:1;min-width:160px;position:relative">
                 <label>客戶名稱</label>
-                <input type="hidden" name="customer_id" id="customerId" value="<?= e($case['customer_id'] ?? '') ?>">
-                <input type="text" name="customer_name" id="customerNameInput" class="form-control" value="<?= e($case['customer_name'] ?? '') ?>" placeholder="輸入客戶名稱搜尋..." autocomplete="off" onkeyup="onCustomerKeyup(event)">
+                <input type="hidden" name="customer_id" id="customerId" value="<?= e($pCustId) ?>">
+                <input type="text" name="customer_name" id="customerNameInput" class="form-control" value="<?= e($pCustName) ?>" placeholder="輸入客戶名稱搜尋..." autocomplete="off" onkeyup="onCustomerKeyup(event)">
                 <div id="customerDropdown" class="customer-dropdown" style="display:none"></div>
-                <?php if ($case && !empty($case['customer_id'])): ?>
-                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"><a href="customers.php?action=view&id=<?= e($case['customer_id']) ?>" style="color:#007bff;text-decoration:underline;cursor:pointer">已關聯客戶 #<?= e($case['customer_id']) ?></a></small>
+                <?php if ($pCustId): ?>
+                <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"><a href="customers.php?action=view&id=<?= e($pCustId) ?>" style="color:#007bff;text-decoration:underline;cursor:pointer">已關聯客戶 <?= e($pCustName) ?><?= $pCustNo ? ' (' . e($pCustNo) . ')' : '' ?></a></small>
                 <?php else: ?>
                 <small class="text-muted" id="customerInfo" style="position:absolute;bottom:-18px;left:0;font-size:.75rem;z-index:2"></small>
                 <?php endif; ?>
@@ -150,7 +157,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <select name="customer_category" class="form-control">
                     <option value="">請選擇</option>
                     <?php foreach (array('個人 / 住戶','一般公司 / 企業','製造 / 工廠','餐飲業','零售 / 店面','社區 / 管委會','機關 / 政府','金融 / 保險','醫療 / 健康照護','建設 / 營造','教育','宗教','旅宿業','上市櫃企業','休閒娛樂','物流 / 倉儲','協會 / 團體') as $cc): ?>
-                    <option value="<?= $cc ?>" <?= ($case['customer_category'] ?? '') === $cc ? 'selected' : '' ?>><?= $cc ?></option>
+                    <option value="<?= $cc ?>" <?= $pCustCat === $cc ? 'selected' : '' ?>><?= $cc ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -166,7 +173,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div class="form-row">
             <div class="form-group" style="flex:2;min-width:200px">
                 <label>案件名稱 *</label>
-                <input type="text" name="title" class="form-control" value="<?= e($case['title'] ?? '') ?>" required>
+                <input type="text" name="title" class="form-control" value="<?= e($case['title'] ?? (isset($prefillCustomer) && $prefillCustomer ? $prefillCustomer['name'] : '')) ?>" required>
             </div>
             <div class="form-group">
                 <label>所屬分公司 *</label>
@@ -179,13 +186,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
             </div>
             <div class="form-group">
                 <label>進件公司</label>
+                <?php $pCompany = $case['company'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['source_company'] ?? '') : ''); ?>
                 <select name="company" id="companyInput" class="form-control">
                     <option value="">請選擇</option>
                     <?php if (isset($caseCompanyOptions)): foreach ($caseCompanyOptions as $opt): ?>
-                    <option value="<?= e($opt['label']) ?>" <?= ($case['company'] ?? '') === $opt['label'] ? 'selected' : '' ?>><?= e($opt['label']) ?></option>
+                    <option value="<?= e($opt['label']) ?>" <?= $pCompany === $opt['label'] ? 'selected' : '' ?>><?= e($opt['label']) ?></option>
                     <?php endforeach; endif; ?>
-                    <?php if (!empty($case['company']) && !in_array($case['company'], array_column($caseCompanyOptions ?? array(), 'label'))): ?>
-                    <option value="<?= e($case['company']) ?>" selected><?= e($case['company']) ?></option>
+                    <?php if ($pCompany && !in_array($pCompany, array_column($caseCompanyOptions ?? array(), 'label'))): ?>
+                    <option value="<?= e($pCompany) ?>" selected><?= e($pCompany) ?></option>
                     <?php endif; ?>
                 </select>
             </div>
@@ -203,21 +211,27 @@ require __DIR__ . '/../_readonly_form_helper.php';
             </div>
         </div>
         <div class="form-row">
+            <?php
+            $pContact = $case['contact_person'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['contact_person'] ?? '') : '');
+            $pPhone = $case['customer_phone'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['phone'] ?? '') : '');
+            $pMobile = $case['customer_mobile'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['mobile'] ?? '') : '');
+            $pLine = $case['contact_line_id'] ?? (isset($prefillCustomer) && $prefillCustomer ? ($prefillCustomer['line_official'] ?? '') : '');
+            ?>
             <div class="form-group">
                 <label>聯絡人 *</label>
-                <input type="text" name="contact_person" id="contactPersonInput" class="form-control" value="<?= e($case['contact_person'] ?? '') ?>" placeholder="聯絡人姓名" required>
+                <input type="text" name="contact_person" id="contactPersonInput" class="form-control" value="<?= e($pContact) ?>" placeholder="聯絡人姓名" required>
             </div>
             <div class="form-group">
                 <label>市話</label>
-                <input type="text" name="customer_phone" id="customerPhoneInput" class="form-control" value="<?= e($case['customer_phone'] ?? '') ?>" placeholder="如 04-2222-3333">
+                <input type="text" name="customer_phone" id="customerPhoneInput" class="form-control" value="<?= e($pPhone) ?>" placeholder="如 04-2222-3333">
             </div>
             <div class="form-group">
                 <label>手機</label>
-                <input type="text" name="customer_mobile" id="customerMobileInput" class="form-control" value="<?= e($case['customer_mobile'] ?? '') ?>" placeholder="如 0912-345-678">
+                <input type="text" name="customer_mobile" id="customerMobileInput" class="form-control" value="<?= e($pMobile) ?>" placeholder="如 0912-345-678">
             </div>
             <div class="form-group">
                 <label>LINE ID</label>
-                <input type="text" name="contact_line_id" id="contactLineInput" class="form-control" value="<?= e($case['contact_line_id'] ?? '') ?>" placeholder="LINE ID">
+                <input type="text" name="contact_line_id" id="contactLineInput" class="form-control" value="<?= e($pLine) ?>" placeholder="LINE ID">
             </div>
         </div>
         <div class="form-row">
@@ -311,7 +325,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
             </div>
             <div class="form-group">
                 <label>施工地址</label>
-                <input type="text" name="address" class="form-control" value="<?= e($case['address'] ?? '') ?>">
+                <input type="text" name="address" class="form-control" value="<?= e($case['address'] ?? (isset($prefillCustomer) && $prefillCustomer ? trim(($prefillCustomer['site_city'] ?: '') . ($prefillCustomer['site_district'] ?: '') . ($prefillCustomer['site_address'] ?: '')) : '')) ?>">
             </div>
         </div>
         <div class="form-row">
@@ -427,6 +441,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 $contacts = array();
                 if ($case && !empty($case['contacts'])) {
                     $contacts = $case['contacts'];
+                } elseif (isset($prefillCustomer) && $prefillCustomer && !empty($prefillCustomer['contacts'])) {
+                    foreach ($prefillCustomer['contacts'] as $pc) {
+                        $contacts[] = array(
+                            'contact_name' => $pc['contact_name'] ?: '',
+                            'contact_phone' => $pc['phone'] ?: '',
+                            'contact_role' => $pc['role'] ?: ''
+                        );
+                    }
                 }
                 foreach ($contacts as $idx => $c):
                 ?>
@@ -1602,15 +1624,21 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_pa = $caseProfitAnalysis;
         $_deal = $_pa['deal_amount'];
         $_opRate = $_pa['op_rate'];
-        $_opCost = round($_deal * $_opRate / 100);
-        $_hourlyCost = !empty($_pa['labor_hourly_cost']) ? $_pa['labor_hourly_cost'] : 361;
+        $_opMode = !empty($_pa['op_mode']) ? $_pa['op_mode'] : 'labor_ratio';
+        $_hourlyCost = !empty($_pa['labor_hourly_cost']) ? $_pa['labor_hourly_cost'] : 560;
         // 報價預估
         $_qMatCost = $_pa['q_material_cost'];
         $_qCableCostFromQuote = !empty($_pa['q_cable_cost']) ? $_pa['q_cable_cost'] : 0;
         $_qCableCostFromEst = $_pa['est_cable_cost'];
         $_qCableCost = $_qCableCostFromQuote > 0 ? $_qCableCostFromQuote : $_qCableCostFromEst;
         $_qLaborCost = $_pa['q_labor_cost'];
-        $_qTotalCost = $_qMatCost + $_qCableCost + $_qLaborCost + $_opCost;
+        // 營運成本計算：按人力成本比率 or 按成交金額比率
+        if ($_opMode === 'labor_ratio') {
+            $_qOpCost = round($_qLaborCost * $_opRate / 100);
+        } else {
+            $_qOpCost = round($_deal * $_opRate / 100);
+        }
+        $_qTotalCost = $_qMatCost + $_qCableCost + $_qLaborCost + $_qOpCost;
         $_qProfit = $_deal - $_qTotalCost;
         $_qProfitRate = $_deal > 0 ? round($_qProfit / $_deal * 100, 1) : 0;
         // 實際數據
@@ -1625,8 +1653,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_aMinutes = $_pa['actual_total_minutes'];
         $_aHours = round($_aMinutes / 60, 1);
         $_aLaborCost = round($_aHours * $_hourlyCost);
+        // 實際營運成本
+        if ($_opMode === 'labor_ratio') {
+            $_aOpCost = round($_aLaborCost * $_opRate / 100);
+        } else {
+            $_aOpCost = round($_deal * $_opRate / 100);
+        }
         // 實際總成本
-        $_aTotalCost = $_aMatTotal + $_aLaborCost + $_opCost;
+        $_aTotalCost = $_aMatTotal + $_aLaborCost + $_aOpCost;
         $_aProfit = $_deal - $_aTotalCost;
         $_aProfitRate = $_deal > 0 ? round($_aProfit / $_deal * 100, 1) : 0;
         // 工時
@@ -1694,9 +1728,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr>
-                        <td>營運成本 (<?= $_opRate ?>%)</td>
-                        <td class="text-right">$<?= number_format($_opCost) ?></td>
-                        <td class="text-right" colspan="2"><span class="text-muted">同報價預估</span></td>
+                        <td>營運成本 <small style="color:#888">(人力×<?= $_opRate ?>%)</small></td>
+                        <td class="text-right"><?= $_qLaborCost ? '$' . number_format($_qOpCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?= $_aLaborCost ? '$' . number_format($_aOpCost) : '<span class="text-muted">-</span>' ?></td>
+                        <td class="text-right"><?php if ($_qLaborCost && $_aLaborCost): $d = $_aOpCost - $_qOpCost; ?>
+                            <span style="color:<?= $d > 0 ? '#c5221f' : '#137333' ?>"><?= ($d > 0 ? '+' : '') . '$' . number_format($d) ?></span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr class="profit-row-highlight">
                         <td><strong>總成本</strong></td>

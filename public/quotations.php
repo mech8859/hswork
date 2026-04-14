@@ -200,7 +200,7 @@ switch ($action) {
             if (!$syncLabor && $syncHours > 0) {
                 $_hrStmt = $_db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
                 $_hrStmt->execute();
-                $_hrCost = (int)$_hrStmt->fetchColumn() ?: 404;
+                $_hrCost = (int)$_hrStmt->fetchColumn() ?: 560;
                 $syncLabor = (int)round($syncHours * $_hrCost);
                 $needSync = true;
             }

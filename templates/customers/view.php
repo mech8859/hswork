@@ -13,6 +13,7 @@
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1 flex-wrap">
+        <a href="/cases.php?action=create&customer_id=<?= $customer['id'] ?>" class="btn btn-success btn-sm">+ 新增案件</a>
         <?php if (Auth::hasPermission('customers.manage')): ?>
         <a href="/customers.php?action=edit&id=<?= $customer['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
         <?php endif; ?>

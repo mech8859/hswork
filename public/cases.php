@@ -131,7 +131,22 @@ switch ($action) {
         $systemTypeOptions = $ddModel->getOptions('system_type');
         $extraCss = array('/css/cases-form.css?v=20260413d');
         $extraJs = array('/js/tw_districts.js');
-        $extraHeadHtml = '<script>var CASE_DATA={contactCount:0,caseId:0};</script>';
+
+        // 從客戶管理帶入客戶資料
+        $prefillCustomer = null;
+        if (!empty($_GET['customer_id'])) {
+            require_once __DIR__ . '/../modules/customers/CustomerModel.php';
+            $custModel = new CustomerModel();
+            $prefillCustomer = $custModel->getById((int)$_GET['customer_id']);
+            if ($prefillCustomer) {
+                $cs = Database::getInstance()->prepare('SELECT contact_name, phone, role FROM customer_contacts WHERE customer_id = ? LIMIT 10');
+                $cs->execute(array($prefillCustomer['id']));
+                $prefillCustomer['contacts'] = $cs->fetchAll(PDO::FETCH_ASSOC);
+            }
+        }
+
+        $contactCount = $prefillCustomer && !empty($prefillCustomer['contacts']) ? count($prefillCustomer['contacts']) : 0;
+        $extraHeadHtml = '<script>var CASE_DATA={contactCount:' . $contactCount . ',caseId:0};</script>';
 
         $pageTitle = '新增案件';
         $currentPage = 'cases';
@@ -348,7 +363,10 @@ switch ($action) {
             ");
             $_ecStmt->execute(array($id));
             $caseProfitAnalysis['est_cable_cost'] = (int)$_ecStmt->fetchColumn();
-            // 5) 營運成本比例（from system_settings，預設 10%）
+            // 5) 營運成本（支援兩種模式：labor_ratio=人力成本×比率, deal_ratio=成交金額×比率）
+            $_opModeStmt = $_paDb->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");
+            $_opModeStmt->execute();
+            $caseProfitAnalysis['op_mode'] = $_opModeStmt->fetchColumn() ?: 'labor_ratio';
             $_opStmt = $_paDb->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
             $_opStmt->execute();
             $_opVal = $_opStmt->fetchColumn();
@@ -359,7 +377,7 @@ switch ($action) {
             $_hrStmt = $_paDb->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
             $_hrStmt->execute();
             $_hrVal = $_hrStmt->fetchColumn();
-            $caseProfitAnalysis['labor_hourly_cost'] = ($_hrVal !== false && $_hrVal !== null) ? (int)$_hrVal : 404;
+            $caseProfitAnalysis['labor_hourly_cost'] = ($_hrVal !== false && $_hrVal !== null) ? (int)$_hrVal : 560;
             // 7) 收款單已收金額
             $_rcStmt = $_paDb->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM receipts WHERE case_id = ? AND status != '作廢'");
             $_rcStmt->execute(array($id));
