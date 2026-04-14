@@ -330,7 +330,12 @@ switch ($action) {
         $date = $_GET['date'] ?? date('Y-m-d');
         $caseId = (int)($_GET['case_id'] ?? 0);
         if (!$caseId) json_response(['error' => 'Missing case_id'], 400);
-        $engineers = $model->getAvailableEngineers($date, $caseId, $branchIds);
+        // 支援多日查詢：dates=2026-04-15,2026-04-16,2026-04-17
+        $extraDates = array();
+        if (!empty($_GET['dates'])) {
+            $extraDates = array_filter(array_map('trim', explode(',', $_GET['dates'])));
+        }
+        $engineers = $model->getAvailableEngineers($date, $caseId, $branchIds, $extraDates);
         json_response(['data' => $engineers]);
         break;
 

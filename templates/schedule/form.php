@@ -22,7 +22,12 @@ if ($isEdit) {
                 <?php if (!$isEdit): ?>
                 <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                     <button type="button" class="btn btn-outline btn-sm" onclick="addDateToBatch()">+ 加入批次多日</button>
-                    <small class="text-muted">按此將主日期加入批次，可重複指定多日</small>
+                    <span style="color:var(--gray-400);font-size:.85rem">|</span>
+                    <span style="font-size:.85rem;color:var(--gray-600)">連續</span>
+                    <input type="number" id="consecutiveDays" min="2" max="30" value="3" style="width:55px;padding:4px 6px;border:1px solid var(--gray-300);border-radius:4px;font-size:.85rem;text-align:center">
+                    <span style="font-size:.85rem;color:var(--gray-600)">天</span>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="generateConsecutiveDates()" style="padding:4px 10px">產生</button>
+                    <small class="text-muted">跳過週日，上限30天</small>
                 </div>
                 <div id="batchDatesList" style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"></div>
                 <small class="text-muted" id="batchHint" style="display:none;margin-top:4px">
@@ -42,6 +47,8 @@ if ($isEdit) {
                             data-designated-time="<?= e(!empty($c['planned_start_time']) ? $c['planned_start_time'] : '') ?>"
                             data-work-start="<?= e(!empty($c['work_time_start']) ? $c['work_time_start'] : '') ?>"
                             data-work-end="<?= e(!empty($c['work_time_end']) ? $c['work_time_end'] : '') ?>"
+                            data-est-days="<?= e(!empty($c['est_labor_days']) ? $c['est_labor_days'] : '') ?>"
+                            data-planned-start="<?= e(!empty($c['planned_start_date']) ? $c['planned_start_date'] : '') ?>"
                             <?= ($schedule['case_id'] ?? $caseId ?? '') == $c['id'] ? 'selected' : '' ?>>
                         <?= e($c['case_number']) ?> - <?= e($c['title']) ?> (<?= e($c['branch_name']) ?>)
                     </option>
@@ -118,6 +125,7 @@ if ($isEdit) {
         </div>
         <p class="text-muted mb-1" style="font-size:.85rem">綠色=技能符合，灰色=已滿/休假，黃色=有排工但仍有餘量</p>
 
+        <input type="hidden" name="engineer_ids_submitted" value="1">
         <div id="engineerList">
             <?php if (!empty($engineers)): ?>
                 <?php foreach ($engineers as $eng): ?>
@@ -252,7 +260,7 @@ function reloadSuggestions() {
     var date = document.getElementById('scheduleDate').value;
     if (!caseId || !date) return;
 
-    // 從案件帶入指定時間
+    // 從案件帶入指定時間 + 預估天數 + 預計施工日
     var opt = document.getElementById('caseSelect').selectedOptions[0];
     if (opt) {
         var dt = opt.dataset.designatedTime || '';
@@ -268,14 +276,32 @@ function reloadSuggestions() {
         var etInput = document.getElementById('endTime');
         if (ws && !stInput.value) stInput.value = ws.substring(0, 5);
         if (we && !etInput.value) etInput.value = we.substring(0, 5);
+
+        // 帶入預計施工日
+        var ps = opt.dataset.plannedStart || '';
+        var dateInput = document.getElementById('scheduleDate');
+        if (ps && dateInput && !dateInput.dataset.userSet) {
+            dateInput.value = ps;
+        }
+        // 帶入預估施工天數到連續天數
+        var ed = opt.dataset.estDays || '';
+        var cdInput = document.getElementById('consecutiveDays');
+        if (ed && cdInput && parseFloat(ed) >= 2) {
+            cdInput.value = Math.ceil(parseFloat(ed));
+        }
     }
 
-    // 透過 AJAX 載入推薦工程師
-    fetch('/schedule.php?action=ajax_engineers&case_id=' + caseId + '&date=' + date, {
+    // 透過 AJAX 載入推薦工程師（含多日可用性）
+    var engUrl = '/schedule.php?action=ajax_engineers&case_id=' + caseId + '&date=' + date;
+    if (typeof batchDates !== 'undefined' && batchDates.length > 1) {
+        engUrl += '&dates=' + encodeURIComponent(batchDates.join(','));
+    }
+    fetch(engUrl, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(function(r) { return r.json(); })
     .then(function(result) {
+        var hasBatch = (typeof batchDates !== 'undefined' && batchDates.length > 1);
         var html = '';
         result.data.forEach(function(eng) {
             var usedH = eng.hours_used || 0;
@@ -292,6 +318,20 @@ function reloadSuggestions() {
                 html += '<span class="badge" style="background:#e53935;color:#fff">已滿(' + usedH + 'h)</span>';
             } else if (usedH > 0) {
                 html += '<span class="badge badge-warning">已排' + usedH + 'h / 剩' + eng.remaining_hours + 'h</span>';
+            }
+            // 連續多日可用性標記
+            if (hasBatch && eng.multi_day_total) {
+                if (eng.multi_day_all_ok) {
+                    html += '<span class="badge" style="background:#2e7d32;color:#fff">' + eng.multi_day_total + '天全可</span>';
+                } else if (eng.multi_day_available > 0) {
+                    var unavailShort = '';
+                    if (eng.multi_day_unavail_dates && eng.multi_day_unavail_dates.length > 0) {
+                        unavailShort = eng.multi_day_unavail_dates.map(function(d){ return d.substring(5); }).join(',');
+                    }
+                    html += '<span class="badge" style="background:#e65100;color:#fff">' + eng.multi_day_available + '/' + eng.multi_day_total + '天可' + (unavailShort ? ' 衝突:' + unavailShort : '') + '</span>';
+                } else {
+                    html += '<span class="badge" style="background:#c62828;color:#fff">全部不可用</span>';
+                }
             }
             html += '</div>';
         });
@@ -451,4 +491,42 @@ function formatShortDate(ymd) {
         }
     });
 })();
+
+// ===== 連續天數快速產生 =====
+function generateConsecutiveDates() {
+    var dateInput = document.getElementById('scheduleDate');
+    var daysInput = document.getElementById('consecutiveDays');
+    if (!dateInput || !daysInput) return;
+    var startDate = dateInput.value;
+    if (!startDate) { alert('請先選擇施工日期'); return; }
+    var days = parseInt(daysInput.value, 10);
+    if (isNaN(days) || days < 2) { alert('請輸入至少 2 天'); return; }
+    if (days > 30) { days = 30; daysInput.value = 30; }
+
+    // 清空現有批次
+    batchDates = [];
+
+    // 從主日期開始，產生連續天數（跳過週日）
+    var parts = startDate.split('-');
+    var current = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var count = 0;
+    var maxLoop = days + 10; // 避免無限迴圈
+    var loop = 0;
+    while (count < days && loop < maxLoop) {
+        var dow = current.getDay(); // 0=日
+        if (dow !== 0) { // 跳過週日
+            var y = current.getFullYear();
+            var m = String(current.getMonth() + 1).padStart(2, '0');
+            var d = String(current.getDate()).padStart(2, '0');
+            batchDates.push(y + '-' + m + '-' + d);
+            count++;
+        }
+        current.setDate(current.getDate() + 1);
+        loop++;
+    }
+
+    renderBatchDates();
+    // 重新載入工程師（帶入多日參數）
+    reloadSuggestions();
+}
 </script>

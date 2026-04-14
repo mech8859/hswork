@@ -1334,11 +1334,11 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div class="form-row">
             <div class="form-group">
                 <label>預計施工日</label>
-                <input type="date" max="2099-12-31" name="planned_start_date" class="form-control" value="<?= e($case['planned_start_date'] ?? '') ?>">
+                <input type="date" max="2099-12-31" name="planned_start_date" id="plannedStartDate" class="form-control" value="<?= e($case['planned_start_date'] ?? '') ?>" onchange="autoCalcEndDate()">
             </div>
             <div class="form-group">
-                <label>預計完工日</label>
-                <input type="date" max="2099-12-31" name="planned_end_date" class="form-control" value="<?= e($case['planned_end_date'] ?? '') ?>">
+                <label>預計完工日 <small style="color:#888;font-weight:normal">(自動=施工日+天數)</small></label>
+                <input type="date" max="2099-12-31" name="planned_end_date" id="plannedEndDate" class="form-control" value="<?= e($case['planned_end_date'] ?? '') ?>">
             </div>
             <div class="form-group">
                 <label>急迫性</label>
@@ -2453,12 +2453,12 @@ var CASE_DATA = {
 
 <!-- 請款流程 Modal -->
 <div id="biModal" class="modal-overlay" style="display:none">
-    <div class="modal-content" id="biModalBox" style="max-width:700px;position:relative;cursor:default">
-        <div class="d-flex justify-between align-center mb-2" id="biModalHeader" style="cursor:move;user-select:none">
+    <div class="modal-content" id="biModalBox" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;position:relative;cursor:default">
+        <div class="d-flex justify-between align-center" id="biModalHeader" style="cursor:move;user-select:none;padding:12px 16px;border-bottom:1px solid var(--gray-200,#eee);flex-shrink:0;position:sticky;top:0;background:#fff;z-index:1;border-radius:12px 12px 0 0">
             <h3 id="biModalTitle" style="margin:0">新增請款項目</h3>
-            <a href="javascript:void(0)" onclick="closeBiModal()" style="font-size:1.5rem;color:var(--gray-400)">&times;</a>
+            <a href="javascript:void(0)" onclick="closeBiModal()" style="font-size:1.5rem;color:var(--gray-400);padding:4px 8px">&times;</a>
         </div>
-        <form id="biForm" onsubmit="event.preventDefault();saveBillingItem()">
+        <form id="biForm" onsubmit="event.preventDefault();saveBillingItem()" style="overflow-y:auto;padding:12px 16px;flex:1;-webkit-overflow-scrolling:touch">
             <input type="hidden" name="id" id="biId">
             <div class="form-row">
                 <div class="form-group">
@@ -2762,16 +2762,47 @@ document.addEventListener('keydown', function(e) {
 // 預估施工時數自動計算
 var caseHoursManual = false;
 function autoCalcCaseHours() {
-    if (caseHoursManual) return;
-    var days = parseFloat(document.getElementById('estLaborDays').value) || 0;
-    var people = parseFloat(document.getElementById('estLaborPeople').value) || 0;
-    var hoursInput = document.getElementById('estLaborHours');
-    if (days > 0 && people > 0) {
-        hoursInput.value = (days * people * 8);
-    } else if (days === 0 && people === 0) {
-        hoursInput.value = '';
+    if (!caseHoursManual) {
+        var days = parseFloat(document.getElementById('estLaborDays').value) || 0;
+        var people = parseFloat(document.getElementById('estLaborPeople').value) || 0;
+        var hoursInput = document.getElementById('estLaborHours');
+        if (days > 0 && people > 0) {
+            hoursInput.value = (days * people * 8);
+        } else if (days === 0 && people === 0) {
+            hoursInput.value = '';
+        }
     }
+    autoCalcEndDate();
 }
+// 預計完工日自動計算（施工日 + 天數，跳過週日）
+function autoCalcEndDate() {
+    var startInput = document.getElementById('plannedStartDate');
+    var endInput = document.getElementById('plannedEndDate');
+    var daysInput = document.getElementById('estLaborDays');
+    if (!startInput || !endInput || !daysInput) return;
+    var startVal = startInput.value;
+    var days = parseFloat(daysInput.value) || 0;
+    if (!startVal || days <= 0) return;
+    // 已手動填過完工日就不覆蓋
+    if (endInput.dataset.manual === '1') return;
+    var parts = startVal.split('-');
+    var current = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var count = 0;
+    var daysInt = Math.ceil(days);
+    while (count < daysInt - 1) {
+        current.setDate(current.getDate() + 1);
+        if (current.getDay() !== 0) count++; // 跳過週日
+    }
+    var y = current.getFullYear();
+    var m = String(current.getMonth() + 1).padStart(2, '0');
+    var d = String(current.getDate()).padStart(2, '0');
+    endInput.value = y + '-' + m + '-' + d;
+}
+// 手動改完工日時標記
+(function(){
+    var endInput = document.getElementById('plannedEndDate');
+    if (endInput) endInput.addEventListener('input', function(){ endInput.dataset.manual = '1'; });
+})();
 
 var contactIndex = <?= count($contacts) ?>;
 function addContact() {

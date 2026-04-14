@@ -242,10 +242,12 @@ class ScheduleModel
             $id,
         ));
 
-        // 重新指派工程師
-        if (isset($data['engineer_ids'])) {
+        // 重新指派工程師（engineer_ids_submitted 確保全取消勾選也會清除）
+        if (isset($data['engineer_ids']) || isset($data['engineer_ids_submitted'])) {
             $this->db->prepare('DELETE FROM schedule_engineers WHERE schedule_id = ?')->execute([$id]);
-            $this->assignEngineers($id, $data['engineer_ids'], $data);
+            if (!empty($data['engineer_ids'])) {
+                $this->assignEngineers($id, $data['engineer_ids'], $data);
+            }
         }
 
         // 重新指派點工人員
@@ -426,7 +428,7 @@ class ScheduleModel
     /**
      * 智慧篩選可用工程師
      */
-    public function getAvailableEngineers(string $date, int $caseId, array $branchIds): array
+    public function getAvailableEngineers(string $date, int $caseId, array $branchIds, array $extraDates = array())
     {
         // 擴充分公司範圍：含案件的支援分公司
         $supportStmt = $this->db->prepare('SELECT branch_id FROM case_branch_support WHERE case_id = ?');
@@ -454,21 +456,30 @@ class ScheduleModel
         $engStmt->execute($allBranchIds);
         $engineers = $engStmt->fetchAll();
 
-        // 取得當日已排工人員的工時
+        // 組合所有要檢查的日期（主日期 + 額外日期）
+        $allDates = array_unique(array_merge(array($date), $extraDates));
+        sort($allDates);
+        $hasMultiDates = count($allDates) > 1;
+
+        // 取得所有日期的排工工時
         $defaultH = self::DEFAULT_ESTIMATED_HOURS;
-        $busyStmt = $this->db->prepare("
-            SELECT se.user_id, SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultH})) AS hours_used
-            FROM schedule_engineers se
-            JOIN schedules s ON se.schedule_id = s.id
-            JOIN cases c ON s.case_id = c.id
-            WHERE s.schedule_date = ? AND s.status != 'cancelled'
-            GROUP BY se.user_id
-        ");
-        $busyStmt->execute(array($date));
-        $hoursMap = array();
-        foreach ($busyStmt->fetchAll() as $row) {
-            $hoursMap[$row['user_id']] = (float)$row['hours_used'];
+        $hoursMapByDate = array(); // date => user_id => hours
+        foreach ($allDates as $d) {
+            $busyStmt = $this->db->prepare("
+                SELECT se.user_id, SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultH})) AS hours_used
+                FROM schedule_engineers se
+                JOIN schedules s ON se.schedule_id = s.id
+                JOIN cases c ON s.case_id = c.id
+                WHERE s.schedule_date = ? AND s.status != 'cancelled'
+                GROUP BY se.user_id
+            ");
+            $busyStmt->execute(array($d));
+            $hoursMapByDate[$d] = array();
+            foreach ($busyStmt->fetchAll() as $row) {
+                $hoursMapByDate[$d][$row['user_id']] = (float)$row['hours_used'];
+            }
         }
+        $hoursMap = $hoursMapByDate[$date]; // 主日期工時（相容原邏輯）
 
         // 取得目標案件工時
         $caseStmt2 = $this->db->prepare('SELECT estimated_hours FROM cases WHERE id = ?');
@@ -476,10 +487,14 @@ class ScheduleModel
         $targetHours = (float)$caseStmt2->fetchColumn();
         if ($targetHours <= 0) $targetHours = self::DEFAULT_ESTIMATED_HOURS;
 
-        // 取得當日請假人員
-        $leaveStmt = $this->db->prepare("SELECT user_id FROM leaves WHERE status = 'approved' AND start_date <= ? AND end_date >= ?");
-        $leaveStmt->execute(array($date, $date));
-        $onLeaveIds = array_column($leaveStmt->fetchAll(PDO::FETCH_ASSOC), 'user_id');
+        // 取得所有日期的請假人員
+        $onLeaveByDate = array(); // date => array of user_ids
+        foreach ($allDates as $d) {
+            $leaveStmt = $this->db->prepare("SELECT user_id FROM leaves WHERE status = 'approved' AND start_date <= ? AND end_date >= ?");
+            $leaveStmt->execute(array($d, $d));
+            $onLeaveByDate[$d] = array_column($leaveStmt->fetchAll(PDO::FETCH_ASSOC), 'user_id');
+        }
+        $onLeaveIds = $onLeaveByDate[$date]; // 主日期（相容原邏輯）
 
         // 為每位工程師計算資訊
         foreach ($engineers as &$eng) {
@@ -492,20 +507,45 @@ class ScheduleModel
 
             // 技能符合度
             $eng['skill_match'] = true;
-            $eng['skill_details'] = [];
+            $eng['skill_details'] = array();
             foreach ($requiredSkills as $rs) {
                 $skillStmt = $this->db->prepare('SELECT proficiency FROM user_skills WHERE user_id = ? AND skill_id = ?');
-                $skillStmt->execute([$eng['id'], $rs['skill_id']]);
+                $skillStmt->execute(array($eng['id'], $rs['skill_id']));
                 $prof = $skillStmt->fetchColumn();
-                $eng['skill_details'][] = ['skill_id' => $rs['skill_id'], 'required' => $rs['min_proficiency'], 'has' => $prof ?: 0];
+                $eng['skill_details'][] = array('skill_id' => $rs['skill_id'], 'required' => $rs['min_proficiency'], 'has' => $prof ? (int)$prof : 0);
                 if (!$prof || $prof < $rs['min_proficiency']) {
                     $eng['skill_match'] = false;
                 }
             }
+
+            // 連續多日可用性
+            if ($hasMultiDates) {
+                $availDates = array();
+                $unavailDates = array();
+                foreach ($allDates as $d) {
+                    $dUsed = isset($hoursMapByDate[$d][$eng['id']]) ? $hoursMapByDate[$d][$eng['id']] : 0;
+                    $dRemain = self::DAILY_HOURS_CAPACITY - $dUsed;
+                    $dOnLeave = in_array($eng['id'], $onLeaveByDate[$d]);
+                    if (!$dOnLeave && $dRemain >= $targetHours) {
+                        $availDates[] = $d;
+                    } else {
+                        $unavailDates[] = $d;
+                    }
+                }
+                $eng['multi_day_total'] = count($allDates);
+                $eng['multi_day_available'] = count($availDates);
+                $eng['multi_day_unavail_dates'] = $unavailDates;
+                $eng['multi_day_all_ok'] = empty($unavailDates);
+            }
         }
 
-        // 排序: 技能符合 > 未忙碌 > 姓名
-        usort($engineers, function($a, $b) {
+        // 排序: 多日全可用 > 技能符合 > 未忙碌 > 姓名
+        usort($engineers, function($a, $b) use ($hasMultiDates) {
+            if ($hasMultiDates) {
+                $aAllOk = !empty($a['multi_day_all_ok']) ? 1 : 0;
+                $bAllOk = !empty($b['multi_day_all_ok']) ? 1 : 0;
+                if ($aAllOk !== $bAllOk) return $bAllOk - $aAllOk;
+            }
             if ($a['skill_match'] !== $b['skill_match']) return $b['skill_match'] - $a['skill_match'];
             if ($a['is_busy'] !== $b['is_busy']) return $a['is_busy'] - $b['is_busy'];
             return strcmp($a['real_name'], $b['real_name']);
@@ -544,18 +584,20 @@ class ScheduleModel
     public function getSchedulableCases(array $branchIds): array
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = array_merge($branchIds, $branchIds);
         $stmt = $this->db->prepare("
             SELECT c.id, c.case_number, c.title, c.address, c.difficulty,
                    c.total_visits, c.current_visit, c.max_engineers,
                    c.planned_start_time, c.work_time_start, c.work_time_end,
+                   c.est_labor_days, c.planned_start_date,
                    b.name AS branch_name
             FROM cases c
             JOIN branches b ON c.branch_id = b.id
-            WHERE c.branch_id IN ($ph)
+            WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
               AND c.status NOT IN ('無效','客戶取消')
             ORDER BY c.status ASC, c.updated_at DESC
         ");
-        $stmt->execute($branchIds);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
