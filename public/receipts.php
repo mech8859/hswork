@@ -157,12 +157,22 @@ switch ($action) {
             }
 
             // 同步更新對應的案件帳款交易（用 receipt_number 反查）
+            // 備註剝掉「案件帳款自動產生 - {類別} / 」系統前綴，只同步使用者部分
+            $syncCaseNote = $data['note'] ?? '';
+            if ($syncCaseNote !== null && $syncCaseNote !== '') {
+                if (preg_match('/^案件帳款自動產生\s*-\s*[^\/]*?\s*\/\s*(.*)$/us', $syncCaseNote, $m)) {
+                    $syncCaseNote = trim($m[1]);
+                } elseif (preg_match('/^案件帳款自動產生\s*-\s*[^\/]*$/us', $syncCaseNote)) {
+                    // 只有前綴沒有使用者備註
+                    $syncCaseNote = '';
+                }
+            }
             try {
                 $rnStmt = Database::getInstance()->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
                 $rnStmt->execute(array($id));
                 $rNum = $rnStmt->fetchColumn();
                 if ($rNum) {
-                    Database::getInstance()->prepare("UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=? WHERE receipt_number=?")
+                    Database::getInstance()->prepare("UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, note=? WHERE receipt_number=?")
                        ->execute(array(
                            $data['register_date'],
                            $data['invoice_category'],
@@ -170,6 +180,7 @@ switch ($action) {
                            (int)$data['total_amount'],
                            (int)$data['subtotal'],
                            (int)$data['tax'],
+                           $syncCaseNote,
                            $rNum,
                        ));
                     // 同步後重算對應案件的總收款

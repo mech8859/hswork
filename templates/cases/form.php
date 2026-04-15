@@ -1266,7 +1266,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <?php endif; endif; ?>
 
         <!-- 銷項發票 -->
-        <?php if ($case): $caseSalesInvoices = $case['sales_invoices'] ?? array(); ?>
+        <?php if ($case): $caseSalesInvoices = $case['sales_invoices'] ?? array(); $siVouchers = $case['sales_invoice_vouchers'] ?? array(); ?>
         <div style="margin:8px 0;padding:10px;background:#fafafa;border:1px solid var(--gray-200);border-radius:6px">
             <div class="d-flex justify-between align-center" style="margin-bottom:6px">
                 <strong style="font-size:.9rem">銷項發票</strong>
@@ -1276,18 +1276,40 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <div class="text-muted text-center" style="padding:12px;font-size:.85rem">尚無銷項發票</div>
             <?php else: ?>
             <table class="table" style="font-size:.85rem;margin:0">
-                <thead><tr><th style="width:120px">日期</th><th style="width:140px">發票號碼</th><th class="text-right" style="width:120px">含稅金額</th><th style="width:80px">狀態</th><th style="width:60px">操作</th></tr></thead>
+                <thead><tr><th style="width:120px">日期</th><th style="width:140px">發票號碼</th><th class="text-right" style="width:120px">含稅金額</th><th style="width:80px">狀態</th><th>憑證（僅此案件）</th><th style="width:140px">操作</th></tr></thead>
                 <tbody>
                 <?php foreach ($caseSalesInvoices as $si):
                     $statusLabels = array('draft'=>'草稿','pending'=>'待確認','confirmed'=>'已確認','voided'=>'作廢');
                     $statusLabel = isset($statusLabels[$si['status']]) ? $statusLabels[$si['status']] : $si['status'];
+                    $vList = isset($siVouchers[$si['id']]) ? $siVouchers[$si['id']] : array();
                 ?>
                 <tr>
                     <td><?= e($si['invoice_date']) ?></td>
                     <td style="color:var(--primary);font-weight:600"><?= e($si['invoice_number']) ?></td>
                     <td class="text-right">$<?= number_format($si['total_amount']) ?></td>
                     <td><span class="badge"><?= e($statusLabel) ?></span></td>
-                    <td><a href="/sales_invoices.php?action=edit&id=<?= $si['id'] ?>&return=case&case_id=<?= $case['id'] ?>" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px">編輯</a></td>
+                    <td>
+                        <div id="siv-list-<?= $si['id'] ?>" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+                            <?php foreach ($vList as $v):
+                                $ext = strtolower(pathinfo($v['file_path'], PATHINFO_EXTENSION));
+                                $isImg = in_array($ext, array('jpg','jpeg','png','gif','webp'));
+                            ?>
+                            <span class="siv-item" data-id="<?= $v['id'] ?>" style="position:relative;display:inline-block">
+                                <?php if ($isImg): ?>
+                                    <a href="/<?= e($v['file_path']) ?>" target="_blank" title="<?= e($v['file_name']) ?>"><img src="/<?= e($v['file_path']) ?>" style="width:40px;height:40px;object-fit:cover;border:1px solid #ccc;border-radius:3px"></a>
+                                <?php else: ?>
+                                    <a href="/<?= e($v['file_path']) ?>" target="_blank" title="<?= e($v['file_name']) ?>" style="display:inline-block;padding:3px 8px;background:#eee;border-radius:3px;color:#333;text-decoration:none;font-size:.75rem">📎 <?= e(mb_substr($v['file_name'] ?: 'file', 0, 8)) ?></a>
+                                <?php endif; ?>
+                                <button type="button" onclick="deleteSiVoucher(<?= $v['id'] ?>, <?= $si['id'] ?>)" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:#f44;color:#fff;font-size:10px;cursor:pointer;line-height:14px;padding:0" title="刪除">×</button>
+                            </span>
+                            <?php endforeach; ?>
+                        </div>
+                    </td>
+                    <td>
+                        <a href="/sales_invoices.php?action=edit&id=<?= $si['id'] ?>&return=case&case_id=<?= $case['id'] ?>" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px">編輯</a>
+                        <button type="button" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="document.getElementById('siv-input-<?= $si['id'] ?>').click()">上傳憑證</button>
+                        <input type="file" id="siv-input-<?= $si['id'] ?>" accept="image/*,application/pdf" style="display:none" onchange="uploadSiVoucher(this, <?= $si['id'] ?>, <?= $case['id'] ?>)">
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -1295,6 +1317,67 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <?php endif; ?>
         </div>
         <?php endif; ?>
+
+        <script>
+        function uploadSiVoucher(input, siId, caseId) {
+            if (!input.files || !input.files[0]) return;
+            var fd = new FormData();
+            fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+            fd.append('case_id', caseId);
+            fd.append('sales_invoice_id', siId);
+            fd.append('file', input.files[0]);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/cases.php?action=upload_si_voucher');
+            xhr.onload = function() {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (res.success) {
+                        // 附加到該發票的憑證清單
+                        var list = document.getElementById('siv-list-' + siId);
+                        if (list) {
+                            var ext = (res.file_name || '').split('.').pop().toLowerCase();
+                            var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
+                            var html = '<span class="siv-item" data-id="' + res.id + '" style="position:relative;display:inline-block">';
+                            if (isImg) {
+                                html += '<a href="/' + res.file_path + '" target="_blank" title="' + res.file_name + '"><img src="/' + res.file_path + '" style="width:40px;height:40px;object-fit:cover;border:1px solid #ccc;border-radius:3px"></a>';
+                            } else {
+                                html += '<a href="/' + res.file_path + '" target="_blank" title="' + res.file_name + '" style="display:inline-block;padding:3px 8px;background:#eee;border-radius:3px;color:#333;text-decoration:none;font-size:.75rem">📎 ' + (res.file_name || 'file').substring(0, 8) + '</a>';
+                            }
+                            html += '<button type="button" onclick="deleteSiVoucher(' + res.id + ',' + siId + ')" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:#f44;color:#fff;font-size:10px;cursor:pointer;line-height:14px;padding:0" title="刪除">×</button>';
+                            html += '</span>';
+                            list.insertAdjacentHTML('beforeend', html);
+                        }
+                        input.value = '';
+                    } else {
+                        alert('上傳失敗：' + (res.error || ''));
+                    }
+                } catch (e) { alert('回應解析失敗'); }
+            };
+            xhr.onerror = function() { alert('上傳失敗'); };
+            xhr.send(fd);
+        }
+
+        function deleteSiVoucher(voucherId, siId) {
+            if (!confirm('確定刪除此憑證？')) return;
+            var fd = new FormData();
+            fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+            fd.append('voucher_id', voucherId);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/cases.php?action=delete_si_voucher');
+            xhr.onload = function() {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (res.success) {
+                        var el = document.querySelector('#siv-list-' + siId + ' .siv-item[data-id="' + voucherId + '"]');
+                        if (el) el.remove();
+                    } else {
+                        alert('刪除失敗：' + (res.error || ''));
+                    }
+                } catch (e) { alert('回應解析失敗'); }
+            };
+            xhr.send(fd);
+        }
+        </script>
 
         <div class="form-row">
             <div class="form-group">

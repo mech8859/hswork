@@ -25,7 +25,7 @@
         </div>
         <div>
             <label style="font-size:0.85em">往來類型</label>
-            <select name="relation_type" class="form-control" style="width:100px">
+            <select name="relation_type" class="form-control" style="width:100px" onchange="this.form.submit()" title="變更後自動重載，使下方編號下拉跟著過濾">
                 <option value="">全部</option>
                 <option value="customer" <?= $olRelType === 'customer' ? 'selected' : '' ?>>客戶</option>
                 <option value="vendor" <?= $olRelType === 'vendor' ? 'selected' : '' ?>>廠商</option>

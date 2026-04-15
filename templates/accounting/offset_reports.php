@@ -31,7 +31,7 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
         </div>
         <div>
             <label style="font-size:.85em">往來類型</label>
-            <select name="relation_type" class="form-control" style="width:90px">
+            <select name="relation_type" class="form-control" style="width:90px" onchange="this.form.submit()" title="變更後自動重載，使下方編號下拉跟著過濾">
                 <option value="">全部</option>
                 <option value="customer" <?= $orRelType === 'customer' ? 'selected' : '' ?>>客戶</option>
                 <option value="vendor" <?= $orRelType === 'vendor' ? 'selected' : '' ?>>廠商</option>
@@ -185,8 +185,18 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
 
 <!-- ========== 2. 科目餘額表 ========== -->
 <div id="tab-balance" class="or-panel" style="<?= $orTab !== 'balance' ? 'display:none' : '' ?>">
-<?php if (empty($orGrouped)): ?>
-<div class="card" style="padding:20px;text-align:center;color:#999">無資料</div>
+<?php
+// 科目餘額表：僅顯示未沖餘額 > 0 的項目，合計也依此重算
+$orBalance = array_filter($orGrouped, function($g) { return (float)$g['sum_remaining'] != 0; });
+$balOriginal = 0; $balOffset = 0; $balRemaining = 0;
+foreach ($orBalance as $g) {
+    $balOriginal += $g['sum_original'];
+    $balOffset += $g['sum_offset'];
+    $balRemaining += $g['sum_remaining'];
+}
+?>
+<?php if (empty($orBalance)): ?>
+<div class="card" style="padding:20px;text-align:center;color:#999">無未沖餘額資料</div>
 <?php else: ?>
 <div class="card" style="overflow-x:auto">
     <table class="data-table" style="width:100%;font-size:.85rem">
@@ -198,7 +208,7 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
         <?php
         $prevAcct = '';
         $acctOriginal = 0; $acctOffset = 0; $acctRemaining = 0;
-        foreach ($orGrouped as $key => $g):
+        foreach ($orBalance as $key => $g):
             // 科目變換時輸出小計
             if ($prevAcct && $prevAcct !== $g['account_code']) {
                 echo '<tr style="background:#fff3e0;font-weight:600"><td colspan="7" style="text-align:right">科目小計</td>';
@@ -236,10 +246,10 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
         </tbody>
         <tfoot>
             <tr style="font-weight:bold;background:#f0f0f0;font-size:.9rem">
-                <td colspan="7" style="text-align:right">合計</td>
-                <td style="text-align:right"><?= number_format($grandOriginal) ?></td>
-                <td style="text-align:right"><?= number_format($grandOffset) ?></td>
-                <td style="text-align:right"><?= number_format($grandRemaining) ?></td>
+                <td colspan="7" style="text-align:right">合計（已排除沖完項目）</td>
+                <td style="text-align:right"><?= number_format($balOriginal) ?></td>
+                <td style="text-align:right"><?= number_format($balOffset) ?></td>
+                <td style="text-align:right"><?= number_format($balRemaining) ?></td>
             </tr>
         </tfoot>
     </table>

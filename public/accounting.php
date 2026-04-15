@@ -598,15 +598,23 @@ switch ($action) {
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
-        // 下拉選項：廠商顯示 vendor_code (B-XXXX)，其他保留 relation_id
-        $olRelIds = Database::getInstance()->query("
+        // 下拉選項：依已選的 relation_type 過濾（未選時全部）
+        $olRelIdsSql = "
             SELECT DISTINCT ol.relation_id, ol.relation_type, ol.relation_name,
                    CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS vendor_code
             FROM offset_ledger ol
             LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
             WHERE ol.relation_id IS NOT NULL AND ol.relation_id != ''
-            ORDER BY CAST(ol.relation_id AS UNSIGNED)
-        ")->fetchAll(PDO::FETCH_ASSOC);
+        ";
+        $olRelIdsParams = array();
+        if ($olRelType) {
+            $olRelIdsSql .= " AND ol.relation_type = ?";
+            $olRelIdsParams[] = $olRelType;
+        }
+        $olRelIdsSql .= " ORDER BY CAST(ol.relation_id AS UNSIGNED)";
+        $olRelIdsStmt = Database::getInstance()->prepare($olRelIdsSql);
+        $olRelIdsStmt->execute($olRelIdsParams);
+        $olRelIds = $olRelIdsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $where = '1=1';
         $params = array();
@@ -954,15 +962,23 @@ switch ($action) {
         $costCenters = $model->getCostCenters();
         $db = Database::getInstance();
 
-        // 往來編號清單（廠商顯示 vendor_code）
-        $orRelIds = $db->query("
+        // 往來編號清單（依已選 relation_type 過濾；廠商顯示 vendor_code）
+        $orRelIdsSql = "
             SELECT DISTINCT ol.relation_id, ol.relation_type, ol.relation_name,
                    CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS vendor_code
             FROM offset_ledger ol
             LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
             WHERE ol.relation_id IS NOT NULL AND ol.relation_id != ''
-            ORDER BY CAST(ol.relation_id AS UNSIGNED)
-        ")->fetchAll(PDO::FETCH_ASSOC);
+        ";
+        $orRelIdsParams = array();
+        if ($orRelType) {
+            $orRelIdsSql .= " AND ol.relation_type = ?";
+            $orRelIdsParams[] = $orRelType;
+        }
+        $orRelIdsSql .= " ORDER BY CAST(ol.relation_id AS UNSIGNED)";
+        $orRelIdsStmt = $db->prepare($orRelIdsSql);
+        $orRelIdsStmt->execute($orRelIdsParams);
+        $orRelIds = $orRelIdsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // 查詢立帳記錄
         $where = '1=1';

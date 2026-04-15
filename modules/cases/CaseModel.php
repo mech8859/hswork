@@ -228,6 +228,19 @@ class CaseModel
             $case['sales_invoices'] = array();
         }
 
+        // 案件端銷項發票憑證（不同步至銷項發票模組）
+        try {
+            $vStmt = $this->db->prepare("SELECT id, sales_invoice_id, file_path, file_name FROM case_sales_invoice_vouchers WHERE case_id = ? ORDER BY id");
+            $vStmt->execute([$id]);
+            $byInvoice = array();
+            foreach ($vStmt->fetchAll(PDO::FETCH_ASSOC) as $v) {
+                $byInvoice[$v['sales_invoice_id']][] = $v;
+            }
+            $case['sales_invoice_vouchers'] = $byInvoice;
+        } catch (Exception $e) {
+            $case['sales_invoice_vouchers'] = array();
+        }
+
         // 無訂金排工簽核狀態（最新一筆）
         try {
             $stmt = $this->db->prepare("SELECT status FROM approval_flows WHERE module = 'no_deposit_schedule' AND target_id = ? ORDER BY id DESC LIMIT 1");

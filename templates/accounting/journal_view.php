@@ -100,7 +100,7 @@ $statusColor = isset($statusColors[$entry['status']]) ? $statusColors[$entry['st
     </div>
     <?php if ($entry['description']): ?>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee">
-        <div style="font-size:0.85em;color:#666">摘要</div>
+        <div style="font-size:0.85em;color:#666">備註</div>
         <div><?= e($entry['description']) ?></div>
     </div>
     <?php endif; ?>

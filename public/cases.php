@@ -691,10 +691,12 @@ switch ($action) {
             ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newNote, $pid));
 
         // 同步更新對應的收款單（若有 receipt_number）
+        // note 格式：「案件帳款自動產生 - {類別} / {使用者備註}」；使用者備註取自 case_payments
         if (!empty($newReceiptNo)) {
             try {
-                $db->prepare("UPDATE receipts SET register_date=?, deposit_date=?, receipt_method=?, invoice_category=?, subtotal=?, tax=?, total_amount=?, note=CONCAT('案件帳款自動產生 - ', ?, ?) WHERE receipt_number=?")
-                   ->execute(array($newDate, $newDate, $newMethod, $newType, $newUntaxed, $newTax, $newAmount, $newType, $newNote ? ' / ' . $newNote : '', $newReceiptNo));
+                $syncNote = '案件帳款自動產生 - ' . $newType . ($newNote ? ' / ' . $newNote : '');
+                $db->prepare("UPDATE receipts SET register_date=?, deposit_date=?, receipt_method=?, invoice_category=?, subtotal=?, tax=?, total_amount=?, note=? WHERE receipt_number=?")
+                   ->execute(array($newDate, $newDate, $newMethod, $newType, $newUntaxed, $newTax, $newAmount, $syncNote, $newReceiptNo));
             } catch (Exception $e) {
                 error_log('sync receipt failed: ' . $e->getMessage());
             }
@@ -716,6 +718,63 @@ switch ($action) {
         }
         updateTotalCollected((int)$pay['case_id'], 'payment_edit');
         echo json_encode(array('success' => true));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+        }
+        break;
+
+    // ---- AJAX: 上傳銷項發票憑證（案件端專屬，不同步至銷項發票模組）----
+    case 'upload_si_voucher':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $siId = (int)($_POST['sales_invoice_id'] ?? 0);
+        if ($caseId <= 0 || $siId <= 0) {
+            echo json_encode(array('success' => false, 'error' => '參數錯誤'));
+            break;
+        }
+        if (empty($_FILES['file']['tmp_name'])) {
+            echo json_encode(array('success' => false, 'error' => '未選取檔案'));
+            break;
+        }
+        try {
+            $dir = __DIR__ . '/uploads/cases/' . $caseId . '/sales_invoices';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            $origName = $_FILES['file']['name'];
+            $ext = pathinfo($origName, PATHINFO_EXTENSION);
+            $fname = 'si' . $siId . '_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6) . ($ext ? '.' . $ext : '');
+            $target = $dir . '/' . $fname;
+            if (!move_uploaded_file($_FILES['file']['tmp_name'], $target)) {
+                echo json_encode(array('success' => false, 'error' => '檔案移動失敗'));
+                break;
+            }
+            $relPath = 'uploads/cases/' . $caseId . '/sales_invoices/' . $fname;
+            $db = Database::getInstance();
+            $ins = $db->prepare("INSERT INTO case_sales_invoice_vouchers (case_id, sales_invoice_id, file_path, file_name, uploaded_by) VALUES (?,?,?,?,?)");
+            $ins->execute(array($caseId, $siId, $relPath, $origName, Auth::id()));
+            $newId = (int)$db->lastInsertId();
+            echo json_encode(array('success' => true, 'id' => $newId, 'file_path' => $relPath, 'file_name' => $origName));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+        }
+        break;
+
+    // ---- AJAX: 刪除銷項發票憑證 ----
+    case 'delete_si_voucher':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        $voucherId = (int)($_POST['voucher_id'] ?? 0);
+        if ($voucherId <= 0) { echo json_encode(array('success' => false, 'error' => '參數錯誤')); break; }
+        try {
+            $db = Database::getInstance();
+            $row = $db->prepare("SELECT file_path FROM case_sales_invoice_vouchers WHERE id = ?");
+            $row->execute(array($voucherId));
+            $r = $row->fetch(PDO::FETCH_ASSOC);
+            if (!$r) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
+            $full = __DIR__ . '/' . $r['file_path'];
+            if (file_exists($full)) @unlink($full);
+            $db->prepare("DELETE FROM case_sales_invoice_vouchers WHERE id = ?")->execute(array($voucherId));
+            echo json_encode(array('success' => true));
         } catch (Exception $e) {
             echo json_encode(array('success' => false, 'error' => $e->getMessage()));
         }
