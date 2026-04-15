@@ -164,7 +164,7 @@ $statusColor = isset($statusColors[$entry['status']]) ? $statusColors[$entry['st
                 <td><?= e($line['account_name']) ?></td>
                 <td><?= e($line['cost_center_name']) ?></td>
                 <td><?= isset($relTypeLabels[$line['relation_type']]) ? $relTypeLabels[$line['relation_type']] : '' ?></td>
-                <td><?= e($line['relation_id'] ?: '') ?></td>
+                <td><?= e(!empty($line['relation_display_code']) ? $line['relation_display_code'] : ($line['relation_id'] ?: '')) ?></td>
                 <td title="<?= e($line['relation_name'] ?: '') ?>"><?= e($line['relation_name'] ? mb_substr($line['relation_name'], 0, 6) : '') ?></td>
                 <td style="text-align:right"><?= (float)$line['debit_amount'] > 0 ? number_format((float)$line['debit_amount']) : '' ?></td>
                 <td style="text-align:right"><?= (float)$line['credit_amount'] > 0 ? number_format((float)$line['credit_amount']) : '' ?></td>

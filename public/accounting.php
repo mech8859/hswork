@@ -351,7 +351,7 @@ switch ($action) {
             $customers = $db2->query("SELECT id, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $customers = array(); }
         try {
-            $vendors = $db2->query("SELECT id, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $vendors = $db2->query("SELECT id, vendor_code, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $vendors = array(); }
 
         $pageTitle = $entry ? '編輯傳票 - ' . $entry['voucher_number'] : '新增傳票';
@@ -475,7 +475,7 @@ switch ($action) {
             $customers = $db2->query("SELECT id, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $customers = array(); }
         try {
-            $vendors = $db2->query("SELECT id, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $vendors = $db2->query("SELECT id, vendor_code, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $vendors = array(); }
 
         $pageTitle = '複製傳票';
@@ -597,7 +597,15 @@ switch ($action) {
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
-        $olRelIds = Database::getInstance()->query("SELECT DISTINCT relation_id, relation_name FROM offset_ledger WHERE relation_id IS NOT NULL AND relation_id != '' ORDER BY CAST(relation_id AS UNSIGNED)")->fetchAll(PDO::FETCH_ASSOC);
+        // 下拉選項：廠商顯示 vendor_code (B-XXXX)，其他保留 relation_id
+        $olRelIds = Database::getInstance()->query("
+            SELECT DISTINCT ol.relation_id, ol.relation_type, ol.relation_name,
+                   CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS vendor_code
+            FROM offset_ledger ol
+            LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
+            WHERE ol.relation_id IS NOT NULL AND ol.relation_id != ''
+            ORDER BY CAST(ol.relation_id AS UNSIGNED)
+        ")->fetchAll(PDO::FETCH_ASSOC);
 
         $where = '1=1';
         $params = array();
@@ -622,10 +630,12 @@ switch ($action) {
 
         $db = Database::getInstance();
         $stmt = $db->prepare("
-            SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name
+            SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name,
+                   CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS relation_display_code
             FROM offset_ledger ol
             LEFT JOIN chart_of_accounts coa ON ol.account_id = coa.id
             LEFT JOIN cost_centers cc ON ol.cost_center_id = cc.id
+            LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
             WHERE {$where}
             ORDER BY ol.voucher_date DESC, ol.id DESC
         ");
@@ -936,8 +946,15 @@ switch ($action) {
         $costCenters = $model->getCostCenters();
         $db = Database::getInstance();
 
-        // 往來編號清單
-        $orRelIds = $db->query("SELECT DISTINCT relation_id, relation_name FROM offset_ledger WHERE relation_id IS NOT NULL AND relation_id != '' ORDER BY CAST(relation_id AS UNSIGNED)")->fetchAll(PDO::FETCH_ASSOC);
+        // 往來編號清單（廠商顯示 vendor_code）
+        $orRelIds = $db->query("
+            SELECT DISTINCT ol.relation_id, ol.relation_type, ol.relation_name,
+                   CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS vendor_code
+            FROM offset_ledger ol
+            LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
+            WHERE ol.relation_id IS NOT NULL AND ol.relation_id != ''
+            ORDER BY CAST(ol.relation_id AS UNSIGNED)
+        ")->fetchAll(PDO::FETCH_ASSOC);
 
         // 查詢立帳記錄
         $where = '1=1';
@@ -957,10 +974,12 @@ switch ($action) {
         if ($orCostCenterId) { $where .= ' AND ol.cost_center_id = ?'; $params[] = $orCostCenterId; }
 
         $stmt = $db->prepare("
-            SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name
+            SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name,
+                   CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS relation_display_code
             FROM offset_ledger ol
             LEFT JOIN chart_of_accounts coa ON ol.account_id = coa.id
             LEFT JOIN cost_centers cc ON ol.cost_center_id = cc.id
+            LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
             WHERE {$where}
             ORDER BY coa.code, CAST(ol.relation_id AS UNSIGNED), ol.voucher_date, ol.id
         ");
@@ -992,6 +1011,7 @@ switch ($action) {
                     'account_name' => $r['account_name'],
                     'relation_type' => $r['relation_type'],
                     'relation_id' => $r['relation_id'],
+                    'relation_display_code' => !empty($r['relation_display_code']) ? $r['relation_display_code'] : $r['relation_id'],
                     'relation_name' => $r['relation_name'],
                     'cost_center_name' => $r['cost_center_name'],
                     'records' => array(),

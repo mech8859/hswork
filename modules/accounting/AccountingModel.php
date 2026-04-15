@@ -346,6 +346,7 @@ class AccountingModel
         if (!$entry) return false;
 
         // Load lines
+        // relation_display_code: 廠商顯示 vendor_code (B-XXXX)，其他類型 fallback relation_id
         $lineStmt = $this->db->prepare(
             "SELECT jl.id, jl.journal_entry_id, jl.account_id, jl.cost_center_id,
                     jl.relation_type, jl.relation_id, jl.relation_name,
@@ -356,11 +357,13 @@ class AccountingModel
                     coa.account_code AS account_code, coa.account_name AS account_name,
                     cc.name AS cost_center_name,
                     ol.voucher_number AS offset_voucher_number,
-                    ol.relation_name AS offset_relation_name
+                    ol.relation_name AS offset_relation_name,
+                    CASE WHEN jl.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS relation_display_code
              FROM journal_entry_lines jl
              LEFT JOIN chart_of_accounts coa ON jl.account_id = coa.id
              LEFT JOIN cost_centers cc ON jl.cost_center_id = cc.id
              LEFT JOIN offset_ledger ol ON jl.offset_ledger_id = ol.id
+             LEFT JOIN vendors v ON jl.relation_type = 'vendor' AND v.id = jl.relation_id
              WHERE jl.journal_entry_id = ?
              ORDER BY jl.sort_order, jl.id"
         );

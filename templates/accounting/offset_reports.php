@@ -38,8 +38,8 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
             <label style="font-size:.85em">編號（從）</label>
             <select name="rel_id_from" class="form-control" style="width:150px">
                 <option value="">--</option>
-                <?php foreach ($orRelIds as $ri): ?>
-                <option value="<?= e($ri['relation_id']) ?>" <?= $orRelIdFrom === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($ri['relation_id']) ?> <?= e($ri['relation_name'] ?? '') ?></option>
+                <?php foreach ($orRelIds as $ri): $riCode = !empty($ri['vendor_code']) ? $ri['vendor_code'] : $ri['relation_id']; ?>
+                <option value="<?= e($ri['relation_id']) ?>" <?= $orRelIdFrom === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($riCode) ?> <?= e($ri['relation_name'] ?? '') ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -47,8 +47,8 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
             <label style="font-size:.85em">編號（到）</label>
             <select name="rel_id_to" class="form-control" style="width:150px">
                 <option value="">--</option>
-                <?php foreach ($orRelIds as $ri): ?>
-                <option value="<?= e($ri['relation_id']) ?>" <?= $orRelIdTo === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($ri['relation_id']) ?> <?= e($ri['relation_name'] ?? '') ?></option>
+                <?php foreach ($orRelIds as $ri): $riCode = !empty($ri['vendor_code']) ? $ri['vendor_code'] : $ri['relation_id']; ?>
+                <option value="<?= e($ri['relation_id']) ?>" <?= $orRelIdTo === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($riCode) ?> <?= e($ri['relation_name'] ?? '') ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -118,7 +118,8 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
             // 小計分隔
             if ($prevKey) {
                 $pg = $orGrouped[$prevKey];
-                echo '<tr style="background:#e8f5e9;font-weight:bold"><td colspan="8" style="text-align:right">小計 - ' . e($pg['account_code']) . ' / ' . e($pg['relation_id']) . ' ' . e($pg['relation_name']) . '</td>';
+                $pgCode = !empty($pg['relation_display_code']) ? $pg['relation_display_code'] : $pg['relation_id'];
+                echo '<tr style="background:#e8f5e9;font-weight:bold"><td colspan="8" style="text-align:right">小計 - ' . e($pg['account_code']) . ' / ' . e($pgCode) . ' ' . e($pg['relation_name']) . '</td>';
                 echo '<td style="text-align:right">' . number_format($pg['sum_original']) . '</td>';
                 echo '<td style="text-align:right">' . number_format($pg['sum_offset']) . '</td>';
                 echo '<td style="text-align:right">' . number_format($pg['sum_remaining']) . '</td></tr>';
@@ -132,7 +133,7 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
                 <td><?= e($r['account_code']) ?> <?= e($r['account_name']) ?></td>
                 <td><?= e($r['cost_center_name'] ?? '') ?></td>
                 <td><?= $relTypeLabels[$r['relation_type']] ?? $r['relation_type'] ?></td>
-                <td><?= e($r['relation_id']) ?></td>
+                <td><?= e(!empty($r['relation_display_code']) ? $r['relation_display_code'] : $r['relation_id']) ?></td>
                 <td><?= e($r['relation_name'] ?? '') ?></td>
                 <td style="color:#666"><?= e($r['description'] ?? '') ?></td>
                 <td style="text-align:right;font-weight:600"><?= number_format((float)$r['original_amount']) ?></td>
@@ -157,7 +158,8 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
         // 最後一組小計
         if ($prevKey) {
             $pg = $orGrouped[$prevKey];
-            echo '<tr style="background:#e8f5e9;font-weight:bold"><td colspan="8" style="text-align:right">小計 - ' . e($pg['account_code']) . ' / ' . e($pg['relation_id']) . ' ' . e($pg['relation_name']) . '</td>';
+            $pgCode = !empty($pg['relation_display_code']) ? $pg['relation_display_code'] : $pg['relation_id'];
+            echo '<tr style="background:#e8f5e9;font-weight:bold"><td colspan="8" style="text-align:right">小計 - ' . e($pg['account_code']) . ' / ' . e($pgCode) . ' ' . e($pg['relation_name']) . '</td>';
             echo '<td style="text-align:right">' . number_format($pg['sum_original']) . '</td>';
             echo '<td style="text-align:right">' . number_format($pg['sum_offset']) . '</td>';
             echo '<td style="text-align:right">' . number_format($pg['sum_remaining']) . '</td></tr>';
@@ -210,7 +212,7 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
             <td style="font-family:monospace"><?= e($g['account_code']) ?></td>
             <td><?= e($g['account_name']) ?></td>
             <td><?= $relTypeLabels[$g['relation_type']] ?? $g['relation_type'] ?></td>
-            <td><?= e($g['relation_id']) ?></td>
+            <td><?= e(!empty($g['relation_display_code']) ? $g['relation_display_code'] : $g['relation_id']) ?></td>
             <td><?= e($g['relation_name'] ?? '') ?></td>
             <td><?= e($g['cost_center_name'] ?? '') ?></td>
             <td><?= count($g['records']) ?></td>
@@ -252,7 +254,7 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
         <div>
             <strong style="font-family:monospace"><?= e($g['account_code']) ?></strong> <?= e($g['account_name']) ?>
             <span style="margin-left:12px;color:#666">|</span>
-            <span style="margin-left:12px"><?= $relTypeLabels[$g['relation_type']] ?? $g['relation_type'] ?>：<?= e($g['relation_id']) ?> <?= e($g['relation_name'] ?? '') ?></span>
+            <span style="margin-left:12px"><?= $relTypeLabels[$g['relation_type']] ?? $g['relation_type'] ?>：<?= e(!empty($g['relation_display_code']) ? $g['relation_display_code'] : $g['relation_id']) ?> <?= e($g['relation_name'] ?? '') ?></span>
             <?php if ($g['cost_center_name']): ?>
             <span style="margin-left:12px;color:#666">| <?= e($g['cost_center_name']) ?></span>
             <?php endif; ?>

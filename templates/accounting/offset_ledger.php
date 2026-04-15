@@ -32,8 +32,8 @@
             <label style="font-size:0.85em">往來編號（從）</label>
             <select name="rel_id_from" class="form-control" style="width:160px">
                 <option value="">-- 起始 --</option>
-                <?php foreach ($olRelIds as $ri): ?>
-                <option value="<?= e($ri['relation_id']) ?>" <?= ($olRelIdFrom ?? '') === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($ri['relation_id']) ?> <?= e($ri['relation_name'] ?? '') ?></option>
+                <?php foreach ($olRelIds as $ri): $riCode = !empty($ri['vendor_code']) ? $ri['vendor_code'] : $ri['relation_id']; ?>
+                <option value="<?= e($ri['relation_id']) ?>" <?= ($olRelIdFrom ?? '') === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($riCode) ?> <?= e($ri['relation_name'] ?? '') ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -41,8 +41,8 @@
             <label style="font-size:0.85em">往來編號（到）</label>
             <select name="rel_id_to" class="form-control" style="width:160px">
                 <option value="">-- 結束 --</option>
-                <?php foreach ($olRelIds as $ri): ?>
-                <option value="<?= e($ri['relation_id']) ?>" <?= ($olRelIdTo ?? '') === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($ri['relation_id']) ?> <?= e($ri['relation_name'] ?? '') ?></option>
+                <?php foreach ($olRelIds as $ri): $riCode = !empty($ri['vendor_code']) ? $ri['vendor_code'] : $ri['relation_id']; ?>
+                <option value="<?= e($ri['relation_id']) ?>" <?= ($olRelIdTo ?? '') === (string)$ri['relation_id'] ? 'selected' : '' ?>><?= e($riCode) ?> <?= e($ri['relation_name'] ?? '') ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

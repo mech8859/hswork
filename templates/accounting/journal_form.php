@@ -407,7 +407,8 @@ function addLine(data) {
         '<option value="other"' + (relType === 'other' ? ' selected' : '') + '>其他</option>' +
         '</select>';
 
-    var relIdDisplay = relId || '<span style="color:#999">--</span>';
+    // 廠商顯示 vendor_code，其他類型 fallback 原 id
+    var relIdDisplay = relId ? (typeof getRelDisplayCode === 'function' ? getRelDisplayCode(relType, relId) : relId) : '<span style="color:#999">--</span>';
     var relNameShort = relName ? relName.substring(0, 6) : '';
     var relNameDisplay = relNameShort || '<span style="color:#999">--</span>';
 
@@ -585,9 +586,12 @@ function renderRelList(type, keyword) {
         var item = list[i];
         var code = item.tax_id_number || item.tax_id || '';
         var idStr = String(item.id);
-        if (kw && item.name.toLowerCase().indexOf(kw) === -1 && code.toLowerCase().indexOf(kw) === -1 && idStr.indexOf(kw) === -1) continue;
+        // 廠商顯示 vendor_code (B-XXXX)；客戶 fallback 用 id
+        var displayCode = item.vendor_code || item.id;
+        var displayCodeStr = String(displayCode).toLowerCase();
+        if (kw && item.name.toLowerCase().indexOf(kw) === -1 && code.toLowerCase().indexOf(kw) === -1 && idStr.indexOf(kw) === -1 && displayCodeStr.indexOf(kw) === -1) continue;
         html += '<tr class="acct-row" style="cursor:pointer" onclick="pickRel(' + item.id + ',\'' + item.name.replace(/'/g, "\\'") + '\')">' +
-            '<td style="font-family:monospace">' + (item.id) + '</td>' +
+            '<td style="font-family:monospace">' + displayCode + '</td>' +
             '<td>' + item.name + '</td>' +
             '<td style="color:#aaa">' + code + '</td></tr>';
         count++;
@@ -597,11 +601,27 @@ function renderRelList(type, keyword) {
     document.getElementById('relModalCount').textContent = '共 ' + count + ' 筆';
 }
 
+// 依 relation_type + id 查顯示用編號（廠商用 vendor_code，客戶 fallback id）
+function getRelDisplayCode(type, id) {
+    if (!id) return id;
+    if (type === 'vendor') {
+        for (var i = 0; i < vendors.length; i++) {
+            if (String(vendors[i].id) === String(id)) {
+                return vendors[i].vendor_code || id;
+            }
+        }
+    }
+    return id;
+}
+
 function pickRel(id, name) {
     if (_relPickerIdx === null) return;
+    var sel = document.querySelector('select[data-idx="' + _relPickerIdx + '"]');
+    var type = sel ? sel.value : '';
+    var displayCode = getRelDisplayCode(type, id);
     document.getElementById('rel_id_' + _relPickerIdx).value = id;
     document.getElementById('rel_name_' + _relPickerIdx).value = name;
-    document.getElementById('rel_id_display_' + _relPickerIdx).innerHTML = id;
+    document.getElementById('rel_id_display_' + _relPickerIdx).innerHTML = displayCode;
     var short = name.length > 6 ? name.substring(0, 6) : name;
     document.getElementById('rel_name_display_' + _relPickerIdx).innerHTML = short;
     document.getElementById('rel_name_display_' + _relPickerIdx).title = name;
