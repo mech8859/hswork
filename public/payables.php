@@ -165,6 +165,14 @@ switch ($action) {
                 Session::flash('error', '無權限執行此操作');
                 redirect('/payables.php');
             }
+            // 鎖定保護：已生成付款單 → 不可修改
+            if (!empty($record['payment_out_id'])) {
+                $poStmt = Database::getInstance()->prepare("SELECT payment_number FROM payments_out WHERE id = ?");
+                $poStmt->execute(array($record['payment_out_id']));
+                $poNum = $poStmt->fetchColumn() ?: '';
+                Session::flash('error', '此應付帳款已生成付款單 ' . $poNum . '，請先刪除該付款單才能修改');
+                redirect('/payables.php?action=edit&id=' . $id);
+            }
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
                 redirect('/payables.php?action=edit&id=' . $id);
@@ -246,11 +254,99 @@ switch ($action) {
         }
         $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
         if ($id > 0) {
+            // 鎖定保護
+            $delRecord = $model->getPayable($id);
+            if ($delRecord && !empty($delRecord['payment_out_id'])) {
+                $poStmt = Database::getInstance()->prepare("SELECT payment_number FROM payments_out WHERE id = ?");
+                $poStmt->execute(array($delRecord['payment_out_id']));
+                $poNum = $poStmt->fetchColumn() ?: '';
+                Session::flash('error', '此應付帳款已生成付款單 ' . $poNum . '，請先刪除該付款單才能刪除應付帳款');
+                redirect('/payables.php');
+            }
             AuditLog::log('payables', 'delete', $id, '刪除應付帳款單');
             $model->deletePayable($id);
             Session::flash('success', '應付帳款單已刪除');
         }
         redirect('/payables.php');
+        break;
+
+    // ---- 生成付款單（從應付帳款）----
+    case 'generate_payment':
+        if (!$canManageFinance && !$isBoss) {
+            Session::flash('error', '無權限執行此操作');
+            redirect('/payables.php');
+        }
+        if (!verify_csrf()) {
+            Session::flash('error', '安全驗證失敗');
+            redirect('/payables.php');
+        }
+        $payableId = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
+        $record = $model->getPayable($payableId);
+        if (!$record) {
+            Session::flash('error', '應付帳款單不存在');
+            redirect('/payables.php');
+        }
+        // 1:1 保護
+        if (!empty($record['payment_out_id'])) {
+            $poStmt = Database::getInstance()->prepare("SELECT payment_number FROM payments_out WHERE id = ?");
+            $poStmt->execute(array($record['payment_out_id']));
+            $poNum = $poStmt->fetchColumn() ?: '';
+            Session::flash('error', '此應付帳款已生成付款單 ' . $poNum . '，如需重新生成請先刪除該付款單');
+            redirect('/payables.php?action=edit&id=' . $payableId);
+        }
+        try {
+            $db = Database::getInstance();
+            $userId = Session::getUser()['id'];
+            $userName = Session::getUser()['real_name'] ?? null;
+
+            // 建立付款單（草稿/待付款狀態）
+            $poData = array(
+                'create_date'    => date('Y-m-d'),
+                'payment_date'   => null, // 空白，讓會計填
+                'payable_id'     => $payableId,
+                'vendor_name'    => $record['vendor_name'],
+                'vendor_code'    => $record['vendor_code'],
+                'payment_method' => null,
+                'payment_type'   => null,
+                'payment_terms'  => $record['payment_terms'],
+                'status'         => '待付款',
+                'subtotal'       => $record['subtotal'],
+                'tax'            => $record['tax'],
+                'remittance_fee' => 0,
+                'total_amount'   => $record['payable_amount'] ?: $record['total_amount'],
+                'main_category'  => null,
+                'sub_category'   => null,
+                'note'           => '由應付帳款 ' . $record['payable_number'] . ' 生成',
+                'registrar'      => $userName,
+                'created_by'     => $userId,
+            );
+            $paymentOutId = $model->createPaymentOut($poData);
+
+            // 複製分公司拆帳到付款單
+            $branchItems = $model->getPayableBranches($payableId);
+            if (!empty($branchItems)) {
+                $branchData = array();
+                foreach ($branchItems as $idx => $b) {
+                    $branchData[$idx] = array(
+                        'branch_id' => $b['branch_id'],
+                        'amount'    => $b['amount'],
+                        'note'      => $b['note'] ?? '',
+                    );
+                }
+                $model->savePaymentOutBranches($paymentOutId, $branchData);
+            }
+
+            // 鎖定應付帳款
+            $db->prepare("UPDATE payables SET payment_out_id = ? WHERE id = ?")
+               ->execute(array($paymentOutId, $payableId));
+
+            AuditLog::log('payables', 'generate_payment', $payableId, '從應付帳款 ' . $record['payable_number'] . ' 生成付款單');
+            Session::flash('success', '付款單已生成，請檢查並填入付款日期/付款方式');
+            redirect('/payments_out.php?action=edit&id=' . $paymentOutId);
+        } catch (Exception $e) {
+            Session::flash('error', '生成失敗：' . $e->getMessage());
+            redirect('/payables.php?action=edit&id=' . $payableId);
+        }
         break;
 
     // ---- AJAX: 廠商搜尋 ----

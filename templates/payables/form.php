@@ -1,8 +1,30 @@
 <?php $isEdit = !empty($record); ?>
 
+<?php
+// 檢查是否已生成付款單（鎖定狀態）
+$isLocked = $isEdit && !empty($record['payment_out_id']);
+$lockedPaymentNumber = '';
+$lockedPaymentId = 0;
+if ($isLocked) {
+    $_pnStmt = Database::getInstance()->prepare("SELECT id, payment_number FROM payments_out WHERE id = ?");
+    $_pnStmt->execute(array($record['payment_out_id']));
+    $_pnRow = $_pnStmt->fetch(PDO::FETCH_ASSOC);
+    if ($_pnRow) {
+        $lockedPaymentNumber = $_pnRow['payment_number'];
+        $lockedPaymentId = (int)$_pnRow['id'];
+    }
+}
+?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <div>
-        <h2><?= $isEdit ? '編輯應付帳款單 - ' . e($record['payable_number']) : '新增應付帳款單' ?></h2>
+        <h2>
+            <?= $isEdit ? '編輯應付帳款單 - ' . e($record['payable_number']) : '新增應付帳款單' ?>
+            <?php if ($isLocked && $lockedPaymentNumber): ?>
+            <span style="font-size:.7em;color:#2e7d32;background:#e8f5e9;padding:4px 10px;border-radius:4px;margin-left:8px">✓ 已付款
+                <a href="/payments_out.php?action=edit&id=<?= $lockedPaymentId ?>" style="color:#1565c0;text-decoration:underline;font-weight:600"><?= e($lockedPaymentNumber) ?></a>
+            </span>
+            <?php endif; ?>
+        </h2>
         <?php if ($isEdit && !empty($record['updated_at'])): ?>
         <?php
         $updaterName = '';
@@ -16,12 +38,23 @@
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
-        <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
+        <?php if ($isEdit && !$isLocked && (Auth::hasPermission('finance.manage') || Auth::hasPermission('all'))): ?>
+        <form method="POST" action="/payables.php?action=generate_payment&id=<?= $record['id'] ?>" style="display:inline" onsubmit="return confirm('確定生成付款單？\n\n金額與廠商會從本應付帳款帶入，生成後本應付帳款將鎖定不可修改，請先確認所有進貨明細正確。')">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn btn-sm" style="background:#2e7d32;color:#fff">⚡ 生成付款單</button>
+        </form>
+        <?php endif; ?>
+        <?php if ($isEdit && !$isLocked && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="if(confirm('確定刪除？'))document.getElementById('deleteForm').submit()">刪除</button>
         <?php endif; ?>
         <?= back_button('/payables.php') ?>
     </div>
 </div>
+<?php if ($isLocked): ?>
+<div class="alert" style="background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:.9rem">
+    ⚠ 此應付帳款已生成付款單 <strong><?= e($lockedPaymentNumber) ?></strong>，目前為<b>鎖定狀態</b>不可修改。如需調整，請先到該付款單刪除。
+</div>
+<?php endif; ?>
 <?php if ($isEdit): ?>
 <form id="deleteForm" method="POST" action="/payables.php?action=delete&id=<?= $record['id'] ?>" style="display:none"><?= csrf_field() ?></form>
 <?php endif; ?>

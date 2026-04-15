@@ -256,6 +256,23 @@ document.addEventListener('click', function(e) {
             <label>付款日</label>
             <div class="form-value"><?= !empty($record['paid_date']) ? e($record['paid_date']) : '-' ?></div>
         </div>
+        <div class="form-group">
+            <label>付款單號</label>
+            <div class="form-value">
+                <?php if (!empty($record['payment_number'])):
+                    // 查 payment_out id 以便連結
+                    $_poStmt = Database::getInstance()->prepare("SELECT id FROM payments_out WHERE payment_number = ? LIMIT 1");
+                    $_poStmt->execute(array($record['payment_number']));
+                    $_poId = (int)$_poStmt->fetchColumn();
+                ?>
+                <?php if ($_poId > 0): ?>
+                <a href="/payments_out.php?action=edit&id=<?= $_poId ?>" style="color:#1565c0;font-weight:600"><?= e($record['payment_number']) ?></a>
+                <?php else: ?>
+                <?= e($record['payment_number']) ?>
+                <?php endif; ?>
+                <?php else: ?>-<?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
 

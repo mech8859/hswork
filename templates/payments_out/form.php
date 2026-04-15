@@ -218,6 +218,121 @@
         </div>
     </div>
 
+    <?php
+    // ========== 應付帳款連動 - 進貨/進退/發票 3 張卡片（共用讀取） ==========
+    if ($isEdit && !empty($record['payable_id'])) {
+        $_pblDb = Database::getInstance();
+        $_pblStmt = $_pblDb->prepare("SELECT id, payable_number FROM payables WHERE id = ?");
+        $_pblStmt->execute(array($record['payable_id']));
+        $_pbl = $_pblStmt->fetch(PDO::FETCH_ASSOC);
+        if ($_pbl) {
+            // 進貨明細
+            $_pdStmt = $_pblDb->prepare("SELECT * FROM payable_purchase_details WHERE payable_id = ? ORDER BY sort_order, id");
+            $_pdStmt->execute(array($_pbl['id']));
+            $_pdList = $_pdStmt->fetchAll(PDO::FETCH_ASSOC);
+            // 進退明細
+            $_rdStmt = $_pblDb->prepare("SELECT * FROM payable_return_details WHERE payable_id = ? ORDER BY sort_order, id");
+            $_rdStmt->execute(array($_pbl['id']));
+            $_rdList = $_rdStmt->fetchAll(PDO::FETCH_ASSOC);
+            // 發票明細
+            $_invStmt = $_pblDb->prepare("SELECT * FROM payable_invoices WHERE payable_id = ? ORDER BY id");
+            $_invStmt->execute(array($_pbl['id']));
+            $_invList = $_invStmt->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+    <!-- 關聯應付帳款提示 -->
+    <div class="card" style="background:#f0f7ff;border-left:4px solid #1976d2">
+        <div style="padding:10px 16px;font-size:.9rem">
+            🔗 此付款單關聯應付帳款：<a href="/payables.php?action=edit&id=<?= (int)$_pbl['id'] ?>" style="font-weight:600;color:#1565c0"><?= e($_pbl['payable_number']) ?></a>
+            <span style="color:#666;margin-left:8px">（以下 3 張明細為共用讀取，不可在此修改）</span>
+        </div>
+    </div>
+
+    <!-- 進貨明細（共用） -->
+    <div class="card">
+        <div class="card-header">進貨明細（<?= count($_pdList) ?> 筆，共用讀取）</div>
+        <div class="table-responsive">
+            <?php if (empty($_pdList)): ?>
+            <div style="padding:12px;color:#999;text-align:center">尚無進貨明細</div>
+            <?php else: ?>
+            <table class="table" style="font-size:.85rem;margin:0">
+                <thead><tr><th>進貨日期</th><th>進貨單號</th><th>分公司</th><th>廠商名稱</th><th class="text-right">未稅</th><th class="text-right">稅</th><th class="text-right">含稅</th><th>發票字軌</th></tr></thead>
+                <tbody>
+                <?php foreach ($_pdList as $_pd): ?>
+                <tr>
+                    <td><?= e($_pd['purchase_date']) ?></td>
+                    <td><?= e($_pd['purchase_number']) ?></td>
+                    <td><?= e($_pd['branch_name']) ?></td>
+                    <td><?= e($_pd['vendor_name']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_pd['amount_untaxed']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_pd['tax_amount']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_pd['total_amount']) ?></td>
+                    <td><?= e($_pd['invoice_track']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- 進退明細（共用） -->
+    <div class="card">
+        <div class="card-header">進退明細（<?= count($_rdList) ?> 筆，共用讀取）</div>
+        <div class="table-responsive">
+            <?php if (empty($_rdList)): ?>
+            <div style="padding:12px;color:#999;text-align:center">尚無進退明細</div>
+            <?php else: ?>
+            <table class="table" style="font-size:.85rem;margin:0">
+                <thead><tr><th>退貨日期</th><th>退貨單號</th><th>對應進貨單</th><th>廠商名稱</th><th>分公司</th><th>倉庫</th><th class="text-right">退款金額</th><th>退貨原因</th></tr></thead>
+                <tbody>
+                <?php foreach ($_rdList as $_rd): ?>
+                <tr>
+                    <td><?= e($_rd['return_date']) ?></td>
+                    <td><?= e($_rd['return_number']) ?></td>
+                    <td><?= e($_rd['purchase_number']) ?></td>
+                    <td><?= e($_rd['vendor_name']) ?></td>
+                    <td><?= e($_rd['branch_name']) ?></td>
+                    <td><?= e($_rd['warehouse_name']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_rd['refund_amount']) ?></td>
+                    <td><?= e($_rd['return_reason']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- 發票明細（共用） -->
+    <div class="card">
+        <div class="card-header">發票明細（<?= count($_invList) ?> 筆，共用讀取）</div>
+        <div class="table-responsive">
+            <?php if (empty($_invList)): ?>
+            <div style="padding:12px;color:#999;text-align:center">尚無發票明細</div>
+            <?php else: ?>
+            <table class="table" style="font-size:.85rem;margin:0">
+                <thead><tr><th>發票日期</th><th>發票號碼</th><th>統編</th><th class="text-right">未稅金額</th><th class="text-right">稅金</th><th class="text-right">小計</th></tr></thead>
+                <tbody>
+                <?php foreach ($_invList as $_inv): ?>
+                <tr>
+                    <td><?= e($_inv['invoice_date']) ?></td>
+                    <td><?= e($_inv['invoice_number']) ?></td>
+                    <td><?= e($_inv['tax_id']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_inv['amount_untaxed']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_inv['tax']) ?></td>
+                    <td class="text-right">$<?= number_format((int)$_inv['subtotal']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+        }
+    }
+    ?>
+
     <!-- 憑證明細 -->
     <div class="card">
         <div class="card-header d-flex justify-between align-center">

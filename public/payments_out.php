@@ -161,6 +161,22 @@ switch ($action) {
                 }
             }
 
+            // 回寫進貨單（若本付款單連結應付帳款）
+            if (!empty($record['payable_id']) && !empty($data['payment_date'])) {
+                try {
+                    $wbDb = Database::getInstance();
+                    $wbStmt = $wbDb->prepare("SELECT purchase_number, total_amount FROM payable_purchase_details WHERE payable_id = ? AND purchase_number IS NOT NULL AND purchase_number != ''");
+                    $wbStmt->execute(array($record['payable_id']));
+                    $wbPaymentNumber = $record['payment_number'];
+                    foreach ($wbStmt->fetchAll(PDO::FETCH_ASSOC) as $wbRow) {
+                        $wbDb->prepare("UPDATE goods_receipts SET payment_number = ?, paid_date = ?, paid_amount = ? WHERE gr_number = ?")
+                             ->execute(array($wbPaymentNumber, $data['payment_date'], (int)$wbRow['total_amount'], $wbRow['purchase_number']));
+                    }
+                } catch (Exception $wbEx) {
+                    error_log('Payment writeback to goods_receipts failed: ' . $wbEx->getMessage());
+                }
+            }
+
             Session::flash('success', '付款單已更新');
             redirect('/payments_out.php?action=edit&id=' . $id);
         }
@@ -215,14 +231,34 @@ switch ($action) {
         exit;
 
     // ---- 刪除 ----
+    // 限制：僅系統管理者（因刪除會觸發進貨單反向清理，避免會計誤觸）
     case 'delete':
-        if (!$isBoss && !Auth::hasPermission('finance.delete')) {
-            Session::flash('error', '無權限執行此操作');
+        if (!$isBoss) {
+            Session::flash('error', '無權限執行此操作，僅系統管理者可刪除付款單');
             redirect('/payments_out.php');
         }
         if (verify_csrf()) {
             $id = (int)(!empty($_GET['id']) ? $_GET['id'] : 0);
-            AuditLog::log('payments_out', 'delete', $id, '刪除付款單');
+            // 取得付款單資訊以便反向清理
+            $delRec = $model->getPaymentOut($id);
+            try {
+                if ($delRec) {
+                    $cleanDb = Database::getInstance();
+                    // 清除進貨單的付款資訊
+                    if (!empty($delRec['payment_number'])) {
+                        $cleanDb->prepare("UPDATE goods_receipts SET payment_number = NULL, paid_date = NULL, paid_amount = 0 WHERE payment_number = ?")
+                                ->execute(array($delRec['payment_number']));
+                    }
+                    // 解鎖應付帳款
+                    if (!empty($delRec['payable_id'])) {
+                        $cleanDb->prepare("UPDATE payables SET payment_out_id = NULL WHERE id = ?")
+                                ->execute(array($delRec['payable_id']));
+                    }
+                }
+            } catch (Exception $delEx) {
+                error_log('Payment delete cleanup failed: ' . $delEx->getMessage());
+            }
+            AuditLog::log('payments_out', 'delete', $id, '刪除付款單' . ($delRec && !empty($delRec['payable_id']) ? '（含解鎖應付帳款）' : ''));
             $model->deletePaymentOut($id);
             Session::flash('success', '付款單已刪除');
         }
