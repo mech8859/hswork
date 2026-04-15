@@ -308,8 +308,9 @@ function updateSubCategory() {
 updateSubCategory();
 
 // ---- 金額自動計算 ----
-// 稅額預設依小計×5%自動帶入；使用者手動修改後不再覆寫
-var taxManualEdited = <?= ($isEdit && !empty($record['subtotal']) && !empty($record['tax']) && (int)$record['tax'] !== (int)round((int)$record['subtotal'] * 0.05)) ? 'true' : 'false' ?>;
+// 載入時不重算（保留資料庫原值，包含 0）
+// 使用者改小計時才自動帶入 5%；使用者一旦手動修改稅額，後續不再覆寫
+var taxManualEdited = false;
 function onTaxManual() {
     taxManualEdited = true;
     recalcTotal();
@@ -332,7 +333,7 @@ function recalcTotal() {
     var remittanceFee = _num('remittanceFee');
     document.getElementById('totalAmount').value = subtotal + tax + remittanceFee;
 }
-calcAmounts();
+// 不在載入時呼叫 calcAmounts()，避免覆寫使用者已儲存的稅額（如手動設為 0）
 
 // ---- 分公司拆帳動態列 ----
 var branchIdx = <?= !empty($branchItems) ? count($branchItems) : 0 ?>;

@@ -98,7 +98,17 @@ switch ($action) {
                 'note'               => !empty($_POST['note']) ? $_POST['note'] : null,
                 'created_by'         => $userId,
             );
-            $invoiceId = $model->createPurchaseInvoice($data);
+            try {
+                $invoiceId = $model->createPurchaseInvoice($data);
+            } catch (Exception $e) {
+                Session::flash('error', $e->getMessage());
+                Session::set('purchase_invoice_form_data', $_POST);
+                $back = '/purchase_invoices.php?action=create';
+                if ($returnPayable > 0) {
+                    $back .= '&vendor_name=' . urlencode($_POST['vendor_name'] ?? '') . '&return_to_payable=' . $returnPayable;
+                }
+                redirect($back);
+            }
             AuditLog::log('purchase_invoices', 'create', $invoiceId, '新增進項發票');
 
             // Auto-journal on purchase invoice create
@@ -200,7 +210,13 @@ switch ($action) {
                 'status'             => !empty($_POST['status']) ? $_POST['status'] : 'pending',
                 'note'           => !empty($_POST['note']) ? $_POST['note'] : null,
             );
-            $model->updatePurchaseInvoice($id, $data);
+            try {
+                $model->updatePurchaseInvoice($id, $data);
+            } catch (Exception $e) {
+                Session::flash('error', $e->getMessage());
+                Session::set('purchase_invoice_form_data', $_POST);
+                redirect('/purchase_invoices.php?action=edit&id=' . $id);
+            }
             AuditLog::log('purchase_invoices', 'update', $id, '更新進項發票');
             Session::flash('success', '進項發票已更新');
             redirect('/purchase_invoices.php');

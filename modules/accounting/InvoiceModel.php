@@ -169,10 +169,36 @@ class InvoiceModel
     }
 
     /**
+     * 檢查進項發票號碼是否重複
+     * @param string $invoiceNumber 發票號碼
+     * @param int|null $excludeId 排除的 ID（編輯時用）
+     * @return bool 重複回傳 true
+     */
+    public function isPurchaseInvoiceNumberDuplicate($invoiceNumber, $excludeId = null)
+    {
+        if (empty($invoiceNumber)) {
+            return false; // 空白不檢查
+        }
+        if ($excludeId) {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM purchase_invoices WHERE invoice_number = ? AND id != ? AND status != 'voided'");
+            $stmt->execute(array($invoiceNumber, (int)$excludeId));
+        } else {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM purchase_invoices WHERE invoice_number = ? AND status != 'voided'");
+            $stmt->execute(array($invoiceNumber));
+        }
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
+    /**
      * 新增進項發票
      */
     public function createPurchaseInvoice($data)
     {
+        // 唯一性檢查
+        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'])) {
+            throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法新增');
+        }
+
         // 自動計算稅額
         $data = $this->autoCalculateTax($data);
         // 自動計算期間
@@ -218,6 +244,11 @@ class InvoiceModel
      */
     public function updatePurchaseInvoice($id, $data)
     {
+        // 唯一性檢查（排除自己）
+        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'], $id)) {
+            throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法更新');
+        }
+
         $data = $this->autoCalculateTax($data);
         if (empty($data['period']) && !empty($data['invoice_date'])) {
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
