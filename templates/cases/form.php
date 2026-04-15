@@ -1270,8 +1270,32 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div style="margin:8px 0;padding:10px;background:#fafafa;border:1px solid var(--gray-200);border-radius:6px">
             <div class="d-flex justify-between align-center" style="margin-bottom:6px">
                 <strong style="font-size:.9rem">銷項發票</strong>
-                <a href="/sales_invoices.php?action=create&case_id=<?= $case['id'] ?>&return=case" class="btn btn-primary btn-sm">+ 新增銷項發票</a>
+                <div style="display:flex;gap:6px">
+                    <?php if (Auth::hasPermission('finance.manage') || Auth::hasPermission('all')): ?>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="openSiSearchModal()" title="搜尋既有銷項發票並連結到本案件（舊資料補掛用）">🔍 搜尋連結</button>
+                    <?php endif; ?>
+                    <a href="/sales_invoices.php?action=create&case_id=<?= $case['id'] ?>&return=case" class="btn btn-primary btn-sm">+ 新增銷項發票</a>
+                </div>
             </div>
+
+            <?php if (Auth::hasPermission('finance.manage') || Auth::hasPermission('all')): ?>
+            <!-- 搜尋銷項發票 Modal（僅會計/系統管理者可見，舊資料補掛用） -->
+            <div id="siSearchModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;align-items:flex-start;justify-content:center;padding-top:60px">
+                <div style="background:#fff;border-radius:8px;width:90%;max-width:900px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+                    <div style="padding:14px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+                        <strong>搜尋銷項發票並連結到本案件</strong>
+                        <button type="button" onclick="closeSiSearchModal()" style="border:none;background:transparent;font-size:20px;cursor:pointer">×</button>
+                    </div>
+                    <div style="padding:14px 20px;border-bottom:1px solid #eee">
+                        <input type="text" id="siSearchInput" class="form-control" placeholder="輸入發票號碼（如 ZN00168850）" oninput="onSiSearchInput()" style="width:100%">
+                        <small class="text-muted" style="font-size:.75rem">僅搜尋發票號碼；最多顯示 30 筆。已連結其他案件者不可改連結（請先從原案件解除）</small>
+                    </div>
+                    <div id="siSearchResults" style="padding:10px;overflow-y:auto;flex:1">
+                        <div style="padding:20px;color:#999;text-align:center">輸入發票號碼搜尋</div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             <?php if (empty($caseSalesInvoices)): ?>
             <div class="text-muted text-center" style="padding:12px;font-size:.85rem">尚無銷項發票</div>
             <?php else: ?>
@@ -1354,6 +1378,113 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 } catch (e) { alert('回應解析失敗'); }
             };
             xhr.onerror = function() { alert('上傳失敗'); };
+            xhr.send(fd);
+        }
+
+        // ========== 搜尋銷項發票並連結 ==========
+        function openSiSearchModal() {
+            var modal = document.getElementById('siSearchModal');
+            if (!modal) {
+                alert('Modal 元素不存在（siSearchModal 未找到）— 請確認頁面已重新載入');
+                return;
+            }
+            modal.style.display = 'flex';
+            var input = document.getElementById('siSearchInput');
+            if (input) input.value = '';
+            var results = document.getElementById('siSearchResults');
+            if (results) results.innerHTML = '<div style="padding:20px;color:#999;text-align:center">輸入發票號碼搜尋</div>';
+            setTimeout(function() { if (input) input.focus(); }, 100);
+        }
+        function closeSiSearchModal() {
+            var modal = document.getElementById('siSearchModal');
+            if (modal) modal.style.display = 'none';
+        }
+        var _siSearchTimer = null;
+        function onSiSearchInput() {
+            clearTimeout(_siSearchTimer);
+            var q = document.getElementById('siSearchInput').value.trim();
+            if (q === '') {
+                document.getElementById('siSearchResults').innerHTML = '<div style="padding:20px;color:#999;text-align:center">輸入發票號碼搜尋</div>';
+                return;
+            }
+            _siSearchTimer = setTimeout(function() { doSiSearch(q); }, 300);
+        }
+        function doSiSearch(q) {
+            var caseId = <?= (int)($case['id'] ?? 0) ?>;
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/cases.php?action=ajax_search_si&q=' + encodeURIComponent(q));
+            xhr.onload = function() {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (!res.success) {
+                        document.getElementById('siSearchResults').innerHTML = '<div style="padding:20px;color:#c62828">' + (res.error || '搜尋失敗') + '</div>';
+                        return;
+                    }
+                    renderSiSearchResults(res.data, caseId);
+                } catch (e) {
+                    document.getElementById('siSearchResults').innerHTML = '<div style="padding:20px;color:#c62828">回應解析失敗</div>';
+                }
+            };
+            xhr.send();
+        }
+        function renderSiSearchResults(list, caseId) {
+            var box = document.getElementById('siSearchResults');
+            if (!list || list.length === 0) {
+                box.innerHTML = '<div style="padding:20px;color:#999;text-align:center">無符合發票</div>';
+                return;
+            }
+            var html = '<table class="table" style="font-size:.85rem;margin:0"><thead><tr><th>發票號碼</th><th>日期</th><th>客戶</th><th class="text-right">金額</th><th>連結狀態</th><th>操作</th></tr></thead><tbody>';
+            for (var i = 0; i < list.length; i++) {
+                var r = list[i];
+                var statusText = '<span style="color:#2e7d32">未連結</span>';
+                var canLink = true;
+                if (r.reference_type === 'case' && r.reference_id) {
+                    if (String(r.reference_id) === String(caseId)) {
+                        statusText = '<span style="color:#1976d2">已連結本案件</span>';
+                        canLink = false;
+                    } else {
+                        var tag = r.linked_case_number ? r.linked_case_number : ('ref=' + r.reference_id);
+                        statusText = '<span style="color:#c62828">已連結至 ' + tag + '（需先解除）</span>';
+                        canLink = false;
+                    }
+                } else if (r.reference_type && r.reference_id) {
+                    statusText = '<span style="color:#e65100">已連結其他類型（' + r.reference_type + '）</span>';
+                    canLink = false;
+                }
+                html += '<tr>'
+                     + '<td style="font-weight:600;color:#1976d2">' + (r.invoice_number || '') + '</td>'
+                     + '<td>' + (r.invoice_date || '') + '</td>'
+                     + '<td>' + (r.customer_name || '') + '</td>'
+                     + '<td class="text-right">$' + Number(r.total_amount || 0).toLocaleString() + '</td>'
+                     + '<td>' + statusText + '</td>'
+                     + '<td>' + (canLink
+                         ? '<button type="button" class="btn btn-primary btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="linkSiToCase(' + r.id + ',\'' + (r.invoice_number || '').replace(/\'/g,"\\'") + '\')">連結</button>'
+                         : '<button type="button" class="btn btn-outline btn-sm" disabled style="font-size:.7rem;padding:2px 8px;opacity:.4">—</button>') + '</td>'
+                     + '</tr>';
+            }
+            html += '</tbody></table>';
+            box.innerHTML = html;
+        }
+        function linkSiToCase(siId, invNum) {
+            if (!confirm('確定將發票「' + invNum + '」連結到本案件？')) return;
+            var fd = new FormData();
+            fd.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+            fd.append('case_id', <?= (int)($case['id'] ?? 0) ?>);
+            fd.append('sales_invoice_id', siId);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/cases.php?action=link_si_to_case');
+            xhr.onload = function() {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (res.success) {
+                        alert('已連結發票 ' + (res.invoice_number || ''));
+                        closeSiSearchModal();
+                        location.reload();
+                    } else {
+                        alert('連結失敗：' + (res.error || ''));
+                    }
+                } catch (e) { alert('回應解析失敗'); }
+            };
             xhr.send(fd);
         }
 
@@ -3992,3 +4123,4 @@ function updateConstructionArea() {
     document.getElementById('constructionDistrict').dispatchEvent(evt);
 }
 </script>
+

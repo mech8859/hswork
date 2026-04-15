@@ -723,6 +723,76 @@ switch ($action) {
         }
         break;
 
+    // ---- AJAX: 搜尋銷項發票（僅會計可用，用於補掛舊資料）----
+    case 'ajax_search_si':
+        header('Content-Type: application/json');
+        if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無權限'));
+            break;
+        }
+        $q = trim($_GET['q'] ?? '');
+        if ($q === '') { echo json_encode(array('success' => true, 'data' => array())); break; }
+        $kw = '%' . $q . '%';
+        $db = Database::getInstance();
+        // 回傳發票 + 目前連結狀態（含已連結到哪張 case）
+        $stmt = $db->prepare("
+            SELECT si.id, si.invoice_number, si.invoice_date, si.customer_name, si.customer_tax_id,
+                   si.total_amount, si.status, si.reference_type, si.reference_id,
+                   CASE WHEN si.reference_type='case' AND si.reference_id REGEXP '^[0-9]+$' THEN c.case_number ELSE NULL END AS linked_case_number,
+                   CASE WHEN si.reference_type='case' AND si.reference_id REGEXP '^[0-9]+$' THEN c.id ELSE NULL END AS linked_case_id
+            FROM sales_invoices si
+            LEFT JOIN cases c ON si.reference_type='case' AND si.reference_id REGEXP '^[0-9]+$' AND c.id = CAST(si.reference_id AS UNSIGNED)
+            WHERE si.status != 'voided' AND si.invoice_number LIKE ?
+            ORDER BY si.invoice_date DESC, si.id DESC
+            LIMIT 30
+        ");
+        $stmt->execute(array($kw));
+        echo json_encode(array('success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)));
+        break;
+
+    // ---- AJAX: 連結銷項發票到案件（僅會計可用）----
+    case 'link_si_to_case':
+        header('Content-Type: application/json');
+        if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success' => false, 'error' => '無權限'));
+            break;
+        }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $siId = (int)($_POST['sales_invoice_id'] ?? 0);
+        if ($caseId <= 0 || $siId <= 0) { echo json_encode(array('success' => false, 'error' => '參數錯誤')); break; }
+        try {
+            $db = Database::getInstance();
+            // 確認發票存在
+            $stmt = $db->prepare("SELECT id, invoice_number, reference_type, reference_id FROM sales_invoices WHERE id = ?");
+            $stmt->execute(array($siId));
+            $si = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$si) { echo json_encode(array('success' => false, 'error' => '發票不存在')); break; }
+            // 保護：已連結其他案件不允許搬
+            if ($si['reference_type'] === 'case' && $si['reference_id'] !== '' && $si['reference_id'] !== null) {
+                $currentRef = $si['reference_id'];
+                $sameCase = false;
+                if (preg_match('/^\d+$/', $currentRef) && (int)$currentRef === $caseId) $sameCase = true;
+                if (!$sameCase) {
+                    echo json_encode(array('success' => false, 'error' => '此發票已連結到其他案件（ref_id=' . $currentRef . '），請先解除'));
+                    break;
+                }
+            }
+            // 確認 case 存在
+            $cs = $db->prepare("SELECT id, case_number FROM cases WHERE id = ?");
+            $cs->execute(array($caseId));
+            $case = $cs->fetch(PDO::FETCH_ASSOC);
+            if (!$case) { echo json_encode(array('success' => false, 'error' => '案件不存在')); break; }
+            // 更新連結
+            $db->prepare("UPDATE sales_invoices SET reference_type='case', reference_id=? WHERE id=?")
+               ->execute(array((string)$caseId, $siId));
+            AuditLog::log('sales_invoices', 'link_to_case', $siId, '連結發票 ' . $si['invoice_number'] . ' 到案件 ' . $case['case_number']);
+            echo json_encode(array('success' => true, 'invoice_number' => $si['invoice_number']));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+        }
+        break;
+
     // ---- AJAX: 上傳銷項發票憑證（案件端專屬，不同步至銷項發票模組）----
     case 'upload_si_voucher':
         header('Content-Type: application/json');

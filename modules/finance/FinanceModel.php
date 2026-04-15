@@ -544,7 +544,7 @@ class FinanceModel
             LEFT JOIN branches b ON r.branch_id = b.id
             LEFT JOIN users u ON r.sales_id = u.id
             WHERE {$where}
-            ORDER BY r.register_date {$sortDir}, r.id {$sortDir}
+            ORDER BY {$rDateCol} {$sortDir}, r.id {$sortDir}
             LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);
@@ -974,7 +974,7 @@ class FinanceModel
 
         $offset = ($page - 1) * $perPage;
         $stmt = $this->db->prepare("
-            SELECT p.* FROM payments_out p WHERE {$where} ORDER BY p.create_date {$sortDir}, p.id {$sortDir} LIMIT {$perPage} OFFSET {$offset}
+            SELECT p.* FROM payments_out p WHERE {$where} ORDER BY {$dateCol} {$sortDir}, p.id {$sortDir} LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);
 
