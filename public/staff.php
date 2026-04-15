@@ -444,7 +444,7 @@ switch ($action) {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/staff.php?action=permissions&id=' . $id); }
 
             // 組合自訂權限 JSON
-            $allModules = array('cases','schedule','repairs','staff','staff_skills','leaves','inter_branch','reports','products','vehicles','worklog','attendance','quotations','customers','business_calendar','business_tracking','engineering_tracking','finance','petty_cash','procurement','inventory','accounting','reviews','settings','system');
+            $allModules = array('cases','schedule','repairs','staff','staff_skills','leaves','inter_branch','reports','products','vehicles','worklog','attendance','quotations','customers','business_calendar','business_tracking','engineering_tracking','finance','transactions','petty_cash','procurement','inventory','accounting','reviews','settings','system');
             $customPerms = array();
             $hasCustom = false;
 
@@ -464,7 +464,7 @@ switch ($action) {
             }
 
             // 刪除權限（獨立 checkbox）
-            $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance');
+            $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance', 'transactions');
             foreach ($deleteModules as $dm) {
                 $deleteKey = 'delete_' . $dm;
                 if (!empty($_POST[$deleteKey])) {

@@ -318,6 +318,10 @@ switch ($action) {
             $branchName = $bn->fetchColumn() ?: '';
         }
 
+        $userNote = isset($_POST['manual_note']) ? trim($_POST['manual_note']) : '';
+        $noteStr = '手動餘料入庫，來源出庫單 ' . $so['so_number'];
+        if ($userNote !== '') $noteStr .= ' / ' . $userNote;
+
         $siData = array(
             'si_date'       => date('Y-m-d'),
             'warehouse_id'  => $so['warehouse_id'],
@@ -327,14 +331,14 @@ switch ($action) {
             'source_type'   => 'manual_return',
             'source_id'     => $id,
             'source_number' => $so['so_number'],
-            'note'          => '手動餘料入庫，來源出庫單 ' . $so['so_number'],
+            'note'          => $noteStr,
             'items'         => $siItems,
             'created_by'    => Auth::id(),
         );
 
         try {
             $siId = $model->createStockIn($siData);
-            AuditLog::log('stock_ins', 'create', $siId, '手動餘料入庫，來源出庫單 ' . $so['so_number']);
+            AuditLog::log('stock_ins', 'create', $siId, $noteStr);
             Session::flash('success', '入庫單已建立，請確認入庫');
             redirect('/stock_ins.php?action=view&id=' . $siId);
         } catch (Exception $e) {

@@ -82,7 +82,7 @@ $canEdit = $canManage && in_array($record['status'], array('待確認', 'pending
         <button type="button" id="btnEnterEdit" class="btn btn-sm" style="background:#ff9800;color:#fff" onclick="enterEditMode()">✏ 編輯明細</button>
         <?php endif; ?>
         <?php if ($canManage && !$isPending && !empty($record['has_return_material'])): ?>
-        <a href="/stock_ins.php?action=create_from_return&stock_out_id=<?= $record['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('確認將餘料建立入庫單？')">餘料入庫</a>
+        <button type="button" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="submitReturnMaterial(<?= $record['id'] ?>)">餘料入庫</button>
         <?php endif; ?>
         <?php
         $allConfirmed = !$hasUnconfirmed && !empty($items);
@@ -1202,9 +1202,10 @@ document.addEventListener('click', function(e) {
 </div>
 
 <?php if ($canManage && $allConfirmed && !$isCancelled): ?>
-<div id="returnBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#7B1FA2;color:#fff;padding:12px 24px;z-index:100;display:none;align-items:center;justify-content:space-between;box-shadow:0 -2px 8px rgba(0,0,0,.2)">
-    <span id="returnInfo">已選 0 項</span>
-    <div>
+<div id="returnBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#7B1FA2;color:#fff;padding:12px 24px;z-index:100;display:none;align-items:center;justify-content:space-between;box-shadow:0 -2px 8px rgba(0,0,0,.2);flex-wrap:wrap;gap:8px">
+    <span id="returnInfo" style="white-space:nowrap">已選 0 項</span>
+    <input type="text" id="manualReturnNote" placeholder="備註（選填）" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;color:#333">
+    <div style="white-space:nowrap">
         <button type="button" class="btn btn-sm" style="background:#fff;color:#7B1FA2;font-weight:600" onclick="confirmManualReturn()">確認退料入庫</button>
         <button type="button" class="btn btn-sm" style="background:transparent;color:#fff;border:1px solid #fff;margin-left:8px" onclick="exitReturnMode()">取消</button>
     </div>
@@ -1255,6 +1256,25 @@ document.addEventListener('change', function(e) {
         updateReturnInfo();
     }
 });
+// 一般餘料入庫：輸入備註後送出
+function submitReturnMaterial(soId) {
+    var userNote = prompt('確認將餘料建立入庫單？\n\n可輸入備註（選填，直接按確定則不加備註）：', '');
+    if (userNote === null) return; // 使用者按取消
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/stock_ins.php?action=create_from_return&stock_out_id=' + soId;
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden'; csrf.name = 'csrf_token'; csrf.value = '<?= e(Session::getCsrfToken()) ?>';
+    form.appendChild(csrf);
+    if (userNote.trim() !== '') {
+        var noteHidden = document.createElement('input');
+        noteHidden.type = 'hidden'; noteHidden.name = 'return_note'; noteHidden.value = userNote;
+        form.appendChild(noteHidden);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+
 function confirmManualReturn() {
     var checks = document.querySelectorAll('.return-check:checked');
     if (checks.length === 0) { alert('請先勾選要退回的品項'); return; }
@@ -1276,6 +1296,13 @@ function confirmManualReturn() {
     var csrf = document.createElement('input');
     csrf.type = 'hidden'; csrf.name = 'csrf_token'; csrf.value = '<?= e(Session::getCsrfToken()) ?>';
     form.appendChild(csrf);
+    // 備註
+    var noteInput = document.getElementById('manualReturnNote');
+    if (noteInput && noteInput.value.trim() !== '') {
+        var noteHidden = document.createElement('input');
+        noteHidden.type = 'hidden'; noteHidden.name = 'manual_note'; noteHidden.value = noteInput.value;
+        form.appendChild(noteHidden);
+    }
     for (var j = 0; j < checks.length; j++) {
         var itemId = checks[j].value;
         var inp = document.createElement('input');

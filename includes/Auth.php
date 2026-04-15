@@ -148,6 +148,7 @@ class Auth
                     'settings' => array('settings.manage'),
                     'inventory' => array('inventory.manage', 'inventory.view', 'inventory.delete'),
                     'finance' => array('finance.manage', 'finance.view', 'finance.delete'),
+                    'transactions' => array('transactions.manage', 'transactions.view', 'transactions.delete'),
                     'engineering_tracking' => array('engineering_tracking.manage', 'engineering_tracking.view', 'engineering_tracking.own'),
                     'procurement' => array('procurement.manage', 'procurement.view'),
                     'accounting' => array('accounting.manage', 'accounting.view'),
@@ -192,7 +193,7 @@ class Auth
                     }
                 }
                 // 處理獨立的刪除權限（delete_cases, delete_schedule 等）
-                $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance');
+                $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance', 'transactions');
                 foreach ($deleteModules as $dm) {
                     $deleteKey = 'delete_' . $dm;
                     if (array_key_exists($deleteKey, $custom)) {
@@ -428,6 +429,7 @@ class Auth
                     'settings' => array('settings.manage'),
                     'inventory' => array('inventory.manage', 'inventory.view', 'inventory.delete'),
                     'finance' => array('finance.manage', 'finance.view', 'finance.delete'),
+                    'transactions' => array('transactions.manage', 'transactions.view', 'transactions.delete'),
                     'engineering_tracking' => array('engineering_tracking.manage', 'engineering_tracking.view', 'engineering_tracking.own'),
                     'procurement' => array('procurement.manage', 'procurement.view'),
                     'accounting' => array('accounting.manage', 'accounting.view'),
@@ -458,7 +460,7 @@ class Auth
                         foreach ($rolePermsForMod as $rp) $permissions[] = $rp;
                     }
                 }
-                $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance');
+                $deleteModules = array('cases', 'schedule', 'repairs', 'quotations', 'customers', 'leaves', 'inter_branch', 'products', 'inventory', 'finance', 'transactions');
                 foreach ($deleteModules as $dm) {
                     $deleteKey = 'delete_' . $dm;
                     if (array_key_exists($deleteKey, $custom)) {

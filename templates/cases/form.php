@@ -175,7 +175,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <?php
                 $dealStatuses = array('已成交','跨月成交','現簽','電話報價成交');
                 $curSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '';
-                $showNewBtn = in_array($curSubStatus, $dealStatuses, true);
+                $hasCustomerLinked = !empty($case['customer_no']);
+                // 已有客戶編號代表已連結既有客戶，不需再新增客戶
+                $showNewBtn = in_array($curSubStatus, $dealStatuses, true) && !$hasCustomerLinked;
                 ?>
                 <button type="button" id="btnNewCustomer" class="btn btn-outline btn-sm" onclick="openNewCustomerModal()" style="white-space:nowrap;<?= $showNewBtn ? '' : 'display:none' ?>">+ 新增客戶</button>
             </div>
@@ -3376,6 +3378,10 @@ function selectCustomer(c) {
     // 更新客戶編號顯示
     var noDisp = document.getElementById('customerNoDisplay');
     if (noDisp && c.customer_no) noDisp.value = c.customer_no;
+
+    // 已連結既有客戶 → 隱藏「+ 新增客戶」按鈕
+    var newBtn = document.getElementById('btnNewCustomer');
+    if (newBtn && c.customer_no) newBtn.style.display = 'none';
 
     // 帶入施工地址（如果為空）
     var addrInput = document.querySelector('input[name="address"]');

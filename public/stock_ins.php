@@ -179,6 +179,10 @@ switch ($action) {
             $totalQty += $qty;
         }
 
+        $userReturnNote = isset($_POST['return_note']) ? trim($_POST['return_note']) : '';
+        $returnNoteStr = '餘料入庫，來源出庫單 ' . $so['so_number'];
+        if ($userReturnNote !== '') $returnNoteStr .= ' / ' . $userReturnNote;
+
         try {
             $siId = $model->createStockIn(array(
                 'si_date'       => date('Y-m-d'),
@@ -187,7 +191,7 @@ switch ($action) {
                 'source_number' => $so['so_number'],
                 'warehouse_id'  => $so['warehouse_id'],
                 'customer_name' => !empty($so['customer_name']) ? $so['customer_name'] : null,
-                'note'          => '餘料入庫，來源出庫單 ' . $so['so_number'],
+                'note'          => $returnNoteStr,
                 'total_qty'     => $totalQty,
                 'created_by'    => $userId,
                 'items'         => $items,
