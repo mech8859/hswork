@@ -227,14 +227,19 @@ foreach ($approvalStatus['flows'] as $af) {
 
 <!-- 預計使用線材與配件（僅管理者，統計分析用） -->
 <?php
+$matCostTotal = 0;
 if ($canManage && !empty($quote['case_id'])) {
     $viewCaseModel = new CaseModel();
     $viewEstMaterials = $viewCaseModel->getMaterialEstimates($quote['case_id']);
-    if (!empty($viewEstMaterials)):
-        $matCostTotal = 0;
 ?>
 <div class="card">
-    <div class="card-header">預計使用線材與配件（統計分析用）</div>
+    <div class="card-header d-flex justify-between align-center">
+        <span>預計使用線材與配件（統計分析用）</span>
+        <a href="/cases.php?action=edit&id=<?= (int)$quote['case_id'] ?>#tab-estimate" class="btn btn-outline btn-sm" style="font-size:.75rem">去案件編輯</a>
+    </div>
+    <?php if (empty($viewEstMaterials)): ?>
+    <div style="padding:20px;text-align:center;color:#999;font-size:.9rem">尚無預計材料 — 請到案件編輯頁「預計材料」頁籤新增</div>
+    <?php else: ?>
     <div class="table-responsive">
         <table class="table" style="font-size:.85rem;margin:0">
             <thead><tr>
@@ -278,9 +283,9 @@ if ($canManage && !empty($quote['case_id'])) {
             </tfoot>
         </table>
     </div>
+    <?php endif; ?>
 </div>
 <?php
-    endif;
 }
 ?>
 
