@@ -79,6 +79,7 @@ $statusBadgeMap = array(
         <table class="table">
             <thead>
                 <tr>
+                    <th style="width:32px"></th>
                     <th>請款單號</th>
                     <th>傳票號碼</th>
                     <th>請款日期</th>
@@ -92,8 +93,14 @@ $statusBadgeMap = array(
             </thead>
             <tbody>
                 <?php foreach ($data as $row): ?>
-                <?php $badgeCls = !empty($statusBadgeMap[$row['status']]) ? $statusBadgeMap[$row['status']] : 'badge-secondary'; ?>
+                <?php $badgeCls = !empty($statusBadgeMap[$row['status']]) ? $statusBadgeMap[$row['status']] : 'badge-secondary'; $isStar = !empty($row['is_starred']); ?>
                 <tr>
+                    <td class="text-center">
+                        <span class="star-toggle <?= $isStar ? 'is-on' : '' ?>"
+                              data-id="<?= (int)$row['id'] ?>"
+                              onclick="toggleStarReceivable(this)"
+                              title="標記/取消標記">&#9733;</span>
+                    </td>
                     <td><a href="/receivables.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['receivable_number'] ?: $row['invoice_number'] ?: '-') ?></a></td>
                     <td><?= e($row['voucher_number'] ?? '-') ?></td>
                     <td><?= !empty($row['invoice_date']) ? $row['invoice_date'] : '-' ?></td>
@@ -123,4 +130,32 @@ $statusBadgeMap = array(
 .show-mobile { display: flex; }
 .hide-mobile { display: none; }
 @media (min-width: 768px) { .show-mobile { display: none !important; } .hide-mobile { display: block !important; } }
+
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
 </style>
+
+<script>
+function toggleStarReceivable(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id');
+    if (!id) return;
+    el.classList.add('saving');
+    var form = new FormData();
+    form.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/receivables.php?action=toggle_star');
+    xhr.onload = function() {
+        el.classList.remove('saving');
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.error) { alert(res.error); return; }
+            el.classList.toggle('is-on', !!res.starred);
+        } catch (e) { alert('回應錯誤'); }
+    };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(form);
+}
+</script>

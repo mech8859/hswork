@@ -457,6 +457,18 @@ require __DIR__ . '/../templates/layouts/header.php';
     <?php if (empty($todaySchedules)): ?>
         <p class="text-muted">今日無排工</p>
     <?php else: ?>
+    <?php
+    $scheduleStatusLabels = array(
+        'planned'       => '已排',
+        'confirmed'     => '已確認',
+        'in_progress'   => '施工中',
+        'checked_out'   => '已下工',
+        'needs_revisit' => '需再施工',
+        'no_report'     => '未回報',
+        'completed'     => '已完工',
+        'cancelled'     => '已取消',
+    );
+    ?>
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -478,8 +490,8 @@ require __DIR__ . '/../templates/layouts/header.php';
                     <td><?= e($sch['plate_number'] ?: '-') ?></td>
                     <td><?= $sch['visit_number'] ?></td>
                     <td>
-                        <span class="badge badge-<?= $sch['status'] === 'completed' ? 'success' : ($sch['status'] === 'in_progress' ? 'warning' : 'primary') ?>">
-                            <?= e($sch['status']) ?>
+                        <span class="badge badge-<?= $sch['status'] === 'completed' ? 'success' : ($sch['status'] === 'in_progress' ? 'warning' : ($sch['status'] === 'cancelled' ? 'danger' : 'primary')) ?>">
+                            <?= e(isset($scheduleStatusLabels[$sch['status']]) ? $scheduleStatusLabels[$sch['status']] : $sch['status']) ?>
                         </span>
                     </td>
                 </tr>

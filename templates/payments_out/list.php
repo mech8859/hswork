@@ -111,6 +111,7 @@ $statusBadgeMap = array(
         <table class="table">
             <thead>
                 <tr>
+                    <th style="width:32px"></th>
                     <th>付款單編號</th>
                     <th>建立日期</th>
                     <th>付款日期</th>
@@ -124,8 +125,11 @@ $statusBadgeMap = array(
             <tbody>
                 <?php foreach ($records as $r): ?>
                 <?php $badgeCls = !empty($statusBadgeMap[$r['status']]) ? $statusBadgeMap[$r['status']] : 'badge-secondary'; ?>
-                <?php $isExcluded = !empty($r['exclude_from_branch_stats']); ?>
+                <?php $isExcluded = !empty($r['exclude_from_branch_stats']); $isStar = !empty($r['is_starred']); ?>
                 <tr<?= $isExcluded ? ' style="background:#fff8e1"' : '' ?>>
+                    <td class="text-center">
+                        <span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="toggleStarPaymentOut(this)" title="標記">&#9733;</span>
+                    </td>
                     <td>
                         <a href="/payments_out.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['payment_number']) ? $r['payment_number'] : '-') ?></a>
                         <?php if ($isExcluded): ?>
@@ -160,4 +164,25 @@ $statusBadgeMap = array(
 .show-mobile { display: flex; }
 .hide-mobile { display: none; }
 @media (min-width: 768px) { .show-mobile { display: none !important; } .hide-mobile { display: block !important; } }
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
 </style>
+
+<script>
+function toggleStarPaymentOut(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id'); if (!id) return;
+    el.classList.add('saving');
+    var fd = new FormData(); fd.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/payments_out.php?action=toggle_star');
+    xhr.onload = function() {
+        el.classList.remove('saving');
+        try { var res = JSON.parse(xhr.responseText); if (res.error) { alert(res.error); return; } el.classList.toggle('is-on', !!res.starred); } catch (e) { alert('回應錯誤'); }
+    };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(fd);
+}
+</script>

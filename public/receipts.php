@@ -255,4 +255,24 @@ switch ($action) {
         }
         redirect('/receipts.php');
         break;
+
+    case 'toggle_star':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$canManageFinance && !$isBoss) { echo json_encode(array('error' => '無權限')); exit; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(array('error' => '方法錯誤')); exit; }
+        $sid = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        if ($sid <= 0) { echo json_encode(array('error' => '參數錯誤')); exit; }
+        try {
+            $db = Database::getInstance();
+            $cur = $db->prepare("SELECT is_starred FROM receipts WHERE id = ?");
+            $cur->execute(array($sid));
+            $c = $cur->fetchColumn();
+            if ($c === false) { echo json_encode(array('error' => '記錄不存在')); exit; }
+            $new = ((int)$c === 1) ? 0 : 1;
+            $db->prepare("UPDATE receipts SET is_starred = ? WHERE id = ?")->execute(array($new, $sid));
+            echo json_encode(array('success' => true, 'starred' => $new));
+        } catch (Exception $e) {
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+        exit;
 }

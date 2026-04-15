@@ -40,6 +40,7 @@
         <table class="table">
             <thead>
                 <tr>
+                    <th style="width:32px"></th>
                     <th>發票號碼</th>
                     <th>日期</th>
                     <th>客戶名稱</th>
@@ -53,8 +54,9 @@
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($records as $r): ?>
+                <?php foreach ($records as $r): $isStar = !empty($r['is_starred']); ?>
                 <tr<?= $r['status'] === 'voided' ? ' style="opacity:.5;text-decoration:line-through"' : '' ?>>
+                    <td class="text-center"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="toggleStarSalesInvoice(this)" title="標記">&#9733;</span></td>
                     <td><a href="/sales_invoices.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') ?></a></td>
                     <td><?= e(!empty($r['invoice_date']) ? $r['invoice_date'] : '') ?></td>
                     <td><?= e(!empty($r['customer_name']) ? $r['customer_name'] : '-') ?></td>
@@ -94,4 +96,21 @@
 .badge-warning { background: var(--warning); color: #fff; }
 .badge { padding: 2px 8px; border-radius: 4px; font-size: .8rem; }
 @media (min-width: 768px) { .show-mobile { display: none !important; } .hide-mobile { display: block !important; } }
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
 </style>
+<script>
+function toggleStarSalesInvoice(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id'); if (!id) return;
+    el.classList.add('saving');
+    var fd = new FormData(); fd.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/sales_invoices.php?action=toggle_star');
+    xhr.onload = function() { el.classList.remove('saving'); try { var res = JSON.parse(xhr.responseText); if (res.error) { alert(res.error); return; } el.classList.toggle('is-on', !!res.starred); } catch (e) { alert('回應錯誤'); } };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(fd);
+}
+</script>
