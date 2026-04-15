@@ -288,11 +288,15 @@ class InventoryModel
                 $inventoryId = $existing['id'];
                 $qtyAfter = $existing['stock_qty'] + $quantity;
             } else {
+                // 反查 warehouse 對應的 branch_id 一併寫入（避免 branch_id=0 孤立）
+                $brStmt = $this->db->prepare("SELECT branch_id FROM warehouses WHERE id = ?");
+                $brStmt->execute(array($warehouseId));
+                $branchId = (int)$brStmt->fetchColumn();
                 $stmt = $this->db->prepare("
-                    INSERT INTO inventory (product_id, warehouse_id, stock_qty, available_qty)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO inventory (product_id, warehouse_id, branch_id, stock_qty, available_qty)
+                    VALUES (?, ?, ?, ?, ?)
                 ");
-                $stmt->execute(array($productId, $warehouseId, $quantity, $quantity));
+                $stmt->execute(array($productId, $warehouseId, $branchId, $quantity, $quantity));
                 $inventoryId = $this->db->lastInsertId();
                 $qtyAfter = $quantity;
             }
