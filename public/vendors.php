@@ -28,8 +28,9 @@ switch ($action) {
                 redirect('/vendors.php');
             }
 
+            // 廠商編號強制由系統自動產生（不接受 POST 傳入，防止竄改）
             $data = array(
-                'vendor_code'    => !empty($_POST['vendor_code']) ? $_POST['vendor_code'] : null,
+                'vendor_code'    => null, // 由 createVendor 內部自動產生
                 'name'           => !empty($_POST['name']) ? $_POST['name'] : '',
                 'short_name'     => !empty($_POST['short_name']) ? $_POST['short_name'] : null,
                 'tax_id'         => !empty($_POST['tax_id']) ? $_POST['tax_id'] : null,
@@ -84,8 +85,9 @@ switch ($action) {
                 redirect('/vendors.php?action=edit&id=' . $id);
             }
 
+            // 廠商編號唯讀，不允許修改：強制保留原值
             $data = array(
-                'vendor_code'    => !empty($_POST['vendor_code']) ? $_POST['vendor_code'] : null,
+                'vendor_code'    => $record['vendor_code'],
                 'name'           => !empty($_POST['name']) ? $_POST['name'] : '',
                 'short_name'     => !empty($_POST['short_name']) ? $_POST['short_name'] : null,
                 'tax_id'         => !empty($_POST['tax_id']) ? $_POST['tax_id'] : null,

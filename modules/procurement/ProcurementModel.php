@@ -156,8 +156,36 @@ class ProcurementModel
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * 產生下一個廠商編號（B-XXXX 格式，4 位數字）
+     * 規則：取現有 vendors 中 B-XXXX 格式的最大數字 + 1
+     * 若無現有編號則從 B-0001 開始
+     */
+    public function generateNextVendorCode()
+    {
+        // 從 B-XXXX 抓數字部分並取最大
+        $stmt = $this->db->query("
+            SELECT vendor_code FROM vendors
+            WHERE vendor_code REGEXP '^B-[0-9]{4}$'
+            ORDER BY CAST(SUBSTRING(vendor_code, 3) AS UNSIGNED) DESC
+            LIMIT 1
+        ");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $maxNum = 0;
+        if ($row && !empty($row['vendor_code'])) {
+            $maxNum = (int)substr($row['vendor_code'], 2);
+        }
+        $next = $maxNum + 1;
+        return 'B-' . str_pad($next, 4, '0', STR_PAD_LEFT);
+    }
+
     public function createVendor($data)
     {
+        // 若未指定 vendor_code 或為空，自動產生
+        if (empty($data['vendor_code'])) {
+            $data['vendor_code'] = $this->generateNextVendorCode();
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO vendors (vendor_code, name, short_name, tax_id, category, service_items,
                 contact_person, phone, fax, email, postal_code, city_district, street_address, address,

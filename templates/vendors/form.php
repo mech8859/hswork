@@ -11,8 +11,14 @@
         <div class="form-row">
             <div class="form-group">
                 <label>廠商編號</label>
-                <input type="text" name="vendor_code" class="form-control" placeholder="自動產生或手動輸入"
-                       value="<?= e(!empty($record['vendor_code']) ? $record['vendor_code'] : '') ?>">
+                <input type="text" name="vendor_code" class="form-control"
+                       value="<?= e(!empty($record['vendor_code']) ? $record['vendor_code'] : '') ?>"
+                       placeholder="<?= $isEdit ? '' : '儲存後自動產生（B-XXXX）' ?>"
+                       readonly
+                       style="background:#f5f5f5;color:#555">
+                <?php if (!$isEdit): ?>
+                <small class="text-muted">系統自動產生，格式 B-XXXX</small>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>廠商名稱 *</label>
