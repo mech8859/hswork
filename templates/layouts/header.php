@@ -210,8 +210,10 @@
         <li><a href="/inter_branch.php?action=attendance" class="<?= ($currentPage ?? '') === 'inter_branch' && (isset($_GET['action']) && $_GET['action'] === 'attendance') ? 'active' : '' ?>">📋 點工出勤登錄</a></li>
         <li><a href="/inter_branch.php?action=attendance_settle_page" class="<?= ($currentPage ?? '') === 'inter_branch' && (isset($_GET['action']) && $_GET['action'] === 'attendance_settle_page') ? 'active' : '' ?>">📊 點工出勤結算</a></li>
         <?php endif; ?>
-        <?php if (Auth::hasPermission('finance.manage') || Auth::hasPermission('finance.view')): ?>
+        <?php if (Auth::hasPermission('transactions.manage') || Auth::hasPermission('transactions.view')): ?>
         <li><a href="/transactions.php" class="<?= ($currentPage ?? '') === 'transactions' ? 'active' : '' ?>">💳 非廠商交易</a></li>
+        <?php endif; ?>
+        <?php if (Auth::hasPermission('finance.manage') || Auth::hasPermission('finance.view')): ?>
         <li><a href="/remittance.php" class="<?= ($currentPage ?? '') === 'remittance' ? 'active' : '' ?>">🏦 未繳回帳務</a></li>
         <?php endif; ?>
         <?php if (Auth::hasPermission('reports.view')): ?>

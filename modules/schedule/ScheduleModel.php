@@ -227,6 +227,13 @@ class ScheduleModel
      */
     public function update(int $id, array $data): void
     {
+        // 取更新前的狀態與 case_id（用於判斷是否需要回退案件狀態）
+        $prev = $this->getById($id);
+        $prevStatus = $prev ? $prev['status'] : null;
+        $caseId = $prev ? (int)$prev['case_id'] : 0;
+
+        $newStatus = $data['status'] ?: 'planned';
+
         $stmt = $this->db->prepare('
             UPDATE schedules SET schedule_date = ?, start_time = ?, end_time = ?, designated_time = ?, vehicle_id = ?, status = ?, note = ?
             WHERE id = ?
@@ -237,7 +244,7 @@ class ScheduleModel
             !empty($data['end_time']) ? $data['end_time'] : null,
             !empty($data['designated_time']) ? $data['designated_time'] : null,
             $data['vehicle_id'] ?: null,
-            $data['status'] ?: 'planned',
+            $newStatus,
             isset($data['note']) ? $data['note'] : null,
             $id,
         ));
@@ -253,6 +260,39 @@ class ScheduleModel
         // 重新指派點工人員
         if (isset($data['dispatch_worker_ids'])) {
             $this->assignDispatchWorkers($id, $data['dispatch_worker_ids']);
+        }
+
+        // 排工狀態 從非 cancelled 變更為 cancelled 時，若該案件沒有其他未取消的排工
+        // 且案件還在 stage=5（已排工）階段，自動將案件回退到 stage=4（成交待排工）
+        if ($caseId > 0 && $prevStatus !== 'cancelled' && $newStatus === 'cancelled') {
+            $this->revertCaseIfNoActiveSchedules($caseId);
+        }
+    }
+
+    /**
+     * 檢查該案件是否已無未取消的排工，若是且案件仍停在 stage=5，則回退到 stage=4
+     * 行事曆仍保留顯示已取消的排工紀錄
+     */
+    private function revertCaseIfNoActiveSchedules(int $caseId): void
+    {
+        try {
+            // 計算該案件仍活著的排工數（非 cancelled）
+            $cntStmt = $this->db->prepare("SELECT COUNT(*) FROM schedules WHERE case_id = ? AND status != 'cancelled'");
+            $cntStmt->execute(array($caseId));
+            $activeCount = (int)$cntStmt->fetchColumn();
+            if ($activeCount > 0) return;
+
+            // 僅當案件目前在 stage=5 + status='scheduled' 才回退到 stage=4（成交待排工）
+            // status 回退到 'ready'（一般案件的待排工狀態）
+            // 已進場/已完工等後期狀態不動，避免破壞流程
+            $this->db->prepare("
+                UPDATE cases
+                   SET stage = 4, status = 'ready'
+                 WHERE id = ? AND stage = 5 AND status = 'scheduled'
+            ")->execute(array($caseId));
+        } catch (Exception $e) {
+            // 不影響主流程，記 log
+            error_log('revertCaseIfNoActiveSchedules failed: ' . $e->getMessage());
         }
     }
 

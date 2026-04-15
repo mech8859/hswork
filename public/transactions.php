@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
+if (!Auth::hasPermission('transactions.manage') && !Auth::hasPermission('transactions.view')) {
+    Session::flash('error', '無權限存取非廠商交易');
+    redirect('/');
+}
 require_once __DIR__ . '/../modules/transactions/TransactionModel.php';
 
 $model = new TransactionModel();
@@ -38,6 +42,10 @@ switch ($action) {
 
     // ---- 新增 ----
     case 'create':
+        if (!Auth::hasPermission('transactions.manage')) {
+            Session::flash('error', '無管理權限');
+            redirect('/transactions.php');
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/transactions.php'); }
 
@@ -85,6 +93,10 @@ switch ($action) {
 
     // ---- 編輯 ----
     case 'edit':
+        if (!Auth::hasPermission('transactions.manage')) {
+            Session::flash('error', '無管理權限');
+            redirect('/transactions.php');
+        }
         $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
         $record = $model->getById($id);
         if (!$record) { Session::flash('error', '記錄不存在'); redirect('/transactions.php'); }
@@ -147,7 +159,7 @@ switch ($action) {
 
     // ---- 刪除 ----
     case 'delete':
-        if (!Auth::hasPermission('finance.delete')) {
+        if (!Auth::hasPermission('transactions.delete')) {
             Session::flash('error', '無刪除權限');
             redirect('/transactions.php');
         }
@@ -161,6 +173,10 @@ switch ($action) {
 
     // ---- 結清明細 ----
     case 'settle_item':
+        if (!Auth::hasPermission('transactions.manage')) {
+            Session::flash('error', '無管理權限');
+            redirect('/transactions.php');
+        }
         if (verify_csrf()) {
             $itemId = (int)(isset($_GET['item_id']) ? $_GET['item_id'] : 0);
             $model->settleItem($itemId);
@@ -177,6 +193,10 @@ switch ($action) {
 
     // ---- 取消結清 ----
     case 'unsettle_item':
+        if (!Auth::hasPermission('transactions.manage')) {
+            Session::flash('error', '無管理權限');
+            redirect('/transactions.php');
+        }
         if (verify_csrf()) {
             $itemId = (int)(isset($_GET['item_id']) ? $_GET['item_id'] : 0);
             $model->unsettleItem($itemId);
