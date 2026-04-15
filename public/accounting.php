@@ -594,6 +594,7 @@ switch ($action) {
         $olDateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : '';
         $olDateTo = isset($_GET['date_to']) ? $_GET['date_to'] : '';
         $olCostCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : 0;
+        $olKeyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
@@ -627,6 +628,12 @@ switch ($action) {
         if ($olDateFrom) { $where .= ' AND ol.voucher_date >= ?'; $params[] = $olDateFrom; }
         if ($olDateTo) { $where .= ' AND ol.voucher_date <= ?'; $params[] = $olDateTo; }
         if ($olCostCenterId) { $where .= ' AND ol.cost_center_id = ?'; $params[] = $olCostCenterId; }
+        // 全域關鍵字：搜尋 傳票號/往來對象/會計科目/廠商編號
+        if ($olKeyword !== '') {
+            $where .= ' AND (ol.voucher_number LIKE ? OR ol.relation_name LIKE ? OR coa.code LIKE ? OR coa.name LIKE ? OR v.vendor_code LIKE ?)';
+            $kw = '%' . $olKeyword . '%';
+            array_push($params, $kw, $kw, $kw, $kw, $kw);
+        }
 
         $db = Database::getInstance();
         $stmt = $db->prepare("
@@ -941,6 +948,7 @@ switch ($action) {
         $orDateTo = isset($_GET['date_to']) ? $_GET['date_to'] : date('Y-m-d');
         $orCostCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : 0;
         $orTab = isset($_GET['tab']) ? $_GET['tab'] : 'detail';
+        $orKeyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
@@ -972,6 +980,12 @@ switch ($action) {
         if ($orDateFrom) { $where .= ' AND ol.voucher_date >= ?'; $params[] = $orDateFrom; }
         if ($orDateTo) { $where .= ' AND ol.voucher_date <= ?'; $params[] = $orDateTo; }
         if ($orCostCenterId) { $where .= ' AND ol.cost_center_id = ?'; $params[] = $orCostCenterId; }
+        // 全域關鍵字：搜尋 傳票號/往來對象/會計科目/廠商編號
+        if ($orKeyword !== '') {
+            $where .= ' AND (ol.voucher_number LIKE ? OR ol.relation_name LIKE ? OR coa.code LIKE ? OR coa.name LIKE ? OR v.vendor_code LIKE ?)';
+            $kw = '%' . $orKeyword . '%';
+            array_push($params, $kw, $kw, $kw, $kw, $kw);
+        }
 
         $stmt = $db->prepare("
             SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name,

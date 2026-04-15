@@ -16,6 +16,10 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
     <form method="get" action="/accounting.php" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
         <input type="hidden" name="action" value="offset_reports">
         <input type="hidden" name="tab" id="hiddenTab" value="<?= e($orTab) ?>">
+        <div style="flex:1;min-width:220px">
+            <label style="font-size:.85em">關鍵字</label>
+            <input type="text" name="keyword" value="<?= e($orKeyword ?? '') ?>" class="form-control" placeholder="傳票號/往來對象/科目/廠商編號" style="width:100%">
+        </div>
         <div>
             <label style="font-size:.85em">會計科目</label>
             <select name="account_id" class="form-control" style="width:200px">
