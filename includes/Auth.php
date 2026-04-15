@@ -480,6 +480,15 @@ class Auth
                         if ($custom[$deleteKey]) $permissions[] = $dm . '.delete';
                     }
                 }
+                // 處理獨立的新增權限
+                $createModules = array('cases', 'customers');
+                foreach ($createModules as $cm) {
+                    $createKey = 'create_' . $cm;
+                    if (array_key_exists($createKey, $custom)) {
+                        $permissions = array_values(array_diff($permissions, array($cm . '.create')));
+                        if ($custom[$createKey]) $permissions[] = $cm . '.create';
+                    }
+                }
                 Session::set('custom_permissions', $custom);
             }
         }
