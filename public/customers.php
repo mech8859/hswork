@@ -53,7 +53,7 @@ switch ($action) {
 
     // ---- 新增客戶 ----
     case 'create':
-        Auth::requirePermission('customers.manage');
+        Auth::requirePermission('customers.create');
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/customers.php'); }
             $id = $model->create($_POST);

@@ -5,7 +5,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>案件管理</h2>
-    <?php if (Auth::hasPermission('cases.manage') || Auth::hasPermission('cases.own')): ?>
+    <?php if (Auth::hasPermission('cases.create')): ?>
     <a href="/cases.php?action=create" class="btn btn-primary btn-sm">+ 新增案件</a>
     <?php endif; ?>
 </div>

@@ -56,7 +56,7 @@ $isAllPerm = in_array('all', $rolePerms);
 
 // 模組定義：key => [label, available_levels]
 $modules = array(
-    'cases'                => array('label' => '案件管理',   'levels' => array('manage', 'view', 'own', 'assist'), 'has_delete' => true),
+    'cases'                => array('label' => '案件管理',   'levels' => array('manage', 'view', 'own', 'assist'), 'has_delete' => true, 'has_create' => true),
     'schedule'             => array('label' => '排工行事曆', 'levels' => array('manage', 'view'), 'has_delete' => true),
     'repairs'              => array('label' => '維修單',     'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
     'staff'                => array('label' => '人員管理',   'levels' => array('manage', 'view'), 'has_delete' => false),
@@ -70,7 +70,7 @@ $modules = array(
     'attendance'           => array('label' => '出勤',       'levels' => array('view'), 'has_delete' => false),
     'reviews'              => array('label' => '五星評價',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'quotations'           => array('label' => '報價管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
-    'customers'            => array('label' => '客戶管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
+    'customers'            => array('label' => '客戶管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true, 'has_create' => true),
     'business_calendar'    => array('label' => '業務行事曆', 'levels' => array('manage', 'view'), 'has_delete' => false),
     'business_tracking'    => array('label' => '業務追蹤',   'levels' => array('manage', 'view', 'own'), 'has_delete' => false),
     'engineering_tracking' => array('label' => '工程追蹤',   'levels' => array('manage', 'view', 'own'), 'has_delete' => false),
@@ -113,6 +113,16 @@ function getDeleteStatus($module, $customPerms, $rolePerms, $isAllPerm) {
     // 角色預設：檢查角色是否有 module.delete
     if ($isAllPerm) return true;
     return in_array($module . '.delete', $rolePerms);
+}
+
+// 取得模組的新增權限狀態（預設：無自訂則不允許，除非系統管理者或角色有 .create）
+function getCreateStatus($module, $customPerms, $rolePerms, $isAllPerm) {
+    $createKey = 'create_' . $module;
+    if (array_key_exists($createKey, $customPerms)) {
+        return $customPerms[$createKey] ? true : false;
+    }
+    if ($isAllPerm) return true;
+    return in_array($module . '.create', $rolePerms);
 }
 
 // 取得模組的自訂權限等級
@@ -222,6 +232,13 @@ $customReports = isset($customPerms['report_access']) && is_array($customPerms['
                             <?= $current === 'off' ? 'checked' : '' ?>>
                         <span>關閉</span>
                     </label>
+                    <?php if (!empty($modInfo['has_create'])): ?>
+                    <label class="perm-delete-check" title="允許新增" style="background:#e8f5e9;border-color:#4caf50">
+                        <input type="checkbox" name="create_<?= $modKey ?>" value="1"
+                            <?= getCreateStatus($modKey, $customPerms, $rolePerms, $isAllPerm) ? 'checked' : '' ?>>
+                        <span>新增</span>
+                    </label>
+                    <?php endif; ?>
                     <?php if (!empty($modInfo['has_delete'])): ?>
                     <label class="perm-delete-check" title="允許刪除">
                         <input type="checkbox" name="delete_<?= $modKey ?>" value="1"

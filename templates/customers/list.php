@@ -2,7 +2,7 @@
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>客戶管理 <span style="font-size:.6em;color:#888;font-weight:normal">資料總筆數：<?= number_format($dashboardStats['total'] ?? 0) ?></span></h2>
-    <?php if (Auth::hasPermission('customers.manage')): ?>
+    <?php if (Auth::hasPermission('customers.create')): ?>
     <a href="/customers.php?action=create" class="btn btn-primary btn-sm">+ 新增客戶</a>
     <?php endif; ?>
 </div>

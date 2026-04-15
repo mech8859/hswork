@@ -205,6 +205,18 @@ class Auth
                         }
                     }
                 }
+
+                // 處理獨立的新增權限（create_cases, create_customers）
+                $createModules = array('cases', 'customers');
+                foreach ($createModules as $cm) {
+                    $createKey = 'create_' . $cm;
+                    if (array_key_exists($createKey, $custom)) {
+                        $permissions = array_values(array_diff($permissions, array($cm . '.create')));
+                        if ($custom[$createKey]) {
+                            $permissions[] = $cm . '.create';
+                        }
+                    }
+                }
                 // 存到 session 供側邊選單用
                 Session::set('custom_permissions', $custom);
             }

@@ -477,6 +477,19 @@ switch ($action) {
                 }
             }
 
+            // 新增權限（獨立 checkbox，目前案件/客戶用）
+            $createModules = array('cases', 'customers');
+            foreach ($createModules as $cm) {
+                $createKey = 'create_' . $cm;
+                if (!empty($_POST[$createKey])) {
+                    $hasCustom = true;
+                    $customPerms[$createKey] = true;
+                } else {
+                    $hasCustom = true;
+                    $customPerms[$createKey] = false;
+                }
+            }
+
             // 案件編輯區域
             if (empty($_POST['case_section_use_default'])) {
                 $hasCustom = true;

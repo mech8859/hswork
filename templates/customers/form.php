@@ -29,7 +29,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
-        <?php if ($isEdit): ?>
+        <?php if ($isEdit && Auth::hasPermission('cases.create')): ?>
         <a href="/cases.php?action=create&customer_id=<?= $customer['id'] ?>" class="btn btn-success btn-sm">+ 新增案件</a>
         <?php endif; ?>
         <a href="javascript:history.back()" class="btn btn-outline btn-sm">返回</a>

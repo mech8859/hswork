@@ -88,6 +88,10 @@ switch ($action) {
 
     // ---- 新增案件 ----
     case 'create':
+        if (!Auth::hasPermission('cases.create')) {
+            Session::flash('error', '無新增案件權限，請聯絡管理員設定');
+            redirect('/cases.php');
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) {
                 Session::flash('error', '安全驗證失敗');
@@ -1101,6 +1105,10 @@ switch ($action) {
     case 'ajax_create_customer':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        if (!Auth::hasPermission('customers.create')) {
+            echo json_encode(array('success' => false, 'error' => '無新增客戶權限，請聯絡管理員設定'));
+            break;
+        }
         $name = trim($_POST['name'] ?? '');
         if (!$name) { echo json_encode(array('success' => false, 'error' => '名稱不可為空')); break; }
         $db = Database::getInstance();
