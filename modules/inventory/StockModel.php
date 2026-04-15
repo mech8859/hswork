@@ -1021,8 +1021,10 @@ class StockModel
         $anyShippedCnt    = (int)$row['any_shipped_count'];
 
         if ($fullyShippedCnt >= $totalCount) {
-            // 所有品項都完成 → 已確認，同時將預計出庫日更新為實際出庫日（當天）
-            $this->db->prepare("UPDATE stock_outs SET status = '已確認', so_date = CURDATE(), confirmed_by = ?, confirmed_at = NOW() WHERE id = ?")
+            // 所有品項都完成 → 已確認
+            // so_date 保留使用者設定的預計出庫日（只在為 NULL 時補今天）
+            // 確認時間另存於 confirmed_at，不污染 so_date
+            $this->db->prepare("UPDATE stock_outs SET status = '已確認', so_date = IFNULL(so_date, CURDATE()), confirmed_by = ?, confirmed_at = NOW() WHERE id = ?")
                      ->execute(array($userId, $id));
         } elseif ($anyShippedCnt > 0) {
             // 有出但未完成 → 部分出庫

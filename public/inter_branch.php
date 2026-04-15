@@ -145,8 +145,26 @@ switch ($action) {
 
     case 'attendance_delete':
         header('Content-Type: application/json');
+        // 僅系統管理者可刪除單筆
+        if (!Auth::hasPermission('all')) {
+            echo json_encode(array('ok' => false, 'error' => '僅系統管理者可刪除'));
+            exit;
+        }
         $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
         $cnt = $model->deleteAttendance($id);
+        echo json_encode(array('ok' => $cnt > 0));
+        exit;
+
+    // 單筆結算（僅系統管理者）
+    case 'attendance_settle_one':
+        header('Content-Type: application/json');
+        if (!Auth::hasPermission('all')) {
+            echo json_encode(array('ok' => false, 'error' => '僅系統管理者可結算'));
+            exit;
+        }
+        if (!verify_csrf()) { echo json_encode(array('ok' => false, 'error' => 'CSRF')); exit; }
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        $cnt = $model->settleOneAttendance($id);
         echo json_encode(array('ok' => $cnt > 0));
         exit;
 

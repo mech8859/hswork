@@ -335,6 +335,17 @@ class InterBranchModel
         return $stmt->rowCount();
     }
 
+    /**
+     * 單筆結算：將某一筆出勤設為已結算
+     */
+    public function settleOneAttendance($id)
+    {
+        // settle_month 取該筆記錄的月份
+        $stmt = $this->db->prepare("UPDATE dispatch_attendance SET settled = 1, settle_month = DATE_FORMAT(attendance_date, '%Y-%m') WHERE id = ? AND settled = 0");
+        $stmt->execute(array($id));
+        return $stmt->rowCount();
+    }
+
     public function getAttendanceSettle($filters)
     {
         $where = 'da.status = \'present\'';

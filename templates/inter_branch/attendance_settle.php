@@ -111,7 +111,9 @@ if ($settledCount > 0): ?>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($settleData['detail'] as $d):
+                                    <?php
+                                    $isAdmin = Auth::hasPermission('all');
+                                    foreach ($settleData['detail'] as $d):
                                         if ($d['dispatch_worker_id'] != $w['dispatch_worker_id']) continue;
                                     ?>
                                     <tr>
@@ -125,6 +127,10 @@ if ($settledCount > 0): ?>
                                             <span class="badge badge-success">已結算</span>
                                             <?php else: ?>
                                             <span class="badge">未結算</span>
+                                            <?php if ($isAdmin): ?>
+                                            <button type="button" class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:.7rem;margin-left:4px" onclick="settleAttendanceOne(<?= $d['id'] ?>)">結算</button>
+                                            <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:.7rem;margin-left:2px" onclick="deleteAttendance(<?= $d['id'] ?>)">刪除</button>
+                                            <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -283,6 +289,33 @@ function toggleDetail(id) {
     if (el) {
         el.style.display = el.style.display === 'none' ? '' : 'none';
     }
+}
+
+function settleAttendanceOne(id) {
+    if (!confirm('確定將此筆標記為已結算？')) return;
+    var fd = new FormData();
+    fd.append('csrf_token', '<?= e(Session::getCsrfToken()) ?>');
+    fd.append('id', id);
+    fetch('/inter_branch.php?action=attendance_settle_one', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if (res.ok) { location.reload(); }
+            else { alert('結算失敗：' + (res.error || '')); }
+        })
+        .catch(function(){ alert('通訊失敗'); });
+}
+
+function deleteAttendance(id) {
+    if (!confirm('確定刪除此筆出勤紀錄？此操作無法復原。')) return;
+    var fd = new FormData();
+    fd.append('id', id);
+    fetch('/inter_branch.php?action=attendance_delete', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if (res.ok) { location.reload(); }
+            else { alert('刪除失敗：' + (res.error || '')); }
+        })
+        .catch(function(){ alert('通訊失敗'); });
 }
 </script>
 
