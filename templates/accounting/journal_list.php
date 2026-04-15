@@ -53,6 +53,7 @@
 <div class="card" style="overflow-x:auto">
     <table class="data-table" style="width:100%; table-layout:fixed;">
         <colgroup>
+            <col style="width:32px">
             <col style="width:110px">
             <col style="width:180px">
             <col>
@@ -63,6 +64,7 @@
         </colgroup>
         <thead>
             <tr>
+                <th></th>
                 <th>日期</th>
                 <th>傳票號碼</th>
                 <th>備註</th>
@@ -74,7 +76,7 @@
         </thead>
         <tbody>
             <?php if (empty($entries)): ?>
-            <tr><td colspan="7" style="text-align:center;padding:20px;color:#999">尚無傳票資料</td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:20px;color:#999">尚無傳票資料</td></tr>
             <?php endif; ?>
             <?php foreach ($entries as $e2): ?>
             <?php
@@ -82,8 +84,10 @@
                 if ($e2['status'] === 'draft') $statusClass = 'color:var(--warning)';
                 elseif ($e2['status'] === 'posted') $statusClass = 'color:var(--success)';
                 elseif ($e2['status'] === 'voided') $statusClass = 'color:var(--danger);text-decoration:line-through';
+                $isStar = !empty($e2['is_starred']);
             ?>
             <tr style="<?= $e2['status'] === 'voided' ? 'opacity:0.6' : '' ?>">
+                <td class="text-center"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$e2['id'] ?>" onclick="toggleStarJournal(this)" title="標記">&#9733;</span></td>
                 <td><?= e(format_date($e2['voucher_date'])) ?></td>
                 <td style="white-space:nowrap"><a href="/accounting.php?action=journal_view&id=<?= $e2['id'] ?>" style="font-weight:bold"><?= e($e2['voucher_number']) ?></a></td>
                 <td><?= e(mb_substr($e2['description'], 0, 50)) ?><?= mb_strlen($e2['description']) > 50 ? '...' : '' ?></td>
@@ -96,3 +100,23 @@
         </tbody>
     </table>
 </div>
+
+<style>
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
+</style>
+<script>
+function toggleStarJournal(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id'); if (!id) return;
+    el.classList.add('saving');
+    var fd = new FormData(); fd.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/accounting.php?action=toggle_star_journal');
+    xhr.onload = function() { el.classList.remove('saving'); try { var res = JSON.parse(xhr.responseText); if (res.error) { alert(res.error); return; } el.classList.toggle('is-on', !!res.starred); } catch (e) { alert('回應錯誤'); } };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(fd);
+}
+</script>

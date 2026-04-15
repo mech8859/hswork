@@ -122,6 +122,7 @@ foreach ($offsetRecords as $r) {
     <table class="data-table" style="width:100%;font-size:.85rem">
         <thead>
             <tr>
+                <th style="width:32px"></th>
                 <th style="width:100px">傳票日期</th>
                 <th style="width:140px">傳票號碼</th>
                 <th>科目</th>
@@ -138,15 +139,16 @@ foreach ($offsetRecords as $r) {
         </thead>
         <tbody>
             <?php if (empty($offsetRecords)): ?>
-            <tr><td colspan="12" style="text-align:center;padding:20px;color:#999">無符合的立帳記錄</td></tr>
+            <tr><td colspan="13" style="text-align:center;padding:20px;color:#999">無符合的立帳記錄</td></tr>
             <?php endif; ?>
             <?php
             $relTypeLabels = array('customer' => '客戶', 'vendor' => '廠商', 'other' => '其他');
             $statusLabels = array('open' => '未沖', 'partial' => '部分沖', 'closed' => '已沖完');
             $statusColors = array('open' => '#e53e3e', 'partial' => '#f0ad4e', 'closed' => '#5cb85c');
-            foreach ($offsetRecords as $r):
+            foreach ($offsetRecords as $r): $isStar = !empty($r['is_starred']);
             ?>
             <tr>
+                <td class="text-center"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="toggleStarOffset(this)" title="標記">&#9733;</span></td>
                 <td><?= e($r['voucher_date']) ?></td>
                 <td><a href="/accounting.php?action=journal_view&id=<?= $r['journal_entry_id'] ?>&ref=offset_ledger"><?= e($r['voucher_number']) ?></a></td>
                 <td><?= e($r['account_code']) ?> <?= e($r['account_name']) ?></td>
@@ -166,7 +168,7 @@ foreach ($offsetRecords as $r) {
             </tr>
             <?php if (!empty($offsetDetails[$r['id']])): ?>
             <tr id="detail-<?= $r['id'] ?>" style="display:none">
-                <td colspan="12" style="padding:0 16px 8px 40px;background:#fafafa">
+                <td colspan="13" style="padding:0 16px 8px 40px;background:#fafafa">
                     <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:4px">
                         <thead><tr style="color:#666"><th style="padding:4px 8px">沖帳日期</th><th style="padding:4px 8px">沖帳傳票</th><th style="padding:4px 8px;text-align:right">沖帳金額</th></tr></thead>
                         <tbody>
@@ -187,9 +189,26 @@ foreach ($offsetRecords as $r) {
     </table>
 </div>
 
+<style>
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
+</style>
 <script>
 function toggleDetail(id) {
     var row = document.getElementById('detail-' + id);
     if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+function toggleStarOffset(el) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id'); if (!id) return;
+    el.classList.add('saving');
+    var fd = new FormData(); fd.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/accounting.php?action=toggle_star_offset');
+    xhr.onload = function() { el.classList.remove('saving'); try { var res = JSON.parse(xhr.responseText); if (res.error) { alert(res.error); return; } el.classList.toggle('is-on', !!res.starred); } catch (e) { alert('回應錯誤'); } };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(fd);
 }
 </script>
