@@ -864,6 +864,8 @@ switch ($action) {
         $jrDateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : date('Y-m-01');
         $jrDateTo = isset($_GET['date_to']) ? $_GET['date_to'] : date('Y-m-d');
         $jrCostCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : 0;
+        $jrAccountFrom = isset($_GET['account_from']) ? trim($_GET['account_from']) : '';
+        $jrAccountTo = isset($_GET['account_to']) ? trim($_GET['account_to']) : '';
         $jrTab = isset($_GET['tab']) ? $_GET['tab'] : 'daily_voucher';
 
         $costCenters = $model->getCostCenters();
@@ -871,9 +873,15 @@ switch ($action) {
 
         $ccWhere = '';
         $ccParams = array('posted', $jrDateFrom, $jrDateTo);
-        if ($jrCostCenterId) { $ccWhere = ' AND jl.cost_center_id = ?'; $ccParams[] = $jrCostCenterId; }
+        if ($jrCostCenterId) { $ccWhere .= ' AND jl.cost_center_id = ?'; $ccParams[] = $jrCostCenterId; }
 
-        // 1. 傳票列表（日報表用）
+        // 科目區間（用於 jrLines 查詢，影響日記帳/分類帳/日計表/明細分類帳）
+        $accWhere = $ccWhere;
+        $accParams = $ccParams;
+        if ($jrAccountFrom !== '') { $accWhere .= ' AND coa.code >= ?'; $accParams[] = $jrAccountFrom; }
+        if ($jrAccountTo !== '')   { $accWhere .= ' AND coa.code <= ?'; $accParams[] = $jrAccountTo; }
+
+        // 1. 傳票列表（日報表用）— 日報表不篩科目，只篩日期 + 成本中心
         $jrVouchers = $db->prepare("
             SELECT je.*,
                    SUM(jl.debit_amount) as total_debit, SUM(jl.credit_amount) as total_credit,
@@ -888,7 +896,7 @@ switch ($action) {
         $jrVouchers->execute($ccParams);
         $jrVoucherList = $jrVouchers->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2. 全部分錄明細（日記帳/分類帳用）
+        // 2. 全部分錄明細（日記帳/分類帳用）— 套用科目區間
         $jrLines = $db->prepare("
             SELECT jl.*, je.voucher_number, je.voucher_date, je.description as je_description,
                    coa.code as account_code, coa.name as account_name, coa.normal_balance,
@@ -900,10 +908,10 @@ switch ($action) {
             JOIN chart_of_accounts coa ON jl.account_id = coa.id
             LEFT JOIN cost_centers cc ON jl.cost_center_id = cc.id
             LEFT JOIN users u ON je.created_by = u.id
-            WHERE je.status = ? AND je.voucher_date >= ? AND je.voucher_date <= ? {$ccWhere}
+            WHERE je.status = ? AND je.voucher_date >= ? AND je.voucher_date <= ? {$accWhere}
             ORDER BY je.voucher_date, je.voucher_number, jl.sort_order
         ");
-        $jrLines->execute($ccParams);
+        $jrLines->execute($accParams);
         $jrLineList = $jrLines->fetchAll(PDO::FETCH_ASSOC);
 
         // 按日期分組（日計表用）
@@ -986,6 +994,46 @@ switch ($action) {
             if (strpos($l['account_code'], '1111') === 0) {
                 $jrCashLines[] = $l;
             }
+        }
+
+        // 期初餘額：每個科目在 date_from 之前的累計借/貸
+        // 用於總分類帳、明細分類帳，讓期末餘額對應資產負債表（若 date_to = asOfDate）
+        $ccOpeningWhere = '';
+        $ccOpeningParams = array('posted', $jrDateFrom);
+        if ($jrCostCenterId) { $ccOpeningWhere .= ' AND jl.cost_center_id = ?'; $ccOpeningParams[] = $jrCostCenterId; }
+
+        $jrOpeningBalance = array(); // [account_code] => debit - credit (未乘 normal_balance)
+        $openStmt = $db->prepare("
+            SELECT coa.code AS account_code, coa.normal_balance,
+                   COALESCE(SUM(jl.debit_amount), 0) AS d,
+                   COALESCE(SUM(jl.credit_amount), 0) AS c
+            FROM journal_entry_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            JOIN chart_of_accounts coa ON jl.account_id = coa.id
+            WHERE je.status = ? AND je.voucher_date < ? {$ccOpeningWhere}
+            GROUP BY coa.code, coa.normal_balance
+        ");
+        $openStmt->execute($ccOpeningParams);
+        foreach ($openStmt->fetchAll(PDO::FETCH_ASSOC) as $o) {
+            $diff = (float)$o['d'] - (float)$o['c'];
+            // 對借記科目：期初餘額 = 借-貸；對貸記科目：= 貸-借
+            $jrOpeningBalance[$o['account_code']] = array(
+                'debit_minus_credit' => $diff,
+                'normal_balance' => $o['normal_balance'],
+                // 依正常餘額方向計算的期初餘額（正值代表正常方向）
+                'opening' => ($o['normal_balance'] === 'debit') ? $diff : -$diff,
+            );
+        }
+
+        // 總分類帳（前 4 碼合併）期初餘額
+        $jrGlOpeningBalance = array(); // [parent_code] => [opening => ..., normal_balance => ...]
+        foreach ($jrOpeningBalance as $code => $info) {
+            $prefix4 = substr($code, 0, 4);
+            $parentCode = $prefix4 . str_repeat('0', strlen($code) - 4);
+            if (!isset($jrGlOpeningBalance[$parentCode])) {
+                $jrGlOpeningBalance[$parentCode] = array('opening' => 0, 'normal_balance' => $info['normal_balance']);
+            }
+            $jrGlOpeningBalance[$parentCode]['opening'] += $info['opening'];
         }
 
         $pageTitle = '傳票報表';

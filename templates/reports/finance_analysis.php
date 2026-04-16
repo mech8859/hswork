@@ -835,8 +835,9 @@ sort($catMonths);
         <span>八、付款主分類分析</span>
         <div class="d-flex gap-1 align-center">
             <select id="catMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <option value="__all__">全年合計</option>
                 <?php foreach ($catMonths as $cm): ?>
-                <option value="<?= $cm ?>" <?= $cm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($cm,5,2) ?>月</option>
+                <option value="<?= $cm ?>" <?= $cm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($cm,0,4) ?>/<?= (int)substr($cm,5,2) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -850,6 +851,34 @@ sort($catMonths);
                 <th>比例圖</th>
             </tr></thead>
             <tbody>
+            <?php
+            // 全年合計列
+            $yearCatList = array();
+            $yearCatTotal = 0;
+            foreach ($payCatData as $cat => $mArr) {
+                $catSum = array_sum($mArr);
+                if ($catSum > 0) {
+                    $yearCatList[] = array('name' => $cat, 'amount' => $catSum);
+                    $yearCatTotal += $catSum;
+                }
+            }
+            usort($yearCatList, function($a, $b) { return $b['amount'] - $a['amount']; });
+            foreach ($yearCatList as $cl):
+                $pct = $yearCatTotal > 0 ? round($cl['amount'] / $yearCatTotal * 100, 1) : 0;
+            ?>
+                <tr data-month="__all__">
+                    <td style="text-align:left;"><?= e($cl['name']) ?></td>
+                    <td><?= number_format($cl['amount']) ?></td>
+                    <td><?= $pct ?>%</td>
+                    <td style="text-align:left;"><div style="background:#4472C4;height:16px;width:<?= min($pct, 100) ?>%;border-radius:3px;"></div></td>
+                </tr>
+            <?php endforeach; ?>
+                <tr data-month="__all__" class="row-total">
+                    <td style="text-align:left;">合計（全年）</td>
+                    <td><?= number_format($yearCatTotal) ?></td>
+                    <td>100%</td>
+                    <td></td>
+                </tr>
             <?php
             // 預設顯示當月，JS 會切換
             foreach ($catMonths as $cm):
@@ -903,8 +932,9 @@ sort($vendorMonths);
         <span>九、付款廠商 Top 15 分析</span>
         <div class="d-flex gap-1 align-center">
             <select id="vendorMonthFilter" class="form-control" style="width:auto;padding:2px 8px;font-size:.8rem;background:#fff;color:#333;">
+                <option value="__all__">全年合計</option>
                 <?php foreach ($vendorMonths as $vm): ?>
-                <option value="<?= $vm ?>" <?= $vm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($vm,5,2) ?>月</option>
+                <option value="<?= $vm ?>" <?= $vm === $currentMonthPrefix ? 'selected' : '' ?>><?= (int)substr($vm,0,4) ?>/<?= (int)substr($vm,5,2) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -919,6 +949,52 @@ sort($vendorMonths);
                 <th>比例圖</th>
             </tr></thead>
             <tbody>
+            <?php
+            // 全年合計列
+            $yearVendorList = array();
+            $yearVendorTotal = 0;
+            foreach ($payVendorData as $v => $mArr) {
+                $vSum = array_sum($mArr);
+                if ($vSum > 0) {
+                    $yearVendorList[] = array('name' => $v, 'amount' => $vSum);
+                    $yearVendorTotal += $vSum;
+                }
+            }
+            usort($yearVendorList, function($a, $b) { return $b['amount'] - $a['amount']; });
+            $yearTop15 = array_slice($yearVendorList, 0, 15);
+            $yearRank = 0;
+            foreach ($yearTop15 as $vl):
+                $yearRank++;
+                $pct = $yearVendorTotal > 0 ? round($vl['amount'] / $yearVendorTotal * 100, 1) : 0;
+            ?>
+                <tr data-month="__all__">
+                    <td style="text-align:left;"><?= $yearRank ?></td>
+                    <td style="text-align:left;"><?= e($vl['name']) ?></td>
+                    <td><?= number_format($vl['amount']) ?></td>
+                    <td><?= $pct ?>%</td>
+                    <td style="text-align:left;"><div style="background:#ED7D31;height:16px;width:<?= min($pct * 2, 100) ?>%;border-radius:3px;"></div></td>
+                </tr>
+            <?php endforeach; ?>
+                <?php
+                $yearTop15Total = 0;
+                foreach ($yearTop15 as $vl) $yearTop15Total += $vl['amount'];
+                $yearOther = $yearVendorTotal - $yearTop15Total;
+                $yearOtherPct = $yearVendorTotal > 0 ? round($yearOther / $yearVendorTotal * 100, 1) : 0;
+                ?>
+                <tr data-month="__all__" style="color:#888;">
+                    <td></td>
+                    <td style="text-align:left;">其他廠商</td>
+                    <td><?= number_format($yearOther) ?></td>
+                    <td><?= $yearOtherPct ?>%</td>
+                    <td></td>
+                </tr>
+                <tr data-month="__all__" class="row-total">
+                    <td></td>
+                    <td style="text-align:left;">合計（全年·全部廠商）</td>
+                    <td><?= number_format($yearVendorTotal) ?></td>
+                    <td>100%</td>
+                    <td></td>
+                </tr>
             <?php
             foreach ($vendorMonths as $vm):
                 $vendorList = array();

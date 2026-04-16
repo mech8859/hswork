@@ -141,18 +141,40 @@ $records = $result['data'];
 
 // Calculate running balance for each record
 $totalBalance = $model->getReserveFundBalanceUpTo($filters);
-$runningBalance = $totalBalance;
-if ($page > 1) {
+$sortAsc = (!empty($filters['sort']) && $filters['sort'] === 'asc');
+
+if ($sortAsc) {
+    // 舊→新：從 0 累加
     $perPage = $result['perPage'];
     $skipCount = ($page - 1) * $perPage;
-    $stmtSkip = $model->getReserveFundPageSum($filters, $skipCount);
-    $runningBalance = $totalBalance - $stmtSkip;
-}
-foreach ($records as $idx => $r) {
-    $records[$idx]['running_balance'] = $runningBalance;
-    $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
-    $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
-    $runningBalance -= ($income - $expense);
+    if ($skipCount > 0) {
+        $newerCount = $result['total'] - $skipCount;
+        $newerSum = $model->getReserveFundPageSum($filters, $newerCount);
+        $runningBalance = $totalBalance - $newerSum;
+    } else {
+        $runningBalance = 0;
+    }
+    foreach ($records as $idx => $r) {
+        $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
+        $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
+        $runningBalance += ($income - $expense);
+        $records[$idx]['running_balance'] = $runningBalance;
+    }
+} else {
+    // 新→舊：從總餘額開始，每筆減掉自己
+    $runningBalance = $totalBalance;
+    if ($page > 1) {
+        $perPage = $result['perPage'];
+        $skipCount = ($page - 1) * $perPage;
+        $stmtSkip = $model->getReserveFundPageSum($filters, $skipCount);
+        $runningBalance = $totalBalance - $stmtSkip;
+    }
+    foreach ($records as $idx => $r) {
+        $records[$idx]['running_balance'] = $runningBalance;
+        $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
+        $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
+        $runningBalance -= ($income - $expense);
+    }
 }
 
 $pageTitle = '備用金管理';

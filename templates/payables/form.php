@@ -259,6 +259,10 @@ if ($isLocked) {
                 <button type="button" class="btn btn-primary btn-sm" onclick="addPurchaseDetailRow()">+ 新增</button>
             </div>
         </div>
+        <div id="pdBranchSummary" style="padding:8px 16px;background:#f0f7ff;border-bottom:1px solid var(--gray-200);font-size:.85rem;color:#555;display:none">
+            <strong style="color:#1565c0">各分公司未稅小計：</strong>
+            <span id="pdBranchSummaryContent"></span>
+        </div>
         <input type="hidden" name="pd_rendered" value="1">
         <div id="purchaseDetailBody">
             <?php if (!empty($record['purchase_details'])):
@@ -661,6 +665,40 @@ function validatePayableForm() {
         if (firstDup) { firstDup.scrollIntoView({behavior:'smooth', block:'center'}); firstDup.focus(); }
         return false;
     }
+
+    // ===== 三值比對：未稅總額 / 分公司拆帳合計 / 進貨淨額 =====
+    var subtotal = _num('fldSubtotal');
+    // 分公司拆帳合計
+    var branchSum = 0;
+    document.querySelectorAll('#branchBody input[name^="branches"][name$="[amount]"]').forEach(function(el) {
+        branchSum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    // 進貨淨額（= 進貨明細未稅合計 − 進退明細退款合計）
+    var pdSum = 0;
+    document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[amount_untaxed]"]').forEach(function(el) {
+        pdSum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    var rdSum = 0;
+    document.querySelectorAll('#returnDetailBody input[name^="rd"][name$="[refund_amount]"]').forEach(function(el) {
+        rdSum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    });
+    var pdNet = pdSum - rdSum;
+
+    var mismatches = [];
+    if (subtotal !== branchSum) {
+        mismatches.push('・未稅總額 $' + subtotal.toLocaleString() + ' ≠ 分公司拆帳合計 $' + branchSum.toLocaleString() + '（差 $' + (subtotal - branchSum).toLocaleString() + '）');
+    }
+    if (subtotal !== pdNet) {
+        mismatches.push('・未稅總額 $' + subtotal.toLocaleString() + ' ≠ 進貨淨額 $' + pdNet.toLocaleString() + '（差 $' + (subtotal - pdNet).toLocaleString() + '）');
+    }
+    if (branchSum !== pdNet) {
+        mismatches.push('・分公司拆帳合計 $' + branchSum.toLocaleString() + ' ≠ 進貨淨額 $' + pdNet.toLocaleString() + '（差 $' + (branchSum - pdNet).toLocaleString() + '）');
+    }
+    if (mismatches.length > 0) {
+        alert('金額不一致，無法儲存：\n\n' + mismatches.join('\n') + '\n\n請確認三項金額相符後再儲存。');
+        return false;
+    }
+
     return true;
 }
 
@@ -811,15 +849,48 @@ function adoptSelectedGr() {
     if (added > 0) alert('已帶入 ' + added + ' 筆進貨單');
 }
 
-// ---- 進貨明細未稅合計 + 進貨淨額 ----
+// ---- 進貨明細未稅合計 + 進貨淨額 + 各分公司統計 ----
 function recalcPdSum() {
     var sum = 0;
-    document.querySelectorAll('#purchaseDetailBody input[name^="pd"][name$="[amount_untaxed]"]').forEach(function(el) {
-        sum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    var branchMap = {};
+    document.querySelectorAll('#purchaseDetailBody .pd-item').forEach(function(row) {
+        var amtEl = row.querySelector('input[name$="[amount_untaxed]"]');
+        var brEl  = row.querySelector('input[name$="[branch_name]"]');
+        var amt = parseInt(String(amtEl && amtEl.value || '').replace(/,/g, '')) || 0;
+        var br  = (brEl && brEl.value || '').trim() || '(未指定)';
+        sum += amt;
+        if (!branchMap[br]) branchMap[br] = 0;
+        branchMap[br] += amt;
     });
     var disp = document.getElementById('pdSumDisplay');
     if (disp) disp.textContent = '$' + sum.toLocaleString();
+
+    // 各分公司小計
+    var summary = document.getElementById('pdBranchSummary');
+    var content = document.getElementById('pdBranchSummaryContent');
+    if (summary && content) {
+        var keys = Object.keys(branchMap);
+        if (keys.length === 0) {
+            summary.style.display = 'none';
+        } else {
+            summary.style.display = '';
+            // 按金額降序
+            keys.sort(function(a,b){ return branchMap[b] - branchMap[a]; });
+            var html = '';
+            for (var i = 0; i < keys.length; i++) {
+                if (i > 0) html += '　|　';
+                html += '<span style="margin:0 4px">' + escapeHtmlPd(keys[i]) + '</span>';
+                html += '<strong style="color:#1565c0">$' + branchMap[keys[i]].toLocaleString() + '</strong>';
+            }
+            content.innerHTML = html;
+        }
+    }
     recalcPdNet();
+}
+function escapeHtmlPd(s) {
+    return String(s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
 }
 function recalcPdNet() {
     // 進貨淨額 = 進貨明細未稅合計 − 進退明細退款合計
@@ -838,7 +909,7 @@ function recalcPdNet() {
 document.addEventListener('DOMContentLoaded', recalcPdSum);
 // 用事件委派監聽變動 + 刪除
 document.addEventListener('input', function(e) {
-    if (e.target && e.target.name && /^pd\[\d+\]\[amount_untaxed\]$/.test(e.target.name)) {
+    if (e.target && e.target.name && /^pd\[\d+\]\[(amount_untaxed|branch_name)\]$/.test(e.target.name)) {
         recalcPdSum();
     }
 });

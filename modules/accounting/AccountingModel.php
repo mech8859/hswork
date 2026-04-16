@@ -306,8 +306,21 @@ class AccountingModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (je.voucher_number LIKE ? OR je.description LIKE ?)';
+            // 搜傳票號 / 描述 / 分錄摘要 / 會計科目代碼或名稱
+            $where .= ' AND (
+                je.voucher_number LIKE ?
+                OR je.description LIKE ?
+                OR EXISTS(
+                    SELECT 1 FROM journal_entry_lines jl
+                    LEFT JOIN chart_of_accounts coa ON jl.account_id = coa.id
+                    WHERE jl.journal_entry_id = je.id
+                      AND (jl.description LIKE ? OR coa.code LIKE ? OR coa.name LIKE ?)
+                )
+            )';
             $kw = '%' . $filters['keyword'] . '%';
+            $params[] = $kw;
+            $params[] = $kw;
+            $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
         }

@@ -211,20 +211,44 @@ $records = $result['data'];
 
 // Calculate running balance for each record（同樣強制隔離）
 $totalBalance = $model->getPettyCashBalanceUpTo($filters, 0, $accessibleBranchIds);
+$sortAsc = (!empty($filters['sort']) && $filters['sort'] === 'asc');
 
-$runningBalance = $totalBalance;
-if ($page > 1) {
+if ($sortAsc) {
+    // 舊→新：從 0 累加。本頁第一筆的「前置餘額」= 前面跳過筆數的累加
     $perPage = $result['perPage'];
     $skipCount = ($page - 1) * $perPage;
-    $stmtSkip = $model->getPettyCashPageSum($filters, $skipCount, $accessibleBranchIds);
-    $runningBalance = $totalBalance - $stmtSkip;
-}
+    if ($skipCount > 0) {
+        // 前面 skipCount 筆（這裡同樣用 DESC 取「最新的 skipCount 筆」是不對的）
+        // 要的是「最舊的 skipCount 筆」。因為 totalBalance = 全部累加，
+        // 所以「最舊 skipCount 筆累加」= totalBalance − 「最新（count-skipCount）筆累加」
+        $newerCount = $result['total'] - $skipCount; // 比要顯示的這頁更新的筆數
+        $newerSum = $model->getPettyCashPageSum($filters, $newerCount, $accessibleBranchIds);
+        $runningBalance = $totalBalance - $newerSum;
+    } else {
+        $runningBalance = 0;
+    }
+    foreach ($records as $idx => $r) {
+        $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
+        $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
+        $runningBalance += ($income - $expense);
+        $records[$idx]['running_balance'] = $runningBalance;
+    }
+} else {
+    // 新→舊：從總餘額開始，每筆減掉自己
+    $runningBalance = $totalBalance;
+    if ($page > 1) {
+        $perPage = $result['perPage'];
+        $skipCount = ($page - 1) * $perPage;
+        $stmtSkip = $model->getPettyCashPageSum($filters, $skipCount, $accessibleBranchIds);
+        $runningBalance = $totalBalance - $stmtSkip;
+    }
 
-foreach ($records as $idx => $r) {
-    $records[$idx]['running_balance'] = $runningBalance;
-    $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
-    $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
-    $runningBalance -= ($income - $expense);
+    foreach ($records as $idx => $r) {
+        $records[$idx]['running_balance'] = $runningBalance;
+        $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
+        $expense = !empty($r['expense_amount']) ? (float)$r['expense_amount'] : 0;
+        $runningBalance -= ($income - $expense);
+    }
 }
 
 $pageTitle = '零用金管理';

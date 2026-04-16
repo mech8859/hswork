@@ -1,7 +1,7 @@
 <?php
 $voucherTypeLabels = array('general' => '一般傳票', 'receipt' => '收款傳票', 'payment' => '付款傳票', 'transfer' => '轉帳傳票');
 // 建立各 tab 的傳票連結 helper
-$jrRefBase = 'date_from=' . urlencode($jrDateFrom) . '&date_to=' . urlencode($jrDateTo) . ($jrCostCenterId ? '&cost_center_id=' . $jrCostCenterId : '');
+$jrRefBase = 'date_from=' . urlencode($jrDateFrom) . '&date_to=' . urlencode($jrDateTo) . ($jrCostCenterId ? '&cost_center_id=' . $jrCostCenterId : '') . ($jrAccountFrom !== '' ? '&account_from=' . urlencode($jrAccountFrom) : '') . ($jrAccountTo !== '' ? '&account_to=' . urlencode($jrAccountTo) : '');
 function jrVoucherLink($id, $number, $tab, $refBase) {
     return '<a href="/accounting.php?action=journal_view&id=' . (int)$id . '&ref=journal_reports&ref_tab=' . $tab . '&ref_params=' . urlencode($refBase) . '">' . e($number) . '</a>';
 }
@@ -36,6 +36,21 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
                 <?php endforeach; ?>
             </select>
         </div>
+        <div>
+            <label style="font-size:.85em">科目起（編號）</label>
+            <input type="text" name="account_from" value="<?= e($jrAccountFrom) ?>" class="form-control" style="width:110px" placeholder="例 1111" list="jrAccountList">
+        </div>
+        <div>
+            <label style="font-size:.85em">科目迄</label>
+            <input type="text" name="account_to" value="<?= e($jrAccountTo) ?>" class="form-control" style="width:110px" placeholder="例 1119" list="jrAccountList">
+        </div>
+        <datalist id="jrAccountList">
+            <?php
+            $accList = Database::getInstance()->query("SELECT code, name FROM chart_of_accounts WHERE is_active = 1 ORDER BY code")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($accList as $ac): ?>
+            <option value="<?= e($ac['code']) ?>"><?= e($ac['code']) ?> <?= e($ac['name']) ?></option>
+            <?php endforeach; ?>
+        </datalist>
         <button type="submit" class="btn btn-primary">查詢</button>
         <a href="/accounting.php?action=journal_reports" class="btn btn-outline">清除</a>
     </form>
@@ -290,7 +305,23 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
         </tr></thead>
         <tbody>
         <?php
-        $glBal = 0; $glD = 0; $glC = 0;
+        // 期初餘額（基於 normal_balance 方向的正值 / 負值）
+        $glOpen = isset($jrGlOpeningBalance[$acctCode]) ? (float)$jrGlOpeningBalance[$acctCode]['opening'] : 0;
+        $glBal = $glOpen; $glD = 0; $glC = 0;
+        ?>
+        <?php if (abs($glOpen) > 0.01): ?>
+        <tr style="background:#f5f9ff;color:#555">
+            <td><?= e($jrDateFrom) ?></td>
+            <td></td>
+            <td></td>
+            <td style="font-style:italic">期初餘額</td>
+            <td style="text-align:right"></td>
+            <td style="text-align:right"></td>
+            <td style="text-align:center"><?= $glBal >= 0 ? ($isDebitNormal ? '借' : '貸') : ($isDebitNormal ? '貸' : '借') ?></td>
+            <td style="text-align:right;font-weight:bold"><?= number_format(abs($glBal)) ?></td>
+        </tr>
+        <?php endif; ?>
+        <?php
         foreach ($acctData['lines'] as $l):
             $d = (float)$l['debit_amount']; $c = (float)$l['credit_amount'];
             $glD += $d; $glC += $c;
@@ -308,7 +339,15 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
         </tr>
         <?php endforeach; ?>
         </tbody>
-        <tfoot><tr style="font-weight:bold;background:#f8f9fa">
+        <tfoot>
+        <?php if (abs($glOpen) > 0.01): ?>
+        <tr style="color:#666;font-size:.78rem">
+            <td colspan="4" style="text-align:right">期初餘額</td>
+            <td colspan="3" style="text-align:right"></td>
+            <td style="text-align:right"><?= ($glOpen >= 0 ? '' : '-') . number_format(abs($glOpen)) ?></td>
+        </tr>
+        <?php endif; ?>
+        <tr style="font-weight:bold;background:#f8f9fa">
             <td colspan="4" style="text-align:right">本期合計</td>
             <td style="text-align:right"><?= number_format($glD) ?></td>
             <td style="text-align:right"><?= number_format($glC) ?></td>
@@ -343,7 +382,26 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
         </tr></thead>
         <tbody>
         <?php
-        $slBal = 0; $slD = 0; $slC = 0;
+        // 期初餘額（明細分類帳以科目完整代碼查）
+        $slOpen = isset($jrOpeningBalance[$acctCode]) ? (float)$jrOpeningBalance[$acctCode]['opening'] : 0;
+        $slBal = $slOpen; $slD = 0; $slC = 0;
+        ?>
+        <?php if (abs($slOpen) > 0.01): ?>
+        <tr style="background:#f5f9ff;color:#555">
+            <td><?= e($jrDateFrom) ?></td>
+            <td></td>
+            <td></td>
+            <td style="font-family:monospace"><?= e($acctData['code']) ?></td>
+            <td><?= e($acctData['name']) ?></td>
+            <td style="font-style:italic">期初餘額</td>
+            <td style="text-align:right"></td>
+            <td style="text-align:right"></td>
+            <td style="text-align:center"><?= $slBal >= 0 ? ($isDebitNormal ? '借' : '貸') : ($isDebitNormal ? '貸' : '借') ?></td>
+            <td style="text-align:right;font-weight:bold"><?= number_format(abs($slBal)) ?></td>
+            <td></td>
+        </tr>
+        <?php endif; ?>
+        <?php
         foreach ($acctData['lines'] as $l):
             $d = (float)$l['debit_amount']; $c = (float)$l['credit_amount'];
             $slD += $d; $slC += $c;
@@ -364,7 +422,16 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
         </tr>
         <?php endforeach; ?>
         </tbody>
-        <tfoot><tr style="font-weight:600;background:#f8f9fa">
+        <tfoot>
+        <?php if (abs($slOpen) > 0.01): ?>
+        <tr style="color:#666;font-size:.78rem">
+            <td colspan="6" style="text-align:right">期初餘額</td>
+            <td colspan="3" style="text-align:right"></td>
+            <td style="text-align:right"><?= ($slOpen >= 0 ? '' : '-') . number_format(abs($slOpen)) ?></td>
+            <td></td>
+        </tr>
+        <?php endif; ?>
+        <tr style="font-weight:600;background:#f8f9fa">
             <td colspan="6" style="text-align:right">本期合計</td>
             <td style="text-align:right"><?= number_format($slD) ?></td>
             <td style="text-align:right"><?= number_format($slC) ?></td>
