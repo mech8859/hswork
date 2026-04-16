@@ -628,6 +628,25 @@ class StockModel
      * @param int $userId
      * @return array ['deleted'=>n, 'updated'=>n, 'added'=>n]
      */
+    /**
+     * 只更新單一品項備註（任何狀態都可改，但備品不可改）
+     */
+    public function updateStockOutItemNote($itemId, $note, $userId)
+    {
+        $stmt = $this->db->prepare("SELECT id, stock_out_id, is_spare, product_name FROM stock_out_items WHERE id = ?");
+        $stmt->execute(array($itemId));
+        $item = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$item) throw new Exception('品項不存在');
+        if (!empty($item['is_spare'])) throw new Exception('備品的備註不可修改');
+
+        $note = trim((string)$note);
+        if (mb_strlen($note) > 500) throw new Exception('備註不可超過 500 字');
+
+        $upd = $this->db->prepare("UPDATE stock_out_items SET note = ? WHERE id = ?");
+        $upd->execute(array($note, $itemId));
+        return array('stock_out_id' => (int)$item['stock_out_id'], 'note' => $note);
+    }
+
     public function editStockOutItems($stockOutId, array $changes, $userId)
     {
         $record = $this->getStockOutById($stockOutId);

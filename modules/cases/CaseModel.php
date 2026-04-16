@@ -1442,6 +1442,9 @@ class CaseModel
             '報價無下文'       => '報價無下文',
             '無效'             => '無效',
             '客戶毀約'         => '客戶毀約',
+            '完工待簽核'       => '完工待簽核',
+            '完工未收款'       => '完工未收款',
+            '已完工結案'       => '已完工結案',
         );
         return self::loadDropdownOptions('case_status', $fallback);
     }

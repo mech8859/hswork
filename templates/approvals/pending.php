@@ -1,8 +1,11 @@
 <div class="d-flex justify-between align-center mb-2">
     <h2>待簽核</h2>
-    <?php if ($canManageRules): ?>
-    <a href="/approvals.php?action=settings" class="btn btn-outline btn-sm">簽核設定</a>
-    <?php endif; ?>
+    <div class="d-flex gap-1">
+        <a href="/approvals.php?action=history" class="btn btn-outline btn-sm">簽核紀錄</a>
+        <?php if ($canManageRules): ?>
+        <a href="/approvals.php?action=settings" class="btn btn-outline btn-sm">簽核設定</a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php if (empty($pendingList)): ?>

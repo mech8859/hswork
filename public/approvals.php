@@ -26,6 +26,24 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 簽核歷史紀錄（所有模組） ----
+    case 'history':
+        if (!$canViewApprovals) { Session::flash('error', '無權限'); redirect('/index.php'); }
+        $filters = array(
+            'module'    => isset($_GET['module']) ? $_GET['module'] : '',
+            'status'    => isset($_GET['status']) ? $_GET['status'] : '',
+            'date_from' => isset($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'   => isset($_GET['date_to']) ? $_GET['date_to'] : '',
+            'keyword'   => isset($_GET['keyword']) ? $_GET['keyword'] : '',
+        );
+        $history = $model->getApprovalHistory($filters);
+        $pageTitle = '簽核紀錄';
+        $currentPage = 'approvals';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/approvals/history.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 簽核設定 ----
     case 'settings':
         if (!$canManageRules) { Session::flash('error', '無權限'); redirect('/approvals.php'); }

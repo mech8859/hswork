@@ -354,8 +354,12 @@ document.addEventListener('click', function(e) {
                         <?php if ($isSpare): ?>
                         <span style="background:#ff9800;color:#fff;padding:1px 6px;border-radius:3px;font-size:.7rem;margin-left:4px;font-weight:600">備品</span>
                         <?php endif; ?>
-                        <?php if ($itemNote && $itemNote !== '備品'): ?>
-                        <span class="note-display" style="color:#888;font-size:.75rem;margin-left:4px">(<?= e($itemNote) ?>)</span>
+                        <?php if (!$isSpare && $canManage): ?>
+                            <span class="item-note-edit" data-item-id="<?= (int)$item['id'] ?>" data-note="<?= e($itemNote) ?>" style="color:#888;font-size:.75rem;margin-left:4px;cursor:pointer" title="點擊編輯備註">
+                                <?php if ($itemNote): ?>(<?= e($itemNote) ?>)<?php else: ?><span style="color:#bbb;font-style:italic">+ 備註</span><?php endif; ?>
+                            </span>
+                        <?php elseif ($itemNote && $itemNote !== '備品'): ?>
+                            <span style="color:#888;font-size:.75rem;margin-left:4px">(<?= e($itemNote) ?>)</span>
                         <?php endif; ?>
                     </td>
                     <td><?= e($productModel) ?></td>
@@ -1367,6 +1371,71 @@ function saveSoDate() {
     xhr.onerror = function(){ alert('網路錯誤'); btn.disabled = false; btn.textContent = '儲存'; };
     xhr.send(JSON.stringify({so_date: newDate}));
 }
+
+// ===== 品項備註原地編輯 =====
+(function(){
+    var CSRF_NOTE = '<?= e(Session::getCsrfToken()) ?>';
+    document.addEventListener('click', function(e) {
+        var span = e.target.closest('.item-note-edit');
+        if (!span) return;
+        if (span.querySelector('input')) return; // 已在編輯
+        var itemId = span.dataset.itemId;
+        var oldNote = span.dataset.note || '';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = oldNote;
+        input.maxLength = 500;
+        input.style.cssText = 'width:200px;padding:2px 6px;font-size:.78rem;border:1px solid #1976d2;border-radius:3px;color:#333;background:#fff';
+        input.placeholder = '備註';
+        span.innerHTML = '';
+        span.appendChild(input);
+        input.focus();
+        input.select();
+
+        var done = false;
+        function save() {
+            if (done) return; done = true;
+            var newNote = input.value;
+            if (newNote === oldNote) { restore(oldNote); return; }
+            var fd = new FormData();
+            fd.append('item_id', itemId);
+            fd.append('note', newNote);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/stock_outs.php?action=update_item_note');
+            xhr.setRequestHeader('X-CSRF-Token', CSRF_NOTE);
+            xhr.onload = function() {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.error) { alert(data.error); restore(oldNote); }
+                    else { span.dataset.note = data.note; restore(data.note); }
+                } catch (err) { alert('儲存失敗'); restore(oldNote); }
+            };
+            xhr.onerror = function() { alert('網路錯誤'); restore(oldNote); };
+            xhr.send(fd);
+        }
+        function cancel() {
+            if (done) return; done = true;
+            restore(oldNote);
+        }
+        function restore(note) {
+            if (note) {
+                span.innerHTML = '(' + escapeNoteHtml(note) + ')';
+            } else {
+                span.innerHTML = '<span style="color:#bbb;font-style:italic">+ 備註</span>';
+            }
+        }
+        function escapeNoteHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(c){
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+            });
+        }
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+        });
+    });
+})();
 </script>
 
 <style>

@@ -892,6 +892,104 @@ class ApprovalModel
     }
 
     /**
+     * 簽核歷史紀錄（所有模組通用，最多 200 筆）
+     * 篩選：module, status (pending/approved/rejected/cancelled), date_from, date_to, keyword
+     */
+    public function getApprovalHistory($filters = array())
+    {
+        $where = array('1=1');
+        $params = array();
+
+        if (!empty($filters['module'])) {
+            $where[] = 'af.module = ?';
+            $params[] = $filters['module'];
+        }
+        if (!empty($filters['status'])) {
+            $where[] = 'af.status = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where[] = 'DATE(af.created_at) >= ?';
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where[] = 'DATE(af.created_at) <= ?';
+            $params[] = $filters['date_to'];
+        }
+
+        $keywordJoin = '';
+        if (!empty($filters['keyword'])) {
+            // 多模組關鍵字搜尋（cases / quotations / leaves 等）
+            $where[] = '(
+                EXISTS(SELECT 1 FROM cases c WHERE c.id = af.target_id AND af.module IN (\'case_completion\',\'quotation\') AND (c.case_number LIKE ? OR c.customer_name LIKE ? OR c.title LIKE ?))
+                OR EXISTS(SELECT 1 FROM quotations q WHERE q.id = af.target_id AND af.module = \'quotation\' AND (q.quote_number LIKE ? OR q.customer_name LIKE ?))
+            )';
+            $kw = '%' . $filters['keyword'] . '%';
+            $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            $params[] = $kw; $params[] = $kw;
+        }
+
+        $sql = "
+            SELECT af.*, u.real_name AS approver_name, su.real_name AS submitter_name
+            FROM approval_flows af
+            LEFT JOIN users u ON af.approver_id = u.id
+            LEFT JOIN users su ON af.submitted_by = su.id
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY af.id DESC
+            LIMIT 200
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 補上 target_info（從 cases / quotations 取單號和標題）
+        $caseIds = array();
+        $quoteIds = array();
+        foreach ($rows as $r) {
+            if ($r['module'] === 'case_completion') $caseIds[] = (int)$r['target_id'];
+            elseif ($r['module'] === 'quotation') $quoteIds[] = (int)$r['target_id'];
+        }
+        $caseMap = array();
+        if (!empty($caseIds)) {
+            $ph = implode(',', array_fill(0, count($caseIds), '?'));
+            $cs = $this->db->prepare("SELECT c.id, c.case_number, c.customer_name, c.title, b.name AS branch_name FROM cases c LEFT JOIN branches b ON c.branch_id = b.id WHERE c.id IN ($ph)");
+            $cs->execute($caseIds);
+            foreach ($cs->fetchAll(PDO::FETCH_ASSOC) as $c) $caseMap[$c['id']] = $c;
+        }
+        $quoteMap = array();
+        if (!empty($quoteIds)) {
+            $ph = implode(',', array_fill(0, count($quoteIds), '?'));
+            $qs = $this->db->prepare("SELECT id, quote_number, customer_name FROM quotations WHERE id IN ($ph)");
+            $qs->execute($quoteIds);
+            foreach ($qs->fetchAll(PDO::FETCH_ASSOC) as $q) $quoteMap[$q['id']] = $q;
+        }
+
+        foreach ($rows as &$r) {
+            $tid = (int)$r['target_id'];
+            if ($r['module'] === 'case_completion' && isset($caseMap[$tid])) {
+                $r['target_number'] = $caseMap[$tid]['case_number'];
+                $r['target_title'] = $caseMap[$tid]['customer_name'] ?: $caseMap[$tid]['title'];
+                $r['target_url'] = '/cases.php?action=edit&id=' . $tid . '#sec-billing';
+                $r['branch_name'] = $caseMap[$tid]['branch_name'];
+            } elseif ($r['module'] === 'quotation' && isset($quoteMap[$tid])) {
+                $r['target_number'] = $quoteMap[$tid]['quote_number'];
+                $r['target_title'] = $quoteMap[$tid]['customer_name'];
+                $r['target_url'] = '/quotations.php?action=edit&id=' . $tid;
+                $r['branch_name'] = '';
+            } else {
+                $r['target_number'] = '#' . $tid;
+                $r['target_title'] = '';
+                $r['target_url'] = '';
+                $r['branch_name'] = '';
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /**
      * 取得目前使用者該案件待簽核的 flow（如果有）
      */
     public function getMyPendingCompletionFlow($caseId, $userId)

@@ -349,6 +349,24 @@ switch ($action) {
         }
         break;
 
+    // ---- 單一品項備註原地編輯（AJAX，任何狀態都可改）----
+    case 'update_item_note':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$canManage) { echo json_encode(array('error' => '無權限')); exit; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(array('error' => '方法錯誤')); exit; }
+        $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '';
+        if ($csrfHeader !== Session::getCsrfToken()) { echo json_encode(array('error' => '安全驗證失敗')); exit; }
+        $itemId = (int)(isset($_POST['item_id']) ? $_POST['item_id'] : 0);
+        $note = isset($_POST['note']) ? $_POST['note'] : '';
+        try {
+            $r = $model->updateStockOutItemNote($itemId, $note, Auth::id());
+            AuditLog::log('stock_outs', 'update_item_note', $r['stock_out_id'], '更新品項備註 item_id=' . $itemId);
+            echo json_encode(array('success' => true, 'note' => $r['note']));
+        } catch (Exception $e) {
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+        exit;
+
     // ---- 編輯明細（批次 AJAX）----
     case 'edit_items':
         header('Content-Type: application/json; charset=utf-8');

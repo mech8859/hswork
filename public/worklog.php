@@ -138,12 +138,6 @@ switch ($action) {
             $userId,
         ));
 
-        // 處理收款
-        if (!empty($_POST['payment_collected']) && !empty($_POST['payment_amount'])) {
-            $db->prepare("INSERT INTO case_payments (case_id, amount, payment_method, payment_date, notes, created_by, created_at) VALUES (?, ?, ?, ?, '施工現場收款', ?, NOW())")
-               ->execute(array($caseId, $_POST['payment_amount'], $_POST['payment_method'] ?? 'cash', $workDate, $userId));
-        }
-
         // 處理完工狀態
         if (!empty($_POST['is_completed'])) {
             $db->prepare("UPDATE cases SET status = 'completed_pending' WHERE id = ?")->execute(array($caseId));
