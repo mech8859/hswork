@@ -47,11 +47,20 @@
         <div class="form-row">
             <div class="form-group">
                 <label>應付帳款單號</label>
+                <?php if ($isEdit && !empty($record['payable_id']) && !empty($record['payable_number'])): ?>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <a href="/payables.php?action=edit&id=<?= (int)$record['payable_id'] ?>" class="form-control" style="background:#f0f7ff;color:#1565c0;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:6px" target="_blank">
+                        <?= e($record['payable_number']) ?> <span style="font-size:.75rem;color:#999">&#x2197;</span>
+                    </a>
+                    <input type="hidden" name="payable_id" id="payableId" value="<?= (int)$record['payable_id'] ?>">
+                </div>
+                <?php else: ?>
                 <div style="position:relative">
-                    <input type="text" id="payableSearch" class="form-control" value="<?= e(!empty($record['payable_id']) ? ($record['payable_number'] ?? '') : '') ?>" placeholder="輸入搜尋應付帳款..." autocomplete="off">
+                    <input type="text" id="payableSearch" class="form-control" value="" placeholder="輸入搜尋應付帳款..." autocomplete="off">
                     <input type="hidden" name="payable_id" id="payableId" value="<?= e($record['payable_id'] ?? '') ?>">
                     <div id="payableSuggestions" class="autocomplete-list"></div>
                 </div>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label>廠商編號</label>
@@ -163,7 +172,7 @@
         <div class="form-row">
             <div class="form-group">
                 <label>匯費</label>
-                <input type="number" name="remittance_fee" id="remittanceFee" class="form-control" value="<?= !empty($record['remittance_fee']) ? (int)$record['remittance_fee'] : 0 ?>" min="0" onchange="calcAmounts()">
+                <input type="number" name="remittance_fee" id="remittanceFee" class="form-control" value="<?= !empty($record['remittance_fee']) ? (int)$record['remittance_fee'] : 0 ?>" min="0" oninput="recalcTotal()">
             </div>
             <div class="form-group">
                 <label>總金額</label>
@@ -449,6 +458,8 @@ function recalcTotal() {
     document.getElementById('totalAmount').value = subtotal + tax + remittanceFee;
 }
 // 不在載入時呼叫 calcAmounts()，避免覆寫使用者已儲存的稅額（如手動設為 0）
+// 但載入時重算總金額（含匯費），確保 total = subtotal + tax + remittanceFee
+recalcTotal();
 
 // ---- 分公司拆帳動態列 ----
 var branchIdx = <?= !empty($branchItems) ? count($branchItems) : 0 ?>;

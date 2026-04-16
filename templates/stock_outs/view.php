@@ -312,6 +312,7 @@ document.addEventListener('click', function(e) {
                 <th class="return-col" style="width:35px;display:none"><input type="checkbox" id="returnCheckAll" onchange="toggleReturnCheckAll(this)"></th>
                 <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><th class="text-right" style="width:60px">已出</th><th class="text-right" style="width:60px">剩餘</th><?php if (!empty($returnedQtyMap)): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">本次出貨</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:90px">狀態</th>
                 <th class="return-col" style="width:80px;display:none">入庫數量</th>
+                <th class="return-col" style="width:140px;display:none">備註</th>
             </tr></thead>
             <tbody>
                 <?php $totalCost = 0; ?>
@@ -407,6 +408,7 @@ document.addEventListener('click', function(e) {
                         <?php endif; ?>
                     </td>
                     <td class="return-col" style="display:none"><?php if ($shippedQty > 0): ?><input type="number" class="form-control return-qty" data-item-id="<?= (int)$item['id'] ?>" style="width:70px;text-align:right;padding:2px 6px;font-size:.85rem" min="0" max="<?= $shippedQty ?>" value="0"><?php endif; ?></td>
+                    <td class="return-col" style="display:none"><?php if ($shippedQty > 0): ?><input type="text" class="form-control return-note" data-item-id="<?= (int)$item['id'] ?>" placeholder="備註" style="width:130px;padding:2px 6px;font-size:.85rem"><?php endif; ?></td>
                 </tr>
                 <?php $totalCost += $subtotal; ?>
                 <?php endforeach; ?>
@@ -1312,6 +1314,12 @@ function confirmManualReturn() {
         var qInp = document.createElement('input');
         qInp.type = 'hidden'; qInp.name = 'return_qtys[' + itemId + ']'; qInp.value = qInput ? qInput.value : 0;
         form.appendChild(qInp);
+        var nInput = document.querySelector('.return-note[data-item-id="' + itemId + '"]');
+        if (nInput && nInput.value.trim() !== '') {
+            var nInp = document.createElement('input');
+            nInp.type = 'hidden'; nInp.name = 'return_notes[' + itemId + ']'; nInp.value = nInput.value;
+            form.appendChild(nInp);
+        }
     }
     document.body.appendChild(form);
     form.submit();

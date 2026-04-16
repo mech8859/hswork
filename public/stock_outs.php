@@ -276,6 +276,7 @@ switch ($action) {
         if (!$so) { Session::flash('error', '出庫單不存在'); redirect('/stock_outs.php'); }
 
         $returnQtys = isset($_POST['return_qtys']) ? $_POST['return_qtys'] : array();
+        $returnNotes = isset($_POST['return_notes']) ? $_POST['return_notes'] : array();
         $db = Database::getInstance();
 
         // 取出庫單明細
@@ -293,6 +294,7 @@ switch ($action) {
             $maxQty = (int)(isset($item['quantity']) ? $item['quantity'] : 0);
             if ($qty <= 0 || $qty > $maxQty) continue;
 
+            $itemNote = isset($returnNotes[$itemId]) ? trim($returnNotes[$itemId]) : '';
             $siItems[] = array(
                 'product_id' => !empty($item['product_id']) ? $item['product_id'] : null,
                 'model'      => isset($item['model']) ? $item['model'] : (isset($item['product_model']) ? $item['product_model'] : ''),
@@ -301,7 +303,7 @@ switch ($action) {
                 'unit'       => isset($item['unit']) ? $item['unit'] : '',
                 'quantity'   => $qty,
                 'unit_price' => isset($item['unit_cost']) ? $item['unit_cost'] : (isset($item['unit_price']) ? $item['unit_price'] : 0),
-                'note'       => '',
+                'note'       => $itemNote,
             );
         }
 

@@ -75,6 +75,14 @@
         </div>
         <div class="form-row">
             <div class="form-group">
+                <label>出貨人</label>
+                <input type="text" name="shipper_name" class="form-control" value="<?= e($isEdit && !empty($record['shipper_name']) ? $record['shipper_name'] : '') ?>" placeholder="選填">
+            </div>
+            <div class="form-group">
+                <label>進貨人</label>
+                <input type="text" name="receiver_name" class="form-control" value="<?= e($isEdit && !empty($record['receiver_name']) ? $record['receiver_name'] : '') ?>" placeholder="選填">
+            </div>
+            <div class="form-group">
                 <label>登記人</label>
                 <?php $wtUser = Session::getUser(); ?>
                 <input type="text" class="form-control" value="<?= e($isEdit && !empty($record['created_by_name']) ? $record['created_by_name'] : (!empty($wtUser['name']) ? $wtUser['name'] : '')) ?>" disabled style="background:#f5f5f5">

@@ -40,14 +40,27 @@ switch ($action) {
             }
 
             $userId = Session::getUser()['id'];
+            // 從 warehouse_id 自動查出倉庫名稱
+            $fromWhName = '';
+            $toWhName = '';
+            if (!empty($_POST['from_warehouse_id'])) {
+                $whStmt = Database::getInstance()->prepare("SELECT name FROM warehouses WHERE id = ?");
+                $whStmt->execute(array($_POST['from_warehouse_id']));
+                $fromWhName = $whStmt->fetchColumn() ?: '';
+            }
+            if (!empty($_POST['to_warehouse_id'])) {
+                $whStmt = Database::getInstance()->prepare("SELECT name FROM warehouses WHERE id = ?");
+                $whStmt->execute(array($_POST['to_warehouse_id']));
+                $toWhName = $whStmt->fetchColumn() ?: '';
+            }
             $data = array(
                 'transfer_date'       => !empty($_POST['transfer_date']) ? $_POST['transfer_date'] : date('Y-m-d'),
                 'from_branch_id'      => !empty($_POST['from_branch_id']) ? $_POST['from_branch_id'] : null,
                 'to_branch_id'        => !empty($_POST['to_branch_id']) ? $_POST['to_branch_id'] : null,
                 'from_warehouse_id'   => !empty($_POST['from_warehouse_id']) ? $_POST['from_warehouse_id'] : null,
                 'to_warehouse_id'     => !empty($_POST['to_warehouse_id']) ? $_POST['to_warehouse_id'] : null,
-                'from_warehouse_name' => !empty($_POST['from_warehouse_name']) ? $_POST['from_warehouse_name'] : null,
-                'to_warehouse_name'   => !empty($_POST['to_warehouse_name']) ? $_POST['to_warehouse_name'] : null,
+                'from_warehouse_name' => $fromWhName,
+                'to_warehouse_name'   => $toWhName,
                 'status'              => !empty($_POST['status']) ? $_POST['status'] : '待出貨',
                 'shipper_name'        => !empty($_POST['shipper_name']) ? $_POST['shipper_name'] : null,
                 'receiver_name'       => !empty($_POST['receiver_name']) ? $_POST['receiver_name'] : null,
@@ -96,14 +109,27 @@ switch ($action) {
             $oldStatus = $record['status'];
             $newStatus = !empty($_POST['status']) ? $_POST['status'] : $oldStatus;
 
+            // 從 warehouse_id 自動查出倉庫名稱
+            $fromWhName = '';
+            $toWhName = '';
+            if (!empty($_POST['from_warehouse_id'])) {
+                $whStmt = Database::getInstance()->prepare("SELECT name FROM warehouses WHERE id = ?");
+                $whStmt->execute(array($_POST['from_warehouse_id']));
+                $fromWhName = $whStmt->fetchColumn() ?: '';
+            }
+            if (!empty($_POST['to_warehouse_id'])) {
+                $whStmt = Database::getInstance()->prepare("SELECT name FROM warehouses WHERE id = ?");
+                $whStmt->execute(array($_POST['to_warehouse_id']));
+                $toWhName = $whStmt->fetchColumn() ?: '';
+            }
             $data = array(
                 'transfer_date'       => !empty($_POST['transfer_date']) ? $_POST['transfer_date'] : date('Y-m-d'),
                 'from_branch_id'      => !empty($_POST['from_branch_id']) ? $_POST['from_branch_id'] : null,
                 'to_branch_id'        => !empty($_POST['to_branch_id']) ? $_POST['to_branch_id'] : null,
                 'from_warehouse_id'   => !empty($_POST['from_warehouse_id']) ? $_POST['from_warehouse_id'] : null,
                 'to_warehouse_id'     => !empty($_POST['to_warehouse_id']) ? $_POST['to_warehouse_id'] : null,
-                'from_warehouse_name' => !empty($_POST['from_warehouse_name']) ? $_POST['from_warehouse_name'] : null,
-                'to_warehouse_name'   => !empty($_POST['to_warehouse_name']) ? $_POST['to_warehouse_name'] : null,
+                'from_warehouse_name' => $fromWhName,
+                'to_warehouse_name'   => $toWhName,
                 'status'              => $newStatus,
                 'update_inventory'    => !empty($_POST['update_inventory']) ? 1 : 0,
                 'shipper_name'        => !empty($_POST['shipper_name']) ? $_POST['shipper_name'] : null,

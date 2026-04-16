@@ -994,7 +994,12 @@ class FinanceModel
 
     public function getPaymentOut($id)
     {
-        $stmt = $this->db->prepare("SELECT * FROM payments_out WHERE id = ?");
+        $stmt = $this->db->prepare("
+            SELECT po.*, p.payable_number
+            FROM payments_out po
+            LEFT JOIN payables p ON po.payable_id = p.id
+            WHERE po.id = ?
+        ");
         $stmt->execute(array($id));
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }

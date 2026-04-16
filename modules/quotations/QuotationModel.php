@@ -344,7 +344,7 @@ class QuotationModel
             foreach ($items as $iIdx => $item) {
                 if (empty($item['item_name'])) continue;
                 $qty = (float)$item['quantity'];
-                if ($qty <= 0) $qty = 1;
+                if ($qty < 0) $qty = 0;
                 $price = (int)$item['unit_price'];
                 $amount = (int)round($qty * $price);
                 $unitCost = (int)($item['unit_cost'] ?: 0);

@@ -1082,13 +1082,14 @@ function showProgressCases(progressKey, caseKey, title) {
     }
     var cases = data[caseKey];
     var html = '<table class="table table-sm" style="font-size:.8rem;"><thead><tr>';
-    html += '<th>案件編號</th><th>客戶名稱</th><th>報價金額</th><th>成交金額</th><th>尾款</th><th>狀態</th><th>完工日期</th>';
+    html += '<th>案件編號</th><th>客戶名稱</th><th>業務</th><th>報價金額</th><th>成交金額</th><th>尾款</th><th>狀態</th><th>完工日期</th>';
     html += '</tr></thead><tbody>';
     for (var i = 0; i < cases.length; i++) {
         var c = cases[i];
         html += '<tr>';
         html += '<td><a href="/cases.php?action=view&id=' + c.id + '" target="_blank" style="color:var(--primary);text-decoration:underline;">' + escHtml(c.case_number || '-') + '</a></td>';
         html += '<td>' + escHtml(c.customer_name || '-') + '</td>';
+        html += '<td>' + escHtml(c.sales_name || '-') + '</td>';
         html += '<td style="text-align:right">' + (c.quote_amount > 0 ? Number(c.quote_amount).toLocaleString() : '-') + '</td>';
         html += '<td style="text-align:right">' + (c.deal_amount > 0 ? Number(c.deal_amount).toLocaleString() : '-') + '</td>';
         html += '<td style="text-align:right">' + (c.balance_amount > 0 ? Number(c.balance_amount).toLocaleString() : '-') + '</td>';

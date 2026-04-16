@@ -413,6 +413,7 @@ class ReportModel
                 'id' => $r['id'],
                 'case_number' => isset($r['case_number']) ? $r['case_number'] : '',
                 'customer_name' => isset($r['customer_name']) ? $r['customer_name'] : '',
+                'sales_name' => isset($r['sales_name']) ? $r['sales_name'] : '',
                 'quote_amount' => (float)$r['quote_amount'],
                 'deal_amount' => (float)$r['deal_amount'],
                 'total_amount' => (float)$r['total_amount'],
