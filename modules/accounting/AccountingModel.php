@@ -281,7 +281,10 @@ class AccountingModel
      * @param int $limit
      * @return array
      */
-    public function getJournalEntries($filters = array(), $limit = 200)
+    /**
+     * 建 journal_entries 的 WHERE + params（給 getJournalEntries / countJournalEntries 共用）
+     */
+    private function buildJournalWhere($filters)
     {
         $where = '1=1';
         $params = array();
@@ -312,7 +315,14 @@ class AccountingModel
             $where .= ' AND je.source_module = ?';
             $params[] = $filters['source_module'];
         }
+        return array($where, $params);
+    }
 
+    public function getJournalEntries($filters = array(), $limit = 100, $offset = 0)
+    {
+        list($where, $params) = $this->buildJournalWhere($filters);
+
+        $params[] = (int)$offset;
         $params[] = (int)$limit;
         $sql = "SELECT je.*, u.real_name as created_by_name, up.real_name as posted_by_name
                 FROM journal_entries je
@@ -320,10 +330,19 @@ class AccountingModel
                 LEFT JOIN users up ON je.posted_by = up.id
                 WHERE {$where}
                 ORDER BY je.voucher_date DESC, je.id DESC
-                LIMIT ?";
+                LIMIT ?, ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function countJournalEntries($filters = array())
+    {
+        list($where, $params) = $this->buildJournalWhere($filters);
+        $sql = "SELECT COUNT(*) FROM journal_entries je WHERE {$where}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
     }
 
     /**

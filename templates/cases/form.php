@@ -1131,8 +1131,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         <input type="text" id="compApproveComment" class="form-control" placeholder="備註（選填）" style="font-size:.85rem;pointer-events:auto !important;background:#fff !important;color:#333 !important">
                     </div>
                     <div style="display:flex;gap:6px;margin-top:8px">
-                        <button type="button" class="btn btn-success btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionApproveSubmit()" <?= ($_myFlow['level_order'] == 3 && $_balance !== 0) ? 'disabled' : '' ?>>✓ 核准</button>
-                        <button type="button" class="btn btn-danger btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionRejectShow(<?= (int)$_myFlow['id'] ?>, <?= (int)$case['id'] ?>)">✗ 駁回</button>
+                        <button type="button" id="btnCompletionApprove" class="btn btn-success btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionApproveSubmit()" <?= ($_myFlow['level_order'] == 3 && $_balance !== 0) ? 'disabled' : '' ?>>✓ 核准</button>
+                        <button type="button" id="btnCompletionReject" class="btn btn-danger btn-sm" style="pointer-events:auto !important;opacity:1 !important" onclick="completionRejectShow(<?= (int)$_myFlow['id'] ?>, <?= (int)$case['id'] ?>)">✗ 駁回</button>
                     </div>
                 </div>
                 <script>
@@ -1142,6 +1142,11 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     var prEl = document.getElementById('compPaymentReceived');
                     if (!prEl || !prEl.checked) { alert('請勾選「款項已入帳」才能核准'); return; }
                     <?php endif; ?>
+                    // 鎖定按鈕 + 顯示處理中，避免重複點擊與讓使用者知道系統在運作
+                    var btnA = document.getElementById('btnCompletionApprove');
+                    var btnR = document.getElementById('btnCompletionReject');
+                    if (btnA) { btnA.disabled = true; btnA.textContent = '處理中…'; btnA.style.opacity = '0.6'; }
+                    if (btnR) { btnR.disabled = true; btnR.style.opacity = '0.6'; }
                     var f = document.createElement('form');
                     f.method = 'POST';
                     f.action = '/approvals.php?action=approve';

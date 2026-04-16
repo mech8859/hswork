@@ -1,5 +1,5 @@
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <h1>傳票管理</h1>
+    <h1>傳票管理 <small style="font-size:.55em;color:#666;font-weight:normal">共 <?= number_format($totalCount) ?> 筆</small></h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="/accounting.php?action=ledger" class="btn btn-secondary">總帳查詢</a>
         <a href="/accounting.php?action=trial_balance" class="btn btn-secondary">試算表</a>
@@ -100,6 +100,25 @@
         </tbody>
     </table>
 </div>
+
+<?php if ($totalPages > 1):
+    // 建構當前篩選的 URL 參數（不含 page）
+    $qs = $_GET;
+    unset($qs['page']);
+    $baseUrl = '/accounting.php?' . http_build_query($qs);
+?>
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin:12px 0;font-size:.9rem">
+    <?php if ($page > 1): ?>
+    <a href="<?= e($baseUrl) ?>&page=1" class="btn btn-sm btn-outline">« 首頁</a>
+    <a href="<?= e($baseUrl) ?>&page=<?= $page - 1 ?>" class="btn btn-sm btn-outline">‹ 上一頁</a>
+    <?php endif; ?>
+    <span style="color:#666;padding:0 8px">第 <?= $page ?> / <?= $totalPages ?> 頁（共 <?= number_format($totalCount) ?> 筆）</span>
+    <?php if ($page < $totalPages): ?>
+    <a href="<?= e($baseUrl) ?>&page=<?= $page + 1 ?>" class="btn btn-sm btn-outline">下一頁 ›</a>
+    <a href="<?= e($baseUrl) ?>&page=<?= $totalPages ?>" class="btn btn-sm btn-outline">尾頁 »</a>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <style>
 .star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }

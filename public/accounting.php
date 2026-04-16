@@ -245,7 +245,13 @@ switch ($action) {
             'date_to'      => isset($_GET['date_to']) ? $_GET['date_to'] : '',
             'keyword'      => isset($_GET['keyword']) ? $_GET['keyword'] : '',
         );
-        $entries = $model->getJournalEntries($filters);
+        $perPage = 100;
+        $page = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
+        $offset = ($page - 1) * $perPage;
+        $totalCount = $model->countJournalEntries($filters);
+        $totalPages = max(1, (int)ceil($totalCount / $perPage));
+        if ($page > $totalPages) { $page = $totalPages; $offset = ($page - 1) * $perPage; }
+        $entries = $model->getJournalEntries($filters, $perPage, $offset);
         $stats = $model->getJournalStats();
         $voucherTypeOptions = AccountingModel::voucherTypeOptions();
         $statusOptions = AccountingModel::statusOptions();

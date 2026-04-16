@@ -302,9 +302,9 @@ class FinanceModel
                 $where .= ' AND r.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ? OR r.note LIKE ?)';
+                $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ? OR r.note LIKE ? OR r.case_number LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         if (!empty($filters['date_from'])) {
@@ -516,9 +516,9 @@ class FinanceModel
                 $where .= ' AND r.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ? OR r.note LIKE ?)';
+                $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ? OR r.note LIKE ? OR r.case_number LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         $rDateCol = (!empty($filters['date_type']) && $filters['date_type'] === 'deposit') ? 'r.deposit_date' : 'r.register_date';

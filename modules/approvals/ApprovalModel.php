@@ -92,12 +92,26 @@ class ApprovalModel
             if (!empty($clean)) $extraIdsStr = implode(',', $clean);
         }
 
+        // condition_branch_ids / condition_user_roles 處理
+        $branchIdsStr = null;
+        if (!empty($data['condition_branch_ids'])) {
+            $arr = is_array($data['condition_branch_ids']) ? $data['condition_branch_ids'] : explode(',', $data['condition_branch_ids']);
+            $clean = array_filter(array_map('intval', $arr));
+            if (!empty($clean)) $branchIdsStr = implode(',', $clean);
+        }
+        $userRolesStr = null;
+        if (!empty($data['condition_user_roles'])) {
+            $arr = is_array($data['condition_user_roles']) ? $data['condition_user_roles'] : explode(',', $data['condition_user_roles']);
+            $clean = array_filter(array_map('trim', $arr));
+            if (!empty($clean)) $userRolesStr = implode(',', $clean);
+        }
+
         if (!empty($data['id'])) {
             $stmt = $this->db->prepare("
                 UPDATE approval_rules SET
                     module = ?, rule_name = ?, min_amount = ?, max_amount = ?,
                     min_profit_rate = ?, condition_type = ?, product_ids = ?, product_category_id = ?,
-                    case_types = ?,
+                    case_types = ?, condition_branch_ids = ?, condition_user_roles = ?,
                     approver_role = ?, approver_id = ?, extra_approver_ids = ?,
                     level_order = ?, is_active = ?
                 WHERE id = ?
@@ -112,6 +126,8 @@ class ApprovalModel
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
                 $caseTypesStr,
+                $branchIdsStr,
+                $userRolesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
                 $extraIdsStr,
@@ -124,8 +140,9 @@ class ApprovalModel
             $stmt = $this->db->prepare("
                 INSERT INTO approval_rules (module, rule_name, min_amount, max_amount,
                     min_profit_rate, condition_type, product_ids, product_category_id,
-                    case_types, approver_role, approver_id, extra_approver_ids, level_order, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    case_types, condition_branch_ids, condition_user_roles,
+                    approver_role, approver_id, extra_approver_ids, level_order, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute(array(
                 $data['module'],
@@ -137,6 +154,8 @@ class ApprovalModel
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
                 $caseTypesStr,
+                $branchIdsStr,
+                $userRolesStr,
                 $data['approver_role'] ?: null,
                 $data['approver_id'] ?: null,
                 $extraIdsStr,
@@ -200,7 +219,7 @@ class ApprovalModel
      * 判斷是否需要簽核
      * @return array|false  需要簽核時回傳匹配的規則陣列，不需要回傳 false
      */
-    public function needsApproval($module, $amount, $profitRate = null, $productIds = array())
+    public function needsApproval($module, $amount, $profitRate = null, $productIds = array(), $submitterId = null)
     {
         $stmt = $this->db->prepare("
             SELECT * FROM approval_rules
@@ -211,6 +230,19 @@ class ApprovalModel
         $rules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (empty($rules)) return false; // 沒設定規則 = 不需簽核
+
+        // 取得送簽人的 branch_id / role（若有分公司或角色條件才需要）
+        $submitterBranchId = null;
+        $submitterRole = null;
+        if ($submitterId) {
+            $uStmt = $this->db->prepare("SELECT branch_id, role FROM users WHERE id = ?");
+            $uStmt->execute(array($submitterId));
+            $uRow = $uStmt->fetch(PDO::FETCH_ASSOC);
+            if ($uRow) {
+                $submitterBranchId = (int)$uRow['branch_id'];
+                $submitterRole = $uRow['role'];
+            }
+        }
 
         $matched = array();
         foreach ($rules as $rule) {
@@ -252,7 +284,25 @@ class ApprovalModel
                 if ($profitRate < $rule['min_profit_rate']) $profitMatch = false;
             }
 
-            if ($amountMatch && $profitMatch && $productMatch) {
+            // 分公司條件（空=全部，有設定則需匹配）
+            $branchMatch = true;
+            if (!empty($rule['condition_branch_ids'])) {
+                $allowedBranches = array_map('intval', array_filter(explode(',', $rule['condition_branch_ids'])));
+                if (!empty($allowedBranches)) {
+                    $branchMatch = ($submitterBranchId && in_array($submitterBranchId, $allowedBranches));
+                }
+            }
+
+            // 角色條件（空=全部，有設定則需匹配）
+            $roleMatch = true;
+            if (!empty($rule['condition_user_roles'])) {
+                $allowedRoles = array_map('trim', array_filter(explode(',', $rule['condition_user_roles'])));
+                if (!empty($allowedRoles)) {
+                    $roleMatch = ($submitterRole && in_array($submitterRole, $allowedRoles));
+                }
+            }
+
+            if ($amountMatch && $profitMatch && $productMatch && $branchMatch && $roleMatch) {
                 $matched[] = $rule;
             }
         }
@@ -284,31 +334,44 @@ class ApprovalModel
         $this->db->prepare("DELETE FROM approval_flows WHERE module = ? AND target_id = ? AND status = 'pending'")
             ->execute(array($module, $targetId));
 
-        $matchedRules = $this->needsApproval($module, $amount, $profitRate);
+        $matchedRules = $this->needsApproval($module, $amount, $profitRate, array(), $submittedBy);
 
         if (!$matchedRules) {
             // 不需簽核，直接通過
             return array('auto_approved' => true);
         }
 
+        // leaves/overtime 採「分關建立」模式：只建 L1，待 L1 核准後才建 L2
+        $sequentialModules = array('leaves', 'overtime');
+        $isSequential = in_array($module, $sequentialModules, true);
+
         $flows = array();
         foreach ($matchedRules as $rule) {
-            // 免簽核規則跳過，不建立簽核流程
+            // 免簽核規則跳過
             if ($rule['approver_role'] === 'auto_approve') continue;
+
+            // 分關模式：只建最小 level 的規則
+            if ($isSequential) {
+                $minLevel = PHP_INT_MAX;
+                foreach ($matchedRules as $mr) {
+                    if ($mr['approver_role'] !== 'auto_approve' && (int)$mr['level_order'] < $minLevel) {
+                        $minLevel = (int)$mr['level_order'];
+                    }
+                }
+                if ((int)$rule['level_order'] !== $minLevel) continue;
+            }
 
             // 找出簽核人
             $approverId = $rule['approver_id'];
-
-            // 如果指定角色而非指定人，找該角色的人
             if (!$approverId && $rule['approver_role']) {
                 $stmt = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
                 $stmt->execute(array($rule['approver_role']));
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($user) $approverId = $user['id'];
             }
+            if (!$approverId) continue;
 
-            if (!$approverId) continue; // 找不到簽核人就跳過
-
+            // 主簽核人
             $stmt = $this->db->prepare("
                 INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
                 VALUES (?, ?, ?, ?, ?, 'pending', ?)
@@ -319,6 +382,20 @@ class ApprovalModel
                 'approver_id' => $approverId,
                 'level_order' => $rule['level_order'],
             );
+
+            // extra_approver_ids（其他可簽核人，任一即可）
+            if (!empty($rule['extra_approver_ids'])) {
+                $extras = array_filter(array_map('intval', explode(',', $rule['extra_approver_ids'])));
+                foreach ($extras as $extraId) {
+                    if ($extraId === (int)$approverId) continue;
+                    $stmt->execute(array($module, $targetId, $rule['id'], $rule['level_order'], $extraId, $submittedBy));
+                    $flows[] = array(
+                        'id' => (int)$this->db->lastInsertId(),
+                        'approver_id' => $extraId,
+                        'level_order' => $rule['level_order'],
+                    );
+                }
+            }
         }
 
         // 如果過濾掉 auto_approve 後沒有實際簽核流程，視為自動通過
@@ -327,6 +404,82 @@ class ApprovalModel
         }
 
         return $flows;
+    }
+
+    /**
+     * 分關模組（leaves/overtime）的下一關推進
+     * 當該 level 的所有 pending flow 被決定（核准/駁回/取消）後，
+     * 依規則建立下一關的 flow
+     * @return array next_level|null, status: 'pending_next' / 'completed' / 'rejected'
+     */
+    public function advanceSequentialApproval($module, $targetId, $submittedBy)
+    {
+        // 取所有已決定或進行中的 flow
+        $fs = $this->db->prepare("SELECT level_order, status FROM approval_flows WHERE module = ? AND target_id = ?");
+        $fs->execute(array($module, $targetId));
+        $allFlows = $fs->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($allFlows)) return array('next_level' => null, 'status' => 'no_rule');
+
+        // 如果任一 flow 是 rejected → 整個流程結束
+        foreach ($allFlows as $f) {
+            if ($f['status'] === 'rejected') {
+                return array('next_level' => null, 'status' => 'rejected');
+            }
+        }
+
+        // 找目前最大已核准 level
+        $maxApprovedLevel = 0;
+        $hasPending = false;
+        foreach ($allFlows as $f) {
+            if ($f['status'] === 'approved' && (int)$f['level_order'] > $maxApprovedLevel) {
+                $maxApprovedLevel = (int)$f['level_order'];
+            }
+            if ($f['status'] === 'pending') $hasPending = true;
+        }
+        if ($hasPending) return array('next_level' => null, 'status' => 'pending_current');
+
+        // 所有現有 level 都決定完 → 找下一 level 的規則
+        $nextLevel = $maxApprovedLevel + 1;
+        // 需要用送簽人 branch_id/role 過濾
+        $matched = $this->needsApproval($module, 0, null, array(), $submittedBy);
+        if (!$matched) return array('next_level' => null, 'status' => 'completed');
+
+        $nextRules = array();
+        foreach ($matched as $r) {
+            if ($r['approver_role'] === 'auto_approve') continue;
+            if ((int)$r['level_order'] === $nextLevel) $nextRules[] = $r;
+        }
+        if (empty($nextRules)) {
+            return array('next_level' => null, 'status' => 'completed');
+        }
+
+        // 建立下一關
+        $stmt = $this->db->prepare("
+            INSERT INTO approval_flows (module, target_id, rule_id, level_order, approver_id, status, submitted_by)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?)
+        ");
+        foreach ($nextRules as $rule) {
+            $approverId = $rule['approver_id'];
+            if (!$approverId && $rule['approver_role']) {
+                $u = $this->db->prepare("SELECT id FROM users WHERE role = ? AND is_active = 1 LIMIT 1");
+                $u->execute(array($rule['approver_role']));
+                $uRow = $u->fetch(PDO::FETCH_ASSOC);
+                if ($uRow) $approverId = $uRow['id'];
+            }
+            if (!$approverId) continue;
+
+            $stmt->execute(array($module, $targetId, $rule['id'], $nextLevel, $approverId, $submittedBy));
+
+            if (!empty($rule['extra_approver_ids'])) {
+                foreach (array_filter(array_map('intval', explode(',', $rule['extra_approver_ids']))) as $extraId) {
+                    if ($extraId === (int)$approverId) continue;
+                    $stmt->execute(array($module, $targetId, $rule['id'], $nextLevel, $extraId, $submittedBy));
+                }
+            }
+        }
+
+        return array('next_level' => $nextLevel, 'status' => 'pending_next');
     }
 
     /**
@@ -505,6 +658,18 @@ class ApprovalModel
                     $row['amount'] = 0;
                 }
                 return $row ?: array();
+            case 'leaves':
+                $stmt = $this->db->prepare("SELECT l.*, u.real_name FROM leaves l LEFT JOIN users u ON l.user_id = u.id WHERE l.id = ?");
+                $stmt->execute(array($targetId));
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','official'=>'公假','day_off'=>'補休','menstrual'=>'生理假','bereavement'=>'喪假','marriage'=>'婚假','maternity'=>'產假','paternity'=>'陪產假','funeral'=>'喪假','other'=>'其他');
+                    $typeLabel = isset($typeLabels[$row['leave_type']]) ? $typeLabels[$row['leave_type']] : $row['leave_type'];
+                    $row['label'] = '#' . $targetId . ' ' . $row['real_name'] . ' ' . $typeLabel . ' ' . $row['start_date'] . ($row['start_date'] !== $row['end_date'] ? '~' . $row['end_date'] : '');
+                    $row['url'] = '/leaves.php#leave-' . $targetId;
+                    $row['amount'] = 0;
+                }
+                return $row ?: array();
             default:
                 return array('label' => $module . ' #' . $targetId, 'url' => '#');
         }
@@ -523,10 +688,14 @@ class ApprovalModel
      */
     public function getApprovers()
     {
+        // 原本的主管/行政類 + 指定的 4 位業務（蔣佩曄 104、許進鑫 88、謝旻倫 96、顏伸祐 77）
         $stmt = $this->db->query("
             SELECT id, real_name, role FROM users
-            WHERE is_active = 1 AND role IN ('boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant')
-            ORDER BY FIELD(role,'boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant'), real_name
+            WHERE is_active = 1 AND (
+                role IN ('boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant')
+                OR id IN (104, 88, 96, 77)
+            )
+            ORDER BY FIELD(role,'boss','sales_manager','eng_manager','eng_deputy','admin_staff','accountant','sales'), real_name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

@@ -49,6 +49,7 @@ switch ($action) {
         if (!$canManageRules) { Session::flash('error', '無權限'); redirect('/approvals.php'); }
         $rules = $model->getRules();
         $approvers = $model->getApprovers();
+        $branches = Database::getInstance()->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $pageTitle = '簽核設定';
         $currentPage = 'approvals';
         require __DIR__ . '/../templates/layouts/header.php';
@@ -192,6 +193,49 @@ switch ($action) {
                     } else {
                         Session::flash('success', '已核准');
                     }
+                } elseif (($module === 'leaves' || $module === 'overtime') && $targetId) {
+                    // 分關簽核：取消同 level 其他 pending（多人擇一）
+                    $db = Database::getInstance();
+                    $lvStmt = $db->prepare("SELECT level_order, submitted_by FROM approval_flows WHERE id = ?");
+                    $lvStmt->execute(array($flowId));
+                    $flowInfo = $lvStmt->fetch(PDO::FETCH_ASSOC);
+                    $flowLevel = (int)$flowInfo['level_order'];
+                    $flowSubmitter = (int)$flowInfo['submitted_by'];
+
+                    if ($flowLevel > 0) {
+                        $model->cancelSiblingPendingFlows($module, $targetId, $flowLevel, $flowId);
+                    }
+
+                    // 推進到下一關
+                    $advance = $model->advanceSequentialApproval($module, $targetId, $flowSubmitter);
+                    if ($advance['status'] === 'completed') {
+                        // 全部簽完 → 核准
+                        if ($module === 'leaves') {
+                            $db->prepare("UPDATE leaves SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ?")
+                               ->execute(array(Auth::id(), $targetId));
+                        }
+                        Session::flash('success', '已核准（最終關），請假單已核准');
+                    } elseif ($advance['status'] === 'pending_next') {
+                        // 送下一關：通知
+                        require_once __DIR__ . '/../modules/notifications/NotificationModel.php';
+                        $notifModel = new NotificationModel();
+                        $nextLevel = (int)$advance['next_level'];
+                        $nextStmt = $db->prepare("SELECT DISTINCT approver_id FROM approval_flows WHERE module=? AND target_id=? AND level_order=? AND status='pending'");
+                        $nextStmt->execute(array($module, $targetId, $nextLevel));
+                        foreach ($nextStmt->fetchAll(PDO::FETCH_COLUMN) as $approverId) {
+                            $notifModel->send(
+                                $approverId,
+                                'approval_pending',
+                                '待簽核（請假 第' . $nextLevel . '關）#' . $targetId,
+                                '請進入待簽核確認',
+                                '/approvals.php?action=pending',
+                                'leaves', $targetId, Auth::id()
+                            );
+                        }
+                        Session::flash('success', '已核准，已送第' . $nextLevel . '關簽核');
+                    } else {
+                        Session::flash('success', '已核准');
+                    }
                 } elseif ($module === 'case_payments' && $targetId) {
                     if ($model->isFullyApproved('case_payments', $targetId)) {
                         $db = Database::getInstance();
@@ -271,6 +315,13 @@ switch ($action) {
             $comment = $_POST['comment'] ?? '';
             $module = $_POST['module'] ?? '';
             $targetId = (int)($_POST['target_id'] ?? 0);
+            // 若 module/targetId 沒傳，從 flow 補取
+            if ((!$module || !$targetId) && $flowId) {
+                $_fstmt = Database::getInstance()->prepare("SELECT module, target_id FROM approval_flows WHERE id = ?");
+                $_fstmt->execute(array($flowId));
+                $_frow = $_fstmt->fetch(PDO::FETCH_ASSOC);
+                if ($_frow) { $module = $_frow['module']; $targetId = (int)$_frow['target_id']; }
+            }
             if ($model->reject($flowId, Auth::id(), $comment)) {
                 if ($module === 'case_completion' && $targetId) {
                     // 完工簽核退回 → 案件回到施工中
@@ -305,6 +356,21 @@ switch ($action) {
                     $invModel->rejectStocktake($targetId);
                     AuditLog::log('approvals', 'reject', $flowId, '盤點簽核退回 #' . $targetId . ' - ' . $comment);
                     Session::flash('success', '已退回，倉管可修改後重新提交');
+                } elseif (($module === 'leaves' || $module === 'overtime') && $targetId) {
+                    // 分關簽核駁回 → 取消同 level 其他 pending
+                    $db = Database::getInstance();
+                    $lvStmt = $db->prepare("SELECT level_order FROM approval_flows WHERE id = ?");
+                    $lvStmt->execute(array($flowId));
+                    $flowLevel = (int)$lvStmt->fetchColumn();
+                    if ($flowLevel > 0) {
+                        $model->cancelSiblingPendingFlows($module, $targetId, $flowLevel, $flowId);
+                    }
+                    if ($module === 'leaves') {
+                        $db->prepare("UPDATE leaves SET status = 'rejected', approved_by = ?, approved_at = NOW(), reject_reason = ? WHERE id = ?")
+                           ->execute(array(Auth::id(), $comment, $targetId));
+                    }
+                    AuditLog::log('approvals', 'reject', $flowId, $module . ' 簽核退回 #' . $targetId . ' - ' . $comment);
+                    Session::flash('success', '已退回');
                 } else {
                     // 其他模組退回
                     if ($module === 'quotations' && $targetId) {

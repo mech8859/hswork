@@ -119,6 +119,7 @@ $statusBadgeMap = array(
                     <th>主分類</th>
                     <th class="text-right">付款金額</th>
                     <th>狀態</th>
+                    <th>備註</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -142,6 +143,7 @@ $statusBadgeMap = array(
                     <td><?= e(!empty($r['main_category']) ? $r['main_category'] : '-') ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
                     <td><span class="badge <?= $badgeCls ?>"><?= e(!empty($r['status']) ? $r['status'] : '-') ?></span></td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666;font-size:.85rem" title="<?= e(!empty($r['note']) ? $r['note'] : '') ?>"><?= e(!empty($r['note']) ? $r['note'] : '') ?></td>
                     <td>
                         <a href="/payments_out.php?action=edit&id=<?= $r['id'] ?>" class="btn btn-outline btn-sm">編輯</a>
                     </td>

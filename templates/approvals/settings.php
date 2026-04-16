@@ -100,6 +100,35 @@
             </div>
             <p class="text-muted" style="font-size:.8rem;margin-top:4px">未勾選任何類型 = 所有類型都適用</p>
         </div>
+        <!-- 請假/加班：送簽人分公司 + 角色條件 -->
+        <div id="condition-submitter" style="display:none; margin-bottom:12px; padding:10px; background:#f8f9fa; border-radius:4px">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label style="font-weight:600;display:block;margin-bottom:6px">適用分公司（送簽人所屬）</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <?php foreach ($branches as $b): ?>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_branch_ids[]" value="<?= (int)$b['id'] ?>"> <?= e($b['name']) ?></label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label style="font-weight:600;display:block;margin-bottom:6px">適用角色（送簽人）</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="engineer"> 工程師</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="eng_manager"> 工程主管</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="sales"> 業務</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="sales_manager"> 業務主管</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="sales_assistant"> 業務助理</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="admin_staff"> 行政人員</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="accountant"> 會計人員</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="purchaser"> 採購</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="vice_president"> 副總</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="hq"> 總公司</label>
+                    </div>
+                </div>
+            </div>
+            <p class="text-muted" style="font-size:.8rem;margin-top:4px">未勾選任何項目 = 所有分公司/角色都適用。勾選後只有符合的人送簽才走這條規則</p>
+        </div>
         <div class="form-row align-center" style="margin-bottom:16px;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:bold;">
                 <input type="checkbox" id="chk-no-approval" onchange="toggleNoApproval(this)"> 此規則不需簽核（自動通過）
@@ -349,6 +378,38 @@
                                     </select>
                                 </div>
                             </div>
+                            <?php if (in_array($rule['module'], array('leaves', 'overtime'))): ?>
+                            <?php
+                            $ruleBranchIds = !empty($rule['condition_branch_ids']) ? array_map('intval', explode(',', $rule['condition_branch_ids'])) : array();
+                            $ruleUserRoles = !empty($rule['condition_user_roles']) ? array_map('trim', explode(',', $rule['condition_user_roles'])) : array();
+                            $roleOptions = array(
+                                'engineer' => '工程師', 'eng_manager' => '工程主管',
+                                'sales' => '業務', 'sales_manager' => '業務主管', 'sales_assistant' => '業務助理',
+                                'admin_staff' => '行政人員', 'accountant' => '會計人員',
+                                'purchaser' => '採購', 'vice_president' => '副總', 'hq' => '總公司',
+                            );
+                            ?>
+                            <div style="margin-top:10px;padding:10px;background:#f0f7ff;border-radius:4px">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1">
+                                        <label style="font-weight:600;display:block;margin-bottom:6px">適用分公司（送簽人所屬，未勾=全部）</label>
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <?php foreach ($branches as $b): ?>
+                                            <label class="checkbox-label"><input type="checkbox" name="condition_branch_ids[]" value="<?= (int)$b['id'] ?>" <?= in_array((int)$b['id'], $ruleBranchIds) ? 'checked' : '' ?>> <?= e($b['name']) ?></label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="flex:1">
+                                        <label style="font-weight:600;display:block;margin-bottom:6px">適用角色（送簽人，未勾=全部）</label>
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <?php foreach ($roleOptions as $roleKey => $roleLabel): ?>
+                                            <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="<?= e($roleKey) ?>" <?= in_array($roleKey, $ruleUserRoles) ? 'checked' : '' ?>> <?= e($roleLabel) ?></label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                             <div style="display:flex;gap:8px;">
                                 <button type="submit" class="btn btn-primary btn-sm">儲存</button>
                                 <button type="button" class="btn btn-outline btn-sm" onclick="toggleEditForm(<?= $rule['id'] ?>)">取消</button>
@@ -390,6 +451,8 @@ function onModuleChange(mod) {
     document.getElementById('condition-category').style.display = 'none';
     var caseTypesRow = document.getElementById('condition-case-types');
     if (caseTypesRow) caseTypesRow.style.display = 'none';
+    var submitterRow = document.getElementById('condition-submitter');
+    if (submitterRow) submitterRow.style.display = 'none';
 
     if (mod === 'quotations') {
         lblMin.textContent = '最低金額';
@@ -412,11 +475,13 @@ function onModuleChange(mod) {
         lblMin.textContent = '最低天數';
         lblMax.textContent = '最高天數（空=無上限）';
         profitGroup.style.display = 'none';
-        ruleInput.placeholder = '例：3天以上需主管簽核';
+        if (submitterRow) submitterRow.style.display = '';
+        ruleInput.placeholder = '例：潭子工程師請假 - 工程主管簽';
     } else if (mod === 'overtime') {
         lblMin.textContent = '最低時數';
         lblMax.textContent = '最高時數（空=無上限）';
         profitGroup.style.display = 'none';
+        if (submitterRow) submitterRow.style.display = '';
         ruleInput.placeholder = '例：4小時以上需主管簽核';
     } else if (mod === 'case_completion') {
         amountRow.style.display = 'none';

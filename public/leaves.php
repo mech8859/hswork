@@ -51,7 +51,17 @@ switch ($action) {
                 redirect('/leaves.php?action=create');
             }
 
-            $model->create($data);
+            $leaveId = $model->create($data);
+
+            // 觸發簽核流程（依請假人的 branch_id + role 比對規則）
+            try {
+                require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+                $approvalModel = new ApprovalModel();
+                $approvalModel->submitForApproval('leaves', $leaveId, 0, null, (int)$data['user_id']);
+            } catch (Exception $e) {
+                error_log('Leave approval dispatch failed: ' . $e->getMessage());
+            }
+
             Session::flash('success', '請假申請已送出');
             redirect('/leaves.php');
         }

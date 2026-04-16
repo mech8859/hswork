@@ -65,6 +65,7 @@
                     <th class="text-right">稅金</th>
                     <th class="text-right">總計</th>
                     <th class="text-right">應付總額</th>
+                    <th>備註</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -82,6 +83,7 @@
                     <td class="text-right">$<?= number_format(!empty($r['tax']) ? $r['tax'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['payable_amount']) ? $r['payable_amount'] : 0) ?></td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666;font-size:.85rem" title="<?= e(!empty($r['note']) ? $r['note'] : '') ?>"><?= e(!empty($r['note']) ? $r['note'] : '') ?></td>
                     <td>
                         <a href="/payables.php?action=edit&id=<?= $r['id'] ?>" class="btn btn-outline btn-sm">編輯</a>
                     </td>
