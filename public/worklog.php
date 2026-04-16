@@ -300,7 +300,11 @@ switch ($action) {
                     $wlCaseIdForPay = isset($worklog['case_id']) ? (int)$worklog['case_id'] : 0;
                     if ($wlCaseIdForPay > 0) {
                         $payDb = Database::getInstance();
-                        $payRef = '施工回報收款 #' . $id;
+                        // 以排工 ID 為識別（同排工多位工程師共用同一筆交易，避免重複）
+                        $scheduleIdForPay = isset($worklog['schedule_id']) ? (int)$worklog['schedule_id'] : 0;
+                        $payRef = $scheduleIdForPay > 0
+                            ? '施工回報收款 排工#' . $scheduleIdForPay
+                            : '施工回報收款 #' . $id;
                         $payMethod = !empty($_POST['payment_method']) ? $_POST['payment_method'] : 'cash';
                         $methodMap = array('cash' => '現金', 'transfer' => '匯款', 'check' => '支票');
                         $transType = isset($methodMap[$payMethod]) ? $methodMap[$payMethod] : $payMethod;
@@ -459,7 +463,22 @@ switch ($action) {
                     $wlCaseIdForPay = isset($worklog['case_id']) ? (int)$worklog['case_id'] : 0;
                     if ($wlCaseIdForPay > 0) {
                         $payDb = Database::getInstance();
-                        $payRef = '施工回報收款 #' . $id;
+                        // 以排工 ID 為識別
+                        $scheduleIdForPay = isset($worklog['schedule_id']) ? (int)$worklog['schedule_id'] : 0;
+                        $payRef = $scheduleIdForPay > 0
+                            ? '施工回報收款 排工#' . $scheduleIdForPay
+                            : '施工回報收款 #' . $id;
+
+                        // 檢查同排工是否還有其他工程師勾選收款 → 若有則不刪（避免誤刪）
+                        $shouldDelete = true;
+                        if ($scheduleIdForPay > 0) {
+                            $otherStmt = $payDb->prepare("SELECT COUNT(*) FROM work_logs WHERE schedule_id = ? AND id <> ? AND payment_collected = 1");
+                            $otherStmt->execute(array($scheduleIdForPay, $id));
+                            if ((int)$otherStmt->fetchColumn() > 0) {
+                                $shouldDelete = false;
+                            }
+                        }
+
                         // 讀舊值
                         $oldStmt = $payDb->prepare("SELECT total_collected, balance_amount FROM cases WHERE id = ?");
                         $oldStmt->execute(array($wlCaseIdForPay));
@@ -467,9 +486,14 @@ switch ($action) {
                         $oldCollected = $oldRow ? (int)$oldRow['total_collected'] : 0;
                         $oldBalance   = $oldRow ? (int)$oldRow['balance_amount'] : 0;
 
-                        $delStmt = $payDb->prepare("DELETE FROM case_payments WHERE case_id = ? AND note = ?");
-                        $delStmt->execute(array($wlCaseIdForPay, $payRef));
-                        if ($delStmt->rowCount() > 0) {
+                        if (!$shouldDelete) {
+                            // 同排工還有別人勾選收款，保留交易不刪除
+                            $delStmt = null;
+                        } else {
+                            $delStmt = $payDb->prepare("DELETE FROM case_payments WHERE case_id = ? AND note = ?");
+                            $delStmt->execute(array($wlCaseIdForPay, $payRef));
+                        }
+                        if ($shouldDelete && $delStmt && $delStmt->rowCount() > 0) {
                             // 回寫案件帳務欄位
                             $syncStmt = $payDb->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
                             $syncStmt->execute(array($wlCaseIdForPay));

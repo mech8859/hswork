@@ -302,9 +302,9 @@ class FinanceModel
                 $where .= ' AND r.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ?)';
+                $where .= ' AND (r.invoice_number LIKE ? OR r.receivable_number LIKE ? OR r.voucher_number LIKE ? OR r.customer_name LIKE ? OR r.invoice_title LIKE ? OR r.note LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         if (!empty($filters['date_from'])) {
@@ -516,9 +516,9 @@ class FinanceModel
                 $where .= ' AND r.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ?)';
+                $where .= ' AND (r.receipt_number LIKE ? OR r.voucher_number LIKE ? OR r.billing_number LIKE ? OR r.customer_name LIKE ? OR r.note LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         $rDateCol = (!empty($filters['date_type']) && $filters['date_type'] === 'deposit') ? 'r.deposit_date' : 'r.register_date';
@@ -695,9 +695,9 @@ class FinanceModel
                 $where .= ' AND p.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (p.payable_number LIKE ? OR p.voucher_number LIKE ? OR p.vendor_name LIKE ?)';
+                $where .= ' AND (p.payable_number LIKE ? OR p.voucher_number LIKE ? OR p.vendor_name LIKE ? OR p.note LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         if (!empty($filters['date_from'])) {
@@ -854,7 +854,13 @@ class FinanceModel
     // ---- 進貨明細 ----
     public function getPayablePurchaseDetails($payableId)
     {
-        $stmt = $this->db->prepare("SELECT * FROM payable_purchase_details WHERE payable_id = ? ORDER BY sort_order, id");
+        $stmt = $this->db->prepare("
+            SELECT pd.*, gr.id AS gr_id
+            FROM payable_purchase_details pd
+            LEFT JOIN goods_receipts gr ON pd.purchase_number IS NOT NULL AND pd.purchase_number <> '' AND gr.gr_number = pd.purchase_number
+            WHERE pd.payable_id = ?
+            ORDER BY pd.sort_order, pd.id
+        ");
         $stmt->execute(array($payableId));
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -892,7 +898,13 @@ class FinanceModel
     // ---- 進退明細 ----
     public function getPayableReturnDetails($payableId)
     {
-        $stmt = $this->db->prepare("SELECT * FROM payable_return_details WHERE payable_id = ? ORDER BY sort_order, id");
+        $stmt = $this->db->prepare("
+            SELECT rd.*, gr.id AS gr_id
+            FROM payable_return_details rd
+            LEFT JOIN goods_receipts gr ON rd.purchase_number IS NOT NULL AND rd.purchase_number <> '' AND gr.gr_number = rd.purchase_number
+            WHERE rd.payable_id = ?
+            ORDER BY rd.sort_order, rd.id
+        ");
         $stmt->execute(array($payableId));
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -947,9 +959,9 @@ class FinanceModel
                 $where .= ' AND p.total_amount = ?';
                 $params[] = $amt;
             } else {
-                $where .= ' AND (p.payment_number LIKE ? OR p.vendor_name LIKE ?)';
+                $where .= ' AND (p.payment_number LIKE ? OR p.vendor_name LIKE ? OR p.note LIKE ?)';
                 $kw = '%' . $kwRaw . '%';
-                $params[] = $kw; $params[] = $kw;
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
         if (!empty($filters['branch_id'])) {

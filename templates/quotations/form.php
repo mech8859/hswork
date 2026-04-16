@@ -212,7 +212,6 @@ require __DIR__ . '/../_readonly_form_helper.php';
                             <th style="width:50px">單位</th>
                             <th style="width:100px">單價</th>
                             <th style="width:90px">小計</th>
-                            <th style="width:100px">備註</th>
                             <?php if ($canManage): ?><th style="width:120px">成本</th><?php endif; ?>
                             <th style="width:30px"></th>
                         </tr></thead>
@@ -227,13 +226,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
                                     <input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][item_name]" class="form-control item-name" value="<?= e($item['item_name'] ?? '') ?>" placeholder="品名（可手動輸入）" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)">
                                     <input type="hidden" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][product_id]" value="<?= e($item['product_id'] ?? '') ?>">
                                     <div class="manual-warn" style="display:<?= (!empty($item['item_name']) && empty($item['product_id'])) ? 'block' : 'none' ?>;color:#c62828;font-size:.7rem;margin-top:2px">⚠ 請用分類挑選或關鍵字搜尋，否則無法產生出庫單</div>
+                                    <textarea name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][remark]" class="form-control" rows="1" placeholder="備註" style="font-size:.78rem;color:#666;margin-top:3px;padding:3px 6px"><?= e($item['remark'] ?? '') ?></textarea>
                                 </td>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][model_number]" class="form-control item-model" value="<?= e($item['model_number'] ?? '') ?>" placeholder="型號" style="font-size:.8rem;color:#1565c0"></td>
                                 <td><input type="number" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][quantity]" class="form-control item-qty" value="<?= e($item['quantity'] ?? 1) ?>" step="0.01" min="0" oninput="calcRow(this)"></td>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][unit]" class="form-control item-unit" value="<?= e($item['unit'] ?? '式') ?>"></td>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][unit_price]" class="form-control item-price" value="<?= e($item['unit_price'] ?? 0) ?>" oninput="calcRow(this)" inputmode="numeric"></td>
                                 <td class="item-amount text-right"><?= number_format((float)($item['quantity'] ?? 1) * (float)($item['unit_price'] ?? 0)) ?></td>
-                                <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][remark]" class="form-control" value="<?= e($item['remark'] ?? '') ?>"></td>
                                 <?php if ($canManage): ?>
                                 <td><input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][unit_cost]" class="form-control item-cost" value="<?= e($item['unit_cost'] ?? 0) ?>" readonly style="background:#f5f5f5;color:#666;min-width:100px;width:100%"></td>
                                 <?php endif; ?>
@@ -246,7 +245,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                             <!-- 第二排：選擇工具列 -->
                             <tr class="psel-row" data-parent="<?= $iIdx ?>">
                                 <td></td>
-                                <td colspan="<?= $canManage ? 9 : 8 ?>" style="padding:4px 8px;background:#fafafa;border-top:none">
+                                <td colspan="<?= $canManage ? 8 : 7 ?>" style="padding:4px 8px;background:#fafafa;border-top:none">
                                     <div class="psel-controls">
                                         <select class="form-control psel-cat1" onchange="onCat1(this)"><option value="">主分類</option></select>
                                         <select class="form-control psel-cat2" onchange="onCat2(this)"><option value="">子分類</option></select>
@@ -263,7 +262,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="6" class="text-right"><strong>小計</strong></td>
+                                <td colspan="5" class="text-right"><strong>小計</strong></td>
                                 <td class="section-subtotal text-right"><strong>0</strong></td>
                                 <td colspan="<?= $canManage ? 3 : 2 ?>">
                                     <button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button>
@@ -523,7 +522,7 @@ function addSection() {
             '<button type="button" class="btn btn-danger btn-sm" onclick="removeSection(this)">&times;</button>' +
         '</div>' +
         '<div class="table-responsive"><table class="table quote-items-table">' +
-        '<thead><tr><th style="width:30px">序</th><th style="min-width:350px">品名/型號</th><th style="width:80px">數量</th><th style="width:60px">單位</th><th style="width:100px">單價</th><th style="width:100px">小計</th><th style="width:120px">備註</th>' + costTh + '<th style="width:40px"></th></tr></thead>' +
+        '<thead><tr><th style="width:30px">序</th><th style="min-width:350px">品名/型號</th><th style="width:80px">數量</th><th style="width:60px">單位</th><th style="width:100px">單價</th><th style="width:100px">小計</th>' + costTh + '<th style="width:40px"></th></tr></thead>' +
         '<tbody>' + buildItemRow(sectionIdx, 0) + '</tbody>' +
         '<tfoot><tr><td colspan="5" class="text-right"><strong>小計</strong></td><td class="section-subtotal text-right"><strong>0</strong></td><td colspan="' + extraCols + '"><button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button></td></tr></tfoot>' +
         '</table></div></div>';
@@ -618,16 +617,15 @@ function removeItem(btn) {
 
 function buildItemRow(sidx, iidx) {
     var costTh = canManage ? '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][unit_cost]" class="form-control item-cost" value="0" readonly style="background:#f5f5f5;color:#666;min-width:100px;width:100%"></td>' : '';
-    var colSpan = canManage ? 9 : 8;
+    var colSpan = canManage ? 8 : 7;
     return '<tr>' +
         '<td class="row-num">' + (iidx + 1) + '</td>' +
-        '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][item_name]" class="form-control item-name" value="" placeholder="\u54c1\u540d\uff08\u53ef\u624b\u52d5\u8f38\u5165\uff09" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)"><input type="hidden" name="sections[' + sidx + '][items][' + iidx + '][product_id]" value=""><div class="manual-warn" style="display:none;color:#c62828;font-size:.7rem;margin-top:2px">\u26a0 \u8acb\u7528\u5206\u985e\u6311\u9078\u6216\u95dc\u9375\u5b57\u641c\u5c0b\uff0c\u5426\u5247\u7121\u6cd5\u7522\u751f\u51fa\u5eab\u55ae</div></td>' +
+        '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][item_name]" class="form-control item-name" value="" placeholder="\u54c1\u540d\uff08\u53ef\u624b\u52d5\u8f38\u5165\uff09" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)"><input type="hidden" name="sections[' + sidx + '][items][' + iidx + '][product_id]" value=""><div class="manual-warn" style="display:none;color:#c62828;font-size:.7rem;margin-top:2px">\u26a0 \u8acb\u7528\u5206\u985e\u6311\u9078\u6216\u95dc\u9375\u5b57\u641c\u5c0b\uff0c\u5426\u5247\u7121\u6cd5\u7522\u751f\u51fa\u5eab\u55ae</div><textarea name="sections[' + sidx + '][items][' + iidx + '][remark]" class="form-control" rows="1" placeholder="\u5099\u8a3b" style="font-size:.78rem;color:#666;margin-top:3px;padding:3px 6px"></textarea></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][model_number]" class="form-control item-model" value="" placeholder="\u578b\u865f" style="font-size:.8rem;color:#1565c0"></td>' +
         '<td><input type="number" name="sections[' + sidx + '][items][' + iidx + '][quantity]" class="form-control item-qty" value="1" step="0.01" min="0" oninput="calcRow(this)"></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][unit]" class="form-control item-unit" value="式"></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][unit_price]" class="form-control item-price" value="0" oninput="calcRow(this)" inputmode="numeric"></td>' +
         '<td class="item-amount text-right">0</td>' +
-        '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][remark]" class="form-control"></td>' +
         costTh +
         '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemUp(this)" title="上移">▲</button><button type="button" class="btn btn-sm" style="padding:2px 5px;font-size:.7rem;color:#666" onclick="moveItemDown(this)" title="下移">▼</button><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>' +
     '</tr>' +

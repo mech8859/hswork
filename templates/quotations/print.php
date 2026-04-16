@@ -167,12 +167,11 @@ if (!empty($quote['case_id'])) {
     <thead>
         <tr>
             <th style="width:22px">序</th>
-            <th style="width:315px">品名/型號</th>
+            <th style="width:455px">品名/型號</th>
             <th style="width:40px">數量</th>
             <th style="width:40px">單位</th>
             <th style="width:58px">單價</th>
             <th style="width:65px">小計</th>
-            <th style="width:140px">備註</th>
         </tr>
     </thead>
     <tbody>
@@ -180,25 +179,28 @@ if (!empty($quote['case_id'])) {
         <?php if ($quote['format'] === 'project'): ?>
         <tr class="section-header">
             <td><?= isset($chineseNums[$sIdx]) ? $chineseNums[$sIdx] : ($sIdx + 1) ?></td>
-            <td colspan="6"><?= e($sec['title'] ?: '') ?></td>
+            <td colspan="5"><?= e($sec['title'] ?: '') ?></td>
         </tr>
         <?php endif; ?>
         <?php foreach ($sec['items'] as $iIdx => $item): ?>
         <tr>
             <td class="text-center"><?= $iIdx + 1 ?></td>
-            <td><?= e($item['item_name']) ?><?php if (empty($quote['hide_model_on_print']) && !empty($item['model_number'])): ?> / <?= e($item['model_number']) ?><?php endif; ?></td>
+            <td>
+                <?= e($item['item_name']) ?><?php if (empty($quote['hide_model_on_print']) && !empty($item['model_number'])): ?> / <?= e($item['model_number']) ?><?php endif; ?>
+                <?php if (!empty($item['remark'])): ?>
+                <div style="color:#555;font-size:.8em;margin-top:1px;white-space:pre-line"><?= e($item['remark']) ?></div>
+                <?php endif; ?>
+            </td>
             <td class="text-right"><?= rtrim(rtrim(number_format((float)$item['quantity'], 2), '0'), '.') ?></td>
             <td class="text-center"><?= e($item['unit']) ?></td>
             <td class="text-right"><?= number_format((int)$item['unit_price']) ?></td>
             <td class="text-right"><?= number_format((int)$item['amount']) ?></td>
-            <td><?= e($item['remark'] ?: '') ?></td>
         </tr>
         <?php endforeach; ?>
         <?php if ($quote['format'] === 'project'): ?>
         <tr class="subtotal-row">
-            <td colspan="5" class="text-right"><strong>小計</strong></td>
+            <td colspan="4" class="text-right"><strong>小計</strong></td>
             <td class="text-right"><strong><?= number_format((int)$sec['subtotal']) ?></strong></td>
-            <td></td>
         </tr>
         <?php endif; ?>
     <?php endforeach; ?>

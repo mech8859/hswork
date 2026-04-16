@@ -266,7 +266,14 @@ if ($isLocked) {
             <div class="pd-item detail-item" style="padding:8px 0">
                 <div class="form-row" style="align-items:flex-end">
                     <div class="form-group"><label>進貨日期</label><input type="date" name="pd[<?= $pi ?>][purchase_date]" class="form-control" value="<?= e(!empty($pd['purchase_date']) ? $pd['purchase_date'] : '') ?>"></div>
-                    <div class="form-group"><label>進貨單號</label><input type="text" name="pd[<?= $pi ?>][purchase_number]" class="form-control" value="<?= e(!empty($pd['purchase_number']) ? $pd['purchase_number'] : '') ?>"></div>
+                    <div class="form-group"><label>進貨單號</label>
+                        <div style="display:flex;gap:4px;align-items:center">
+                            <input type="text" name="pd[<?= $pi ?>][purchase_number]" class="form-control" value="<?= e(!empty($pd['purchase_number']) ? $pd['purchase_number'] : '') ?>">
+                            <?php if (!empty($pd['gr_id'])): ?>
+                            <a href="/goods_receipts.php?action=view&id=<?= (int)$pd['gr_id'] ?>" target="_blank" title="開啟進貨單" style="flex:0 0 auto;padding:6px 10px;background:#f0f7ff;color:#1565c0;border-radius:4px;text-decoration:none;font-size:.85rem">&#x2197;</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <div class="form-group"><label>分公司</label><input type="text" name="pd[<?= $pi ?>][branch_name]" class="form-control" value="<?= e(!empty($pd['branch_name']) ? $pd['branch_name'] : '') ?>"></div>
                     <div class="form-group"><label>未稅金額</label><input type="number" name="pd[<?= $pi ?>][amount_untaxed]" class="form-control" step="1" value="<?= !empty($pd['amount_untaxed']) ? (int)$pd['amount_untaxed'] : 0 ?>"></div>
                     <div class="form-group"><label>發票字軌</label><input type="text" name="pd[<?= $pi ?>][invoice_track]" class="form-control" value="<?= e(!empty($pd['invoice_track']) ? $pd['invoice_track'] : '') ?>"></div>
@@ -323,7 +330,14 @@ if ($isLocked) {
                 </div>
                 <div class="detail-extra" style="display:none">
                     <div class="form-row">
-                        <div class="form-group"><label>來源進貨單號</label><input type="text" name="rd[<?= $ri ?>][purchase_number]" class="form-control" value="<?= e(!empty($rd['purchase_number']) ? $rd['purchase_number'] : '') ?>"></div>
+                        <div class="form-group"><label>來源進貨單號</label>
+                            <div style="display:flex;gap:4px;align-items:center">
+                                <input type="text" name="rd[<?= $ri ?>][purchase_number]" class="form-control" value="<?= e(!empty($rd['purchase_number']) ? $rd['purchase_number'] : '') ?>">
+                                <?php if (!empty($rd['gr_id'])): ?>
+                                <a href="/goods_receipts.php?action=view&id=<?= (int)$rd['gr_id'] ?>" target="_blank" title="開啟進貨單" style="flex:0 0 auto;padding:6px 10px;background:#f0f7ff;color:#1565c0;border-radius:4px;text-decoration:none;font-size:.85rem">&#x2197;</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         <div class="form-group"><label>廠商名稱</label><input type="text" name="rd[<?= $ri ?>][vendor_name]" class="form-control" value="<?= e(!empty($rd['vendor_name']) ? $rd['vendor_name'] : '') ?>"></div>
                         <div class="form-group"><label>單據狀態</label><input type="text" name="rd[<?= $ri ?>][doc_status]" class="form-control" value="<?= e(!empty($rd['doc_status']) ? $rd['doc_status'] : '') ?>"></div>
                         <div class="form-group"><label>倉庫名稱</label><input type="text" name="rd[<?= $ri ?>][warehouse_name]" class="form-control" value="<?= e(!empty($rd['warehouse_name']) ? $rd['warehouse_name'] : '') ?>"></div>

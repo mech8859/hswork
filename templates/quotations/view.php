@@ -179,19 +179,22 @@ foreach ($approvalStatus['flows'] as $af) {
                 <th style="width:50px">單位</th>
                 <th style="width:90px" class="text-right">單價</th>
                 <th style="width:90px" class="text-right">小計</th>
-                <th>備註</th>
                 <?php if ($canManage): ?><th style="width:80px" class="text-right">成本</th><?php endif; ?>
             </tr></thead>
             <tbody>
                 <?php foreach ($sec['items'] as $iIdx => $item): ?>
                 <tr>
                     <td><?= $iIdx + 1 ?></td>
-                    <td><?= e($item['item_name']) ?><?php if (!empty($item['model_number'])): ?> / <span style="color:#1565c0"><?= e($item['model_number']) ?></span><?php endif; ?></td>
+                    <td>
+                        <?= e($item['item_name']) ?><?php if (!empty($item['model_number'])): ?> / <span style="color:#1565c0"><?= e($item['model_number']) ?></span><?php endif; ?>
+                        <?php if (!empty($item['remark'])): ?>
+                        <div style="color:#666;font-size:.78rem;margin-top:2px;white-space:pre-line"><?= e($item['remark']) ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td><?= rtrim(rtrim(number_format($item['quantity'], 2), '0'), '.') ?></td>
                     <td><?= e($item['unit']) ?></td>
                     <td class="text-right"><?= number_format($item['unit_price']) ?></td>
                     <td class="text-right"><?= number_format($item['amount']) ?></td>
-                    <td><?= e($item['remark'] ?: '') ?></td>
                     <?php if ($canManage): ?>
                     <td class="text-right"><?= number_format($item['cost_amount']) ?></td>
                     <?php endif; ?>

@@ -54,6 +54,7 @@ switch ($action) {
             $data = array(
                 'create_date'    => !empty($_POST['create_date']) ? $_POST['create_date'] : null,
                 'payment_date'   => !empty($_POST['payment_date']) ? $_POST['payment_date'] : null,
+                'payable_id'     => !empty($_POST['payable_id']) ? (int)$_POST['payable_id'] : null,
                 'vendor_name'    => !empty($_POST['vendor_name']) ? $_POST['vendor_name'] : null,
                 'vendor_code'    => !empty($_POST['vendor_code']) ? $_POST['vendor_code'] : null,
                 'payment_method' => !empty($_POST['payment_method']) ? $_POST['payment_method'] : null,
@@ -123,6 +124,7 @@ switch ($action) {
             $data = array(
                 'create_date'    => !empty($_POST['create_date']) ? $_POST['create_date'] : null,
                 'payment_date'   => !empty($_POST['payment_date']) ? $_POST['payment_date'] : null,
+                'payable_id'     => !empty($_POST['payable_id']) ? (int)$_POST['payable_id'] : null,
                 'vendor_name'    => !empty($_POST['vendor_name']) ? $_POST['vendor_name'] : null,
                 'vendor_code'    => !empty($_POST['vendor_code']) ? $_POST['vendor_code'] : null,
                 'payment_method' => !empty($_POST['payment_method']) ? $_POST['payment_method'] : null,
@@ -249,11 +251,15 @@ switch ($action) {
                         $cleanDb->prepare("UPDATE goods_receipts SET payment_number = NULL, paid_date = NULL, paid_amount = 0 WHERE payment_number = ?")
                                 ->execute(array($delRec['payment_number']));
                     }
-                    // 解鎖應付帳款
+                    // 解鎖應付帳款（正向 + 反向雙保險）
+                    // 正向：若付款單有記錄 payable_id → 解鎖該應付帳款
                     if (!empty($delRec['payable_id'])) {
                         $cleanDb->prepare("UPDATE payables SET payment_out_id = NULL WHERE id = ?")
                                 ->execute(array($delRec['payable_id']));
                     }
+                    // 反向：若有其他應付帳款指向這張付款單（payable_id 可能被清掉）→ 一併解鎖
+                    $cleanDb->prepare("UPDATE payables SET payment_out_id = NULL WHERE payment_out_id = ?")
+                            ->execute(array($id));
                 }
             } catch (Exception $delEx) {
                 error_log('Payment delete cleanup failed: ' . $delEx->getMessage());
