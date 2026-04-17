@@ -1262,24 +1262,56 @@ function loadEstMaterials(caseId) {
     });
 }
 
-// 案件切換時載入/隱藏預估線材
+// 案件切換時載入/隱藏預估線材 + 檢查是否已有報價單 + 帶入客戶資料
 (function() {
     var caseSelect = document.getElementById('qCaseId');
     var estCard = document.getElementById('estMaterialsCard');
-    if (!caseSelect || !estCard) return;
+    if (!caseSelect) return;
+    var isEditPage = <?= $isEdit ? 'true' : 'false' ?>;
+    var currentQid = <?= $isEdit && !empty($quote['id']) ? (int)$quote['id'] : 0 ?>;
+
+    function fillIfEmpty(name, val) {
+        if (!val) return;
+        var el = document.querySelector('[name="' + name + '"]');
+        if (el && !el.value) el.value = val;
+    }
+
     caseSelect.addEventListener('change', function() {
         var caseId = this.value;
-        if (!caseId) {
-            estCard.style.display = 'none';
-            return;
-        }
-        estCard.style.display = '';
-        loadEstMaterials(caseId);
+        var self = this;
+        if (estCard) estCard.style.display = caseId ? '' : 'none';
+        if (!caseId) return;
+        fetch('/quotations.php?action=ajax_case_info&case_id=' + encodeURIComponent(caseId) + '&exclude_qid=' + currentQid)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success) {
+                    alert(d.error || '查無此案件');
+                    self.value = '';
+                    return;
+                }
+                if (d.existing_quotation && !isEditPage) {
+                    alert('此進件編號已有報價單（' + d.existing_quotation.quotation_number + '），無法重複建立');
+                    self.value = '';
+                    if (estCard) estCard.style.display = 'none';
+                    return;
+                }
+                if (d.case) {
+                    fillIfEmpty('customer_name', d.case.customer_name);
+                    fillIfEmpty('contact_person', d.case.contact_person);
+                    fillIfEmpty('contact_phone', d.case.contact_phone);
+                    fillIfEmpty('site_name', d.case.site_name);
+                    fillIfEmpty('site_address', d.case.site_address);
+                }
+                if (estCard) loadEstMaterials(caseId);
+            })
+            .catch(function() {
+                if (estCard) loadEstMaterials(caseId);
+            });
     });
+
     // 頁面載入時若已選案件，顯示卡片並載入資料（新增時透過 GET 預選）
-    if (caseSelect.value) {
+    if (caseSelect.value && estCard) {
         estCard.style.display = '';
-        // 編輯模式已由 PHP 預載，新增模式需 AJAX 載入
         var hasRows = document.querySelectorAll('#qEstMaterialsContainer .q-est-row').length;
         if (!hasRows) {
             loadEstMaterials(caseSelect.value);

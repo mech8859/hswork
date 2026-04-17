@@ -43,6 +43,17 @@ switch ($action) {
         if (!$canManage) { Session::flash('error', '無權限'); redirect('/quotations.php'); }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/quotations.php'); }
+            // 擋重複：同案件已有報價單
+            $postCaseId = (int)($_POST['case_id'] ?? 0);
+            if ($postCaseId > 0) {
+                $dupStmt = Database::getInstance()->prepare('SELECT quotation_number FROM quotations WHERE case_id = ? LIMIT 1');
+                $dupStmt->execute(array($postCaseId));
+                $dupQ = $dupStmt->fetchColumn();
+                if ($dupQ) {
+                    Session::flash('error', '此進件編號已有報價單（' . $dupQ . '），無法重複建立');
+                    redirect('/quotations.php');
+                }
+            }
             $quoteId = $model->create($_POST);
             AuditLog::log('quotations', 'create', $quoteId, $_POST['customer_name'] ?? '');
             if (!empty($_POST['sections'])) {
@@ -600,6 +611,45 @@ switch ($action) {
         }
         $caseModel = new CaseModel();
         echo json_encode(array('success' => true, 'data' => $caseModel->getMaterialEstimates($estCaseId)));
+        exit;
+
+    case 'ajax_case_info':
+        // 取得案件基本資料 + 是否已有報價單（排除當前編輯中的報價單）
+        header('Content-Type: application/json');
+        $qCaseId = (int)($_GET['case_id'] ?? 0);
+        $excludeQid = (int)($_GET['exclude_qid'] ?? 0);
+        if ($qCaseId <= 0) {
+            echo json_encode(array('success' => false));
+            exit;
+        }
+        $db = Database::getInstance();
+        $cStmt = $db->prepare("
+            SELECT c.case_number, c.title, c.customer_name, c.customer_phone, c.customer_mobile,
+                   c.contact_person, c.contact_address, c.construction_area
+            FROM cases c WHERE c.id = ?
+        ");
+        $cStmt->execute(array($qCaseId));
+        $c = $cStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$c) {
+            echo json_encode(array('success' => false, 'error' => '查無此案件'));
+            exit;
+        }
+        $qStmt = $db->prepare("SELECT id, quotation_number, status FROM quotations WHERE case_id = ? AND id != ? ORDER BY id DESC LIMIT 1");
+        $qStmt->execute(array($qCaseId, $excludeQid));
+        $existing = $qStmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode(array(
+            'success' => true,
+            'case' => array(
+                'case_number'     => $c['case_number'],
+                'title'           => $c['title'],
+                'customer_name'   => $c['customer_name'],
+                'contact_person'  => $c['contact_person'],
+                'contact_phone'   => $c['customer_phone'] ?: $c['customer_mobile'],
+                'site_name'       => $c['construction_area'],
+                'site_address'    => $c['contact_address'],
+            ),
+            'existing_quotation' => $existing,
+        ));
         exit;
 
     default:
