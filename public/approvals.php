@@ -159,6 +159,15 @@ switch ($action) {
                     $advance = $model->advanceCaseCompletion($targetId);
                     $advStatus = isset($advance['status']) ? $advance['status'] : 'no_rule';
 
+                    // L2 (行政人員) 核准後不論有/無收款都標示已完工，完工日期 = 該案最新完工工程回報的施工日期
+                    if ($flowLevel === 2 && in_array($advStatus, array('pending_next', 'unpaid'), true)) {
+                        $cdStmt = $db->prepare("SELECT MAX(s.schedule_date) FROM work_logs wl JOIN schedules s ON wl.schedule_id = s.id WHERE s.case_id = ? AND wl.is_completed = 1");
+                        $cdStmt->execute(array($targetId));
+                        $compDate = $cdStmt->fetchColumn() ?: date('Y-m-d');
+                        $db->prepare("UPDATE cases SET is_completed = 1, completion_date = ? WHERE id = ? AND (is_completed = 0 OR completion_date IS NULL)")
+                           ->execute(array($compDate, $targetId));
+                    }
+
                     if ($advStatus === 'closed_blocked') {
                         // 不應該到這裡（前面已擋），保險起見再擋一次
                         Session::flash('error', $advance['error']);
