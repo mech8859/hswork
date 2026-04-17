@@ -4216,4 +4216,14 @@ function updateConstructionArea() {
     document.getElementById('constructionDistrict').dispatchEvent(evt);
 }
 </script>
+<script>
+// Last-resort: 強制按 customer_no 隱藏新增客戶按鈕（在其他 script 之後）
+try {
+    var _cno = document.getElementById('customerNoDisplay');
+    var _btn = document.getElementById('btnNewCustomer');
+    if (_cno && _cno.value && _btn) {
+        _btn.style.setProperty('display', 'none', 'important');
+    }
+} catch(e) { console.error('force hide btnNewCustomer failed:', e); }
+</script>
 

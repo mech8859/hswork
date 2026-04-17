@@ -162,6 +162,9 @@ switch ($action) {
 
     // ---- 編輯案件 ----
     case 'edit':
+        // 避免瀏覽器拿到舊版 HTML
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
         $id = (int)($_GET['id'] ?? 0);
         $case = $model->getById($id);
         if (!$case) {
