@@ -167,6 +167,7 @@ switch ($action) {
                     $syncCaseNote = '';
                 }
             }
+            $affectedCaseIds = array();
             try {
                 $rnStmt = Database::getInstance()->prepare('SELECT receipt_number FROM receipts WHERE id = ?');
                 $rnStmt->execute(array($id));
@@ -183,17 +184,22 @@ switch ($action) {
                            $syncCaseNote,
                            $rNum,
                        ));
-                    // 同步後重算對應案件的總收款
+                    // 同步後重算對應案件的總收款 + 尾款
                     $caseStmt = Database::getInstance()->prepare('SELECT DISTINCT case_id FROM case_payments WHERE receipt_number = ?');
                     $caseStmt->execute(array($rNum));
-                    foreach ($caseStmt->fetchAll(PDO::FETCH_COLUMN) as $cid) {
-                        if ($cid) {
-                            // 直接呼叫 case 模組的 updateTotalCollected
-                            $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0) FROM case_payments WHERE case_id = ?");
-                            $totalStmt->execute(array($cid));
-                            $cTotal = (int)$totalStmt->fetchColumn();
-                            Database::getInstance()->prepare("UPDATE cases SET total_collected = ? WHERE id = ?")->execute(array($cTotal, $cid));
-                        }
+                    $affectedCaseIds = array_filter($caseStmt->fetchAll(PDO::FETCH_COLUMN));
+                    foreach ($affectedCaseIds as $cid) {
+                        $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0) FROM case_payments WHERE case_id = ?");
+                        $totalStmt->execute(array($cid));
+                        $cTotal = (int)$totalStmt->fetchColumn();
+                        // 重算尾款
+                        $cInfoStmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount FROM cases WHERE id = ?");
+                        $cInfoStmt->execute(array($cid));
+                        $cInfo = $cInfoStmt->fetch(PDO::FETCH_ASSOC);
+                        $base = $cInfo ? ((int)$cInfo['total_amount'] > 0 ? (int)$cInfo['total_amount'] : (int)$cInfo['deal_amount']) : 0;
+                        $cBalance = $base > 0 ? max(0, $base - $cTotal) : null;
+                        Database::getInstance()->prepare("UPDATE cases SET total_collected = ?, balance_amount = ? WHERE id = ?")
+                            ->execute(array($cTotal, $cBalance, $cid));
                     }
                 }
             } catch (Exception $e) {
@@ -207,6 +213,26 @@ switch ($action) {
                 require_once __DIR__ . '/../modules/notifications/NotificationDispatcher.php';
                 $data['id'] = $id;
                 NotificationDispatcher::dispatch('receipts', 'status_changed', $data, $userId, $record);
+            }
+
+            // 自動結清：狀態改為「已收款」且尾款=0 時，將案件帳款標示已結清
+            if ($data['status'] === '已收款' && $record['status'] !== '已收款' && !empty($affectedCaseIds)) {
+                try {
+                    $settleDate = $data['register_date'] ?: date('Y-m-d');
+                    foreach ($affectedCaseIds as $cid) {
+                        $stmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount, balance_amount, settlement_confirmed FROM cases WHERE id = ?");
+                        $stmt->execute(array($cid));
+                        $c = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if (!$c) continue;
+                        $base = (int)$c['total_amount'] > 0 ? (int)$c['total_amount'] : (int)$c['deal_amount'];
+                        if ($base > 0 && (int)$c['balance_amount'] === 0 && (int)$c['settlement_confirmed'] !== 1) {
+                            Database::getInstance()->prepare("UPDATE cases SET settlement_confirmed = 1, settlement_date = ? WHERE id = ?")
+                                ->execute(array($settleDate, $cid));
+                        }
+                    }
+                } catch (Exception $autoSettleEx) {
+                    error_log('Auto-settle on receipt confirm failed: ' . $autoSettleEx->getMessage());
+                }
             }
 
             // Auto-journal: when status changes to 已入帳
