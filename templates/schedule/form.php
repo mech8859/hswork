@@ -18,7 +18,7 @@ if ($isEdit) {
                 <label>施工日期 *</label>
                 <input type="date" max="2099-12-31" name="schedule_date" id="scheduleDate" class="form-control"
                        value="<?= e($schedule['schedule_date'] ?? $date ?? date('Y-m-d')) ?>" required
-                       onchange="reloadSuggestions()">
+                       onchange="this.dataset.userSet='1'; reloadSuggestions()">
                 <?php if (!$isEdit): ?>
                 <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                     <button type="button" class="btn btn-outline btn-sm" onclick="addDateToBatch()">+ 加入批次多日</button>
