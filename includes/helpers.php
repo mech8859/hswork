@@ -486,6 +486,6 @@ function tryAutoCloseCase($caseId)
     $l2->execute(array($caseId));
     if ((int)$l2->fetchColumn() === 0) return false;
 
-    $db->prepare("UPDATE cases SET status = 'closed', sub_status = '已完工結案' WHERE id = ?")->execute(array($caseId));
+    $db->prepare("UPDATE cases SET status = 'closed' WHERE id = ?")->execute(array($caseId));
     return true;
 }
