@@ -178,8 +178,8 @@ class AccountingModel
      */
     public function getAccountsTree($showInactive = false)
     {
-        $where = $showInactive ? '1=1' : 'is_active = 1';
-        $where = $showInactive ? '1=1' : 'c.is_active = 1';
+        // $showInactive=true → 只顯示停用；false → 只顯示啟用
+        $where = $showInactive ? 'c.is_active = 0' : 'c.is_active = 1';
         $stmt = $this->db->query("SELECT c.*, c.account_code AS code, c.account_name AS name, p.account_code AS parent_code FROM chart_of_accounts c LEFT JOIN chart_of_accounts p ON c.parent_id = p.id WHERE {$where} ORDER BY c.account_code");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
