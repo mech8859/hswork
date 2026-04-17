@@ -81,6 +81,7 @@ $modules = array(
     'procurement'          => array('label' => '採購',       'levels' => array('manage', 'view'), 'has_delete' => false),
     'inventory'            => array('label' => '庫存',       'levels' => array('manage', 'view'), 'has_delete' => true),
     'accounting'           => array('label' => '會計管理',   'levels' => array('manage', 'view'), 'has_delete' => false),
+    'approvals'            => array('label' => '簽核管理',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'settings'             => array('label' => '系統設定',   'levels' => array('manage'), 'has_delete' => false),
     'system'               => array('label' => '系統維護',   'levels' => array('manage'), 'has_delete' => false),
 );
