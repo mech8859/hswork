@@ -29,7 +29,9 @@ switch ($action) {
             $params[] = "%{$keyword}%";
             $params[] = "%{$keyword}%";
         }
-        if (!$showInactive) {
+        if ($showInactive) {
+            $where .= ' AND is_active = 0';
+        } else {
             $where .= ' AND is_active = 1';
         }
 
