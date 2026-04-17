@@ -59,6 +59,20 @@ function updateTotalCollected($caseId, $changeSource = 'payment') {
     // 記錄異動
     logAmountChange($caseId, 'total_collected', $oldCollected, $total, $changeSource);
     logAmountChange($caseId, 'balance_amount', $oldBalance, (int)$balance, $changeSource);
+
+    // 自動結清：尾款為 0 且應收金額 > 0 時，自動將帳款標示為已結清，結清日期=最新交易日期
+    if ($balance !== null && (int)$balance === 0 && $base > 0) {
+        $curStmt = $db->prepare("SELECT settlement_confirmed FROM cases WHERE id = ?");
+        $curStmt->execute(array($caseId));
+        $curSettle = $curStmt->fetchColumn();
+        if ((int)$curSettle !== 1) {
+            $dateStmt = $db->prepare("SELECT MAX(payment_date) FROM case_payments WHERE case_id = ?");
+            $dateStmt->execute(array($caseId));
+            $settleDate = $dateStmt->fetchColumn() ?: date('Y-m-d');
+            $db->prepare("UPDATE cases SET settlement_confirmed = 1, settlement_date = ? WHERE id = ?")
+               ->execute(array($settleDate, $caseId));
+        }
+    }
 }
 
 switch ($action) {
