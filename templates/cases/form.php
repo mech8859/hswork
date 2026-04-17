@@ -749,9 +749,15 @@ require __DIR__ . '/../_readonly_form_helper.php';
             </div>
         </div>
         <div class="form-row">
+            <?php
+            // 尾款=0 才開放手動修改結清狀態/日期；尾款>0 或未成交鎖定（由系統自動管理）
+            $_balance = isset($case['balance_amount']) ? (int)$case['balance_amount'] : null;
+            $_lockSettle = ($_balance === null || $_balance > 0);
+            $_lockTip = $_lockSettle ? '尾款未歸零，由系統自動管理' : '';
+            ?>
             <div class="form-group">
-                <label>帳款是否結清</label>
-                <select name="settlement_confirmed" class="form-control">
+                <label>帳款是否結清<?= $_lockSettle ? ' <span style="color:var(--gray-400);font-weight:400;font-size:.8rem">（唯讀）</span>' : '' ?></label>
+                <select name="settlement_confirmed" class="form-control" <?= $_lockSettle ? 'disabled' : '' ?> title="<?= e($_lockTip) ?>">
                     <?php
                     $settleVal = isset($case['settlement_confirmed']) ? $case['settlement_confirmed'] : '';
                     $isZero = ($settleVal !== '' && $settleVal !== null && (int)$settleVal === 0);
@@ -761,10 +767,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <option value="0" <?= $isZero ? 'selected' : '' ?>>未結清</option>
                     <option value="1" <?= $isOne ? 'selected' : '' ?>>已結清</option>
                 </select>
+                <?php if ($_lockSettle): ?>
+                <input type="hidden" name="settlement_confirmed" value="<?= e($settleVal) ?>">
+                <?php endif; ?>
             </div>
             <div class="form-group">
-                <label>帳款結清日期</label>
-                <input type="date" name="settlement_date" class="form-control" value="<?= e($case['settlement_date'] ?? '') ?>">
+                <label>帳款結清日期<?= $_lockSettle ? ' <span style="color:var(--gray-400);font-weight:400;font-size:.8rem">（唯讀）</span>' : '' ?></label>
+                <input type="date" name="settlement_date" class="form-control" value="<?= e($case['settlement_date'] ?? '') ?>" <?= $_lockSettle ? 'readonly style="background:#f5f5f5"' : '' ?> title="<?= e($_lockTip) ?>">
             </div>
             <div class="form-group"></div>
         </div>
