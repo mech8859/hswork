@@ -663,7 +663,7 @@ function reindexSection(section) {
     for (var i = 0; i < rows.length; i++) {
         var numEl = rows[i].querySelector('.row-num');
         if (numEl) numEl.textContent = i + 1;
-        var inputs = rows[i].querySelectorAll('input');
+        var inputs = rows[i].querySelectorAll('input, textarea');
         for (var j = 0; j < inputs.length; j++) {
             var name = inputs[j].name;
             if (name) {
