@@ -23,7 +23,9 @@ foreach ($approvalStatus['flows'] as $af) {
         <?php if ($canManage): ?>
             <?php if ($canEditQuote && $quote['status'] !== 'approved'): ?>
             <a href="/quotations.php?action=edit&id=<?= $quote['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
+            <?php if (!empty($quote['case_id'])): ?>
             <a href="/quotations.php?action=submit_approval&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#2196F3;color:#fff" onclick="return confirm('確定送出簽核？')">送簽核</a>
+            <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($quote['status'] === 'approved'): ?>
