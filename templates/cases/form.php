@@ -3707,8 +3707,8 @@ function toggleNewCustomerBtn() {
     });
 })();
 
-// 頁面載入時若已是成交類但沒客戶，也要上紅框提醒
-document.addEventListener('DOMContentLoaded', toggleNewCustomerBtn);
+// 立即跑一次（script 在頁尾，此時 DOM 已解析完）
+toggleNewCustomerBtn();
 
 // ===== 新增客戶 Modal =====
 function openNewCustomerModal() {
