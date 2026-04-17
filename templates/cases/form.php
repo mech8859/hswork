@@ -3708,8 +3708,8 @@ function toggleNewCustomerBtn() {
     });
 })();
 
-// 立即跑一次（script 在頁尾，此時 DOM 已解析完）
-toggleNewCustomerBtn();
+// 不在載入時執行，讓 PHP server-side render 的初始狀態保持生效。
+// 只在使用者改 sub_status 時才觸發（由 select 的 onchange 呼叫）。
 
 // ===== 新增客戶 Modal =====
 function openNewCustomerModal() {
