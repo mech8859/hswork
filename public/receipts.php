@@ -271,7 +271,8 @@ switch ($action) {
         break;
 
     case 'delete':
-        if (!$isBoss && !Auth::hasPermission('finance.delete')) {
+        $_delRole = Auth::user()['role'] ?? '';
+        if (!$isBoss && !Auth::hasPermission('finance.delete') && $_delRole !== 'accounting_supervisor') {
             Session::flash('error', '無權限執行此操作');
             redirect('/receipts.php');
         }

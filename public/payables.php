@@ -248,7 +248,8 @@ switch ($action) {
 
     // ---- 刪除應付帳款 ----
     case 'delete':
-        if (!Auth::hasPermission('finance.delete')) {
+        $_delRole = Auth::user()['role'] ?? '';
+        if (!Auth::hasPermission('finance.delete') && $_delRole !== 'accounting_supervisor') {
             Session::flash('error', '無刪除權限');
             redirect('/payables.php');
         }

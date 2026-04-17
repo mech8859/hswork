@@ -44,7 +44,7 @@ if ($isLocked) {
             <button type="submit" class="btn btn-sm" style="background:#2e7d32;color:#fff">⚡ 生成付款單</button>
         </form>
         <?php endif; ?>
-        <?php if ($isEdit && !$isLocked && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
+        <?php if ($isEdit && !$isLocked && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all') || (Auth::user()['role'] ?? '') === 'accounting_supervisor')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="if(confirm('確定刪除？'))document.getElementById('deleteForm').submit()">刪除</button>
         <?php endif; ?>
         <?= back_button('/payables.php') ?>

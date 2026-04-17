@@ -21,7 +21,7 @@ $paymentTermsOptions = FinanceModel::paymentTermsOptions();
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
-        <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all'))): ?>
+        <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all') || (Auth::user()['role'] ?? '') === 'accounting_supervisor')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="if(confirm('確定刪除此請款單？'))document.getElementById('deleteForm').submit()">刪除</button>
         <?php endif; ?>
         <?= back_button('/receivables.php') ?>

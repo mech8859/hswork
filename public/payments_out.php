@@ -238,10 +238,11 @@ switch ($action) {
         exit;
 
     // ---- 刪除 ----
-    // 限制：僅系統管理者（因刪除會觸發進貨單反向清理，避免會計誤觸）
+    // 限制：系統管理者 + 會計主管（刪除會觸發進貨單反向清理）
     case 'delete':
-        if (!$isBoss) {
-            Session::flash('error', '無權限執行此操作，僅系統管理者可刪除付款單');
+        $_delRole = Auth::user()['role'] ?? '';
+        if (!$isBoss && $_delRole !== 'accounting_supervisor') {
+            Session::flash('error', '無權限執行此操作，僅系統管理者或會計主管可刪除付款單');
             redirect('/payments_out.php');
         }
         if (verify_csrf()) {
