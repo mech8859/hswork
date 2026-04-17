@@ -98,6 +98,22 @@ class NotificationDispatcher
                         );
                         $sentIds[] = $id;
                     }
+                } elseif ($rule['notify_type'] === 'user') {
+                    // 指定人員：target 即 user id
+                    $targetUserId = (int)$target;
+                    if ($targetUserId > 0 && $targetUserId != $actorId) {
+                        $id = $notifModel->send(
+                            $targetUserId,
+                            $type,
+                            $title,
+                            $message,
+                            $link,
+                            $module,
+                            $recordId,
+                            $actorId
+                        );
+                        $sentIds[] = $id;
+                    }
                 }
             }
         }

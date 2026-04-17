@@ -13,6 +13,7 @@ switch ($action) {
         $rules = $model->getAll($filterModule ? $filterModule : null);
         $registry = $model->getModuleRegistry();
         $roles = $model->getRoles();
+        $allUsers = Database::getInstance()->query("SELECT id, real_name, role FROM users WHERE is_active = 1 ORDER BY role, real_name")->fetchAll(PDO::FETCH_ASSOC);
         $pageTitle = '通知設定';
         $currentPage = 'notification_settings';
         require __DIR__ . '/../templates/layouts/header.php';

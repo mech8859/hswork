@@ -11,6 +11,14 @@ foreach ($roles as $r) {
     $roleMap[$r['role_key']] = $r['role_label'];
 }
 
+// 人員 id → 姓名 map
+$userNameMap = array();
+if (!empty($allUsers)) {
+    foreach ($allUsers as $u) {
+        $userNameMap[(int)$u['id']] = $u['real_name'];
+    }
+}
+
 // 記錄欄位 map（所有模組合併）
 $allFieldLabels = array();
 foreach ($registry as $mv) {
@@ -91,6 +99,7 @@ foreach ($registry as $mv) {
                 <label>通知對象類型 <span class="text-danger">*</span></label>
                 <select name="notify_type" id="addNotifyType" class="form-control" onchange="onNotifyTypeChange(this, 'add')">
                     <option value="role">角色</option>
+                    <option value="user">指定人員</option>
                     <option value="field">記錄欄位（動態）</option>
                 </select>
             </div>
@@ -181,6 +190,8 @@ foreach ($registry as $mv) {
                         if ($rule['notify_type'] === 'role'):
                     ?>
                         <span class="badge badge-primary" style="margin:1px"><?= e(isset($roleMap[$t]) ? $roleMap[$t] : $t) ?></span>
+                    <?php elseif ($rule['notify_type'] === 'user'): ?>
+                        <span class="badge badge-info" style="margin:1px"><?= e(isset($userNameMap[(int)$t]) ? $userNameMap[(int)$t] : '使用者#' . $t) ?></span>
                     <?php else: ?>
                         <span class="badge badge-warning" style="margin:1px"><?= e(isset($allFieldLabels[$t]) ? $allFieldLabels[$t] : $t) ?></span>
                     <?php endif; ?>
@@ -258,6 +269,7 @@ foreach ($registry as $mv) {
                         <label>通知對象類型</label>
                         <select name="notify_type" id="editNotifyType" class="form-control" onchange="onNotifyTypeChange(this, 'edit')">
                             <option value="role">角色</option>
+                            <option value="user">指定人員</option>
                             <option value="field">記錄欄位</option>
                         </select>
                     </div>
@@ -303,6 +315,7 @@ foreach ($registry as $mv) {
 <script>
 var registry = <?= json_encode($registry, JSON_UNESCAPED_UNICODE) ?>;
 var allRoles = <?= json_encode($roles, JSON_UNESCAPED_UNICODE) ?>;
+var allUsers = <?= json_encode($allUsers ?? array(), JSON_UNESCAPED_UNICODE) ?>;
 var rulesData = <?= json_encode($rules, JSON_UNESCAPED_UNICODE) ?>;
 
 function showAddForm() {
@@ -382,6 +395,29 @@ function onNotifyTypeChange(sel, prefix) {
             label.style = 'display:block;padding:3px 0;font-size:.85rem;cursor:pointer';
             label.innerHTML = '<input type="checkbox" name="' + formName + '" value="' + allRoles[i].role_key + '"> ' + allRoles[i].role_label;
             container.appendChild(label);
+        }
+    } else if (type === 'user') {
+        // 加關鍵字搜尋
+        var search = document.createElement('input');
+        search.type = 'text';
+        search.placeholder = '搜尋人員...';
+        search.style = 'width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;margin-bottom:6px;font-size:.85rem';
+        search.oninput = function() {
+            var kw = this.value.toLowerCase();
+            container.querySelectorAll('label[data-user-row]').forEach(function(lb) {
+                var name = lb.getAttribute('data-search') || '';
+                lb.style.display = (!kw || name.indexOf(kw) !== -1) ? 'block' : 'none';
+            });
+        };
+        container.appendChild(search);
+        for (var j = 0; j < allUsers.length; j++) {
+            var u = allUsers[j];
+            var lb = document.createElement('label');
+            lb.setAttribute('data-user-row', '1');
+            lb.setAttribute('data-search', (u.real_name + ' ' + u.role).toLowerCase());
+            lb.style = 'display:block;padding:3px 0;font-size:.85rem;cursor:pointer';
+            lb.innerHTML = '<input type="checkbox" name="' + formName + '" value="' + u.id + '"> ' + u.real_name + ' <span style="color:#888;font-size:.75rem">(' + u.role + ')</span>';
+            container.appendChild(lb);
         }
     } else {
         var mod = document.getElementById(prefix + 'Module').value;
