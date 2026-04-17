@@ -1,7 +1,13 @@
 <?php
 require_once __DIR__ . '/../includes/bootstrap.php';
 Auth::requireLogin();
-if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('finance.view')) {
+// ajax_vendor_search 給請購單/退貨單共用，採購/庫管也需呼叫
+$action = !empty($_GET['action']) ? $_GET['action'] : 'list';
+$vendorSearchAllowed = ($action === 'ajax_vendor_search') && (
+    Auth::hasPermission('procurement.manage') || Auth::hasPermission('procurement.view') ||
+    Auth::hasPermission('inventory.manage') || Auth::hasPermission('inventory.view')
+);
+if (!Auth::hasPermission('finance.manage') && !Auth::hasPermission('finance.view') && !$vendorSearchAllowed) {
     Session::flash('error', '無權限查看此頁面');
     redirect('/');
 }
@@ -9,7 +15,6 @@ require_once __DIR__ . '/../modules/finance/FinanceModel.php';
 
 $model = new FinanceModel();
 $db = Database::getInstance();
-$action = !empty($_GET['action']) ? $_GET['action'] : 'list';
 $isBoss = Auth::hasPermission('all');
 $canManageFinance = Auth::hasPermission('finance.manage');
 
