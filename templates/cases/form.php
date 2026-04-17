@@ -175,7 +175,8 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <?php
                 $dealStatuses = array('已成交','跨月成交','現簽','電話報價成交');
                 $curSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '';
-                $hasCustomerLinked = !empty($case['customer_no']);
+                // 與顯示邏輯一致：linked_customer_no 或 customer_no 或 customer_id 任一有值
+                $hasCustomerLinked = !empty($case['linked_customer_no']) || !empty($case['customer_no']) || !empty($case['customer_id']);
                 $hasCreateCustomer = Auth::hasPermission('customers.create');
                 // 已有客戶編號代表已連結既有客戶，不需再新增客戶；且使用者要有 customers.create 權限
                 $showNewBtn = in_array($curSubStatus, $dealStatuses, true) && !$hasCustomerLinked && $hasCreateCustomer;
