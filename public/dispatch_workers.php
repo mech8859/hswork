@@ -130,9 +130,12 @@ switch ($action) {
                 $workerId = $worker['id'];
                 Session::flash('success', '人員已更新');
             } else {
-                $db->prepare("INSERT INTO dispatch_workers (worker_type, name, id_number, phone, address, birth_date, specialty, status, daily_rate, emergency_contact, emergency_phone, vendor_id, note, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute($data);
+                // 自動產生 worker_no（取現有最大值 +1，3 碼零補齊）
+                $maxNo = (int)$db->query("SELECT COALESCE(MAX(CAST(worker_no AS UNSIGNED)), 0) FROM dispatch_workers")->fetchColumn();
+                $newWorkerNo = str_pad($maxNo + 1, 3, '0', STR_PAD_LEFT);
+                $db->prepare("INSERT INTO dispatch_workers (worker_no, worker_type, name, id_number, phone, address, birth_date, specialty, status, daily_rate, emergency_contact, emergency_phone, vendor_id, note, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute(array_merge(array($newWorkerNo), $data));
                 $workerId = (int)$db->lastInsertId();
-                Session::flash('success', '人員已新增');
+                Session::flash('success', '人員已新增（編號 ' . $newWorkerNo . '）');
             }
 
             // 處理附件上傳

@@ -23,6 +23,7 @@
         <table class="table">
             <thead>
                 <tr>
+                    <th style="width:70px">編號</th>
                     <th>姓名</th>
                     <th>電話</th>
                     <th>狀態</th>
@@ -35,10 +36,11 @@
             </thead>
             <tbody>
                 <?php if (empty($workers)): ?>
-                <tr><td colspan="8" class="text-center text-muted">目前無資料</td></tr>
+                <tr><td colspan="9" class="text-center text-muted">目前無資料</td></tr>
                 <?php else: ?>
                 <?php foreach ($workers as $w): ?>
                 <tr style="<?= !$w['is_active'] ? 'opacity:.5' : '' ?>">
+                    <td style="font-family:monospace;font-weight:600;color:var(--primary)"><?= e($w['worker_no'] ?? '-') ?></td>
                     <td><a href="/dispatch_workers.php?action=edit&id=<?= $w['id'] ?>"><?= e($w['name']) ?></a></td>
                     <td><a href="tel:<?= e($w['phone'] ?? '') ?>"><?= e($w['phone'] ?? '-') ?></a></td>
                     <td>

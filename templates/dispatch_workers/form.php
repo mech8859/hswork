@@ -18,6 +18,12 @@ foreach ($files as $f) { $filesByType[$f['file_type']][] = $f; }
     <div class="card">
         <div class="card-header">基本資料</div>
         <div class="form-row">
+            <div class="form-group" style="flex:0 0 110px">
+                <label>編號</label>
+                <input type="text" class="form-control" readonly
+                       value="<?= e(!empty($worker['worker_no']) ? $worker['worker_no'] : '（存檔後自動產生）') ?>"
+                       style="background:#f0f7ff;font-weight:600;color:var(--primary)">
+            </div>
             <div class="form-group">
                 <label>姓名 *</label>
                 <input type="text" name="name" class="form-control" required value="<?= e($worker['name'] ?? '') ?>">
