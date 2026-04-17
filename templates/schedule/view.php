@@ -36,26 +36,24 @@ if ($schedule['case_id']) {
         $customerContact = $caseInfo['cu_contact'] ?: ($caseContact ? $caseContact['contact_name'] : '') ?: '';
         $constructionNote = $caseInfo['construction_note'] ?: '';
     }
-    // 現場照片
-    $pStmt = $db->prepare("SELECT file_path, file_name FROM case_attachments WHERE case_id = ? AND file_type = 'site_photo' LIMIT 8");
-    $pStmt->execute(array($schedule['case_id']));
-    $casePhotos = $pStmt->fetchAll(PDO::FETCH_ASSOC);
-    // 施工圖
-    $dStmt = $db->prepare("SELECT file_path, file_name FROM case_attachments WHERE case_id = ? AND file_type = 'drawing' LIMIT 8");
-    $dStmt->execute(array($schedule['case_id']));
-    $caseDrawings = $dStmt->fetchAll(PDO::FETCH_ASSOC);
     // 現場環境
     $siteStmt = $db->prepare("SELECT * FROM case_site_conditions WHERE case_id = ? LIMIT 1");
     $siteStmt->execute(array($schedule['case_id']));
     $siteCond = $siteStmt->fetch(PDO::FETCH_ASSOC);
-    // 報價單附件
-    $qaStmt = $db->prepare("SELECT file_path, file_name FROM case_attachments WHERE case_id = ? AND file_type = 'quotation' LIMIT 8");
-    $qaStmt->execute(array($schedule['case_id']));
-    $caseQuotationFiles = $qaStmt->fetchAll(PDO::FETCH_ASSOC);
-    // 架構圖
-    $bpStmt = $db->prepare("SELECT file_path, file_name FROM case_attachments WHERE case_id = ? AND file_type = 'blueprint' LIMIT 8");
-    $bpStmt->execute(array($schedule['case_id']));
-    $caseBlueprints = $bpStmt->fetchAll(PDO::FETCH_ASSOC);
+    // 案件附件：動態抓全部分類（排除預計使用線材），每類最多 20 筆
+    require_once __DIR__ . '/../../modules/cases/CaseModel.php';
+    $schAttachTypes = CaseModel::attachTypeOptions();
+    unset($schAttachTypes['wire_plan']);
+    $schGroupedAtt = array();
+    foreach ($schAttachTypes as $tk => $_) { $schGroupedAtt[$tk] = array(); }
+    $allAttStmt = $db->prepare("SELECT file_type, file_path, file_name FROM case_attachments WHERE case_id = ? ORDER BY id");
+    $allAttStmt->execute(array($schedule['case_id']));
+    foreach ($allAttStmt->fetchAll(PDO::FETCH_ASSOC) as $att) {
+        $t = $att['file_type'];
+        if (!isset($schGroupedAtt[$t])) continue; // 不在分類清單（含 wire_plan）就跳過
+        if (count($schGroupedAtt[$t]) >= 20) continue;
+        $schGroupedAtt[$t][] = $att;
+    }
     // 報價單（系統產生的）
     $qStmt = $db->prepare("SELECT quotation_number, total_amount, status FROM quotations WHERE case_id = ? ORDER BY id DESC LIMIT 1");
     $qStmt->execute(array($schedule['case_id']));
@@ -172,14 +170,13 @@ $canJoin = $isEngineerUser && !$isInSchedule && !in_array($schedule['status'], a
 <!-- 案件附件 -->
 <?php if ($schedule['case_id']): ?>
 <?php
-$schAttachSections = array(
-    array('label' => '施工圖', 'files' => $caseDrawings),
-    array('label' => '報價單', 'files' => isset($caseQuotationFiles) ? $caseQuotationFiles : array()),
-    array('label' => '現場照片', 'files' => $casePhotos),
-    array('label' => '架構圖', 'files' => isset($caseBlueprints) ? $caseBlueprints : array()),
-);
-$schHasAnyFile = false;
-foreach ($schAttachSections as $sec) { if (!empty($sec['files'])) { $schHasAnyFile = true; break; } }
+$schAttachSections = array();
+foreach ($schAttachTypes as $tk => $tlabel) {
+    if (!empty($schGroupedAtt[$tk])) {
+        $schAttachSections[] = array('label' => $tlabel, 'files' => $schGroupedAtt[$tk]);
+    }
+}
+$schHasAnyFile = !empty($schAttachSections);
 ?>
 <?php if ($schHasAnyFile): ?>
 <div class="card">
