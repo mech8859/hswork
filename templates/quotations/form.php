@@ -556,15 +556,29 @@ function addSection() {
     var costTd = canManage ? '<td><input type="text" name="sections[' + sectionIdx + '][items][0][unit_cost]" class="form-control item-cost" value="0" readonly style="background:#f5f5f5;color:#666;min-width:100px;width:100%"></td>' : '';
     var extraCols = canManage ? 3 : 2;
 
+    var curFmt = (document.querySelector('input[name="format"]:checked') || {}).value || 'project';
+    var discChkDisplay = curFmt === 'project' ? 'inline-flex' : 'none';
     var html = '<div class="quote-section" data-sidx="' + sectionIdx + '">' +
         '<div class="quote-section-header">' +
             '<input type="text" name="sections[' + sectionIdx + '][title]" class="form-control" placeholder="區段標題（如：電話線工程）">' +
             '<button type="button" class="btn btn-danger btn-sm" onclick="removeSection(this)">&times;</button>' +
         '</div>' +
         '<div class="table-responsive"><table class="table quote-items-table">' +
-        '<thead><tr><th style="width:30px">序</th><th style="min-width:350px">品名/型號</th><th style="width:80px">數量</th><th style="width:60px">單位</th><th style="width:100px">單價</th><th style="width:100px">小計</th>' + costTh + '<th style="width:40px"></th></tr></thead>' +
+        '<thead><tr><th style="width:30px">序</th><th style="min-width:160px">產品名稱</th><th style="width:120px">型號</th><th style="width:70px">數量</th><th style="width:50px">單位</th><th style="width:100px">單價</th><th style="width:90px">小計</th>' + costTh + '<th style="width:30px"></th></tr></thead>' +
         '<tbody>' + buildItemRow(sectionIdx, 0) + '</tbody>' +
-        '<tfoot><tr><td colspan="5" class="text-right"><strong>小計</strong></td><td class="section-subtotal text-right"><strong>0</strong></td><td colspan="' + extraCols + '"><button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button></td></tr></tfoot>' +
+        '<tfoot><tr>' +
+            '<td colspan="6" class="text-right">' +
+                '<strong>小計</strong>' +
+                '<label class="section-discount-chk checkbox-label" style="margin-left:15px;display:' + discChkDisplay + ';font-weight:400;font-size:.85rem">' +
+                    '<input type="checkbox" class="section-discount-toggle" onchange="toggleSectionDiscount(this)"> 優惠價' +
+                '</label>' +
+            '</td>' +
+            '<td class="section-subtotal text-right" style="white-space:nowrap">' +
+                '<strong class="section-subtotal-display">0</strong>' +
+                '<input type="number" name="sections[' + sectionIdx + '][discount_amount]" class="form-control section-discount-input" style="width:120px;text-align:right;color:var(--danger);font-weight:700;display:none;margin-top:4px" min="0" placeholder="優惠價" oninput="calcGrandTotal()">' +
+            '</td>' +
+            '<td colspan="' + extraCols + '"><button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button></td>' +
+        '</tr></tfoot>' +
         '</table></div></div>';
 
     container.insertAdjacentHTML('beforeend', html);
