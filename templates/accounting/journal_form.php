@@ -586,10 +586,17 @@ function renderRelList(type, keyword) {
         var item = list[i];
         var code = item.tax_id_number || item.tax_id || '';
         var idStr = String(item.id);
-        // 廠商顯示 vendor_code (B-XXXX)；客戶 fallback 用 id
-        var displayCode = item.vendor_code || item.id;
+        var custNo = item.customer_no || '';
+        // 廠商顯示 vendor_code (B-XXXX)；客戶優先用 customer_no，否則 id
+        var displayCode = item.vendor_code || custNo || item.id;
         var displayCodeStr = String(displayCode).toLowerCase();
-        if (kw && item.name.toLowerCase().indexOf(kw) === -1 && code.toLowerCase().indexOf(kw) === -1 && idStr.indexOf(kw) === -1 && displayCodeStr.indexOf(kw) === -1) continue;
+        var custNoStr = String(custNo).toLowerCase();
+        if (kw
+            && item.name.toLowerCase().indexOf(kw) === -1
+            && code.toLowerCase().indexOf(kw) === -1
+            && idStr.indexOf(kw) === -1
+            && displayCodeStr.indexOf(kw) === -1
+            && custNoStr.indexOf(kw) === -1) continue;
         html += '<tr class="acct-row" style="cursor:pointer" onclick="pickRel(' + item.id + ',\'' + item.name.replace(/'/g, "\\'") + '\')">' +
             '<td style="font-family:monospace">' + displayCode + '</td>' +
             '<td>' + item.name + '</td>' +

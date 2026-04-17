@@ -396,7 +396,7 @@ switch ($action) {
         // 客戶和廠商清單（往來類型用）
         $db2 = Database::getInstance();
         try {
-            $customers = $db2->query("SELECT id, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $customers = $db2->query("SELECT id, customer_no, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $customers = array(); }
         try {
             $vendors = $db2->query("SELECT id, vendor_code, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
@@ -520,7 +520,7 @@ switch ($action) {
         // 載入客戶和廠商資料
         $db2 = Database::getInstance();
         try {
-            $customers = $db2->query("SELECT id, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $customers = $db2->query("SELECT id, customer_no, name, tax_id FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $customers = array(); }
         try {
             $vendors = $db2->query("SELECT id, vendor_code, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
