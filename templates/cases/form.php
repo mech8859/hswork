@@ -750,10 +750,14 @@ require __DIR__ . '/../_readonly_form_helper.php';
         </div>
         <div class="form-row">
             <?php
-            // 尾款=0 才開放手動修改結清狀態/日期；尾款>0 或未成交鎖定（由系統自動管理）
-            $_balance = isset($case['balance_amount']) ? (int)$case['balance_amount'] : null;
-            $_lockSettle = ($_balance === null || $_balance > 0);
-            $_lockTip = $_lockSettle ? '尾款未歸零，由系統自動管理' : '';
+            // 開放手動修改結清狀態/日期的條件：尾款=0 且 有實際金額流動（成交金額或總收款其中一個 > 0）
+            $_balance   = isset($case['balance_amount']) ? (int)$case['balance_amount'] : null;
+            $_deal      = isset($case['deal_amount']) ? (int)$case['deal_amount'] : 0;
+            $_totalAmt  = isset($case['total_amount']) ? (int)$case['total_amount'] : 0;
+            $_collected = isset($case['total_collected']) ? (int)$case['total_collected'] : 0;
+            $_noAmount  = ($_deal <= 0 && $_totalAmt <= 0 && $_collected <= 0);
+            $_lockSettle = ($_balance === null || $_balance > 0 || $_noAmount);
+            $_lockTip = $_noAmount ? '尚無成交金額與收款，無需結清' : ($_lockSettle ? '尾款未歸零，由系統自動管理' : '');
             ?>
             <div class="form-group">
                 <label>帳款是否結清<?= $_lockSettle ? ' <span style="color:var(--gray-400);font-weight:400;font-size:.8rem">（唯讀）</span>' : '' ?></label>
