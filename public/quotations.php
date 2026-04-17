@@ -613,6 +613,18 @@ switch ($action) {
         echo json_encode(array('success' => true, 'data' => $caseModel->getMaterialEstimates($estCaseId)));
         exit;
 
+    case 'ajax_case_lookup':
+        // 由 case_number 查 case_id
+        header('Content-Type: application/json');
+        $cNum = trim($_GET['case_number'] ?? '');
+        if ($cNum === '') { echo json_encode(array('success' => false)); exit; }
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT id FROM cases WHERE case_number = ? LIMIT 1");
+        $stmt->execute(array($cNum));
+        $cid = $stmt->fetchColumn();
+        echo json_encode(array('success' => (bool)$cid, 'case_id' => $cid ? (int)$cid : 0));
+        exit;
+
     case 'ajax_case_info':
         // 取得案件基本資料 + 是否已有報價單（排除當前編輯中的報價單）
         header('Content-Type: application/json');

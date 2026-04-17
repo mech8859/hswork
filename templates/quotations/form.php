@@ -90,15 +90,28 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     }
                 }
                 ?>
-                <select name="case_id" id="qCaseId" class="form-control">
-                    <option value="">-- 不關聯案件 --</option>
+                <?php
+                $initCaseNumber = '';
+                if ($extraCase) {
+                    $initCaseNumber = $extraCase['case_number'];
+                } elseif ($initCaseId) {
+                    foreach ($cases as $c) {
+                        if ($c['id'] == $initCaseId) { $initCaseNumber = $c['case_number']; break; }
+                    }
+                }
+                ?>
+                <input type="text" id="qCaseNumberInput" class="form-control" list="qCaseList"
+                       value="<?= e($initCaseNumber) ?>" placeholder="-- 不關聯案件（可輸入或下拉選）--"
+                       autocomplete="off">
+                <input type="hidden" name="case_id" id="qCaseId" value="<?= e($initCaseId) ?>">
+                <datalist id="qCaseList">
                     <?php if ($extraCase): ?>
-                    <option value="<?= $extraCase['id'] ?>" selected><?= e($extraCase['case_number']) ?> <?= e($extraCase['title']) ?></option>
+                    <option value="<?= e($extraCase['case_number']) ?>"><?= e($extraCase['title']) ?></option>
                     <?php endif; ?>
                     <?php foreach ($cases as $c): ?>
-                    <option value="<?= $c['id'] ?>" <?= $initCaseId == $c['id'] ? 'selected' : '' ?>><?= e($c['case_number']) ?> <?= e($c['title']) ?></option>
+                    <option value="<?= e($c['case_number']) ?>"><?= e($c['title']) ?></option>
                     <?php endforeach; ?>
-                </select>
+                </datalist>
             </div>
             <div class="form-group">
                 <label>案場名稱</label>
@@ -1262,11 +1275,12 @@ function loadEstMaterials(caseId) {
     });
 }
 
-// 案件切換時載入/隱藏預估線材 + 檢查是否已有報價單 + 帶入客戶資料
+// 進件編號：支援輸入或下拉選 → 查 case_id + 帶客戶資料 + 擋重複 + 載入預估線材
 (function() {
-    var caseSelect = document.getElementById('qCaseId');
+    var caseInput = document.getElementById('qCaseNumberInput');
+    var caseHidden = document.getElementById('qCaseId');
     var estCard = document.getElementById('estMaterialsCard');
-    if (!caseSelect) return;
+    if (!caseInput || !caseHidden) return;
     var isEditPage = <?= $isEdit ? 'true' : 'false' ?>;
     var currentQid = <?= $isEdit && !empty($quote['id']) ? (int)$quote['id'] : 0 ?>;
 
@@ -1276,45 +1290,65 @@ function loadEstMaterials(caseId) {
         if (el && !el.value) el.value = val;
     }
 
-    caseSelect.addEventListener('change', function() {
-        var caseId = this.value;
-        var self = this;
-        if (estCard) estCard.style.display = caseId ? '' : 'none';
-        if (!caseId) return;
-        fetch('/quotations.php?action=ajax_case_info&case_id=' + encodeURIComponent(caseId) + '&exclude_qid=' + currentQid)
+    function applyCaseInfo(caseId, d) {
+        if (!d || !d.success) {
+            alert((d && d.error) || '查無此進件編號');
+            caseInput.value = '';
+            caseHidden.value = '';
+            if (estCard) estCard.style.display = 'none';
+            return false;
+        }
+        if (d.existing_quotation && !isEditPage) {
+            alert('此進件編號已有報價單（' + d.existing_quotation.quotation_number + '），無法重複建立');
+            caseInput.value = '';
+            caseHidden.value = '';
+            if (estCard) estCard.style.display = 'none';
+            return false;
+        }
+        if (d.case) {
+            fillIfEmpty('customer_name', d.case.customer_name);
+            fillIfEmpty('contact_person', d.case.contact_person);
+            fillIfEmpty('contact_phone', d.case.contact_phone);
+            fillIfEmpty('site_name', d.case.site_name);
+            fillIfEmpty('site_address', d.case.site_address);
+        }
+        if (estCard) { estCard.style.display = ''; loadEstMaterials(caseId); }
+        return true;
+    }
+
+    var lookupTimer = null;
+    caseInput.addEventListener('change', function() {
+        clearTimeout(lookupTimer);
+        var txt = this.value.trim();
+        if (!txt) {
+            caseHidden.value = '';
+            if (estCard) estCard.style.display = 'none';
+            return;
+        }
+        // 查詢 case_number → case_id
+        fetch('/quotations.php?action=ajax_case_lookup&case_number=' + encodeURIComponent(txt))
             .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (!d.success) {
-                    alert(d.error || '查無此案件');
-                    self.value = '';
-                    return;
-                }
-                if (d.existing_quotation && !isEditPage) {
-                    alert('此進件編號已有報價單（' + d.existing_quotation.quotation_number + '），無法重複建立');
-                    self.value = '';
+            .then(function(r) {
+                if (!r.success || !r.case_id) {
+                    alert('查無此進件編號：' + txt);
+                    caseInput.value = '';
+                    caseHidden.value = '';
                     if (estCard) estCard.style.display = 'none';
                     return;
                 }
-                if (d.case) {
-                    fillIfEmpty('customer_name', d.case.customer_name);
-                    fillIfEmpty('contact_person', d.case.contact_person);
-                    fillIfEmpty('contact_phone', d.case.contact_phone);
-                    fillIfEmpty('site_name', d.case.site_name);
-                    fillIfEmpty('site_address', d.case.site_address);
-                }
-                if (estCard) loadEstMaterials(caseId);
-            })
-            .catch(function() {
-                if (estCard) loadEstMaterials(caseId);
+                caseHidden.value = r.case_id;
+                return fetch('/quotations.php?action=ajax_case_info&case_id=' + r.case_id + '&exclude_qid=' + currentQid)
+                    .then(function(r2) { return r2.json(); })
+                    .then(function(d) { applyCaseInfo(r.case_id, d); });
             });
     });
 
-    // 頁面載入時若已選案件，顯示卡片並載入資料（新增時透過 GET 預選）
-    if (caseSelect.value && estCard) {
+    // 頁面載入時若已選案件，顯示預估線材卡片
+    if (caseHidden.value && estCard) {
         estCard.style.display = '';
         var hasRows = document.querySelectorAll('#qEstMaterialsContainer .q-est-row').length;
         if (!hasRows) {
-            loadEstMaterials(caseSelect.value);
+            loadEstMaterials(caseHidden.value);
         }
     }
 })();
