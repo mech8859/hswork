@@ -181,7 +181,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 // 已有客戶編號代表已連結既有客戶，不需再新增客戶；且使用者要有 customers.create 權限
                 $showNewBtn = in_array($curSubStatus, $dealStatuses, true) && !$hasCustomerLinked && $hasCreateCustomer;
                 ?>
-                <?php if ($hasCreateCustomer): ?>
+                <?php if ($hasCreateCustomer && !$hasCustomerLinked): ?>
                 <button type="button" id="btnNewCustomer" class="btn btn-outline btn-sm" onclick="openNewCustomerModal()" style="white-space:nowrap;<?= $showNewBtn ? '' : 'display:none' ?>">+ 新增客戶</button>
                 <?php endif; ?>
             </div>
