@@ -3708,8 +3708,14 @@ function toggleNewCustomerBtn() {
     });
 })();
 
-// 不在載入時執行，讓 PHP server-side render 的初始狀態保持生效。
-// 只在使用者改 sub_status 時才觸發（由 select 的 onchange 呼叫）。
+// 強制：客戶編號顯示有值就隱藏新增客戶按鈕（不管其他邏輯）
+(function(){
+    var cno = document.getElementById('customerNoDisplay');
+    var btn = document.getElementById('btnNewCustomer');
+    if (cno && cno.value && btn) {
+        btn.style.setProperty('display', 'none', 'important');
+    }
+})();
 
 // ===== 新增客戶 Modal =====
 function openNewCustomerModal() {
