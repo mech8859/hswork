@@ -262,8 +262,16 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="5" class="text-right"><strong>小計</strong></td>
-                                <td class="section-subtotal text-right"><strong>0</strong></td>
+                                <td colspan="5" class="text-right">
+                                    <strong>小計</strong>
+                                    <label class="section-discount-chk checkbox-label" style="margin-left:15px;display:<?= $fmt === 'project' ? 'inline-flex' : 'none' ?>;font-weight:400;font-size:.85rem">
+                                        <input type="checkbox" class="section-discount-toggle" <?= (isset($sec['discount_amount']) && $sec['discount_amount'] !== null) ? 'checked' : '' ?> onchange="toggleSectionDiscount(this)"> 優惠價
+                                    </label>
+                                </td>
+                                <td class="section-subtotal text-right" style="white-space:nowrap">
+                                    <strong class="section-subtotal-display" style="<?= (isset($sec['discount_amount']) && $sec['discount_amount'] !== null) ? 'text-decoration:line-through;color:#999;font-weight:400;font-size:.85rem' : '' ?>">0</strong>
+                                    <input type="number" name="sections[<?= $sIdx ?>][discount_amount]" class="form-control section-discount-input" style="width:120px;text-align:right;color:var(--danger);font-weight:700;display:<?= (isset($sec['discount_amount']) && $sec['discount_amount'] !== null) ? 'inline-block' : 'none' ?>;margin-top:4px" value="<?= isset($sec['discount_amount']) && $sec['discount_amount'] !== null ? (int)$sec['discount_amount'] : '' ?>" min="0" placeholder="優惠價" oninput="calcGrandTotal()">
+                                </td>
                                 <td colspan="<?= $canManage ? 3 : 2 ?>">
                                     <button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button>
                                 </td>
@@ -508,6 +516,38 @@ function toggleFormat(fmt) {
         headers[i].style.display = fmt === 'project' ? 'flex' : 'none';
     }
     btn.style.display = fmt === 'project' ? '' : 'none';
+    // 區段優惠價 checkbox 只在專案模式顯示
+    var chks = document.querySelectorAll('.section-discount-chk');
+    for (var j = 0; j < chks.length; j++) {
+        chks[j].style.display = fmt === 'project' ? 'inline-flex' : 'none';
+        if (fmt !== 'project') {
+            var cb = chks[j].querySelector('.section-discount-toggle');
+            if (cb && cb.checked) { cb.checked = false; toggleSectionDiscount(cb); }
+        }
+    }
+    calcGrandTotal();
+}
+
+function toggleSectionDiscount(cb) {
+    var section = cb.closest('.quote-section');
+    var display = section.querySelector('.section-subtotal-display');
+    var input = section.querySelector('.section-discount-input');
+    if (cb.checked) {
+        input.style.display = 'inline-block';
+        if (!input.value) input.value = display.textContent.replace(/,/g, '') || '0';
+        display.style.textDecoration = 'line-through';
+        display.style.color = '#999';
+        display.style.fontWeight = '400';
+        display.style.fontSize = '.85rem';
+    } else {
+        input.style.display = 'none';
+        input.value = '';
+        display.style.textDecoration = '';
+        display.style.color = '';
+        display.style.fontWeight = '';
+        display.style.fontSize = '';
+    }
+    calcGrandTotal();
 }
 
 function addSection() {
@@ -711,17 +751,26 @@ function calcGrandTotal() {
     var grandCost = 0;
     for (var s = 0; s < sections.length; s++) {
         var rows = sections[s].querySelectorAll('tbody tr:not(.psel-row)');
+        var secSubtotal = 0;
         for (var i = 0; i < rows.length; i++) {
             var qtyEl = rows[i].querySelector('.item-qty');
             var priceEl = rows[i].querySelector('.item-price');
             if (!qtyEl || !priceEl) continue;
             var qty = parseFloat(qtyEl.value) || 0;
             var price = parseFloat(priceEl.value) || 0;
-            grandSubtotal += Math.round(qty * price);
+            secSubtotal += Math.round(qty * price);
             var costEl = rows[i].querySelector('.item-cost');
             if (costEl) {
                 grandCost += Math.round(qty * (parseFloat(costEl.value) || 0));
             }
+        }
+        // 區段優惠價：若啟用則以優惠價入合計，否則用小計
+        var discToggle = sections[s].querySelector('.section-discount-toggle');
+        var discInput = sections[s].querySelector('.section-discount-input');
+        if (discToggle && discToggle.checked && discInput) {
+            grandSubtotal += parseInt(discInput.value, 10) || 0;
+        } else {
+            grandSubtotal += secSubtotal;
         }
     }
     var isTaxFree = document.querySelector('input[name="tax_free"][type="checkbox"]');

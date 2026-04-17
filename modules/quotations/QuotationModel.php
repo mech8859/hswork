@@ -324,8 +324,8 @@ class QuotationModel
         $this->db->prepare('DELETE FROM quotation_sections WHERE quotation_id = ?')->execute(array($quotationId));
 
         $secStmt = $this->db->prepare('
-            INSERT INTO quotation_sections (quotation_id, title, sort_order, subtotal)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO quotation_sections (quotation_id, title, sort_order, subtotal, discount_amount)
+            VALUES (?, ?, ?, ?, ?)
         ');
         $itemStmt = $this->db->prepare('
             INSERT INTO quotation_items (section_id, product_id, item_name, model_number, quantity, unit, unit_price, amount, remark, sort_order, unit_cost, cost_amount)
@@ -337,7 +337,13 @@ class QuotationModel
 
         foreach ($sectionsData as $sIdx => $sec) {
             $secSubtotal = 0;
-            $secStmt->execute(array($quotationId, $sec['title'] ?: '', (int)$sIdx, 0));
+            // 區段優惠價（空字串/未勾選 = NULL）
+            $secDiscount = null;
+            if (isset($sec['discount_amount']) && $sec['discount_amount'] !== '' && $sec['discount_amount'] !== null) {
+                $secDiscount = (int)$sec['discount_amount'];
+                if ($secDiscount < 0) $secDiscount = 0;
+            }
+            $secStmt->execute(array($quotationId, $sec['title'] ?: '', (int)$sIdx, 0, $secDiscount));
             $sectionId = (int)$this->db->lastInsertId();
 
             $items = isset($sec['items']) ? $sec['items'] : array();
@@ -371,7 +377,8 @@ class QuotationModel
             // 更新區段小計
             $this->db->prepare('UPDATE quotation_sections SET subtotal = ? WHERE id = ?')
                 ->execute(array($secSubtotal, $sectionId));
-            $grandSubtotal += $secSubtotal;
+            // 有優惠價則以優惠價入合計，否則用小計
+            $grandSubtotal += ($secDiscount !== null) ? $secDiscount : $secSubtotal;
         }
 
         // 更新報價單金額
@@ -429,7 +436,7 @@ class QuotationModel
         // 複製區段和項目
         $sectionsData = array();
         foreach ($orig['sections'] as $sec) {
-            $secData = array('title' => $sec['title'], 'items' => array());
+            $secData = array('title' => $sec['title'], 'items' => array(), 'discount_amount' => isset($sec['discount_amount']) ? $sec['discount_amount'] : null);
             foreach ($sec['items'] as $item) {
                 $secData['items'][] = array(
                     'product_id' => $item['product_id'],
