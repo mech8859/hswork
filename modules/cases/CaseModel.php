@@ -1613,7 +1613,6 @@ class CaseModel
             'drawing'    => '施工圖',
             'quotation'  => '報價單',
             'warranty'   => '保固書',
-            'wire_plan'  => '預計使用線材',
             'site_photo' => '現場照片',
             'other'      => '其他',
         );
