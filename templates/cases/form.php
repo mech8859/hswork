@@ -280,7 +280,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <div class="form-group">
                 <label>狀態</label>
                 <?php $defaultSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '未指派'; ?>
-                <select name="sub_status" id="subStatusSelect" class="form-control" onchange="toggleNewCustomerBtn();checkSalesNoteRequired()">
+                <select name="sub_status" id="subStatusSelect" class="form-control" data-original="<?= e($defaultSubStatus) ?>" onchange="toggleNewCustomerBtn();checkSalesNoteRequired()">
                     <option value="">請選擇</option>
                     <?php foreach (CaseModel::subStatusOptions() as $v => $l): ?>
                     <option value="<?= $v ?>" <?= $defaultSubStatus === $v ? 'selected' : '' ?>><?= e($l) ?></option>
@@ -3650,6 +3650,62 @@ if (document.readyState === 'loading') {
 } else {
     _initTaxIdLink();
 }
+
+// ===== 新增客戶按鈕動態顯示/紅框提醒 =====
+(function(){
+    if (document.getElementById('pulseRedStyle')) return;
+    var s = document.createElement('style');
+    s.id = 'pulseRedStyle';
+    s.textContent = '@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(229,57,53,.5)}50%{box-shadow:0 0 0 6px rgba(229,57,53,0)}}';
+    document.head.appendChild(s);
+})();
+var _dealSubStatuses = ['電話報價成交','已成交','跨月成交','現簽'];
+function toggleNewCustomerBtn() {
+    var sel = document.getElementById('subStatusSelect');
+    var btn = document.getElementById('btnNewCustomer');
+    var cidEl = document.getElementById('customerId');
+    if (!sel || !btn) return;
+    var sub = sel.value;
+    var hasCust = cidEl && cidEl.value;
+    var needCust = _dealSubStatuses.indexOf(sub) !== -1 && !hasCust;
+    btn.style.display = needCust ? '' : 'none';
+    if (needCust) {
+        btn.style.border = '2px solid #e53935';
+        btn.style.color = '#e53935';
+        btn.style.fontWeight = '700';
+        btn.style.animation = 'pulseRed 1.2s infinite';
+        btn.setAttribute('title', '此狀態必須新增客戶才能儲存');
+    } else {
+        btn.style.border = '';
+        btn.style.color = '';
+        btn.style.fontWeight = '';
+        btn.style.animation = '';
+        btn.removeAttribute('title');
+    }
+}
+
+// 送出前檢查：改成成交類 + 沒客戶 → 擋
+(function() {
+    var form = document.querySelector('form');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        var sel = document.getElementById('subStatusSelect');
+        var cidEl = document.getElementById('customerId');
+        if (!sel || !cidEl) return;
+        var cur = sel.value;
+        var orig = sel.getAttribute('data-original') || '';
+        var hasCust = cidEl.value;
+        if (_dealSubStatuses.indexOf(cur) !== -1 && !hasCust && cur !== orig) {
+            e.preventDefault();
+            alert('狀態改為「' + cur + '」前，請先按「+ 新增客戶」建立客戶');
+            var btn = document.getElementById('btnNewCustomer');
+            if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+})();
+
+// 頁面載入時若已是成交類但沒客戶，也要上紅框提醒
+document.addEventListener('DOMContentLoaded', toggleNewCustomerBtn);
 
 // ===== 新增客戶 Modal =====
 function openNewCustomerModal() {
