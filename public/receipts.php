@@ -229,6 +229,8 @@ switch ($action) {
                             Database::getInstance()->prepare("UPDATE cases SET settlement_confirmed = 1, settlement_date = ? WHERE id = ?")
                                 ->execute(array($settleDate, $cid));
                         }
+                        // 嘗試自動結案
+                        tryAutoCloseCase($cid);
                     }
                 } catch (Exception $autoSettleEx) {
                     error_log('Auto-settle on receipt confirm failed: ' . $autoSettleEx->getMessage());

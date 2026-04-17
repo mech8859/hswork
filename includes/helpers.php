@@ -458,3 +458,34 @@ function backup_to_drive($localPath, $type, $subFolder, $fileName = null)
         error_log('backup_to_drive error: ' . $e->getMessage());
     }
 }
+
+/**
+ * 自動將案件結案：當以下條件全部成立
+ *  - 完工簽核 L2（行政人員）已核准
+ *  - is_completed=1 且 completion_date 不為空
+ *  - settlement_confirmed=1 且 settlement_date 不為空
+ *  - 應收基底 > 0 且 balance_amount=0
+ *  - 案件目前不是 closed
+ * 通過則 status='closed', sub_status='已完工結案'
+ * @return bool true=已自動結案
+ */
+function tryAutoCloseCase($caseId)
+{
+    $db = Database::getInstance();
+    $stmt = $db->prepare("SELECT status, is_completed, completion_date, settlement_confirmed, settlement_date, balance_amount, deal_amount, total_amount FROM cases WHERE id = ?");
+    $stmt->execute(array($caseId));
+    $c = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return false;
+    if ($c['status'] === 'closed') return false;
+    if ((int)$c['is_completed'] !== 1 || empty($c['completion_date'])) return false;
+    if ((int)$c['settlement_confirmed'] !== 1 || empty($c['settlement_date'])) return false;
+    $base = (int)$c['total_amount'] > 0 ? (int)$c['total_amount'] : (int)$c['deal_amount'];
+    if ($base <= 0) return false;
+    if ((int)$c['balance_amount'] !== 0) return false;
+    $l2 = $db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=2 AND status='approved'");
+    $l2->execute(array($caseId));
+    if ((int)$l2->fetchColumn() === 0) return false;
+
+    $db->prepare("UPDATE cases SET status = 'closed', sub_status = '已完工結案' WHERE id = ?")->execute(array($caseId));
+    return true;
+}

@@ -256,6 +256,8 @@ switch ($action) {
             if (isset($_POST['est_materials'])) {
                 $model->saveMaterialEstimates($id, $_POST['est_materials']);
             }
+            // 嘗試自動結案（手動編輯後若四項條件都到位）
+            tryAutoCloseCase($id);
             Session::flash('success', '案件已更新');
             redirect('/cases.php?action=view&id=' . $id);
         }

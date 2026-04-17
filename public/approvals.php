@@ -166,6 +166,8 @@ switch ($action) {
                         $compDate = $cdStmt->fetchColumn() ?: date('Y-m-d');
                         $db->prepare("UPDATE cases SET is_completed = 1, completion_date = ? WHERE id = ? AND (is_completed = 0 OR completion_date IS NULL)")
                            ->execute(array($compDate, $targetId));
+                        // 嘗試自動結案（若四項條件都到位）
+                        tryAutoCloseCase($targetId);
                     }
 
                     if ($advStatus === 'closed_blocked') {
