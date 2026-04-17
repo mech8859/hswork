@@ -215,7 +215,7 @@
                     <td style="padding:6px 8px">勾選「<strong>有無收款</strong>」<br><small style="color:#888">系統依 total_collected 自動帶值，可手改</small></td>
                     <td style="padding:6px 8px">
                         ✅ 勾「<strong>有收款</strong>」 → 通知 Level 3 會計<br>
-                        ❌ 不勾 → 案件狀態 = <strong style="color:#e65100">完工未收款 (unpaid)</strong>，<u>流程結束</u>
+                        ❌ 不勾 → 案件進度 = <strong style="color:#e65100">完工未收款 (unpaid)</strong>，<u>流程結束</u>
                     </td>
                 </tr>
                 <tr style="border-top:1px solid rgba(0,0,0,.08)">
@@ -224,7 +224,7 @@
                     <td style="padding:6px 8px">勾選「<strong>款項已入帳</strong>」<br><small style="color:#888">必勾才能核准</small></td>
                     <td style="padding:6px 8px">
                         系統檢查 <code>balance_amount === 0</code>：<br>
-                        ✅ 是 → 案件狀態 = <strong style="color:#2e7d32">已完工結案 (closed)</strong><br>
+                        ✅ 是 → 案件進度 = <strong style="color:#2e7d32">已完工結案 (closed)</strong><br>
                         ❌ 否 → 擋下並提示「尾款還有 $X，請先處理」
                     </td>
                 </tr>
