@@ -503,13 +503,16 @@ class QuotationModel
     public function getCaseOptions(array $branchIds)
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $excludeSubStatus = array('已報價無意願', '報價無下文', '無效', '客戶毀約');
+        $phSub = implode(',', array_fill(0, count($excludeSubStatus), '?'));
         $stmt = $this->db->prepare("
             SELECT id, case_number, title FROM cases
-            WHERE branch_id IN ($ph) AND status NOT IN ('completed','cancelled')
+            WHERE branch_id IN ($ph)
+              AND (sub_status IS NULL OR sub_status NOT IN ($phSub))
             ORDER BY id DESC
             LIMIT 200
         ");
-        $stmt->execute($branchIds);
+        $stmt->execute(array_merge($branchIds, $excludeSubStatus));
         return $stmt->fetchAll();
     }
 
