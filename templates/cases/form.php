@@ -3664,9 +3664,11 @@ function toggleNewCustomerBtn() {
     var sel = document.getElementById('subStatusSelect');
     var btn = document.getElementById('btnNewCustomer');
     var cidEl = document.getElementById('customerId');
+    var cnoEl = document.getElementById('customerNoDisplay');
     if (!sel || !btn) return;
     var sub = sel.value;
-    var hasCust = cidEl && cidEl.value;
+    // 客戶 id 或 客戶編號 任一有值就視為已關聯
+    var hasCust = (cidEl && cidEl.value) || (cnoEl && cnoEl.value);
     var needCust = _dealSubStatuses.indexOf(sub) !== -1 && !hasCust;
     btn.style.display = needCust ? '' : 'none';
     if (needCust) {
@@ -3694,7 +3696,8 @@ function toggleNewCustomerBtn() {
         if (!sel || !cidEl) return;
         var cur = sel.value;
         var orig = sel.getAttribute('data-original') || '';
-        var hasCust = cidEl.value;
+        var cnoEl2 = document.getElementById('customerNoDisplay');
+        var hasCust = cidEl.value || (cnoEl2 && cnoEl2.value);
         if (_dealSubStatuses.indexOf(cur) !== -1 && !hasCust && cur !== orig) {
             e.preventDefault();
             alert('狀態改為「' + cur + '」前，請先按「+ 新增客戶」建立客戶');
