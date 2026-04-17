@@ -62,6 +62,7 @@ $modules = array(
     'staff'                => array('label' => '人員管理',   'levels' => array('manage', 'view'), 'has_delete' => false),
     'staff_skills'         => array('label' => '技能與配對', 'levels' => array('manage', 'view'), 'has_delete' => false),
     'leaves'               => array('label' => '請假管理',   'levels' => array('manage', 'view', 'own'), 'has_delete' => true),
+    'overtime'             => array('label' => '加班單管理', 'levels' => array('manage', 'view', 'own'), 'has_delete' => false),
     'inter_branch'         => array('label' => '點工費',     'levels' => array('manage', 'view'), 'has_delete' => true),
     'reports'              => array('label' => '報表',       'levels' => array('view'), 'has_delete' => false),
     'products'             => array('label' => '產品目錄',   'levels' => array('manage', 'view'), 'has_delete' => true),
