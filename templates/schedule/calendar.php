@@ -629,7 +629,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 
 /* 桌面版行事曆 */
 .calendar-grid {
-    display: grid; grid-template-columns: repeat(7, 1fr);
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     border: 1px solid var(--gray-200); border-radius: var(--radius);
     background: #fff;
 }
@@ -641,6 +641,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 .cal-cell {
     min-height: 130px; padding: 4px; border-right: 1px solid var(--gray-200);
     border-bottom: 1px solid var(--gray-200); position: relative;
+    min-width: 0; overflow: hidden;
 }
 .cal-cell:nth-child(7n) { border-right: none; }
 .cal-empty { background: var(--gray-50); }
