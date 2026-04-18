@@ -392,17 +392,25 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <label>施工人數</label>
                 <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($quote['labor_people'] ?? '') ?>" min="0" oninput="autoCalcHours()">
             </div>
+            <?php
+            $_preLockHours = $isEdit && !empty($quote['labor_days']) && !empty($quote['labor_people']);
+            $_hoursReadonly = $_preLockHours ? 'readonly' : '';
+            $_hoursStyle = $_preLockHours ? 'background:#f5f5f5;cursor:not-allowed' : '';
+            ?>
             <div class="form-group">
-                <label>施工時數 <small style="color:#888;font-weight:normal">(自動=天數×人數×8，最低 1)</small></label>
-                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="1" oninput="laborHoursManual=true;recalcLaborCost()">
+                <label>施工時數</label>
+                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="1" oninput="recalcLaborCost()" <?= $_hoursReadonly ?> style="<?= $_hoursStyle ?>">
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">單人工時，天數×8（天數+人數都填時鎖定）</small>
             </div>
             <div class="form-group">
-                <label>人力成本 <small style="color:#888;font-weight:normal">(自動=時數×$<?= $_qfHourly ?>)</small></label>
+                <label>人力成本</label>
                 <input type="number" name="labor_cost_total" id="laborCostTotal" class="form-control" value="<?= e($quote['labor_cost_total'] ?? '') ?>" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">人數×時數×$<?= $_qfHourly ?></small>
             </div>
             <div class="form-group">
-                <label>線材成本 <small style="color:#888;font-weight:normal">(由預估線材帶入)</small></label>
+                <label>線材成本</label>
                 <input type="number" name="cable_cost" id="cableCost" class="form-control" value="<?= e($quote['cable_cost'] ?? '') ?>" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">由預估線材帶入</small>
             </div>
         </div>
         <div class="form-row" style="margin-top:4px">
@@ -1090,13 +1098,14 @@ document.addEventListener('click', function(e) {
 // 人力時薪（由系統設定帶入）
 var laborHourlyCost = <?= isset($_qfHourly) ? (int)$_qfHourly : 560 ?>;
 
-// 人力成本自動計算：時數 × 時薪
+// 人力成本自動計算：人數 × 時數 × 時薪（時數為單人工時）
 function recalcLaborCost() {
     var costEl = document.getElementById('laborCostTotal');
     if (!costEl) return;
     var hours = parseFloat(document.getElementById('laborHours').value) || 0;
+    var people = parseFloat(document.getElementById('laborPeople').value) || 0;
     if (hours > 0 && hours < 1) hours = 1;
-    var cost = hours > 0 ? Math.round(hours * laborHourlyCost) : 0;
+    var cost = (hours > 0 && people > 0) ? Math.round(people * hours * laborHourlyCost) : 0;
     costEl.value = cost || '';
     calcGrandTotal();
 }
@@ -1136,18 +1145,25 @@ if (document.getElementById('discountAmount')) {
     document.getElementById('discountAmount').addEventListener('input', calcGrandTotal);
 }
 
-// 施工時數自動計算（天數 × 人數 × 8，最低 1）
-var laborHoursManual = false;
+// 施工時數自動計算（天數 × 8 = 單人工時，最低 1）
+// 當天數 + 人數都有值 → 時數自動、鎖定不可修改
+// 只填人數時 → 時數可手動輸入
 function autoCalcHours() {
     var days = parseFloat(document.getElementById('laborDays').value) || 0;
     var people = parseFloat(document.getElementById('laborPeople').value) || 0;
     var hoursInput = document.getElementById('laborHours');
-    if (!laborHoursManual) {
-        if (days > 0 && people > 0) {
-            var h = days * people * 8;
-            if (h < 1) h = 1;
-            hoursInput.value = h;
-        } else if (days === 0 && people === 0) {
+    if (days > 0 && people > 0) {
+        var h = days * 8;
+        if (h < 1) h = 1;
+        hoursInput.value = h;
+        hoursInput.readOnly = true;
+        hoursInput.style.background = '#f5f5f5';
+        hoursInput.style.cursor = 'not-allowed';
+    } else {
+        hoursInput.readOnly = false;
+        hoursInput.style.background = '';
+        hoursInput.style.cursor = '';
+        if (days === 0 && people === 0) {
             hoursInput.value = '';
         }
     }

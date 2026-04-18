@@ -308,19 +308,19 @@ if ($canManage && !empty($quote['case_id'])) {
     $viewMaterialCost = (int)$quote['total_cost'] - $viewLaborCost - (int)($quote['cable_cost'] ?: 0);
     ?>
     <?php
-    // 即時計算施工時數與人力成本（若DB未存但有天數人數）
+    // 即時計算施工時數與人力成本（時數=單人工時，成本=人數×時數×時薪）
     $viewDays = (float)($quote['labor_days'] ?: 0);
     $viewPeople = (int)($quote['labor_people'] ?: 0);
     $viewHours = (float)($quote['labor_hours'] ?: 0);
     if (!$viewHours && $viewDays > 0 && $viewPeople > 0) {
-        $viewHours = $viewDays * $viewPeople * 8;
+        $viewHours = $viewDays * 8;
     }
-    if ($viewLaborCost == 0 && $viewHours > 0) {
+    if ($viewLaborCost == 0 && $viewHours > 0 && $viewPeople > 0) {
         $hrStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
         $hrStmt->execute();
         $hrVal = $hrStmt->fetchColumn();
         $viewHourlyCost = ($hrVal !== false && $hrVal !== null) ? (int)$hrVal : 560;
-        $viewLaborCost = (int)round($viewHours * $viewHourlyCost);
+        $viewLaborCost = (int)round($viewPeople * $viewHours * $viewHourlyCost);
     }
     // 營運成本
     $_vOpModeStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");

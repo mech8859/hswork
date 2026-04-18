@@ -228,21 +228,21 @@ class QuotationModel
         $people = !empty($data['labor_people']) ? (int)$data['labor_people'] : null;
         $hours  = !empty($data['labor_hours']) ? (float)$data['labor_hours'] : null;
 
-        // 自動算施工時數（天數 × 人數 × 8），若使用者未手動填
-        if (!$hours && $days && $people) {
-            $hours = $days * $people * 8;
+        // 時數為單人工時；若有填天數+人數則強制 hours = days × 8（忽略送來的 hours）
+        if ($days && $people) {
+            $hours = $days * 8;
         }
-        // 施工時數最低 1（有天數或人數時）
+        // 施工時數最低 1
         if ($hours !== null && $hours > 0 && $hours < 1) {
             $hours = 1;
         }
-        // 人力成本一律 = 時數 × 時薪（禁止手動輸入）
+        // 人力成本一律 = 人數 × 時數 × 時薪（禁止手動輸入）
         $laborCost = null;
-        if ($hours) {
+        if ($hours && $people) {
             $hrStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
             $hrStmt->execute();
             $hourlyCost = (int)$hrStmt->fetchColumn() ?: 560;
-            $laborCost = (int)round($hours * $hourlyCost);
+            $laborCost = (int)round($people * $hours * $hourlyCost);
         }
 
         // cable_not_used：有勾選 → 線材成本 0；無連結案件 → 視為 0

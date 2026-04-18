@@ -1964,7 +1964,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <thead>
                     <tr>
                         <th style="min-width:140px">項目</th>
-                        <th style="width:160px;text-align:right">報價預估</th>
+                        <th style="width:160px;text-align:right">報價金額</th>
                         <th style="width:160px;text-align:right">實際數據</th>
                         <th style="width:120px;text-align:right">差異</th>
                     </tr>
@@ -1972,7 +1972,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <tbody>
                     <tr class="profit-row-highlight">
                         <td><strong>成交金額</strong></td>
-                        <td class="text-right" colspan="3"><strong>$<?= number_format($_deal) ?></strong></td>
+                        <td class="text-right"><strong>$<?= number_format($_deal) ?></strong></td>
+                        <td class="text-right"><span class="text-muted">-</span></td>
+                        <td class="text-right"><span class="text-muted">-</span></td>
                     </tr>
                     <tr>
                         <td>器材成本</td>
