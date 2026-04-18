@@ -94,6 +94,160 @@
     </div>
 </div>
 
+<!-- 銷項發票聯式彙總 -->
+<?php
+$_sfLabels = array(
+    '31' => '31：銷項三聯式、電子計算機統一發票',
+    '32' => '32：銷項二聯式、二聯式收銀機統一發票',
+    '33' => '33：三聯式銷貨退回或折讓證明單',
+    '34' => '34：二聯式銷貨退回或折讓證明單',
+    '35' => '35：銷項三聯式收銀機統一發票、電子發票',
+);
+$_sfStats = array();
+foreach ($_sfLabels as $_k => $_v) {
+    $_sfStats[$_k] = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+}
+$_sfOther = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+foreach ($salesDetail as $_r) {
+    if ($_r['status'] === 'voided') continue;
+    $_fmt = !empty($_r['invoice_format']) ? $_r['invoice_format'] : '';
+    $_target = isset($_sfStats[$_fmt]) ? $_sfStats[$_fmt] : $_sfOther;
+    $_target['count']   += 1;
+    $_target['untaxed'] += (int)$_r['amount_untaxed'];
+    $_target['tax']     += (int)$_r['tax_amount'];
+    $_target['total']   += (int)$_r['total_amount'];
+    if (isset($_sfStats[$_fmt])) { $_sfStats[$_fmt] = $_target; } else { $_sfOther = $_target; }
+}
+$_sfTot = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+foreach ($_sfStats as $s) { $_sfTot['count']+=$s['count']; $_sfTot['untaxed']+=$s['untaxed']; $_sfTot['tax']+=$s['tax']; $_sfTot['total']+=$s['total']; }
+$_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; $_sfTot['tax']+=$_sfOther['tax']; $_sfTot['total']+=$_sfOther['total'];
+?>
+<div class="card mt-2">
+    <div class="card-header">銷項發票聯式彙總（不含作廢）</div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:80px">代碼</th>
+                    <th>說明</th>
+                    <th class="text-right" style="width:80px">張數</th>
+                    <th class="text-right">未稅金額</th>
+                    <th class="text-right">稅額</th>
+                    <th class="text-right">含稅金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($_sfStats as $_k => $_s): ?>
+                <tr<?= $_s['count'] === 0 ? ' style="color:#bbb"' : '' ?>>
+                    <td><strong><?= e($_k) ?></strong></td>
+                    <td><?= e($_sfLabels[$_k]) ?></td>
+                    <td class="text-right"><?= number_format($_s['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_s['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--danger)">$<?= number_format($_s['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_s['total']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if ($_sfOther['count'] > 0): ?>
+                <tr>
+                    <td><strong>-</strong></td>
+                    <td style="color:#888">未標註聯式</td>
+                    <td class="text-right"><?= number_format($_sfOther['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_sfOther['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--danger)">$<?= number_format($_sfOther['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_sfOther['total']) ?></td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600;background:var(--gray-50,#f8f9fa)">
+                    <td colspan="2">合計</td>
+                    <td class="text-right"><?= number_format($_sfTot['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_sfTot['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--danger)">$<?= number_format($_sfTot['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_sfTot['total']) ?></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- 進項發票聯式彙總 -->
+<?php
+$_pfLabels = array(
+    '21' => '21：進項三聯式、電子計算機統一發票',
+    '22' => '22：進項二聯式收銀機統一發票、載有稅額之其他憑證',
+    '23' => '23：三聯式進貨退出或折讓證明單',
+    '24' => '24：二聯式進貨退出或折讓證明單',
+    '25' => '25：進項三聯式收銀機統一發票、公用事業憑證',
+);
+$_pfStats = array();
+foreach ($_pfLabels as $_k => $_v) {
+    $_pfStats[$_k] = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+}
+$_pfOther = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+foreach ($purchaseDetail as $_r) {
+    if ($_r['status'] === 'voided') continue;
+    $_fmt = !empty($_r['invoice_format']) ? $_r['invoice_format'] : '';
+    $_target = isset($_pfStats[$_fmt]) ? $_pfStats[$_fmt] : $_pfOther;
+    $_target['count']   += 1;
+    $_target['untaxed'] += (int)$_r['amount_untaxed'];
+    $_target['tax']     += (int)$_r['tax_amount'];
+    $_target['total']   += (int)$_r['total_amount'];
+    if (isset($_pfStats[$_fmt])) { $_pfStats[$_fmt] = $_target; } else { $_pfOther = $_target; }
+}
+$_pfTot = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+foreach ($_pfStats as $s) { $_pfTot['count']+=$s['count']; $_pfTot['untaxed']+=$s['untaxed']; $_pfTot['tax']+=$s['tax']; $_pfTot['total']+=$s['total']; }
+$_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; $_pfTot['tax']+=$_pfOther['tax']; $_pfTot['total']+=$_pfOther['total'];
+?>
+<div class="card mt-2">
+    <div class="card-header">進項發票聯式彙總（不含作廢）</div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:80px">代碼</th>
+                    <th>說明</th>
+                    <th class="text-right" style="width:80px">張數</th>
+                    <th class="text-right">未稅金額</th>
+                    <th class="text-right">稅額</th>
+                    <th class="text-right">含稅金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($_pfStats as $_k => $_s): ?>
+                <tr<?= $_s['count'] === 0 ? ' style="color:#bbb"' : '' ?>>
+                    <td><strong><?= e($_k) ?></strong></td>
+                    <td><?= e($_pfLabels[$_k]) ?></td>
+                    <td class="text-right"><?= number_format($_s['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_s['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--success)">$<?= number_format($_s['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_s['total']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if ($_pfOther['count'] > 0): ?>
+                <tr>
+                    <td><strong>-</strong></td>
+                    <td style="color:#888">未標註聯式</td>
+                    <td class="text-right"><?= number_format($_pfOther['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_pfOther['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--success)">$<?= number_format($_pfOther['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_pfOther['total']) ?></td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600;background:var(--gray-50,#f8f9fa)">
+                    <td colspan="2">合計</td>
+                    <td class="text-right"><?= number_format($_pfTot['count']) ?></td>
+                    <td class="text-right">$<?= number_format($_pfTot['untaxed']) ?></td>
+                    <td class="text-right" style="color:var(--success)">$<?= number_format($_pfTot['tax']) ?></td>
+                    <td class="text-right">$<?= number_format($_pfTot['total']) ?></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
 <!-- 銷項明細 -->
 <div class="card mt-2">
     <div class="card-header d-flex justify-between align-center">
