@@ -1,0 +1,3218 @@
+[
+  {
+    "invoice_number": "XK45063451",
+    "tax_id": "97168264",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 1500,
+    "tax_amount": 75,
+    "total_amount": 1575
+  },
+  {
+    "invoice_number": "WX28909099",
+    "tax_id": "39725951",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 6813,
+    "tax_amount": 342,
+    "total_amount": 7155
+  },
+  {
+    "invoice_number": "UV49146862",
+    "tax_id": "23060541",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 12947,
+    "tax_amount": 647,
+    "total_amount": 13594
+  },
+  {
+    "invoice_number": "VW60414941",
+    "tax_id": "28527455",
+    "invoice_date": "2026-02-01",
+    "amount_untaxed": 789,
+    "tax_amount": 39,
+    "total_amount": 828
+  },
+  {
+    "invoice_number": "VW55983173",
+    "tax_id": "17563448",
+    "invoice_date": "2026-02-07",
+    "amount_untaxed": 4034,
+    "tax_amount": 202,
+    "total_amount": 4236
+  },
+  {
+    "invoice_number": "WH73242928",
+    "tax_id": "96977225",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 4276,
+    "tax_amount": 214,
+    "total_amount": 4490
+  },
+  {
+    "invoice_number": "WE59504055",
+    "tax_id": "28979128",
+    "invoice_date": "2026-01-04",
+    "amount_untaxed": 1466,
+    "tax_amount": 73,
+    "total_amount": 1539
+  },
+  {
+    "invoice_number": "WF59337582",
+    "tax_id": "90269787",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 299,
+    "tax_amount": 15,
+    "total_amount": 314
+  },
+  {
+    "invoice_number": "WH27214623",
+    "tax_id": "39912526",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 14181,
+    "tax_amount": 709,
+    "total_amount": 14890
+  },
+  {
+    "invoice_number": "WH27210167",
+    "tax_id": "39912526",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 10370,
+    "tax_amount": 519,
+    "total_amount": 10889
+  },
+  {
+    "invoice_number": "XH56670816",
+    "tax_id": "52676779",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 490,
+    "tax_amount": 25,
+    "total_amount": 515
+  },
+  {
+    "invoice_number": "WE59400652",
+    "tax_id": "28980188",
+    "invoice_date": "2026-01-10",
+    "amount_untaxed": 5512,
+    "tax_amount": 276,
+    "total_amount": 5788
+  },
+  {
+    "invoice_number": "XF56447832",
+    "tax_id": "59165371",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 1882,
+    "tax_amount": 94,
+    "total_amount": 1976
+  },
+  {
+    "invoice_number": "XH61163165",
+    "tax_id": "94545194",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 711,
+    "tax_amount": 36,
+    "total_amount": 747
+  },
+  {
+    "invoice_number": "XH65136429",
+    "tax_id": "93094376",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 405,
+    "tax_amount": 20,
+    "total_amount": 425
+  },
+  {
+    "invoice_number": "WW23606294",
+    "tax_id": "24209177",
+    "invoice_date": "2026-01-14",
+    "amount_untaxed": 1389,
+    "tax_amount": 69,
+    "total_amount": 1458
+  },
+  {
+    "invoice_number": "XF05429445",
+    "tax_id": "82541692",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 436,
+    "tax_amount": 22,
+    "total_amount": 458
+  },
+  {
+    "invoice_number": "WX93761342",
+    "tax_id": "52676588",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 40476,
+    "tax_amount": 2024,
+    "total_amount": 42500
+  },
+  {
+    "invoice_number": "XE12425191",
+    "tax_id": "27359705",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 21500,
+    "tax_amount": 1075,
+    "total_amount": 22575
+  },
+  {
+    "invoice_number": "XG57886719",
+    "tax_id": "54262450",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 505,
+    "tax_amount": 25,
+    "total_amount": 530
+  },
+  {
+    "invoice_number": "XH47363211",
+    "tax_id": "77214070",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 248,
+    "tax_amount": 12,
+    "total_amount": 260
+  },
+  {
+    "invoice_number": "XE96983071",
+    "tax_id": "80139929",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 16667,
+    "tax_amount": 833,
+    "total_amount": 17500
+  },
+  {
+    "invoice_number": "XD63631503",
+    "tax_id": "04861064",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 952,
+    "tax_amount": 48,
+    "total_amount": 1000
+  },
+  {
+    "invoice_number": "WW99535245",
+    "tax_id": "28985487",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 228,
+    "tax_amount": 11,
+    "total_amount": 239
+  },
+  {
+    "invoice_number": "WV97308840",
+    "tax_id": "08297510",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 5948,
+    "tax_amount": 297,
+    "total_amount": 6245
+  },
+  {
+    "invoice_number": "VL54837371",
+    "tax_id": "42894662",
+    "invoice_date": "2025-11-27",
+    "amount_untaxed": 343,
+    "tax_amount": 17,
+    "total_amount": 360
+  },
+  {
+    "invoice_number": "WJ62322578",
+    "tax_id": "55294205",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 143,
+    "tax_amount": 7,
+    "total_amount": 150
+  },
+  {
+    "invoice_number": "XC78104083",
+    "tax_id": "82983063",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 229,
+    "tax_amount": 11,
+    "total_amount": 240
+  },
+  {
+    "invoice_number": "WE76382915",
+    "tax_id": "20322275",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 9235,
+    "tax_amount": 462,
+    "total_amount": 9697
+  },
+  {
+    "invoice_number": "WW23612446",
+    "tax_id": "24209177",
+    "invoice_date": "2026-01-31",
+    "amount_untaxed": 270,
+    "tax_amount": 14,
+    "total_amount": 284
+  },
+  {
+    "invoice_number": "WE59416802",
+    "tax_id": "53013948",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 500,
+    "tax_amount": 25,
+    "total_amount": 525
+  },
+  {
+    "invoice_number": "XF33015848",
+    "tax_id": "90354799",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 580,
+    "tax_amount": 29,
+    "total_amount": 609
+  },
+  {
+    "invoice_number": "XH43801933",
+    "tax_id": "90500033",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 124,
+    "tax_amount": 6,
+    "total_amount": 130
+  },
+  {
+    "invoice_number": "WE04371288",
+    "tax_id": "55025005",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 190,
+    "tax_amount": 10,
+    "total_amount": 200
+  },
+  {
+    "invoice_number": "XF73659393",
+    "tax_id": "90617667",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 788,
+    "tax_amount": 39,
+    "total_amount": 827
+  },
+  {
+    "invoice_number": "XG05789094",
+    "tax_id": "90804649",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 390,
+    "tax_amount": 20,
+    "total_amount": 410
+  },
+  {
+    "invoice_number": "WA57919809",
+    "tax_id": "53016945",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 313,
+    "tax_amount": 16,
+    "total_amount": 329
+  },
+  {
+    "invoice_number": "WW87472945",
+    "tax_id": "28483484",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 119,
+    "tax_amount": 6,
+    "total_amount": 125
+  },
+  {
+    "invoice_number": "WJ03370150",
+    "tax_id": "42680063",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 103,
+    "tax_amount": 5,
+    "total_amount": 108
+  },
+  {
+    "invoice_number": "WE76383913",
+    "tax_id": "20322275",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 6655,
+    "tax_amount": 333,
+    "total_amount": 6988
+  },
+  {
+    "invoice_number": "XF33019119",
+    "tax_id": "90354799",
+    "invoice_date": "2026-02-13",
+    "amount_untaxed": 450,
+    "tax_amount": 23,
+    "total_amount": 473
+  },
+  {
+    "invoice_number": "XK26828656",
+    "tax_id": "28639682",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 75200,
+    "tax_amount": 3760,
+    "total_amount": 78960
+  },
+  {
+    "invoice_number": "XF33022923",
+    "tax_id": "90354799",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 438,
+    "tax_amount": 22,
+    "total_amount": 460
+  },
+  {
+    "invoice_number": "WJ03725993",
+    "tax_id": "42679468",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 148,
+    "tax_amount": 7,
+    "total_amount": 155
+  },
+  {
+    "invoice_number": "WJ03729220",
+    "tax_id": "42679468",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 86,
+    "tax_amount": 4,
+    "total_amount": 90
+  },
+  {
+    "invoice_number": "WJ03858445",
+    "tax_id": "85053745",
+    "invoice_date": "2026-01-25",
+    "amount_untaxed": 782,
+    "tax_amount": 39,
+    "total_amount": 821
+  },
+  {
+    "invoice_number": "XK26828289",
+    "tax_id": "28639682",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 111000,
+    "tax_amount": 5550,
+    "total_amount": 116550
+  },
+  {
+    "invoice_number": "WJ03312100",
+    "tax_id": "42679158",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 537,
+    "tax_amount": 27,
+    "total_amount": 564
+  },
+  {
+    "invoice_number": "WF52654916",
+    "tax_id": "72573836",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 1562,
+    "tax_amount": 78,
+    "total_amount": 1640
+  },
+  {
+    "invoice_number": "XA06166415",
+    "tax_id": "82544614",
+    "invoice_date": "2026-02-26",
+    "amount_untaxed": 858,
+    "tax_amount": 42,
+    "total_amount": 900
+  },
+  {
+    "invoice_number": "WW91463302",
+    "tax_id": "28730393",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 4045,
+    "tax_amount": 202,
+    "total_amount": 4247
+  },
+  {
+    "invoice_number": "WW02271585",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 15500,
+    "tax_amount": 775,
+    "total_amount": 16275
+  },
+  {
+    "invoice_number": "VU14558652",
+    "tax_id": "28572520",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 19200,
+    "tax_amount": 960,
+    "total_amount": 20160
+  },
+  {
+    "invoice_number": "WW02272551",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 44100,
+    "tax_amount": 2205,
+    "total_amount": 46305
+  },
+  {
+    "invoice_number": "VU15684150",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 1360,
+    "tax_amount": 68,
+    "total_amount": 1428
+  },
+  {
+    "invoice_number": "WW02272578",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 31500,
+    "tax_amount": 1575,
+    "total_amount": 33075
+  },
+  {
+    "invoice_number": "VU10593321",
+    "tax_id": "90374198",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 74365,
+    "tax_amount": 3718,
+    "total_amount": 78083
+  },
+  {
+    "invoice_number": "WW02273367",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 25700,
+    "tax_amount": 1285,
+    "total_amount": 26985
+  },
+  {
+    "invoice_number": "VU15684192",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 3177,
+    "tax_amount": 159,
+    "total_amount": 3336
+  },
+  {
+    "invoice_number": "WW02273637",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 54950,
+    "tax_amount": 2748,
+    "total_amount": 57698
+  },
+  {
+    "invoice_number": "VU15684200",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-31",
+    "amount_untaxed": 2393,
+    "tax_amount": 120,
+    "total_amount": 2513
+  },
+  {
+    "invoice_number": "WW02273648",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 15000,
+    "tax_amount": 750,
+    "total_amount": 15750
+  },
+  {
+    "invoice_number": "VU15570520",
+    "tax_id": "20313058",
+    "invoice_date": "2026-02-01",
+    "amount_untaxed": 799,
+    "tax_amount": 40,
+    "total_amount": 839
+  },
+  {
+    "invoice_number": "WW02277009",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 52200,
+    "tax_amount": 2610,
+    "total_amount": 54810
+  },
+  {
+    "invoice_number": "VU15684716",
+    "tax_id": "78165479",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 4586,
+    "tax_amount": 229,
+    "total_amount": 4815
+  },
+  {
+    "invoice_number": "WW02277931",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 3420,
+    "tax_amount": 171,
+    "total_amount": 3591
+  },
+  {
+    "invoice_number": "VU15708847",
+    "tax_id": "58493404",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 710,
+    "tax_amount": 35,
+    "total_amount": 745
+  },
+  {
+    "invoice_number": "WW02278091",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 20600,
+    "tax_amount": 1030,
+    "total_amount": 21630
+  },
+  {
+    "invoice_number": "VU14861310",
+    "tax_id": "40285100",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 650,
+    "tax_amount": 33,
+    "total_amount": 683
+  },
+  {
+    "invoice_number": "WW02278387",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 35600,
+    "tax_amount": 1780,
+    "total_amount": 37380
+  },
+  {
+    "invoice_number": "VU14861305",
+    "tax_id": "40285100",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 1212,
+    "tax_amount": 61,
+    "total_amount": 1273
+  },
+  {
+    "invoice_number": "WW02278411",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 8250,
+    "tax_amount": 413,
+    "total_amount": 8663
+  },
+  {
+    "invoice_number": "VU15684314",
+    "tax_id": "78165479",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 529,
+    "tax_amount": 26,
+    "total_amount": 555
+  },
+  {
+    "invoice_number": "WW02281362",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 7200,
+    "tax_amount": 360,
+    "total_amount": 7560
+  },
+  {
+    "invoice_number": "VU21324629",
+    "tax_id": "97874541",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 7196,
+    "tax_amount": 360,
+    "total_amount": 7556
+  },
+  {
+    "invoice_number": "WW02281372",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 6600,
+    "tax_amount": 330,
+    "total_amount": 6930
+  },
+  {
+    "invoice_number": "VU20162273",
+    "tax_id": "25023310",
+    "invoice_date": "2026-02-13",
+    "amount_untaxed": 27400,
+    "tax_amount": 1370,
+    "total_amount": 28770
+  },
+  {
+    "invoice_number": "WW02281445",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 21780,
+    "tax_amount": 1089,
+    "total_amount": 22869
+  },
+  {
+    "invoice_number": "VU15684342",
+    "tax_id": "78165479",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 700,
+    "tax_amount": 35,
+    "total_amount": 735
+  },
+  {
+    "invoice_number": "WW02283203",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 8700,
+    "tax_amount": 435,
+    "total_amount": 9135
+  },
+  {
+    "invoice_number": "VU15684353",
+    "tax_id": "78165479",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 1190,
+    "tax_amount": 60,
+    "total_amount": 1250
+  },
+  {
+    "invoice_number": "WW02283284",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 18000,
+    "tax_amount": 900,
+    "total_amount": 18900
+  },
+  {
+    "invoice_number": "VU10593406",
+    "tax_id": "90374198",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 77722,
+    "tax_amount": 3886,
+    "total_amount": 81608
+  },
+  {
+    "invoice_number": "WW02283419",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 5400,
+    "tax_amount": 270,
+    "total_amount": 5670
+  },
+  {
+    "invoice_number": "VU16060431",
+    "tax_id": "05807932",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 28991,
+    "tax_amount": 1450,
+    "total_amount": 30441
+  },
+  {
+    "invoice_number": "WW02284236",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 7050,
+    "tax_amount": 353,
+    "total_amount": 7403
+  },
+  {
+    "invoice_number": "VU21324648",
+    "tax_id": "97874541",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 15110,
+    "tax_amount": 756,
+    "total_amount": 15866
+  },
+  {
+    "invoice_number": "WW02286017",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 14700,
+    "tax_amount": 735,
+    "total_amount": 15435
+  },
+  {
+    "invoice_number": "VU15708984",
+    "tax_id": "58493404",
+    "invoice_date": "2026-02-26",
+    "amount_untaxed": 190,
+    "tax_amount": 9,
+    "total_amount": 199
+  },
+  {
+    "invoice_number": "WW02286112",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 24450,
+    "tax_amount": 1223,
+    "total_amount": 25673
+  },
+  {
+    "invoice_number": "VU15517005",
+    "tax_id": "61146392",
+    "invoice_date": "2026-02-27",
+    "amount_untaxed": 19340,
+    "tax_amount": 967,
+    "total_amount": 20307
+  },
+  {
+    "invoice_number": "WW02288096",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 12600,
+    "tax_amount": 630,
+    "total_amount": 13230
+  },
+  {
+    "invoice_number": "VU15684806",
+    "tax_id": "78165479",
+    "invoice_date": "2026-02-28",
+    "amount_untaxed": 2100,
+    "tax_amount": 105,
+    "total_amount": 2205
+  },
+  {
+    "invoice_number": "WW02288626",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 12600,
+    "tax_amount": 630,
+    "total_amount": 13230
+  },
+  {
+    "invoice_number": "XE35901311",
+    "tax_id": "06211798",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 57600,
+    "tax_amount": 2880,
+    "total_amount": 60480
+  },
+  {
+    "invoice_number": "WW02288961",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 11950,
+    "tax_amount": 598,
+    "total_amount": 12548
+  },
+  {
+    "invoice_number": "BB32605728",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 1094,
+    "tax_amount": 55,
+    "total_amount": 1149
+  },
+  {
+    "invoice_number": "WW02289957",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 39450,
+    "tax_amount": 1973,
+    "total_amount": 41423
+  },
+  {
+    "invoice_number": "WA64071687",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 190,
+    "tax_amount": 9,
+    "total_amount": 199
+  },
+  {
+    "invoice_number": "WW02289974",
+    "tax_id": "23134543",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 24200,
+    "tax_amount": 1210,
+    "total_amount": 25410
+  },
+  {
+    "invoice_number": "WA64072058",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 385,
+    "tax_amount": 19,
+    "total_amount": 404
+  },
+  {
+    "invoice_number": "WW02296208",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 62300,
+    "tax_amount": 3115,
+    "total_amount": 65415
+  },
+  {
+    "invoice_number": "WA64069047",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 461,
+    "tax_amount": 23,
+    "total_amount": 484
+  },
+  {
+    "invoice_number": "WW02296587",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 58500,
+    "tax_amount": 2925,
+    "total_amount": 61425
+  },
+  {
+    "invoice_number": "WA64071522",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 3467,
+    "tax_amount": 173,
+    "total_amount": 3640
+  },
+  {
+    "invoice_number": "WW02296589",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 7100,
+    "tax_amount": 355,
+    "total_amount": 7455
+  },
+  {
+    "invoice_number": "WE22271121",
+    "tax_id": "58800108",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 544,
+    "tax_amount": 27,
+    "total_amount": 571
+  },
+  {
+    "invoice_number": "WW02298591",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 22370,
+    "tax_amount": 1119,
+    "total_amount": 23489
+  },
+  {
+    "invoice_number": "WA64071775",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 2378,
+    "tax_amount": 119,
+    "total_amount": 2497
+  },
+  {
+    "invoice_number": "WW02299657",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-06",
+    "amount_untaxed": 10200,
+    "tax_amount": 510,
+    "total_amount": 10710
+  },
+  {
+    "invoice_number": "WA64071716",
+    "tax_id": "52003801",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 1094,
+    "tax_amount": 55,
+    "total_amount": 1149
+  },
+  {
+    "invoice_number": "WW02299833",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-06",
+    "amount_untaxed": 9900,
+    "tax_amount": 495,
+    "total_amount": 10395
+  },
+  {
+    "invoice_number": "WA64287519",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 190,
+    "tax_amount": 10,
+    "total_amount": 200
+  },
+  {
+    "invoice_number": "WW02300168",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-06",
+    "amount_untaxed": 9300,
+    "tax_amount": 465,
+    "total_amount": 9765
+  },
+  {
+    "invoice_number": "WA64293243",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 1094,
+    "tax_amount": 55,
+    "total_amount": 1149
+  },
+  {
+    "invoice_number": "WW02301110",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 17000,
+    "tax_amount": 850,
+    "total_amount": 17850
+  },
+  {
+    "invoice_number": "WA64288154",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 410,
+    "tax_amount": 20,
+    "total_amount": 430
+  },
+  {
+    "invoice_number": "WW02301705",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 14100,
+    "tax_amount": 705,
+    "total_amount": 14805
+  },
+  {
+    "invoice_number": "WA64285387",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 446,
+    "tax_amount": 22,
+    "total_amount": 468
+  },
+  {
+    "invoice_number": "WW02302539",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 33950,
+    "tax_amount": 1698,
+    "total_amount": 35648
+  },
+  {
+    "invoice_number": "WA64287223",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 1567,
+    "tax_amount": 78,
+    "total_amount": 1645
+  },
+  {
+    "invoice_number": "WW02302680",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 8400,
+    "tax_amount": 420,
+    "total_amount": 8820
+  },
+  {
+    "invoice_number": "WE22331020",
+    "tax_id": "58800108",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 573,
+    "tax_amount": 29,
+    "total_amount": 602
+  },
+  {
+    "invoice_number": "WW02304147",
+    "tax_id": "23134543",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 10100,
+    "tax_amount": 505,
+    "total_amount": 10605
+  },
+  {
+    "invoice_number": "WA64287585",
+    "tax_id": "52003801",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 2378,
+    "tax_amount": 119,
+    "total_amount": 2497
+  },
+  {
+    "invoice_number": "TU78165479",
+    "tax_id": "78165479",
+    "invoice_date": "2025-12-31",
+    "amount_untaxed": 505,
+    "tax_amount": 25,
+    "total_amount": 530
+  },
+  {
+    "invoice_number": "VU15684005",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 1334,
+    "tax_amount": 67,
+    "total_amount": 1401
+  },
+  {
+    "invoice_number": "VU15684025",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 7383,
+    "tax_amount": 369,
+    "total_amount": 7752
+  },
+  {
+    "invoice_number": "VU15594831",
+    "tax_id": "17800667",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 4500,
+    "tax_amount": 225,
+    "total_amount": 4725
+  },
+  {
+    "invoice_number": "VU14857950",
+    "tax_id": "40285100",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 150,
+    "tax_amount": 8,
+    "total_amount": 158
+  },
+  {
+    "invoice_number": "VU14857929",
+    "tax_id": "40285100",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 2882,
+    "tax_amount": 144,
+    "total_amount": 3026
+  },
+  {
+    "invoice_number": "VU21134917",
+    "tax_id": "97184807",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 56250,
+    "tax_amount": 2813,
+    "total_amount": 59063
+  },
+  {
+    "invoice_number": "VU15684078",
+    "tax_id": "78165479",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 5714,
+    "tax_amount": 286,
+    "total_amount": 6000
+  },
+  {
+    "invoice_number": "VU16135235",
+    "tax_id": "27650033",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 1484,
+    "tax_amount": 74,
+    "total_amount": 1558
+  },
+  {
+    "invoice_number": "VU20160067",
+    "tax_id": "25023310",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 450,
+    "tax_amount": 23,
+    "total_amount": 473
+  },
+  {
+    "invoice_number": "VU21084303",
+    "tax_id": "27462428",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 27000,
+    "tax_amount": 1350,
+    "total_amount": 28350
+  },
+  {
+    "invoice_number": "VU16060197",
+    "tax_id": "05807932",
+    "invoice_date": "2026-01-24",
+    "amount_untaxed": 20301,
+    "tax_amount": 1015,
+    "total_amount": 21316
+  },
+  {
+    "invoice_number": "VU15516740",
+    "tax_id": "61146392",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 50267,
+    "tax_amount": 2513,
+    "total_amount": 52780
+  },
+  {
+    "invoice_number": "WE59055392",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 34203,
+    "tax_amount": 1710,
+    "total_amount": 35913
+  },
+  {
+    "invoice_number": "WE59055777",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 25200,
+    "tax_amount": 1260,
+    "total_amount": 26460
+  },
+  {
+    "invoice_number": "WE59055853",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 24000,
+    "tax_amount": 1200,
+    "total_amount": 25200
+  },
+  {
+    "invoice_number": "WE59056168",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 29680,
+    "tax_amount": 1484,
+    "total_amount": 31164
+  },
+  {
+    "invoice_number": "WE59056361",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 18350,
+    "tax_amount": 918,
+    "total_amount": 19268
+  },
+  {
+    "invoice_number": "WE59056883",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 8260,
+    "tax_amount": 413,
+    "total_amount": 8673
+  },
+  {
+    "invoice_number": "WE59056986",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 6500,
+    "tax_amount": 325,
+    "total_amount": 6825
+  },
+  {
+    "invoice_number": "WE59057187",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 25357,
+    "tax_amount": 1268,
+    "total_amount": 26625
+  },
+  {
+    "invoice_number": "WE59057474",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 15085,
+    "tax_amount": 754,
+    "total_amount": 15839
+  },
+  {
+    "invoice_number": "WE59057481",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 292790,
+    "tax_amount": 14640,
+    "total_amount": 307430
+  },
+  {
+    "invoice_number": "WE59057535",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 12061,
+    "tax_amount": 603,
+    "total_amount": 12664
+  },
+  {
+    "invoice_number": "WE59057958",
+    "tax_id": "86683947",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 74085,
+    "tax_amount": 3704,
+    "total_amount": 77789
+  },
+  {
+    "invoice_number": "WE59066593",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 53703,
+    "tax_amount": 2685,
+    "total_amount": 56388
+  },
+  {
+    "invoice_number": "WE59066948",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 31619,
+    "tax_amount": 1581,
+    "total_amount": 33200
+  },
+  {
+    "invoice_number": "WE59067894",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 32261,
+    "tax_amount": 1613,
+    "total_amount": 33874
+  },
+  {
+    "invoice_number": "WE59067895",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 67500,
+    "tax_amount": 3375,
+    "total_amount": 70875
+  },
+  {
+    "invoice_number": "WE59067896",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 36100,
+    "tax_amount": 1805,
+    "total_amount": 37905
+  },
+  {
+    "invoice_number": "WE59067897",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 17119,
+    "tax_amount": 856,
+    "total_amount": 17975
+  },
+  {
+    "invoice_number": "WE59068177",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 18657,
+    "tax_amount": 933,
+    "total_amount": 19590
+  },
+  {
+    "invoice_number": "WE59068555",
+    "tax_id": "86683947",
+    "invoice_date": "2026-02-26",
+    "amount_untaxed": 25349,
+    "tax_amount": 1267,
+    "total_amount": 26616
+  },
+  {
+    "invoice_number": "XD76211705",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 71060,
+    "tax_amount": 3553,
+    "total_amount": 74613
+  },
+  {
+    "invoice_number": "XD76211716",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 21650,
+    "tax_amount": 1083,
+    "total_amount": 22733
+  },
+  {
+    "invoice_number": "XD76211735",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 41900,
+    "tax_amount": 2095,
+    "total_amount": 43995
+  },
+  {
+    "invoice_number": "XD76211752",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 54550,
+    "tax_amount": 2728,
+    "total_amount": 57278
+  },
+  {
+    "invoice_number": "XD76211767",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-07",
+    "amount_untaxed": 18500,
+    "tax_amount": 925,
+    "total_amount": 19425
+  },
+  {
+    "invoice_number": "XD76211768",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-07",
+    "amount_untaxed": 160200,
+    "tax_amount": 8010,
+    "total_amount": 168210
+  },
+  {
+    "invoice_number": "XD76211789",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 3360,
+    "tax_amount": 168,
+    "total_amount": 3528
+  },
+  {
+    "invoice_number": "XD76211843",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 1800,
+    "tax_amount": 90,
+    "total_amount": 1890
+  },
+  {
+    "invoice_number": "XD76211850",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 26880,
+    "tax_amount": 1344,
+    "total_amount": 28224
+  },
+  {
+    "invoice_number": "XD76211879",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 12040,
+    "tax_amount": 602,
+    "total_amount": 12642
+  },
+  {
+    "invoice_number": "XD76212010",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 2650,
+    "tax_amount": 133,
+    "total_amount": 2783
+  },
+  {
+    "invoice_number": "XD76212024",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 144000,
+    "tax_amount": 7200,
+    "total_amount": 151200
+  },
+  {
+    "invoice_number": "XD76212038",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 600,
+    "tax_amount": 30,
+    "total_amount": 630
+  },
+  {
+    "invoice_number": "XD76212040",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 32740,
+    "tax_amount": 1637,
+    "total_amount": 34377
+  },
+  {
+    "invoice_number": "XD76212044",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 8100,
+    "tax_amount": 405,
+    "total_amount": 8505
+  },
+  {
+    "invoice_number": "XD76212055",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 159350,
+    "tax_amount": 7968,
+    "total_amount": 167318
+  },
+  {
+    "invoice_number": "XD76212056",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 15620,
+    "tax_amount": 781,
+    "total_amount": 16401
+  },
+  {
+    "invoice_number": "XD76212123",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 28440,
+    "tax_amount": 1422,
+    "total_amount": 29862
+  },
+  {
+    "invoice_number": "XD76212173",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 10900,
+    "tax_amount": 545,
+    "total_amount": 11445
+  },
+  {
+    "invoice_number": "XD76212245",
+    "tax_id": "91095785",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 323950,
+    "tax_amount": 16198,
+    "total_amount": 340148
+  },
+  {
+    "invoice_number": "XD76212296",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 44930,
+    "tax_amount": 2247,
+    "total_amount": 47177
+  },
+  {
+    "invoice_number": "XD76212299",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 8830,
+    "tax_amount": 442,
+    "total_amount": 9272
+  },
+  {
+    "invoice_number": "XD76212339",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 14310,
+    "tax_amount": 716,
+    "total_amount": 15026
+  },
+  {
+    "invoice_number": "XD76212340",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 26400,
+    "tax_amount": 1320,
+    "total_amount": 27720
+  },
+  {
+    "invoice_number": "XD76212377",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 12400,
+    "tax_amount": 620,
+    "total_amount": 13020
+  },
+  {
+    "invoice_number": "XD76212435",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 35180,
+    "tax_amount": 1759,
+    "total_amount": 36939
+  },
+  {
+    "invoice_number": "XD76212482",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 3680,
+    "tax_amount": 184,
+    "total_amount": 3864
+  },
+  {
+    "invoice_number": "XD76212494",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 55150,
+    "tax_amount": 2758,
+    "total_amount": 57908
+  },
+  {
+    "invoice_number": "XD76212528",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 15500,
+    "tax_amount": 775,
+    "total_amount": 16275
+  },
+  {
+    "invoice_number": "XD76212538",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 630,
+    "tax_amount": 32,
+    "total_amount": 662
+  },
+  {
+    "invoice_number": "XD76212587",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 40980,
+    "tax_amount": 2049,
+    "total_amount": 43029
+  },
+  {
+    "invoice_number": "XD76212595",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 13500,
+    "tax_amount": 675,
+    "total_amount": 14175
+  },
+  {
+    "invoice_number": "XD76212736",
+    "tax_id": "91095785",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 114370,
+    "tax_amount": 5719,
+    "total_amount": 120089
+  },
+  {
+    "invoice_number": "SK08220216",
+    "tax_id": "27365925",
+    "invoice_date": "2025-10-03",
+    "amount_untaxed": 4752,
+    "tax_amount": 238,
+    "total_amount": 4990
+  },
+  {
+    "invoice_number": "SK10138613",
+    "tax_id": "27365925",
+    "invoice_date": "2025-10-17",
+    "amount_untaxed": 2472,
+    "tax_amount": 124,
+    "total_amount": 2596
+  },
+  {
+    "invoice_number": "UK12489589",
+    "tax_id": "27365925",
+    "invoice_date": "2025-12-12",
+    "amount_untaxed": 1428,
+    "tax_amount": 71,
+    "total_amount": 1499
+  },
+  {
+    "invoice_number": "UK14589182",
+    "tax_id": "27365925",
+    "invoice_date": "2025-12-24",
+    "amount_untaxed": 7410,
+    "tax_amount": 370,
+    "total_amount": 7780
+  },
+  {
+    "invoice_number": "WF25002159",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 3762,
+    "tax_amount": 188,
+    "total_amount": 3950
+  },
+  {
+    "invoice_number": "WF39562136",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 666,
+    "tax_amount": 33,
+    "total_amount": 699
+  },
+  {
+    "invoice_number": "WF28543911",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-24",
+    "amount_untaxed": 9930,
+    "tax_amount": 497,
+    "total_amount": 10427
+  },
+  {
+    "invoice_number": "WF28553803",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-24",
+    "amount_untaxed": 1336,
+    "tax_amount": 67,
+    "total_amount": 1403
+  },
+  {
+    "invoice_number": "WF28529100",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-24",
+    "amount_untaxed": 9523,
+    "tax_amount": 476,
+    "total_amount": 9999
+  },
+  {
+    "invoice_number": "WF28742836",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-25",
+    "amount_untaxed": 16190,
+    "tax_amount": 809,
+    "total_amount": 16999
+  },
+  {
+    "invoice_number": "WF28873331",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 5514,
+    "tax_amount": 276,
+    "total_amount": 5790
+  },
+  {
+    "invoice_number": "WF29054643",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 9882,
+    "tax_amount": 494,
+    "total_amount": 10376
+  },
+  {
+    "invoice_number": "WF31516924",
+    "tax_id": "27365925",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 666,
+    "tax_amount": 33,
+    "total_amount": 699
+  },
+  {
+    "invoice_number": "WW74138792",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 14476,
+    "tax_amount": 724,
+    "total_amount": 15200
+  },
+  {
+    "invoice_number": "VT21975181",
+    "tax_id": "17775436",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 2300,
+    "tax_amount": 115,
+    "total_amount": 2415
+  },
+  {
+    "invoice_number": "WW74138793",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 13524,
+    "tax_amount": 676,
+    "total_amount": 14200
+  },
+  {
+    "invoice_number": "VT33834087",
+    "tax_id": "22582851",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 5700,
+    "tax_amount": 285,
+    "total_amount": 5985
+  },
+  {
+    "invoice_number": "WW74138794",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 22476,
+    "tax_amount": 1124,
+    "total_amount": 23600
+  },
+  {
+    "invoice_number": "VT24502802",
+    "tax_id": "59125028",
+    "invoice_date": "2026-01-14",
+    "amount_untaxed": 160,
+    "tax_amount": 8,
+    "total_amount": 168
+  },
+  {
+    "invoice_number": "WW74138795",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 14286,
+    "tax_amount": 714,
+    "total_amount": 15000
+  },
+  {
+    "invoice_number": "VT24502803",
+    "tax_id": "59125028",
+    "invoice_date": "2026-01-14",
+    "amount_untaxed": 220,
+    "tax_amount": 11,
+    "total_amount": 231
+  },
+  {
+    "invoice_number": "WW74138796",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 15143,
+    "tax_amount": 757,
+    "total_amount": 15900
+  },
+  {
+    "invoice_number": "VT33655622",
+    "tax_id": "98749613",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 800,
+    "tax_amount": 40,
+    "total_amount": 840
+  },
+  {
+    "invoice_number": "WW74138797",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT46697932",
+    "tax_id": "84990651",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 6600,
+    "tax_amount": 330,
+    "total_amount": 6930
+  },
+  {
+    "invoice_number": "WW74138798",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 61333,
+    "tax_amount": 3067,
+    "total_amount": 64400
+  },
+  {
+    "invoice_number": "VT16985838",
+    "tax_id": "23077466",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 13230,
+    "tax_amount": 662,
+    "total_amount": 13892
+  },
+  {
+    "invoice_number": "WW74147126",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 13524,
+    "tax_amount": 676,
+    "total_amount": 14200
+  },
+  {
+    "invoice_number": "VT46748385",
+    "tax_id": "27838213",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 9310,
+    "tax_amount": 466,
+    "total_amount": 9776
+  },
+  {
+    "invoice_number": "WW74147127",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 14476,
+    "tax_amount": 724,
+    "total_amount": 15200
+  },
+  {
+    "invoice_number": "VT47922607",
+    "tax_id": "14421397",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 600,
+    "tax_amount": 30,
+    "total_amount": 630
+  },
+  {
+    "invoice_number": "WW74147128",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT38333590",
+    "tax_id": "24716167",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 5900,
+    "tax_amount": 295,
+    "total_amount": 6195
+  },
+  {
+    "invoice_number": "WW74147129",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 15524,
+    "tax_amount": 776,
+    "total_amount": 16300
+  },
+  {
+    "invoice_number": "VT18014909",
+    "tax_id": "89978558",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 450,
+    "tax_amount": 23,
+    "total_amount": 473
+  },
+  {
+    "invoice_number": "WW74147130",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 16190,
+    "tax_amount": 810,
+    "total_amount": 17000
+  },
+  {
+    "invoice_number": "VT35222908",
+    "tax_id": "16480645",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 6600,
+    "tax_amount": 330,
+    "total_amount": 6930
+  },
+  {
+    "invoice_number": "WW74147131",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT38333593",
+    "tax_id": "24716167",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 4400,
+    "tax_amount": 220,
+    "total_amount": 4620
+  },
+  {
+    "invoice_number": "WW74147132",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 14286,
+    "tax_amount": 714,
+    "total_amount": 15000
+  },
+  {
+    "invoice_number": "VT46815911",
+    "tax_id": "54748784",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 11429,
+    "tax_amount": 571,
+    "total_amount": 12000
+  },
+  {
+    "invoice_number": "WW74147133",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 12762,
+    "tax_amount": 638,
+    "total_amount": 13400
+  },
+  {
+    "invoice_number": "VT35034744",
+    "tax_id": "16104543",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 58512,
+    "tax_amount": 2926,
+    "total_amount": 61438
+  },
+  {
+    "invoice_number": "WW74147134",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT17531707",
+    "tax_id": "53269785",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 14600,
+    "tax_amount": 730,
+    "total_amount": 15330
+  },
+  {
+    "invoice_number": "WW74147135",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT50301994",
+    "tax_id": "82810008",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 19000,
+    "tax_amount": 950,
+    "total_amount": 19950
+  },
+  {
+    "invoice_number": "WW74148074",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT52697320",
+    "tax_id": "54288493",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 50600,
+    "tax_amount": 2530,
+    "total_amount": 53130
+  },
+  {
+    "invoice_number": "WW74148223",
+    "tax_id": "27998148",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT35703866",
+    "tax_id": "80383937",
+    "invoice_date": "2026-01-25",
+    "amount_untaxed": 15138,
+    "tax_amount": 757,
+    "total_amount": 15895
+  },
+  {
+    "invoice_number": "WW74153791",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 14476,
+    "tax_amount": 724,
+    "total_amount": 15200
+  },
+  {
+    "invoice_number": "VT17572603",
+    "tax_id": "60526546",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 64381,
+    "tax_amount": 3219,
+    "total_amount": 67600
+  },
+  {
+    "invoice_number": "WW74153792",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 13524,
+    "tax_amount": 676,
+    "total_amount": 14200
+  },
+  {
+    "invoice_number": "VT38333601",
+    "tax_id": "24716167",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 6500,
+    "tax_amount": 325,
+    "total_amount": 6825
+  },
+  {
+    "invoice_number": "WW74153793",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 22476,
+    "tax_amount": 1124,
+    "total_amount": 23600
+  },
+  {
+    "invoice_number": "VT18042969",
+    "tax_id": "05678000",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 26000,
+    "tax_amount": 1300,
+    "total_amount": 27300
+  },
+  {
+    "invoice_number": "WW74153794",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 14286,
+    "tax_amount": 714,
+    "total_amount": 15000
+  },
+  {
+    "invoice_number": "VT46815916",
+    "tax_id": "54748784",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 8190,
+    "tax_amount": 410,
+    "total_amount": 8600
+  },
+  {
+    "invoice_number": "WW74153795",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 15143,
+    "tax_amount": 757,
+    "total_amount": 15900
+  },
+  {
+    "invoice_number": "VT48430227",
+    "tax_id": "72514491",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 23810,
+    "tax_amount": 1190,
+    "total_amount": 25000
+  },
+  {
+    "invoice_number": "WW74153796",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT11067800",
+    "tax_id": "26159026",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 800,
+    "tax_amount": 40,
+    "total_amount": 840
+  },
+  {
+    "invoice_number": "WW74153797",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 61333,
+    "tax_amount": 3067,
+    "total_amount": 64400
+  },
+  {
+    "invoice_number": "VT22055713",
+    "tax_id": "27656753",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 4400,
+    "tax_amount": 220,
+    "total_amount": 4620
+  },
+  {
+    "invoice_number": "WW74162310",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 13524,
+    "tax_amount": 676,
+    "total_amount": 14200
+  },
+  {
+    "invoice_number": "VT35223208",
+    "tax_id": "16480645",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 6000,
+    "tax_amount": 300,
+    "total_amount": 6300
+  },
+  {
+    "invoice_number": "WW74162311",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 14476,
+    "tax_amount": 724,
+    "total_amount": 15200
+  },
+  {
+    "invoice_number": "VT30281727",
+    "tax_id": "00022090",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 71200,
+    "tax_amount": 3560,
+    "total_amount": 74760
+  },
+  {
+    "invoice_number": "WW74162312",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT35703962",
+    "tax_id": "80383937",
+    "invoice_date": "2026-02-01",
+    "amount_untaxed": 21483,
+    "tax_amount": 1074,
+    "total_amount": 22557
+  },
+  {
+    "invoice_number": "WW74162313",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 15524,
+    "tax_amount": 776,
+    "total_amount": 16300
+  },
+  {
+    "invoice_number": "VT50301987",
+    "tax_id": "82810008",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 19800,
+    "tax_amount": 990,
+    "total_amount": 20790
+  },
+  {
+    "invoice_number": "WW74162314",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 16190,
+    "tax_amount": 810,
+    "total_amount": 17000
+  },
+  {
+    "invoice_number": "VT35290732",
+    "tax_id": "59560801",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 6571,
+    "tax_amount": 329,
+    "total_amount": 6900
+  },
+  {
+    "invoice_number": "WW74162315",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT23299821",
+    "tax_id": "77216210",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 800,
+    "tax_amount": 40,
+    "total_amount": 840
+  },
+  {
+    "invoice_number": "WW74162316",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 14286,
+    "tax_amount": 714,
+    "total_amount": 15000
+  },
+  {
+    "invoice_number": "VT16605430",
+    "tax_id": "12888755",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 253063,
+    "tax_amount": 12653,
+    "total_amount": 265716
+  },
+  {
+    "invoice_number": "WW74162317",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 12762,
+    "tax_amount": 638,
+    "total_amount": 13400
+  },
+  {
+    "invoice_number": "VT05406797",
+    "tax_id": "84757140",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 32800,
+    "tax_amount": 1640,
+    "total_amount": 34440
+  },
+  {
+    "invoice_number": "WW74162318",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 16381,
+    "tax_amount": 819,
+    "total_amount": 17200
+  },
+  {
+    "invoice_number": "VT52697318",
+    "tax_id": "54288493",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 37500,
+    "tax_amount": 1875,
+    "total_amount": 39375
+  },
+  {
+    "invoice_number": "WW74162319",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT20630308",
+    "tax_id": "60737985",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 42370,
+    "tax_amount": 2119,
+    "total_amount": 44489
+  },
+  {
+    "invoice_number": "WW74162320",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT16985923",
+    "tax_id": "23077466",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 2930,
+    "tax_amount": 147,
+    "total_amount": 3077
+  },
+  {
+    "invoice_number": "WW74162321",
+    "tax_id": "27998148",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 15810,
+    "tax_amount": 790,
+    "total_amount": 16600
+  },
+  {
+    "invoice_number": "VT33834138",
+    "tax_id": "22582851",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 8700,
+    "tax_amount": 435,
+    "total_amount": 9135
+  },
+  {
+    "invoice_number": "TT20958771",
+    "tax_id": "09275943",
+    "invoice_date": "2025-12-05",
+    "amount_untaxed": 340,
+    "tax_amount": 17,
+    "total_amount": 357
+  },
+  {
+    "invoice_number": "VT47922621",
+    "tax_id": "14421397",
+    "invoice_date": "2026-02-13",
+    "amount_untaxed": 5540,
+    "tax_amount": 277,
+    "total_amount": 5817
+  },
+  {
+    "invoice_number": "VT35222114",
+    "tax_id": "16480645",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 11000,
+    "tax_amount": 550,
+    "total_amount": 11550
+  },
+  {
+    "invoice_number": "VT35033645",
+    "tax_id": "13199601",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 238430,
+    "tax_amount": 11922,
+    "total_amount": 250352
+  },
+  {
+    "invoice_number": "VT34908704",
+    "tax_id": "09569026",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 4500,
+    "tax_amount": 225,
+    "total_amount": 4725
+  },
+  {
+    "invoice_number": "VT18014946",
+    "tax_id": "89978558",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 900,
+    "tax_amount": 45,
+    "total_amount": 945
+  },
+  {
+    "invoice_number": "VT34908701",
+    "tax_id": "09569026",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 5200,
+    "tax_amount": 260,
+    "total_amount": 5460
+  },
+  {
+    "invoice_number": "VT50301997",
+    "tax_id": "82810008",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 1200,
+    "tax_amount": 60,
+    "total_amount": 1260
+  },
+  {
+    "invoice_number": "VT24577104",
+    "tax_id": "23792481",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 5232,
+    "tax_amount": 262,
+    "total_amount": 5494
+  },
+  {
+    "invoice_number": "VT46887413",
+    "tax_id": "60369519",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 45000,
+    "tax_amount": 2250,
+    "total_amount": 47250
+  },
+  {
+    "invoice_number": "VT35033466",
+    "tax_id": "13199601",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 904620,
+    "tax_amount": 45231,
+    "total_amount": 949851
+  },
+  {
+    "invoice_number": "VT46698175",
+    "tax_id": "84990651",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 4600,
+    "tax_amount": 230,
+    "total_amount": 4830
+  },
+  {
+    "invoice_number": "VT52697305",
+    "tax_id": "54288493",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 12150,
+    "tax_amount": 608,
+    "total_amount": 12758
+  },
+  {
+    "invoice_number": "VT17531730",
+    "tax_id": "53269785",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 9900,
+    "tax_amount": 495,
+    "total_amount": 10395
+  },
+  {
+    "invoice_number": "VT52697304",
+    "tax_id": "54288493",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 8700,
+    "tax_amount": 435,
+    "total_amount": 9135
+  },
+  {
+    "invoice_number": "VT16985962",
+    "tax_id": "23077466",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 12900,
+    "tax_amount": 645,
+    "total_amount": 13545
+  },
+  {
+    "invoice_number": "VT55748513",
+    "tax_id": "16740369",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 3500,
+    "tax_amount": 175,
+    "total_amount": 3675
+  },
+  {
+    "invoice_number": "VT35034799",
+    "tax_id": "16104543",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 27400,
+    "tax_amount": 1370,
+    "total_amount": 28770
+  },
+  {
+    "invoice_number": "VT55748512",
+    "tax_id": "16740369",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 200650,
+    "tax_amount": 10032,
+    "total_amount": 210682
+  },
+  {
+    "invoice_number": "VT38333666",
+    "tax_id": "24716167",
+    "invoice_date": "2026-02-26",
+    "amount_untaxed": 8300,
+    "tax_amount": 415,
+    "total_amount": 8715
+  },
+  {
+    "invoice_number": "VT16605553",
+    "tax_id": "26999464",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 55613,
+    "tax_amount": 2781,
+    "total_amount": 58394
+  },
+  {
+    "invoice_number": "VT55748537",
+    "tax_id": "16740369",
+    "invoice_date": "2026-01-30",
+    "amount_untaxed": 230250,
+    "tax_amount": 11513,
+    "total_amount": 241763
+  },
+  {
+    "invoice_number": "VT52697308",
+    "tax_id": "54288493",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 15700,
+    "tax_amount": 785,
+    "total_amount": 16485
+  },
+  {
+    "invoice_number": "WU57584978",
+    "tax_id": "04838276",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 4300,
+    "tax_amount": 215,
+    "total_amount": 4515
+  },
+  {
+    "invoice_number": "XE10284551",
+    "tax_id": "86993936",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 6400,
+    "tax_amount": 320,
+    "total_amount": 6720
+  },
+  {
+    "invoice_number": "WU57584991",
+    "tax_id": "04838276",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 16000,
+    "tax_amount": 800,
+    "total_amount": 16800
+  },
+  {
+    "invoice_number": "XE10284803",
+    "tax_id": "86993936",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 3600,
+    "tax_amount": 180,
+    "total_amount": 3780
+  },
+  {
+    "invoice_number": "WU57585003",
+    "tax_id": "04838276",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 15300,
+    "tax_amount": 765,
+    "total_amount": 16065
+  },
+  {
+    "invoice_number": "XE10284808",
+    "tax_id": "86993936",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 16000,
+    "tax_amount": 800,
+    "total_amount": 16800
+  },
+  {
+    "invoice_number": "WU57585021",
+    "tax_id": "04838276",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 26500,
+    "tax_amount": 1325,
+    "total_amount": 27825
+  },
+  {
+    "invoice_number": "XE10284868",
+    "tax_id": "86993936",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 4850,
+    "tax_amount": 243,
+    "total_amount": 5093
+  },
+  {
+    "invoice_number": "WU57585039",
+    "tax_id": "04838276",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 17500,
+    "tax_amount": 875,
+    "total_amount": 18375
+  },
+  {
+    "invoice_number": "UZ13686844",
+    "tax_id": "84115857",
+    "invoice_date": "2025-11-25",
+    "amount_untaxed": 33333,
+    "tax_amount": 1667,
+    "total_amount": 35000
+  },
+  {
+    "invoice_number": "WU57585551",
+    "tax_id": "04838276",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 66500,
+    "tax_amount": 3325,
+    "total_amount": 69825
+  },
+  {
+    "invoice_number": "UZ13687887",
+    "tax_id": "84115857",
+    "invoice_date": "2025-12-23",
+    "amount_untaxed": 16667,
+    "tax_amount": 833,
+    "total_amount": 17500
+  },
+  {
+    "invoice_number": "WU57585557",
+    "tax_id": "04838276",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 21500,
+    "tax_amount": 1075,
+    "total_amount": 22575
+  },
+  {
+    "invoice_number": "WU25171241",
+    "tax_id": "12819580",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 11363,
+    "tax_amount": 568,
+    "total_amount": 11931
+  },
+  {
+    "invoice_number": "WU57585612",
+    "tax_id": "04838276",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 17500,
+    "tax_amount": 875,
+    "total_amount": 18375
+  },
+  {
+    "invoice_number": "WU25172085",
+    "tax_id": "12819580",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 2085,
+    "tax_amount": 104,
+    "total_amount": 2189
+  },
+  {
+    "invoice_number": "XJ94998598",
+    "tax_id": "86532940",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 10000,
+    "tax_amount": 500,
+    "total_amount": 10500
+  },
+  {
+    "invoice_number": "XF06654107",
+    "tax_id": "53293645",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 4175,
+    "tax_amount": 209,
+    "total_amount": 4384
+  },
+  {
+    "invoice_number": "XH56363187",
+    "tax_id": "89505257",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 290,
+    "tax_amount": 15,
+    "total_amount": 305
+  },
+  {
+    "invoice_number": "XF06654177",
+    "tax_id": "53293645",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 480,
+    "tax_amount": 24,
+    "total_amount": 504
+  },
+  {
+    "invoice_number": "XE13091335",
+    "tax_id": "27734110",
+    "invoice_date": "2026-01-15",
+    "amount_untaxed": 2900,
+    "tax_amount": 145,
+    "total_amount": 3045
+  },
+  {
+    "invoice_number": "XF06654599",
+    "tax_id": "53293645",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 5230,
+    "tax_amount": 262,
+    "total_amount": 5492
+  },
+  {
+    "invoice_number": "XG06593235",
+    "tax_id": "12628267",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 4000,
+    "tax_amount": 200,
+    "total_amount": 4200
+  },
+  {
+    "invoice_number": "XD47172157",
+    "tax_id": "84268760",
+    "invoice_date": "2026-01-07",
+    "amount_untaxed": 15000,
+    "tax_amount": 750,
+    "total_amount": 15750
+  },
+  {
+    "invoice_number": "XH16492009",
+    "tax_id": "23967186",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 20738,
+    "tax_amount": 1037,
+    "total_amount": 21775
+  },
+  {
+    "invoice_number": "XD47172208",
+    "tax_id": "84268760",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 26200,
+    "tax_amount": 1310,
+    "total_amount": 27510
+  },
+  {
+    "invoice_number": "XK75514890",
+    "tax_id": "97402557",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 800,
+    "tax_amount": 40,
+    "total_amount": 840
+  },
+  {
+    "invoice_number": "XD47172348",
+    "tax_id": "84268760",
+    "invoice_date": "2026-01-22",
+    "amount_untaxed": 28700,
+    "tax_amount": 1435,
+    "total_amount": 30135
+  },
+  {
+    "invoice_number": "WJ07241732",
+    "tax_id": "15973038",
+    "invoice_date": "2026-02-05",
+    "amount_untaxed": 4800,
+    "tax_amount": 240,
+    "total_amount": 5040
+  },
+  {
+    "invoice_number": "XD47172572",
+    "tax_id": "84268760",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 15500,
+    "tax_amount": 775,
+    "total_amount": 16275
+  },
+  {
+    "invoice_number": "XJ94999222",
+    "tax_id": "86532940",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 10000,
+    "tax_amount": 500,
+    "total_amount": 10500
+  },
+  {
+    "invoice_number": "WW01532793",
+    "tax_id": "23060541",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 49500,
+    "tax_amount": 2475,
+    "total_amount": 51975
+  },
+  {
+    "invoice_number": "XL64837174",
+    "tax_id": "27486414",
+    "invoice_date": "2026-02-23",
+    "amount_untaxed": 18200,
+    "tax_amount": 910,
+    "total_amount": 19110
+  },
+  {
+    "invoice_number": "WW01554434",
+    "tax_id": "23060541",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 131400,
+    "tax_amount": 6570,
+    "total_amount": 137970
+  },
+  {
+    "invoice_number": "XH16492264",
+    "tax_id": "23967186",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 10056,
+    "tax_amount": 503,
+    "total_amount": 10559
+  },
+  {
+    "invoice_number": "WW01597139",
+    "tax_id": "23060541",
+    "invoice_date": "2026-02-06",
+    "amount_untaxed": 59200,
+    "tax_amount": 2960,
+    "total_amount": 62160
+  },
+  {
+    "invoice_number": "XG21998680",
+    "tax_id": "28777404",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 5150,
+    "tax_amount": 258,
+    "total_amount": 5408
+  },
+  {
+    "invoice_number": "WW01601497",
+    "tax_id": "23060541",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 85700,
+    "tax_amount": 4285,
+    "total_amount": 89985
+  },
+  {
+    "invoice_number": "WY77843361",
+    "tax_id": "72108944",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 12320,
+    "tax_amount": 616,
+    "total_amount": 12936
+  },
+  {
+    "invoice_number": "WW01605485",
+    "tax_id": "23060541",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 242000,
+    "tax_amount": 12100,
+    "total_amount": 254100
+  },
+  {
+    "invoice_number": "WV52023978",
+    "tax_id": "22424994",
+    "invoice_date": "2026-01-31",
+    "amount_untaxed": 94292,
+    "tax_amount": 4715,
+    "total_amount": 99007
+  },
+  {
+    "invoice_number": "VE33804188",
+    "tax_id": "20773257",
+    "invoice_date": "2025-12-31",
+    "amount_untaxed": 11400,
+    "tax_amount": 570,
+    "total_amount": 11970
+  },
+  {
+    "invoice_number": "WV52026451",
+    "tax_id": "22424994",
+    "invoice_date": "2026-01-31",
+    "amount_untaxed": 2031,
+    "tax_amount": 102,
+    "total_amount": 2133
+  },
+  {
+    "invoice_number": "XC71636566",
+    "tax_id": "20773257",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 6600,
+    "tax_amount": 330,
+    "total_amount": 6930
+  },
+  {
+    "invoice_number": "XJ98055328",
+    "tax_id": "90746183",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 11207,
+    "tax_amount": 560,
+    "total_amount": 11767
+  },
+  {
+    "invoice_number": "XC71640743",
+    "tax_id": "20773257",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 3016,
+    "tax_amount": 151,
+    "total_amount": 3167
+  },
+  {
+    "invoice_number": "WV31663400",
+    "tax_id": "16606102",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 5428,
+    "tax_amount": 271,
+    "total_amount": 5699
+  },
+  {
+    "invoice_number": "XC71642326",
+    "tax_id": "20773257",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 6880,
+    "tax_amount": 344,
+    "total_amount": 7224
+  },
+  {
+    "invoice_number": "WV32775177",
+    "tax_id": "16606102",
+    "invoice_date": "2026-02-26",
+    "amount_untaxed": 647,
+    "tax_amount": 32,
+    "total_amount": 679
+  },
+  {
+    "invoice_number": "XC71650526",
+    "tax_id": "20773257",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 1836,
+    "tax_amount": 92,
+    "total_amount": 1928
+  },
+  {
+    "invoice_number": "WV52074346",
+    "tax_id": "22424994",
+    "invoice_date": "2026-02-28",
+    "amount_untaxed": 1240,
+    "tax_amount": 62,
+    "total_amount": 1302
+  },
+  {
+    "invoice_number": "XC71682974",
+    "tax_id": "20773257",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 13000,
+    "tax_amount": 650,
+    "total_amount": 13650
+  },
+  {
+    "invoice_number": "WV52071885",
+    "tax_id": "22424994",
+    "invoice_date": "2026-02-28",
+    "amount_untaxed": 58772,
+    "tax_amount": 2939,
+    "total_amount": 61711
+  },
+  {
+    "invoice_number": "XG73628459",
+    "tax_id": "82957086",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 169288,
+    "tax_amount": 8464,
+    "total_amount": 177752
+  },
+  {
+    "invoice_number": "WV52075378",
+    "tax_id": "22424994",
+    "invoice_date": "2026-02-28",
+    "amount_untaxed": 190,
+    "tax_amount": 10,
+    "total_amount": 200
+  },
+  {
+    "invoice_number": "XG73628460",
+    "tax_id": "82957086",
+    "invoice_date": "2026-01-20",
+    "amount_untaxed": 37410,
+    "tax_amount": 1871,
+    "total_amount": 39281
+  },
+  {
+    "invoice_number": "VM61548552",
+    "tax_id": "91002999",
+    "invoice_date": "2025-12-24",
+    "amount_untaxed": 4500,
+    "tax_amount": 225,
+    "total_amount": 4725
+  },
+  {
+    "invoice_number": "XM21233307",
+    "tax_id": "82957086",
+    "invoice_date": "2026-02-06",
+    "amount_untaxed": 7953,
+    "tax_amount": 398,
+    "total_amount": 8351
+  },
+  {
+    "invoice_number": "WA62081806",
+    "tax_id": "22348814",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 12340,
+    "tax_amount": 617,
+    "total_amount": 12957
+  },
+  {
+    "invoice_number": "XM21233391",
+    "tax_id": "82957086",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 13700,
+    "tax_amount": 685,
+    "total_amount": 14385
+  },
+  {
+    "invoice_number": "XK66973253",
+    "tax_id": "60201564",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 5666,
+    "tax_amount": 283,
+    "total_amount": 5949
+  },
+  {
+    "invoice_number": "XM21233421",
+    "tax_id": "82957086",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 4560,
+    "tax_amount": 228,
+    "total_amount": 4788
+  },
+  {
+    "invoice_number": "XA71474105",
+    "tax_id": "96990563",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 3750,
+    "tax_amount": 188,
+    "total_amount": 3938
+  },
+  {
+    "invoice_number": "XM21233439",
+    "tax_id": "82957086",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 6960,
+    "tax_amount": 348,
+    "total_amount": 7308
+  },
+  {
+    "invoice_number": "WF28170220",
+    "tax_id": "27365925",
+    "invoice_date": "2026-01-21",
+    "amount_untaxed": 1084,
+    "tax_amount": 54,
+    "total_amount": 1138
+  },
+  {
+    "invoice_number": "XF03456565",
+    "tax_id": "05194687",
+    "invoice_date": "2026-01-07",
+    "amount_untaxed": 6650,
+    "tax_amount": 333,
+    "total_amount": 6983
+  },
+  {
+    "invoice_number": "XG87256286",
+    "tax_id": "54064846",
+    "invoice_date": "2026-01-23",
+    "amount_untaxed": 25952,
+    "tax_amount": 1298,
+    "total_amount": 27250
+  },
+  {
+    "invoice_number": "XF03456602",
+    "tax_id": "05194687",
+    "invoice_date": "2026-01-08",
+    "amount_untaxed": 7600,
+    "tax_amount": 380,
+    "total_amount": 7980
+  },
+  {
+    "invoice_number": "XE96983182",
+    "tax_id": "80139929",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 1208,
+    "tax_amount": 60,
+    "total_amount": 1268
+  },
+  {
+    "invoice_number": "XF03456714",
+    "tax_id": "05194687",
+    "invoice_date": "2026-01-13",
+    "amount_untaxed": 10260,
+    "tax_amount": 513,
+    "total_amount": 10773
+  },
+  {
+    "invoice_number": "XJ43753167",
+    "tax_id": "00047711",
+    "invoice_date": "2026-01-27",
+    "amount_untaxed": 15522,
+    "tax_amount": 776,
+    "total_amount": 16298
+  },
+  {
+    "invoice_number": "XF03457030",
+    "tax_id": "05194687",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 4390,
+    "tax_amount": 220,
+    "total_amount": 4610
+  },
+  {
+    "invoice_number": "XG02358689",
+    "tax_id": "90170716",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 78000,
+    "tax_amount": 3900,
+    "total_amount": 81900
+  },
+  {
+    "invoice_number": "XF03457805",
+    "tax_id": "05194687",
+    "invoice_date": "2026-02-11",
+    "amount_untaxed": 5360,
+    "tax_amount": 268,
+    "total_amount": 5628
+  },
+  {
+    "invoice_number": "WV35042445",
+    "tax_id": "16633895",
+    "invoice_date": "2026-01-28",
+    "amount_untaxed": 58800,
+    "tax_amount": 2940,
+    "total_amount": 61740
+  },
+  {
+    "invoice_number": "XG63833257",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-02",
+    "amount_untaxed": 3780,
+    "tax_amount": 189,
+    "total_amount": 3969
+  },
+  {
+    "invoice_number": "XD13300465",
+    "tax_id": "83536654",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 23810,
+    "tax_amount": 1190,
+    "total_amount": 25000
+  },
+  {
+    "invoice_number": "XG63833286",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-05",
+    "amount_untaxed": 12200,
+    "tax_amount": 610,
+    "total_amount": 12810
+  },
+  {
+    "invoice_number": "WM52321867",
+    "tax_id": "22601576",
+    "invoice_date": "2026-01-29",
+    "amount_untaxed": 6500,
+    "tax_amount": 325,
+    "total_amount": 6825
+  },
+  {
+    "invoice_number": "XG63833346",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-06",
+    "amount_untaxed": 4275,
+    "tax_amount": 214,
+    "total_amount": 4489
+  },
+  {
+    "invoice_number": "XE58633590",
+    "tax_id": "56801904",
+    "invoice_date": "2026-01-31",
+    "amount_untaxed": 269,
+    "tax_amount": 13,
+    "total_amount": 282
+  },
+  {
+    "invoice_number": "XG63833471",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-09",
+    "amount_untaxed": 9990,
+    "tax_amount": 500,
+    "total_amount": 10490
+  },
+  {
+    "invoice_number": "XJ98055319",
+    "tax_id": "90746183",
+    "invoice_date": "2026-02-02",
+    "amount_untaxed": 128184,
+    "tax_amount": 6409,
+    "total_amount": 134593
+  },
+  {
+    "invoice_number": "XG63833515",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-12",
+    "amount_untaxed": 2320,
+    "tax_amount": 116,
+    "total_amount": 2436
+  },
+  {
+    "invoice_number": "XF32104968",
+    "tax_id": "13093781",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 12000,
+    "tax_amount": 600,
+    "total_amount": 12600
+  },
+  {
+    "invoice_number": "XG63833736",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-16",
+    "amount_untaxed": 24045,
+    "tax_amount": 1202,
+    "total_amount": 25247
+  },
+  {
+    "invoice_number": "XD97183763",
+    "tax_id": "23292583",
+    "invoice_date": "2026-02-04",
+    "amount_untaxed": 10000,
+    "tax_amount": 500,
+    "total_amount": 10500
+  },
+  {
+    "invoice_number": "XG63833765",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 400,
+    "tax_amount": 20,
+    "total_amount": 420
+  },
+  {
+    "invoice_number": "WV35043009",
+    "tax_id": "16633895",
+    "invoice_date": "2026-02-09",
+    "amount_untaxed": 235200,
+    "tax_amount": 11760,
+    "total_amount": 246960
+  },
+  {
+    "invoice_number": "XG63833778",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-19",
+    "amount_untaxed": 12000,
+    "tax_amount": 600,
+    "total_amount": 12600
+  },
+  {
+    "invoice_number": "XA76791736",
+    "tax_id": "97311466",
+    "invoice_date": "2026-02-12",
+    "amount_untaxed": 37905,
+    "tax_amount": 1895,
+    "total_amount": 39800
+  },
+  {
+    "invoice_number": "XG63833908",
+    "tax_id": "84291615",
+    "invoice_date": "2026-01-26",
+    "amount_untaxed": 9990,
+    "tax_amount": 500,
+    "total_amount": 10490
+  },
+  {
+    "invoice_number": "XF95441571",
+    "tax_id": "90237527",
+    "invoice_date": "2026-02-15",
+    "amount_untaxed": 139048,
+    "tax_amount": 6952,
+    "total_amount": 146000
+  },
+  {
+    "invoice_number": "XG63834201",
+    "tax_id": "84291615",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 20403,
+    "tax_amount": 1020,
+    "total_amount": 21423
+  },
+  {
+    "invoice_number": "XK15288257",
+    "tax_id": "21882612",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 17000,
+    "tax_amount": 850,
+    "total_amount": 17850
+  },
+  {
+    "invoice_number": "XG63834202",
+    "tax_id": "84291615",
+    "invoice_date": "2026-02-03",
+    "amount_untaxed": 32202,
+    "tax_amount": 1610,
+    "total_amount": 33812
+  },
+  {
+    "invoice_number": "XF63586535",
+    "tax_id": "54183414",
+    "invoice_date": "2026-02-24",
+    "amount_untaxed": 35000,
+    "tax_amount": 1750,
+    "total_amount": 36750
+  },
+  {
+    "invoice_number": "XG63834428",
+    "tax_id": "84291615",
+    "invoice_date": "2026-02-10",
+    "amount_untaxed": 3220,
+    "tax_amount": 161,
+    "total_amount": 3381
+  },
+  {
+    "invoice_number": "XG87256738",
+    "tax_id": "54064846",
+    "invoice_date": "2026-02-25",
+    "amount_untaxed": 26333,
+    "tax_amount": 1317,
+    "total_amount": 27650
+  }
+]

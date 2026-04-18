@@ -122,15 +122,21 @@ class InvoiceModel
                 $params[] = $amt; $params[] = $amt; $params[] = $amt;
             } else {
                 $kw = '%' . $rawKw . '%';
-                // 申報期間：支援 YYYYMM（月）與 YYYY/M-M月、YYYY-MM-MM（兩月一期）
-                $kwPeriod = '%' . preg_replace('/[^0-9]/', '', $rawKw) . '%';
+                // 申報期間：僅在關鍵字含有數字時才比對 period/report_period
+                $kwDigits = preg_replace('/[^0-9]/', '', $rawKw);
                 $kwBimonth = null;
                 if (preg_match('/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/', $rawKw, $_bm)) {
                     $kwBimonth = sprintf('%04d-%02d-%02d', (int)$_bm[1], (int)$_bm[2], (int)$_bm[3]);
                 }
-                $periodClauses = "pi.period LIKE ?";
+                $extraClauses = '';
+                $extraParams = array();
+                if ($kwDigits !== '') {
+                    $extraClauses .= " OR pi.period LIKE ?";
+                    $extraParams[] = '%' . $kwDigits . '%';
+                }
                 if ($kwBimonth !== null) {
-                    $periodClauses .= " OR pi.report_period = ?";
+                    $extraClauses .= " OR pi.report_period = ?";
+                    $extraParams[] = $kwBimonth;
                 }
                 $where[] = "(pi.invoice_number LIKE ? OR pi.vendor_name LIKE ? OR pi.note LIKE ?
                     OR pi.vendor_tax_id LIKE ?
@@ -138,10 +144,9 @@ class InvoiceModel
                     OR CAST(pi.amount_untaxed AS CHAR) LIKE ?
                     OR CAST(pi.tax_amount AS CHAR) LIKE ?
                     OR CAST(pi.total_amount AS CHAR) LIKE ?
-                    OR {$periodClauses})";
+                    {$extraClauses})";
                 for ($i = 0; $i < 8; $i++) { $params[] = $kw; }
-                $params[] = $kwPeriod;
-                if ($kwBimonth !== null) { $params[] = $kwBimonth; }
+                foreach ($extraParams as $_ep) { $params[] = $_ep; }
             }
         }
         if (!empty($filters['invoice_type'])) {
@@ -377,14 +382,20 @@ class InvoiceModel
                 $params[] = $amt; $params[] = $amt; $params[] = $amt;
             } else {
                 $kw = '%' . $rawKw . '%';
-                $kwPeriod = '%' . preg_replace('/[^0-9]/', '', $rawKw) . '%';
+                $kwDigits = preg_replace('/[^0-9]/', '', $rawKw);
                 $kwBimonth = null;
                 if (preg_match('/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/', $rawKw, $_bm)) {
                     $kwBimonth = sprintf('%04d-%02d-%02d', (int)$_bm[1], (int)$_bm[2], (int)$_bm[3]);
                 }
-                $periodClauses = "si.period LIKE ?";
+                $extraClauses = '';
+                $extraParams = array();
+                if ($kwDigits !== '') {
+                    $extraClauses .= " OR si.period LIKE ?";
+                    $extraParams[] = '%' . $kwDigits . '%';
+                }
                 if ($kwBimonth !== null) {
-                    $periodClauses .= " OR si.report_period = ?";
+                    $extraClauses .= " OR si.report_period = ?";
+                    $extraParams[] = $kwBimonth;
                 }
                 $where[] = "(si.invoice_number LIKE ? OR si.customer_name LIKE ? OR si.note LIKE ?
                     OR si.customer_tax_id LIKE ?
@@ -392,10 +403,9 @@ class InvoiceModel
                     OR CAST(si.amount_untaxed AS CHAR) LIKE ?
                     OR CAST(si.tax_amount AS CHAR) LIKE ?
                     OR CAST(si.total_amount AS CHAR) LIKE ?
-                    OR {$periodClauses})";
+                    {$extraClauses})";
                 for ($i = 0; $i < 8; $i++) { $params[] = $kw; }
-                $params[] = $kwPeriod;
-                if ($kwBimonth !== null) { $params[] = $kwBimonth; }
+                foreach ($extraParams as $_ep) { $params[] = $_ep; }
             }
         }
         if (!empty($filters['invoice_type'])) {
@@ -604,10 +614,16 @@ class InvoiceModel
         $startMonth = $parsed['start'];
         $endMonth = $parsed['end'];
 
-        // 銷項 - 應稅銷售額 & 稅額（invoice_type: 應稅/三聯式/二聯式 皆為應稅）
+        // 銷項 - 應稅銷售額 & 稅額；33/34 為銷貨退回折讓，應從合計扣除
         $sql = "SELECT
-                    COALESCE(SUM(CASE WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_taxable_amount,
-                    COALESCE(SUM(CASE WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS sales_tax,
+                    COALESCE(SUM(CASE
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' AND invoice_format IN ('33','34') THEN -amount_untaxed
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN amount_untaxed
+                        ELSE 0 END), 0) AS sales_taxable_amount,
+                    COALESCE(SUM(CASE
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' AND invoice_format IN ('33','34') THEN -tax_amount
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN tax_amount
+                        ELSE 0 END), 0) AS sales_tax,
                     COALESCE(SUM(CASE WHEN invoice_type = '免稅' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_exempt_amount,
                     COALESCE(SUM(CASE WHEN status != 'voided' THEN total_amount ELSE 0 END), 0) AS sales_total,
                     COUNT(CASE WHEN status != 'voided' THEN 1 END) AS sales_count,
@@ -619,10 +635,16 @@ class InvoiceModel
         $stmt->execute($months);
         $salesRow = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // 進項 - 可扣抵 & 不可扣抵
+        // 進項 - 可扣抵 & 不可扣抵；23/24 為進貨退出折讓，應從合計扣除
         $sql2 = "SELECT
-                    COALESCE(SUM(CASE WHEN deduction_type = 'deductible' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS purchase_deductible_amount,
-                    COALESCE(SUM(CASE WHEN deduction_type = 'deductible' AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS purchase_deductible_tax,
+                    COALESCE(SUM(CASE
+                        WHEN deduction_type = 'deductible' AND status != 'voided' AND invoice_format IN ('23','24') THEN -amount_untaxed
+                        WHEN deduction_type = 'deductible' AND status != 'voided' THEN amount_untaxed
+                        ELSE 0 END), 0) AS purchase_deductible_amount,
+                    COALESCE(SUM(CASE
+                        WHEN deduction_type = 'deductible' AND status != 'voided' AND invoice_format IN ('23','24') THEN -tax_amount
+                        WHEN deduction_type = 'deductible' AND status != 'voided' THEN tax_amount
+                        ELSE 0 END), 0) AS purchase_deductible_tax,
                     COALESCE(SUM(CASE WHEN deduction_type = 'non_deductible' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS purchase_non_deductible_amount,
                     COALESCE(SUM(CASE WHEN deduction_type = 'non_deductible' AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS purchase_non_deductible_tax,
                     COALESCE(SUM(CASE WHEN status != 'voided' THEN total_amount ELSE 0 END), 0) AS purchase_total,

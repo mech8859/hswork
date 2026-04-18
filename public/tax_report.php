@@ -29,6 +29,25 @@ $summary = $model->getTaxSummary($period);
 $purchaseDetail = $model->getTaxDetail($period, 'purchase');
 $salesDetail = $model->getTaxDetail($period, 'sales');
 
+// 上期累積留抵（格108）：依 period 存/讀 system_settings
+$_prevCreditKey = 'tax_prev_credit_' . $period;
+$_db = Database::getInstance();
+if (isset($_GET['prev_credit']) && $_GET['prev_credit'] !== '') {
+    $_pv = max(0, (int)$_GET['prev_credit']);
+    $_stmt = $_db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+    $_stmt->execute(array($_prevCreditKey, (string)$_pv));
+    $prevCredit = $_pv;
+} else {
+    $_stmt = $_db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+    $_stmt->execute(array($_prevCreditKey));
+    $prevCredit = (int)($_stmt->fetchColumn() ?: 0);
+}
+// 回寫頂部「應繳稅額」卡片：實際應繳 = 銷項 - (進項 + 上期留抵)
+$_finalPayable = (int)$summary['sales_tax'] - ((int)$summary['purchase_deductible_tax'] + $prevCredit);
+$summary['tax_payable_final'] = $_finalPayable;
+$summary['prev_credit'] = $prevCredit;
+
 $pageTitle = '401 營業稅申報';
 $currentPage = 'tax_report';
 require __DIR__ . '/../templates/layouts/header.php';
