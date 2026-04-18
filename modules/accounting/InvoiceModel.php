@@ -114,14 +114,43 @@ class InvoiceModel
             $params[] = $filters['status'];
         }
         if (!empty($filters['keyword'])) {
-            $where[] = "(pi.invoice_number LIKE ? OR pi.vendor_name LIKE ? OR pi.note LIKE ?)";
-            $params[] = '%' . $filters['keyword'] . '%';
-            $params[] = '%' . $filters['keyword'] . '%';
-            $params[] = '%' . $filters['keyword'] . '%';
+            $rawKw = trim($filters['keyword']);
+            // $ 開頭：精準比對三個金額欄位
+            if (strlen($rawKw) > 1 && $rawKw[0] === '$') {
+                $amt = (float)preg_replace('/[^0-9.\-]/', '', substr($rawKw, 1));
+                $where[] = "(pi.amount_untaxed = ? OR pi.tax_amount = ? OR pi.total_amount = ?)";
+                $params[] = $amt; $params[] = $amt; $params[] = $amt;
+            } else {
+                $kw = '%' . $rawKw . '%';
+                // 申報期間：支援 YYYYMM（月）與 YYYY/M-M月、YYYY-MM-MM（兩月一期）
+                $kwPeriod = '%' . preg_replace('/[^0-9]/', '', $rawKw) . '%';
+                $kwBimonth = null;
+                if (preg_match('/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/', $rawKw, $_bm)) {
+                    $kwBimonth = sprintf('%04d-%02d-%02d', (int)$_bm[1], (int)$_bm[2], (int)$_bm[3]);
+                }
+                $periodClauses = "pi.period LIKE ?";
+                if ($kwBimonth !== null) {
+                    $periodClauses .= " OR pi.report_period = ?";
+                }
+                $where[] = "(pi.invoice_number LIKE ? OR pi.vendor_name LIKE ? OR pi.note LIKE ?
+                    OR pi.vendor_tax_id LIKE ?
+                    OR CAST(pi.invoice_date AS CHAR) LIKE ?
+                    OR CAST(pi.amount_untaxed AS CHAR) LIKE ?
+                    OR CAST(pi.tax_amount AS CHAR) LIKE ?
+                    OR CAST(pi.total_amount AS CHAR) LIKE ?
+                    OR {$periodClauses})";
+                for ($i = 0; $i < 8; $i++) { $params[] = $kw; }
+                $params[] = $kwPeriod;
+                if ($kwBimonth !== null) { $params[] = $kwBimonth; }
+            }
         }
         if (!empty($filters['invoice_type'])) {
             $where[] = "pi.invoice_type = ?";
             $params[] = $filters['invoice_type'];
+        }
+        if (!empty($filters['invoice_format'])) {
+            $where[] = "pi.invoice_format = ?";
+            $params[] = $filters['invoice_format'];
         }
         if (!empty($filters['deduction_type'])) {
             $where[] = "pi.deduction_type = ?";
@@ -340,14 +369,42 @@ class InvoiceModel
             $params[] = $filters['status'];
         }
         if (!empty($filters['keyword'])) {
-            $where[] = "(si.invoice_number LIKE ? OR si.customer_name LIKE ? OR si.note LIKE ?)";
-            $params[] = '%' . $filters['keyword'] . '%';
-            $params[] = '%' . $filters['keyword'] . '%';
-            $params[] = '%' . $filters['keyword'] . '%';
+            $rawKw = trim($filters['keyword']);
+            // $ 開頭：精準比對三個金額欄位
+            if (strlen($rawKw) > 1 && $rawKw[0] === '$') {
+                $amt = (float)preg_replace('/[^0-9.\-]/', '', substr($rawKw, 1));
+                $where[] = "(si.amount_untaxed = ? OR si.tax_amount = ? OR si.total_amount = ?)";
+                $params[] = $amt; $params[] = $amt; $params[] = $amt;
+            } else {
+                $kw = '%' . $rawKw . '%';
+                $kwPeriod = '%' . preg_replace('/[^0-9]/', '', $rawKw) . '%';
+                $kwBimonth = null;
+                if (preg_match('/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/', $rawKw, $_bm)) {
+                    $kwBimonth = sprintf('%04d-%02d-%02d', (int)$_bm[1], (int)$_bm[2], (int)$_bm[3]);
+                }
+                $periodClauses = "si.period LIKE ?";
+                if ($kwBimonth !== null) {
+                    $periodClauses .= " OR si.report_period = ?";
+                }
+                $where[] = "(si.invoice_number LIKE ? OR si.customer_name LIKE ? OR si.note LIKE ?
+                    OR si.customer_tax_id LIKE ?
+                    OR CAST(si.invoice_date AS CHAR) LIKE ?
+                    OR CAST(si.amount_untaxed AS CHAR) LIKE ?
+                    OR CAST(si.tax_amount AS CHAR) LIKE ?
+                    OR CAST(si.total_amount AS CHAR) LIKE ?
+                    OR {$periodClauses})";
+                for ($i = 0; $i < 8; $i++) { $params[] = $kw; }
+                $params[] = $kwPeriod;
+                if ($kwBimonth !== null) { $params[] = $kwBimonth; }
+            }
         }
         if (!empty($filters['invoice_type'])) {
             $where[] = "si.invoice_type = ?";
             $params[] = $filters['invoice_type'];
+        }
+        if (!empty($filters['invoice_format'])) {
+            $where[] = "si.invoice_format = ?";
+            $params[] = $filters['invoice_format'];
         }
 
         $whereStr = implode(' AND ', $where);

@@ -70,9 +70,29 @@ $refOptions = InvoiceModel::referenceTypeOptions();
         <div class="card-header">發票資訊</div>
         <div class="form-row">
             <div class="form-group">
-                <label>申報年月</label>
-                <input type="month" name="report_period" class="form-control"
-                       value="<?= e($isEdit && !empty($record['report_period']) ? $record['report_period'] : date('Y-m')) ?>">
+                <label>申報期間 <small style="color:#888;font-weight:normal">(401 兩月一期)</small></label>
+                <?php
+                $_bmOpts = $model->getTaxPeriodOptions();
+                $_cur = $isEdit && !empty($record['report_period']) ? $record['report_period'] : '';
+                // 舊格式 YYYY-MM → 轉為所屬兩月期
+                if (preg_match('/^(\d{4})-(\d{2})$/', $_cur, $_m)) {
+                    $_mm = (int)$_m[2];
+                    $_pair = ($_mm % 2 === 1) ? array($_mm, $_mm + 1) : array($_mm - 1, $_mm);
+                    $_cur = sprintf('%s-%02d-%02d', $_m[1], $_pair[0], $_pair[1]);
+                }
+                // 若仍為空，預設本月所屬兩月期
+                if (!$_cur) {
+                    $_ny = (int)date('Y');
+                    $_nm = (int)date('n');
+                    $_pair = ($_nm % 2 === 1) ? array($_nm, $_nm + 1) : array($_nm - 1, $_nm);
+                    $_cur = sprintf('%s-%02d-%02d', $_ny, $_pair[0], $_pair[1]);
+                }
+                ?>
+                <select name="report_period" class="form-control">
+                    <?php foreach ($_bmOpts as $_opt): ?>
+                    <option value="<?= e($_opt['value']) ?>" <?= $_cur === $_opt['value'] ? 'selected' : '' ?>><?= e($_opt['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="form-group">
                 <label>進項發票聯式</label>
@@ -127,16 +147,6 @@ $refOptions = InvoiceModel::referenceTypeOptions();
                     <option value="voided" <?= ($isEdit && !empty($record['status']) && $record['status'] === 'voided') ? 'selected' : '' ?>>已作廢</option>
                 </select>
             </div>
-            <?php if ($isEdit): ?>
-            <div class="form-group">
-                <label>狀態</label>
-                <select name="status" class="form-control">
-                    <?php foreach ($statusOptions as $k => $v): ?>
-                    <option value="<?= e($k) ?>" <?= (!empty($record['status']) ? $record['status'] : 'pending') === $k ? 'selected' : '' ?>><?= e($v) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php endif; ?>
         </div>
     </div>
 

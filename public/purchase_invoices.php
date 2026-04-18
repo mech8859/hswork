@@ -20,7 +20,7 @@ switch ($action) {
             'vendor'         => !empty($_GET['vendor']) ? $_GET['vendor'] : '',
             'status'         => !empty($_GET['status']) ? $_GET['status'] : '',
             'keyword'        => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
-            'invoice_type'   => !empty($_GET['invoice_type']) ? $_GET['invoice_type'] : '',
+            'invoice_format' => !empty($_GET['invoice_format']) ? $_GET['invoice_format'] : '',
             'deduction_type' => !empty($_GET['deduction_type']) ? $_GET['deduction_type'] : '',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;

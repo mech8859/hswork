@@ -20,13 +20,22 @@
             <option value="<?= e($k) ?>" <?= (!empty($filters['status']) && $filters['status'] === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
         </select>
-        <select name="invoice_type" class="form-control" style="width:auto;min-width:80px">
-            <option value="">全部類型</option>
-            <?php foreach (InvoiceModel::salesInvoiceTypeOptions() as $k => $v): ?>
-            <option value="<?= e($k) ?>" <?= (!empty($filters['invoice_type']) && $filters['invoice_type'] === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
+        <select name="invoice_format" class="form-control" style="width:auto;min-width:140px">
+            <option value="">銷項發票聯式（全部）</option>
+            <?php
+            $_sfOpts = array(
+                '31' => '31：銷項三聯式、電子計算機統一發票',
+                '32' => '32：銷項二聯式、二聯式收銀機統一發票',
+                '33' => '33：三聯式銷貨退回或折讓證明單',
+                '34' => '34：二聯式銷貨退回或折讓證明單',
+                '35' => '35：銷項三聯式收銀機統一發票、電子發票',
+            );
+            foreach ($_sfOpts as $_k => $_v):
+            ?>
+            <option value="<?= e($_k) ?>" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === $_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
             <?php endforeach; ?>
         </select>
-        <input type="text" name="keyword" class="form-control" style="width:auto;min-width:140px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註">
+        <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報年月/金額（$1500 精準比對）">
         <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
         <a href="/sales_invoices.php" class="btn btn-outline btn-sm">清除</a>
     </form>
