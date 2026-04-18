@@ -227,27 +227,37 @@ class QuotationModel
         $days   = !empty($data['labor_days']) ? (float)$data['labor_days'] : null;
         $people = !empty($data['labor_people']) ? (int)$data['labor_people'] : null;
         $hours  = !empty($data['labor_hours']) ? (float)$data['labor_hours'] : null;
-        $laborCost = !empty($data['labor_cost_total']) ? (int)$data['labor_cost_total'] : null;
 
         // 自動算施工時數（天數 × 人數 × 8），若使用者未手動填
         if (!$hours && $days && $people) {
             $hours = $days * $people * 8;
         }
-        // 自動算人力成本（時數 × 時薪），若使用者未手動填
-        if (!$laborCost && $hours) {
+        // 施工時數最低 1（有天數或人數時）
+        if ($hours !== null && $hours > 0 && $hours < 1) {
+            $hours = 1;
+        }
+        // 人力成本一律 = 時數 × 時薪（禁止手動輸入）
+        $laborCost = null;
+        if ($hours) {
             $hrStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
             $hrStmt->execute();
             $hourlyCost = (int)$hrStmt->fetchColumn() ?: 560;
             $laborCost = (int)round($hours * $hourlyCost);
         }
 
+        // cable_not_used：有勾選 → 線材成本 0；無連結案件 → 視為 0
+        $cableNotUsed = !empty($data['cable_not_used']) ? 1 : 0;
+        $hasCase = !empty($data['case_id']);
+        $cableCost = ($cableNotUsed || !$hasCase) ? 0 : (int)($data['cable_cost'] ?? 0);
+
         $stmt = $this->db->prepare('
-            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_hours = ?, labor_cost_total = ?, cable_cost = ?
+            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_hours = ?,
+                labor_cost_total = ?, cable_cost = ?, cable_not_used = ?
             WHERE id = ?
         ');
         $stmt->execute(array(
             $days, $people, $hours, $laborCost,
-            $data['cable_cost'] ?: 0,
+            $cableCost, $cableNotUsed,
             $id,
         ));
     }
@@ -398,19 +408,29 @@ class QuotationModel
      */
     private function recalcTotals($quotationId, $subtotal, $materialCost)
     {
-        $stmt = $this->db->prepare('SELECT tax_rate, labor_cost_total, cable_cost, tax_free FROM quotations WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT tax_rate, labor_cost_total, cable_cost, tax_free, has_discount, discount_amount FROM quotations WHERE id = ?');
         $stmt->execute(array($quotationId));
         $q = $stmt->fetch();
         $taxRate = $q ? (float)$q['tax_rate'] : 5.0;
         $laborCost = $q ? (int)$q['labor_cost_total'] : 0;
         $cableCost = $q ? (int)$q['cable_cost'] : 0;
         $isTaxFree = $q ? (int)$q['tax_free'] : 0;
+        $hasDiscount = $q ? (int)$q['has_discount'] : 0;
+        $discountAmount = $q ? (int)$q['discount_amount'] : 0;
 
         $taxAmount = $isTaxFree ? 0 : (int)round($subtotal * $taxRate / 100);
         $totalAmount = $subtotal + $taxAmount;
+        // 營運成本 = 人力 × 倍率（不計入 total_cost 以免破壞 cases.php 的 q_material_cost 計算）
+        $opRateStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
+        $opRateStmt->execute();
+        $opRate = (float)($opRateStmt->fetchColumn() ?: 128);
+        $opsCost = (int)round($laborCost * $opRate / 100);
         $totalCost = $materialCost + $laborCost + $cableCost;
-        $profitAmount = $subtotal - $totalCost;
-        $profitRate = ($subtotal > 0) ? round($profitAmount / $subtotal * 100, 2) : 0;
+        // 預估成交金額：有優惠價取優惠價，無則取未稅合計
+        $projected = ($hasDiscount && $discountAmount > 0) ? $discountAmount : $subtotal;
+        // 利潤以預估成交金額為基礎，扣除實體成本 + 營運成本
+        $profitAmount = $projected - ($totalCost + $opsCost);
+        $profitRate = ($projected > 0) ? round($profitAmount / $projected * 100, 2) : 0;
 
         $this->db->prepare('
             UPDATE quotations SET subtotal = ?, tax_amount = ?, total_amount = ?,

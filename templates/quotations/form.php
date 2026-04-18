@@ -371,7 +371,16 @@ require __DIR__ . '/../_readonly_form_helper.php';
     <?php endif; ?>
 
     <!-- 內部成本（僅管理者可見） -->
-    <?php if ($canManage): ?>
+    <?php if ($canManage):
+        $_qfHrStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
+        $_qfHrStmt->execute();
+        $_qfHourly = (int)($_qfHrStmt->fetchColumn() ?: 560);
+        $_qfOpRateStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
+        $_qfOpRateStmt->execute();
+        $_qfOpRate = (float)($_qfOpRateStmt->fetchColumn() ?: 128);
+        $_hasCase = $isEdit && !empty($quote['case_id']);
+        $_cableNotUsed = $isEdit && !empty($quote['cable_not_used']);
+    ?>
     <div class="card">
         <div class="card-header">內部成本分析（不顯示在報價單）</div>
         <div class="form-row">
@@ -384,26 +393,30 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($quote['labor_people'] ?? '') ?>" min="0" oninput="autoCalcHours()">
             </div>
             <div class="form-group">
-                <label>施工時數 <small style="color:#888;font-weight:normal">(自動=天數×人數×8)</small></label>
-                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="0" oninput="laborHoursManual=true">
+                <label>施工時數 <small style="color:#888;font-weight:normal">(自動=天數×人數×8，最低 1)</small></label>
+                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="1" oninput="laborHoursManual=true;recalcLaborCost()">
             </div>
             <div class="form-group">
-                <label>人力成本</label>
-                <input type="number" name="labor_cost_total" id="laborCostTotal" class="form-control" value="<?= e($quote['labor_cost_total'] ?? '') ?>" min="0">
+                <label>人力成本 <small style="color:#888;font-weight:normal">(自動=時數×$<?= $_qfHourly ?>)</small></label>
+                <input type="number" name="labor_cost_total" id="laborCostTotal" class="form-control" value="<?= e($quote['labor_cost_total'] ?? '') ?>" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
             </div>
             <div class="form-group">
-                <label>線材成本</label>
-                <input type="number" name="cable_cost" id="cableCost" class="form-control" value="<?= e($quote['cable_cost'] ?? '') ?>" min="0">
+                <label>線材成本 <small style="color:#888;font-weight:normal">(由預估線材帶入)</small></label>
+                <input type="number" name="cable_cost" id="cableCost" class="form-control" value="<?= e($quote['cable_cost'] ?? '') ?>" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
             </div>
         </div>
-        <?php
-        $_qfOpModeStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");
-        $_qfOpModeStmt->execute();
-        $_qfOpMode = $_qfOpModeStmt->fetchColumn() ?: 'labor_ratio';
-        $_qfOpRateStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_rate' LIMIT 1");
-        $_qfOpRateStmt->execute();
-        $_qfOpRate = (float)($_qfOpRateStmt->fetchColumn() ?: 128);
-        ?>
+        <div class="form-row" style="margin-top:4px">
+            <div class="form-group" id="cableNotUsedWrap" style="<?= $_hasCase ? '' : 'display:none' ?>">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="cable_not_used" id="cableNotUsed" value="1" <?= $_cableNotUsed ? 'checked' : '' ?> onchange="onCableNotUsedChange()">
+                    此案件無使用線材
+                </label>
+                <small style="color:#888;display:block;margin-top:2px">勾選後線材成本將記為 0</small>
+            </div>
+            <div class="form-group" id="noCaseCableHint" style="<?= $_hasCase ? 'display:none' : '' ?>;color:#c5221f;align-self:center">
+                <small>未連結案件，線材成本預設為 0</small>
+            </div>
+        </div>
         <div class="form-row" style="background:#f8f9fa;padding:8px;border-radius:6px">
             <div class="form-group">
                 <label>器材總成本</label>
@@ -416,6 +429,10 @@ require __DIR__ . '/../_readonly_form_helper.php';
             <div class="form-group">
                 <label>總成本</label>
                 <div id="totalCostDisplay" style="font-weight:600;font-size:1.1rem">$0</div>
+            </div>
+            <div class="form-group">
+                <label>預估成交金額 <small style="color:#999;font-weight:normal">(優惠價優先)</small></label>
+                <div id="projectedRevenue" style="font-weight:600;font-size:1.1rem;color:#1967d2">$0</div>
             </div>
             <div class="form-group">
                 <label>利潤金額</label>
@@ -520,6 +537,7 @@ function toggleDiscount() {
         if (!cb.checked) document.getElementById('discountAmount').value = '';
     }
     if (hf) hf.value = cb.checked ? '1' : '0';
+    calcGrandTotal();
 }
 
 function toggleFormat(fmt) {
@@ -817,19 +835,27 @@ function calcGrandTotal() {
     var hf = document.getElementById('taxFreeHidden');
     if (hf) hf.value = taxFree ? '1' : '0';
 
-    // 內部成本計算（含營運成本）
+    // 內部成本計算（含營運成本；以預估成交金額算利潤）
     if (canManage) {
         var laborCost = parseFloat(document.getElementById('laborCostTotal').value) || 0;
         var cableCost = parseFloat(document.getElementById('cableCost').value) || 0;
         var opsRate = <?= isset($_qfOpRate) ? $_qfOpRate : 128 ?>;
         var opsCost = Math.round(laborCost * opsRate / 100);
         var totalCost = grandCost + laborCost + cableCost + opsCost;
-        var profit = grandSubtotal - totalCost;
-        var profitPct = grandSubtotal > 0 ? (profit / grandSubtotal * 100).toFixed(1) : 0;
+        // 預估成交金額：有優惠價取優惠價，無則取合計未稅（grandSubtotal）
+        var hasDiscountHidden = document.getElementById('hasDiscountHidden');
+        var discountInput = document.getElementById('discountAmount');
+        var discountAmt = discountInput ? (parseInt(discountInput.value, 10) || 0) : 0;
+        var useDiscount = hasDiscountHidden && hasDiscountHidden.value === '1' && discountAmt > 0;
+        var projected = useDiscount ? discountAmt : grandSubtotal;
+        var profit = projected - totalCost;
+        var profitPct = projected > 0 ? (profit / projected * 100).toFixed(1) : 0;
         document.getElementById('materialCost').textContent = '$' + grandCost.toLocaleString();
         var opsEl = document.getElementById('opsCostDisplay');
         if (opsEl) opsEl.textContent = '$' + opsCost.toLocaleString();
         document.getElementById('totalCostDisplay').textContent = '$' + totalCost.toLocaleString();
+        var projEl = document.getElementById('projectedRevenue');
+        if (projEl) projEl.textContent = '$' + projected.toLocaleString();
         document.getElementById('profitAmount').textContent = '$' + profit.toLocaleString();
         document.getElementById('profitRate').textContent = profitPct + '%';
         document.getElementById('profitAmount').style.color = profit >= 0 ? '#137333' : '#c5221f';
@@ -1061,26 +1087,71 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// 人力成本、線材成本輸入時重算
-if (document.getElementById('laborCostTotal')) {
-    document.getElementById('laborCostTotal').addEventListener('input', calcGrandTotal);
-}
-if (document.getElementById('cableCost')) {
-    document.getElementById('cableCost').addEventListener('input', calcGrandTotal);
+// 人力時薪（由系統設定帶入）
+var laborHourlyCost = <?= isset($_qfHourly) ? (int)$_qfHourly : 560 ?>;
+
+// 人力成本自動計算：時數 × 時薪
+function recalcLaborCost() {
+    var costEl = document.getElementById('laborCostTotal');
+    if (!costEl) return;
+    var hours = parseFloat(document.getElementById('laborHours').value) || 0;
+    if (hours > 0 && hours < 1) hours = 1;
+    var cost = hours > 0 ? Math.round(hours * laborHourlyCost) : 0;
+    costEl.value = cost || '';
+    calcGrandTotal();
 }
 
-// 施工時數自動計算（天數 × 人數 × 8）
+// 「此案件無使用線材」切換
+function onCableNotUsedChange() {
+    var chk = document.getElementById('cableNotUsed');
+    var cableEl = document.getElementById('cableCost');
+    if (!chk || !cableEl) return;
+    if (chk.checked) {
+        cableEl.value = 0;
+        calcGrandTotal();
+    }
+    // 未勾選：維持現值（儲存時後端會強制從預估線材同步）
+}
+
+// 依 case_id 切換「無使用線材」勾選與線材成本可用性
+function updateCableCaseUI() {
+    var caseHidden = document.getElementById('qCaseId');
+    var wrap = document.getElementById('cableNotUsedWrap');
+    var hint = document.getElementById('noCaseCableHint');
+    var cableEl = document.getElementById('cableCost');
+    var chk = document.getElementById('cableNotUsed');
+    if (!caseHidden || !cableEl) return;
+    var hasCase = !!caseHidden.value;
+    if (wrap) wrap.style.display = hasCase ? '' : 'none';
+    if (hint) hint.style.display = hasCase ? 'none' : '';
+    if (!hasCase) {
+        cableEl.value = 0;
+        if (chk) chk.checked = false;
+        calcGrandTotal();
+    }
+}
+
+// 優惠價輸入/切換時重算（預估成交金額依賴）
+if (document.getElementById('discountAmount')) {
+    document.getElementById('discountAmount').addEventListener('input', calcGrandTotal);
+}
+
+// 施工時數自動計算（天數 × 人數 × 8，最低 1）
 var laborHoursManual = false;
 function autoCalcHours() {
-    if (laborHoursManual) return;
     var days = parseFloat(document.getElementById('laborDays').value) || 0;
     var people = parseFloat(document.getElementById('laborPeople').value) || 0;
     var hoursInput = document.getElementById('laborHours');
-    if (days > 0 && people > 0) {
-        hoursInput.value = (days * people * 8);
-    } else if (days === 0 && people === 0) {
-        hoursInput.value = '';
+    if (!laborHoursManual) {
+        if (days > 0 && people > 0) {
+            var h = days * people * 8;
+            if (h < 1) h = 1;
+            hoursInput.value = h;
+        } else if (days === 0 && people === 0) {
+            hoursInput.value = '';
+        }
     }
+    recalcLaborCost();
 }
 
 // 載入主分類
@@ -1296,6 +1367,7 @@ function loadEstMaterials(caseId) {
             caseInput.value = '';
             caseHidden.value = '';
             if (estCard) estCard.style.display = 'none';
+            updateCableCaseUI();
             return false;
         }
         if (d.existing_quotation && !isEditPage) {
@@ -1303,6 +1375,7 @@ function loadEstMaterials(caseId) {
             caseInput.value = '';
             caseHidden.value = '';
             if (estCard) estCard.style.display = 'none';
+            updateCableCaseUI();
             return false;
         }
         if (d.case) {
@@ -1313,6 +1386,7 @@ function loadEstMaterials(caseId) {
             fillIfEmpty('site_address', d.case.site_address);
         }
         if (estCard) { estCard.style.display = ''; loadEstMaterials(caseId); }
+        updateCableCaseUI();
         return true;
     }
 
@@ -1323,6 +1397,7 @@ function loadEstMaterials(caseId) {
         if (!txt) {
             caseHidden.value = '';
             if (estCard) estCard.style.display = 'none';
+            updateCableCaseUI();
             return;
         }
         // 查詢 case_number → case_id
@@ -1334,6 +1409,7 @@ function loadEstMaterials(caseId) {
                     caseInput.value = '';
                     caseHidden.value = '';
                     if (estCard) estCard.style.display = 'none';
+                    updateCableCaseUI();
                     return;
                 }
                 caseHidden.value = r.case_id;
@@ -1365,6 +1441,7 @@ document.addEventListener('click', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
     var sections = document.querySelectorAll('.quote-section');
     for (var i = 0; i < sections.length; i++) calcSectionSubtotal(sections[i]);
+    updateCableCaseUI();
     calcGrandTotal();
 });
 </script>

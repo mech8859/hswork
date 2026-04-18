@@ -334,10 +334,13 @@ if ($canManage && !empty($quote['case_id'])) {
     } else {
         $viewOpCost = round((float)$quote['subtotal'] * $_vOpRate / 100);
     }
-    // 含營運成本的真實利潤
+    // 含營運成本的真實利潤（以預估成交金額為基礎：有優惠價取優惠價，無則取未稅小計）
+    $viewProjected = (!empty($quote['has_discount']) && (int)($quote['discount_amount'] ?? 0) > 0)
+        ? (int)$quote['discount_amount']
+        : (float)$quote['subtotal'];
     $viewRealTotalCost = (int)$quote['total_cost'] + $viewOpCost;
-    $viewRealProfit = (float)$quote['subtotal'] - $viewRealTotalCost;
-    $viewRealProfitRate = (float)$quote['subtotal'] > 0 ? round($viewRealProfit / (float)$quote['subtotal'] * 100, 1) : 0;
+    $viewRealProfit = $viewProjected - $viewRealTotalCost;
+    $viewRealProfitRate = $viewProjected > 0 ? round($viewRealProfit / $viewProjected * 100, 1) : 0;
     ?>
     <div class="info-grid">
         <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
@@ -345,9 +348,10 @@ if ($canManage && !empty($quote['case_id'])) {
         <div><span class="info-label">施工時數</span><span><?= $viewHours ? $viewHours : '-' ?></span></div>
         <div><span class="info-label">人力成本</span><span>$<?= number_format($viewLaborCost) ?></span></div>
         <div><span class="info-label">器材成本</span><span>$<?= number_format($viewMaterialCost) ?></span></div>
-        <div><span class="info-label">線材成本</span><span>$<?= number_format($viewCableCost) ?></span></div>
+        <div><span class="info-label">線材成本<?= !empty($quote['cable_not_used']) ? ' <small style="color:#888">(無使用)</small>' : '' ?></span><span>$<?= number_format($viewCableCost) ?></span></div>
         <div><span class="info-label">營運成本 <small style="color:#999">(人力×<?= $_vOpRate ?>%)</small></span><span style="color:#e65100">$<?= number_format($viewOpCost) ?></span></div>
         <div><span class="info-label">總成本</span><span><strong>$<?= number_format($viewRealTotalCost) ?></strong></span></div>
+        <div><span class="info-label">預估成交金額 <small style="color:#999">(優惠價優先)</small></span><span style="color:#1967d2"><strong>$<?= number_format($viewProjected) ?></strong></span></div>
         <div><span class="info-label">利潤</span><span style="color:<?= $viewRealProfit >= 0 ? '#137333' : '#c5221f' ?>"><strong>$<?= number_format($viewRealProfit) ?></strong></span></div>
         <div><span class="info-label">利潤率</span><span style="color:<?= $viewRealProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><strong><?= $viewRealProfitRate ?>%</strong></span></div>
     </div>

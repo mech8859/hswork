@@ -69,9 +69,17 @@ switch ($action) {
                 $caseModel = new CaseModel();
                 $caseModel->saveMaterialEstimates($createCaseId, $_POST['est_materials']);
             }
-            // 自動同步線材成本
-            if ($createCaseId > 0) {
+            // 線材成本：有連結案件且未勾「無使用線材」才強制同步（內含 recalcTotals）
+            if ($createCaseId > 0 && empty($_POST['cable_not_used'])) {
                 $model->syncCableCostFromEstimates($quoteId, $createCaseId);
+            } else {
+                // 無案件或勾選無使用線材：手動觸發利潤重算以反映最新人力成本
+                $_nq = $model->getById($quoteId);
+                if ($_nq) {
+                    $_mStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(qi.unit_cost * qi.quantity), 0) FROM quotation_items qi JOIN quotation_sections qs ON qi.section_id = qs.id WHERE qs.quotation_id = ?");
+                    $_mStmt->execute(array($quoteId));
+                    $model->recalcTotalsPublic($quoteId, (int)$_nq['subtotal'], (int)$_mStmt->fetchColumn());
+                }
             }
             Session::flash('success', '報價單已建立');
             redirect('/quotations.php?action=view&id=' . $quoteId);
@@ -137,9 +145,17 @@ switch ($action) {
                 $caseModel = new CaseModel();
                 $caseModel->saveMaterialEstimates($editCaseId, $_POST['est_materials']);
             }
-            // 自動同步線材成本
-            if ($editCaseId > 0) {
+            // 線材成本：有連結案件且未勾「無使用線材」才強制同步（內含 recalcTotals）
+            if ($editCaseId > 0 && empty($_POST['cable_not_used'])) {
                 $model->syncCableCostFromEstimates($id, $editCaseId);
+            } else {
+                // 無案件或勾選無使用線材：手動觸發利潤重算以反映最新人力成本
+                $_nq = $model->getById($id);
+                if ($_nq) {
+                    $_mStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(qi.unit_cost * qi.quantity), 0) FROM quotation_items qi JOIN quotation_sections qs ON qi.section_id = qs.id WHERE qs.quotation_id = ?");
+                    $_mStmt->execute(array($id));
+                    $model->recalcTotalsPublic($id, (int)$_nq['subtotal'], (int)$_mStmt->fetchColumn());
+                }
             }
             // 已核准狀態編輯後退回草稿，需重新送簽核
             if ($quote['status'] === 'approved') {
@@ -193,56 +209,7 @@ switch ($action) {
         $_so->execute(array($id));
         $relatedStockOuts = $_so->fetchAll(PDO::FETCH_ASSOC);
 
-        // 自動補算：施工時數/人力成本/線材成本（若 DB 未存但可算出）
-        if ($canManage) {
-            $needSync = false;
-            $syncDays   = (float)($quote['labor_days'] ?: 0);
-            $syncPeople = (int)($quote['labor_people'] ?: 0);
-            $syncHours  = (float)($quote['labor_hours'] ?: 0);
-            $syncLabor  = (int)($quote['labor_cost_total'] ?: 0);
-            $syncCable  = (int)($quote['cable_cost'] ?: 0);
-
-            // 自動算施工時數
-            if (!$syncHours && $syncDays > 0 && $syncPeople > 0) {
-                $syncHours = $syncDays * $syncPeople * 8;
-                $needSync = true;
-            }
-            // 自動算人力成本
-            if (!$syncLabor && $syncHours > 0) {
-                $_hrStmt = $_db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
-                $_hrStmt->execute();
-                $_hrCost = (int)$_hrStmt->fetchColumn() ?: 560;
-                $syncLabor = (int)round($syncHours * $_hrCost);
-                $needSync = true;
-            }
-            // 自動同步線材成本
-            if (!$syncCable && !empty($quote['case_id'])) {
-                $model->syncCableCostFromEstimates($id, $quote['case_id']);
-                $needSync = true;
-            }
-            if ($needSync) {
-                $model->saveLaborCost($id, array(
-                    'labor_days' => $syncDays ?: null,
-                    'labor_people' => $syncPeople ?: null,
-                    'labor_hours' => $syncHours ?: null,
-                    'labor_cost_total' => $syncLabor ?: null,
-                    'cable_cost' => $syncCable,
-                ));
-                // 重算利潤
-                $_matStmt = $_db->prepare("
-                    SELECT COALESCE(SUM(qi.unit_cost * qi.quantity), 0)
-                    FROM quotation_items qi
-                    JOIN quotation_sections qs ON qi.section_id = qs.id
-                    WHERE qs.quotation_id = ?
-                ");
-                $_matStmt->execute(array($id));
-                $_matCost = (int)$_matStmt->fetchColumn();
-                $model->recalcTotalsPublic($id, (int)$quote['subtotal'], $_matCost);
-                // 重新讀取
-                $quote = $model->getById($id);
-            }
-        }
-
+        // 舊資料不在檢視時自動補算（避免覆蓋使用者意圖），改於下次編輯儲存時同步
         $pageTitle = '報價單 ' . $quote['quotation_number'];
         $currentPage = 'quotations';
         require __DIR__ . '/../templates/layouts/header.php';
