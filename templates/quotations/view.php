@@ -342,6 +342,18 @@ if ($canManage && !empty($quote['case_id'])) {
     $viewRealProfit = $viewProjected - $viewRealTotalCost;
     $viewRealProfitRate = $viewProjected > 0 ? round($viewRealProfit / $viewProjected * 100, 1) : 0;
     ?>
+    <?php
+    // 利潤率徽章
+    if ($viewRealProfitRate >= 15) {
+        $profitBadge = array('icon' => '💚', 'label' => '優質', 'bg' => '#e6f4ea', 'color' => '#137333');
+    } elseif ($viewRealProfitRate >= 10) {
+        $profitBadge = array('icon' => '🟡', 'label' => '警戒', 'bg' => '#fef7e0', 'color' => '#b26a00');
+    } elseif ($viewRealProfitRate >= 0) {
+        $profitBadge = array('icon' => '⚠️', 'label' => '警告', 'bg' => '#fce8e6', 'color' => '#c5221f');
+    } else {
+        $profitBadge = array('icon' => '🔴', 'label' => '虧損', 'bg' => '#fce8e6', 'color' => '#c5221f');
+    }
+    ?>
     <div class="info-grid">
         <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
         <div><span class="info-label">施工人數</span><span><?= $viewPeople ?: '-' ?></span></div>
@@ -353,8 +365,49 @@ if ($canManage && !empty($quote['case_id'])) {
         <div><span class="info-label">總成本</span><span><strong>$<?= number_format($viewRealTotalCost) ?></strong></span></div>
         <div><span class="info-label">預估成交金額 <small style="color:#999">(優惠價優先)</small></span><span style="color:#1967d2"><strong>$<?= number_format($viewProjected) ?></strong></span></div>
         <div><span class="info-label">利潤</span><span style="color:<?= $viewRealProfit >= 0 ? '#137333' : '#c5221f' ?>"><strong>$<?= number_format($viewRealProfit) ?></strong></span></div>
-        <div><span class="info-label">利潤率</span><span style="color:<?= $viewRealProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><strong><?= $viewRealProfitRate ?>%</strong></span></div>
+        <div>
+            <span class="info-label">利潤率</span>
+            <span style="color:<?= $viewRealProfitRate >= 0 ? '#137333' : '#c5221f' ?>"><strong><?= $viewRealProfitRate ?>%</strong></span>
+            <span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:10px;background:<?= $profitBadge['bg'] ?>;color:<?= $profitBadge['color'] ?>;font-size:.75rem;font-weight:600">
+                <?= $profitBadge['icon'] ?> <?= $profitBadge['label'] ?>
+            </span>
+        </div>
     </div>
+    <?php
+    // 風險評分（純分析，不影響簽核）
+    $__riskModel = new QuotationModel();
+    $__risk = $__riskModel->calculateRiskScore($quote['id']);
+    if ($__risk):
+        if ($__risk['level'] === 'low') {
+            $__rBg = '#e6f4ea'; $__rColor = '#137333'; $__rIcon = '🟢'; $__rLabel = '低風險';
+            $__rAdvice = '風險可控，建議可接';
+        } elseif ($__risk['level'] === 'medium') {
+            $__rBg = '#fef7e0'; $__rColor = '#b26a00'; $__rIcon = '🟡'; $__rLabel = '中風險';
+            $__rAdvice = '部分項目需留意，利潤率低於 10% 要謹慎';
+        } else {
+            $__rBg = '#fce8e6'; $__rColor = '#c5221f'; $__rIcon = '🔴'; $__rLabel = '高風險';
+            $__rAdvice = '多項風險集中，建議要求加價或預收訂金';
+        }
+    ?>
+    <div style="margin:12px 16px 0;padding:12px;border:1px solid <?= $__rColor ?>;background:<?= $__rBg ?>;border-radius:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:600;color:<?= $__rColor ?>">
+                <?= $__rIcon ?> 風險評分 <span style="font-size:1.25rem"><?= $__risk['score'] ?></span> / 100
+                <span style="margin-left:8px;font-size:.85rem">(<?= $__rLabel ?>)</span>
+            </div>
+            <div style="font-size:.8rem;color:#666">💡 <?= $__rAdvice ?></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:6px;font-size:.8rem">
+            <?php foreach ($__risk['items'] as $__it): ?>
+            <div style="background:#fff;padding:6px 8px;border-radius:4px">
+                <div style="color:#666;font-size:.72rem"><?= e($__it['name']) ?> (<?= $__it['score'] ?>/<?= $__it['max'] ?>)</div>
+                <div style="color:#333"><?= e($__it['note']) ?></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <div style="margin-top:8px;font-size:.72rem;color:#888">※ 純分析參考，不影響簽核流程</div>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 

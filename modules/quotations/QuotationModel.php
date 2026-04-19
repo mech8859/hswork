@@ -627,4 +627,228 @@ class QuotationModel
     {
         return generate_doc_number('quotations');
     }
+
+    /**
+     * 報價單風險評分（純顯示、不影響簽核）
+     * 分項：客戶類型 20、庫存 20、工期 15、特殊設備 15、付款紀錄 20、材料新近 10 = 100
+     * 回傳：array('score'=>int, 'level'=>'low|medium|high', 'items'=>[['name','score','max','note']])
+     */
+    public function calculateRiskScore($quoteId)
+    {
+        $q = $this->db->prepare('SELECT id, case_id, customer_id, customer_name, labor_days FROM quotations WHERE id = ?');
+        $q->execute(array($quoteId));
+        $quote = $q->fetch();
+        if (!$quote) return null;
+
+        $items = array();
+        $score = 0;
+
+        // 1. 客戶類型 (max 20)
+        $custScore = 0;
+        $custNote = '新客戶';
+        if (!empty($quote['customer_id'])) {
+            // 成交過的案件數（含已完工結案）
+            $st = $this->db->prepare("
+                SELECT COUNT(*) FROM cases
+                WHERE customer_id = ?
+                  AND (sub_status IN ('已成交','跨月成交','現簽','電話報價成交','已完工結案','已完工待簽核')
+                       OR status IN ('completed','closed','completed_pending'))
+            ");
+            $st->execute(array($quote['customer_id']));
+            $doneCount = (int)$st->fetchColumn();
+            if ($doneCount >= 3) {
+                $custScore = 20;
+                $custNote = '老客戶（成交 ' . $doneCount . ' 次）';
+            } elseif ($doneCount >= 1) {
+                $custScore = 12;
+                $custNote = '合作過 ' . $doneCount . ' 次';
+            } else {
+                // 再查總案件數（有詢價但未成交也算部分關係）
+                $st2 = $this->db->prepare("SELECT COUNT(*) FROM cases WHERE customer_id = ?");
+                $st2->execute(array($quote['customer_id']));
+                $anyCount = (int)$st2->fetchColumn();
+                if ($anyCount >= 1) {
+                    $custScore = 6;
+                    $custNote = '往來過但尚無成交紀錄';
+                } else {
+                    $custScore = 3;
+                    $custNote = '新客戶（首次）';
+                }
+            }
+        }
+        $items[] = array('name' => '客戶類型', 'score' => $custScore, 'max' => 20, 'note' => $custNote);
+        $score += $custScore;
+
+        // 2. 庫存充足度 (max 20) - 看報價區段所有產品庫存
+        $stockScore = 0;
+        $stockNote = '無料件需備';
+        $itemStmt = $this->db->prepare('
+            SELECT qi.product_id, qi.quantity
+            FROM quotation_items qi
+            JOIN quotation_sections qs ON qi.section_id = qs.id
+            WHERE qs.quotation_id = ? AND qi.product_id IS NOT NULL
+        ');
+        $itemStmt->execute(array($quoteId));
+        $needed = array();
+        foreach ($itemStmt->fetchAll() as $it) {
+            $pid = (int)$it['product_id'];
+            if ($pid <= 0) continue;
+            if (!isset($needed[$pid])) $needed[$pid] = 0;
+            $needed[$pid] += (float)$it['quantity'];
+        }
+        if (!empty($needed)) {
+            $ids = implode(',', array_keys($needed));
+            $invStmt = $this->db->query("SELECT product_id, SUM(available_qty) AS qty FROM inventory WHERE product_id IN ($ids) GROUP BY product_id");
+            $avail = array();
+            foreach ($invStmt->fetchAll() as $r) {
+                $avail[(int)$r['product_id']] = (float)$r['qty'];
+            }
+            $okCount = 0;
+            $total = count($needed);
+            foreach ($needed as $pid => $qty) {
+                $have = isset($avail[$pid]) ? $avail[$pid] : 0;
+                if ($have >= $qty) $okCount++;
+            }
+            if ($okCount == $total) {
+                $stockScore = 20;
+                $stockNote = '全部料件庫存充足';
+            } elseif ($okCount >= $total * 0.7) {
+                $stockScore = 12;
+                $stockNote = '多數料件有庫存（' . $okCount . '/' . $total . '）';
+            } elseif ($okCount > 0) {
+                $stockScore = 6;
+                $stockNote = '部分料件需叫貨（' . $okCount . '/' . $total . ' 有庫存）';
+            } else {
+                $stockScore = 0;
+                $stockNote = '全部料件需叫貨';
+            }
+        } else {
+            // 無明細料件 (純施工) — 中性給分
+            $stockScore = 12;
+            $stockNote = '無指定料件（純施工）';
+        }
+        $items[] = array('name' => '庫存狀態', 'score' => $stockScore, 'max' => 20, 'note' => $stockNote);
+        $score += $stockScore;
+
+        // 3. 工期長短 (max 15)
+        $days = (float)($quote['labor_days'] ?: 0);
+        $durScore = 0;
+        $durNote = '未設定';
+        if ($days > 0) {
+            if ($days <= 1) {
+                $durScore = 15; $durNote = '短工期（' . $days . ' 天）';
+            } elseif ($days <= 2) {
+                $durScore = 10; $durNote = '中工期（' . $days . ' 天）';
+            } elseif ($days <= 3) {
+                $durScore = 5; $durNote = '稍長工期（' . $days . ' 天）';
+            } else {
+                $durScore = 0; $durNote = '長工期（' . $days . ' 天，延誤風險高）';
+            }
+        } else {
+            $durScore = 8; // 未設定給中性
+            $durNote = '工期未設定';
+        }
+        $items[] = array('name' => '工期', 'score' => $durScore, 'max' => 15, 'note' => $durNote);
+        $score += $durScore;
+
+        // 4. 特殊設備 (max 15) - 查 case_site_conditions
+        $eqScore = 15;
+        $eqNote = '無特殊設備';
+        if (!empty($quote['case_id'])) {
+            $eq = $this->db->prepare('SELECT has_ladder_needed, needs_scissor_lift, high_ceiling_height FROM case_site_conditions WHERE case_id = ?');
+            $eq->execute(array($quote['case_id']));
+            $cond = $eq->fetch();
+            if ($cond) {
+                $flags = array();
+                if (!empty($cond['has_ladder_needed'])) $flags[] = '拉梯';
+                if (!empty($cond['needs_scissor_lift'])) $flags[] = '自走車';
+                if (!empty($cond['high_ceiling_height'])) $flags[] = '挑高';
+                $n = count($flags);
+                if ($n == 0) { $eqScore = 15; $eqNote = '無特殊設備'; }
+                elseif ($n == 1) { $eqScore = 8; $eqNote = '需' . implode('、', $flags); }
+                else { $eqScore = 0; $eqNote = '需' . implode('、', $flags); }
+            }
+        }
+        $items[] = array('name' => '特殊設備', 'score' => $eqScore, 'max' => 15, 'note' => $eqNote);
+        $score += $eqScore;
+
+        // 5. 付款紀錄 (max 20) - 查該客戶歷史 receivables（用 status='逾期' 判風險）
+        $payScore = 10; // 中性預設
+        $payNote = '無歷史紀錄';
+        if (!empty($quote['customer_id'])) {
+            $rStmt = $this->db->prepare("
+                SELECT COUNT(*) AS total,
+                       SUM(CASE WHEN status = '已收款' THEN 1 ELSE 0 END) AS paid,
+                       SUM(CASE WHEN status = '逾期' THEN 1 ELSE 0 END) AS overdue
+                FROM receivables r
+                WHERE r.case_id IN (SELECT id FROM cases WHERE customer_id = ?)
+            ");
+            try {
+                $rStmt->execute(array($quote['customer_id']));
+                $hist = $rStmt->fetch();
+                $totalR = (int)(isset($hist['total']) ? $hist['total'] : 0);
+                $paidR = (int)(isset($hist['paid']) ? $hist['paid'] : 0);
+                $lateR = (int)(isset($hist['overdue']) ? $hist['overdue'] : 0);
+                if ($totalR >= 2) {
+                    if ($lateR == 0) { $payScore = 20; $payNote = '無逾期紀錄（' . $paidR . '/' . $totalR . ' 已收）'; }
+                    elseif ($lateR <= $totalR * 0.2) { $payScore = 14; $payNote = '偶有逾期（' . $lateR . '/' . $totalR . '）'; }
+                    elseif ($lateR <= $totalR * 0.5) { $payScore = 6; $payNote = '常逾期（' . $lateR . '/' . $totalR . '）'; }
+                    else { $payScore = 0; $payNote = '付款風險高（逾期 ' . $lateR . '/' . $totalR . '）'; }
+                } elseif ($totalR == 1) {
+                    $payScore = $lateR > 0 ? 6 : 12;
+                    $payNote = '僅 1 筆紀錄' . ($lateR > 0 ? '（逾期）' : '');
+                } else {
+                    $payScore = 10;
+                    $payNote = '尚無請款紀錄';
+                }
+            } catch (Exception $e) {
+                $payScore = 10;
+                $payNote = '無法取得付款紀錄';
+            }
+        }
+        $items[] = array('name' => '付款紀錄', 'score' => $payScore, 'max' => 20, 'note' => $payNote);
+        $score += $payScore;
+
+        // 6. 材料新近度 (max 10) - 查報價項目最近進貨日
+        $recentScore = 0;
+        $recentNote = '無料件';
+        if (!empty($needed)) {
+            $ids = implode(',', array_keys($needed));
+            $inStmt = $this->db->query("SELECT product_id, MAX(created_at) AS last_in FROM inventory_transactions WHERE product_id IN ($ids) AND type = 'purchase_in' GROUP BY product_id");
+            $recent30 = 0; $recent90 = 0; $total = count($needed); $noRec = 0;
+            $now = time();
+            $lastIns = array();
+            foreach ($inStmt->fetchAll() as $r) {
+                $lastIns[(int)$r['product_id']] = $r['last_in'];
+            }
+            foreach ($needed as $pid => $_q) {
+                if (!isset($lastIns[$pid])) { $noRec++; continue; }
+                $diffDays = ($now - strtotime($lastIns[$pid])) / 86400;
+                if ($diffDays <= 30) $recent30++;
+                elseif ($diffDays <= 90) $recent90++;
+            }
+            if ($total > 0) {
+                $freshRatio = ($recent30 + $recent90 * 0.5) / $total;
+                if ($freshRatio >= 0.8) { $recentScore = 10; $recentNote = '多數料件近期進貨（價格新）'; }
+                elseif ($freshRatio >= 0.4) { $recentScore = 6; $recentNote = '部分料件近期進貨'; }
+                else { $recentScore = 2; $recentNote = '料件多久未進貨（漲價風險）'; }
+            }
+        } else {
+            $recentScore = 6;
+            $recentNote = '無指定料件';
+        }
+        $items[] = array('name' => '材料新近度', 'score' => $recentScore, 'max' => 10, 'note' => $recentNote);
+        $score += $recentScore;
+
+        // 分級
+        if ($score >= 70) $level = 'low';
+        elseif ($score >= 40) $level = 'medium';
+        else $level = 'high';
+
+        return array(
+            'score' => $score,
+            'level' => $level,
+            'items' => $items,
+        );
+    }
 }

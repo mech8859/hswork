@@ -6,7 +6,19 @@ if (!isset($canEdit)) $canEdit = true;
 $readOnly = $isEdit && !$canEdit;
 require __DIR__ . '/../_readonly_form_helper.php';
 ?>
-<h2><?= $isEdit ? ($readOnly ? '檢視報價單 - ' : '編輯報價單 - ') . e($quote['quotation_number']) : '新增報價單' ?></h2>
+<?php
+$__hasCaseLink = !empty($_GET['case_id']) || ($isEdit && !empty($quote['case_id']));
+// 新增或編輯都檢查：只要未關聯案件就顯示警語（唯讀檢視不顯示）
+$__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
+?>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+    <h2 style="margin:0"><?= $isEdit ? ($readOnly ? '檢視報價單 - ' : '編輯報價單 - ') . e($quote['quotation_number']) : '新增報價單' ?></h2>
+    <?php if ($__showNoLinkWarn): ?>
+    <span id="noLinkWarn" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fce8e6;border:1px solid #c5221f;border-radius:6px;color:#c5221f;font-size:.85rem;font-weight:600">
+        ⚠️ 請由案件管理建立報價單或先關聯案件，否則報價單無法成立
+    </span>
+    <?php endif; ?>
+</div>
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
@@ -329,7 +341,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
     ?>
     <div class="card" id="estMaterialsCard" style="<?= ($isEdit && !empty($quote['case_id'])) ? '' : 'display:none' ?>">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-            <span>預計使用線材與配件（統計分析用，不顯示在報價單）</span>
+            <span>預計使用線材與配件（統計分析用，不顯示在報價單）<small style="color:#c5221f;margin-left:6px">* 送簽核前需填寫或勾選「無使用線材」</small></span>
             <?php if (!$readOnly): ?>
             <button type="button" class="btn btn-outline btn-sm" onclick="addQEstMaterial()">+ 新增材料</button>
             <?php endif; ?>
@@ -382,7 +394,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_cableNotUsed = $isEdit && !empty($quote['cable_not_used']);
     ?>
     <div class="card">
-        <div class="card-header">內部成本分析（不顯示在報價單）</div>
+        <div class="card-header">內部成本分析（不顯示在報價單）<small style="color:#c5221f;margin-left:6px;font-weight:400">* 送簽核前需填寫：施工天數或時數擇一、施工人數</small></div>
         <div class="form-row">
             <div class="form-group">
                 <label>施工天數</label>
@@ -1460,4 +1472,17 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCableCaseUI();
     calcGrandTotal();
 });
+
+// 無關聯案件警語自動隱藏（只看 case_id，客戶無關）
+(function() {
+    var warn = document.getElementById('noLinkWarn');
+    if (!warn) return;
+    function check() {
+        var cs = document.getElementById('qCaseId');
+        var ok = cs && cs.value && cs.value !== '0';
+        warn.style.display = ok ? 'none' : '';
+    }
+    check();
+    setInterval(check, 400);
+})();
 </script>

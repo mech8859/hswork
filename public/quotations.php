@@ -293,6 +293,32 @@ switch ($action) {
             break;
         }
 
+        // 送簽核前檢查：施工天數/時數(二擇一) + 施工人數 + 預估使用線材
+        $_missing = array();
+        $_days = (float)($quote['labor_days'] ?? 0);
+        $_hours = (float)($quote['labor_hours'] ?? 0);
+        $_people = (int)($quote['labor_people'] ?? 0);
+        if ($_days <= 0 && $_hours <= 0) {
+            $_missing[] = '施工天數或施工時數（需擇一填寫）';
+        }
+        if ($_people <= 0) {
+            $_missing[] = '施工人數';
+        }
+        // 預估使用線材：若未勾「無使用線材」則必須有 estimate 紀錄
+        if (empty($quote['cable_not_used'])) {
+            $_emStmt = Database::getInstance()->prepare('SELECT COUNT(*) FROM case_material_estimates WHERE case_id = ?');
+            $_emStmt->execute(array($quote['case_id']));
+            $_emCount = (int)$_emStmt->fetchColumn();
+            if ($_emCount === 0) {
+                $_missing[] = '預估使用線材（或勾選「無使用線材」）';
+            }
+        }
+        if (!empty($_missing)) {
+            Session::flash('error', '送簽核前請先填寫：' . implode('、', $_missing));
+            redirect('/quotations.php?action=view&id=' . $id);
+            break;
+        }
+
         if (verify_csrf()) {
             require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
             $approvalModel = new ApprovalModel();
