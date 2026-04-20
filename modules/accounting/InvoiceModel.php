@@ -416,6 +416,20 @@ class InvoiceModel
             $where[] = "si.invoice_format = ?";
             $params[] = $filters['invoice_format'];
         }
+        // 發票號碼區間（含前後綴英文，按字串比對即可）
+        if (!empty($filters['invoice_no_from'])) {
+            $where[] = "si.invoice_number >= ?";
+            $params[] = trim($filters['invoice_no_from']);
+        }
+        if (!empty($filters['invoice_no_to'])) {
+            $where[] = "si.invoice_number <= ?";
+            $params[] = trim($filters['invoice_no_to']);
+        }
+        // 賣方統一編號
+        if (!empty($filters['seller_tax_id'])) {
+            $where[] = "si.seller_tax_id LIKE ?";
+            $params[] = '%' . trim($filters['seller_tax_id']) . '%';
+        }
 
         $whereStr = implode(' AND ', $where);
 

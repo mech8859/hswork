@@ -21,6 +21,10 @@ switch ($action) {
             'status'       => !empty($_GET['status']) ? $_GET['status'] : '',
             'keyword'      => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
             'invoice_format' => !empty($_GET['invoice_format']) ? $_GET['invoice_format'] : '',
+            'invoice_no_from' => !empty($_GET['invoice_no_from']) ? $_GET['invoice_no_from'] : '',
+            'invoice_no_to'   => !empty($_GET['invoice_no_to']) ? $_GET['invoice_no_to'] : '',
+            // seller_tax_id 預設禾順 94081455；使用者若主動切到「全部賣方」會送空字串
+            'seller_tax_id'   => isset($_GET['seller_tax_id']) ? $_GET['seller_tax_id'] : '94081455',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getSalesInvoices($filters, $page);

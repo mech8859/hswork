@@ -7,6 +7,15 @@
 
 <div class="card" style="padding:12px">
     <form method="GET" action="/sales_invoices.php" class="d-flex flex-wrap gap-1 align-center">
+        <?php
+        // 未提交搜尋時預設禾順 94081455；有提交過就維持使用者選擇（含空字串=全部）
+        $_sellerTaxDefault = isset($_GET['seller_tax_id']) ? $_GET['seller_tax_id'] : '94081455';
+        ?>
+        <select name="seller_tax_id" class="form-control" style="width:auto;min-width:220px">
+            <option value="" <?= $_sellerTaxDefault === '' ? 'selected' : '' ?>>全部賣方</option>
+            <option value="94081455" <?= $_sellerTaxDefault === '94081455' ? 'selected' : '' ?>>94081455 禾順監視數位科技有限公司</option>
+            <option value="97002927" <?= $_sellerTaxDefault === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
+        </select>
         <select name="period" class="form-control" style="width:auto;min-width:100px">
             <option value="">全部期間</option>
             <?php foreach ($periodOptions as $p): ?>
@@ -36,6 +45,9 @@
             <?php endforeach; ?>
         </select>
         <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報年月/金額（$1500 精準比對）">
+        <input type="text" name="invoice_no_from" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_from']) ? $filters['invoice_no_from'] : '') ?>" placeholder="號碼起">
+        <span style="color:#888">~</span>
+        <input type="text" name="invoice_no_to" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_to']) ? $filters['invoice_no_to'] : '') ?>" placeholder="號碼迄">
         <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
         <a href="/sales_invoices.php" class="btn btn-outline btn-sm">清除</a>
     </form>
