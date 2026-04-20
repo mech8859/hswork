@@ -209,7 +209,16 @@ document.addEventListener('click', function(e) {
     <div class="staff-cards show-mobile">
         <?php foreach ($record['items'] as $idx => $item): ?>
         <div class="staff-card">
-            <div><strong>#<?= $idx + 1 ?></strong> <?= e(!empty($item['product_name']) ? $item['product_name'] : '-') ?></div>
+            <?php
+                if (!empty($item['product_id']) && !empty($item['product_db_name'])) {
+                    $cardName = $item['product_db_name'];
+                } elseif (!empty($item['product_name'])) {
+                    $cardName = $item['product_name'];
+                } else {
+                    $cardName = '-';
+                }
+            ?>
+            <div><strong>#<?= $idx + 1 ?></strong> <?= e($cardName) ?></div>
             <div class="staff-card-meta">
                 <span>數量: <?= (int)$item['quantity'] ?></span>
                 <span>未稅單價: $<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></span>
@@ -241,8 +250,20 @@ document.addEventListener('click', function(e) {
                 <?php foreach ($record['items'] as $idx => $item): ?>
                 <tr>
                     <td><?= $idx + 1 ?></td>
-                    <td><?= e(!empty($item['product_name']) ? $item['product_name'] : '-') ?></td>
-                    <td><?= e(!empty($item['model_number']) ? $item['model_number'] : '-') ?></td>
+                    <?php
+                        // 有關聯產品時優先用產品主檔名稱（避免歷史資料中存到不完整的 product_name）
+                        if (!empty($item['product_id']) && !empty($item['product_db_name'])) {
+                            $displayName = $item['product_db_name'];
+                        } elseif (!empty($item['product_name'])) {
+                            $displayName = $item['product_name'];
+                        } else {
+                            $displayName = '-';
+                        }
+                        $displayModel = !empty($item['model']) ? $item['model']
+                                       : (!empty($item['product_model']) ? $item['product_model'] : '-');
+                    ?>
+                    <td><?= e($displayName) ?></td>
+                    <td><?= e($displayModel) ?></td>
                     <td class="text-right"><?= (int)$item['quantity'] ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['tax_amount']) ? $item['tax_amount'] : 0) ?></td>

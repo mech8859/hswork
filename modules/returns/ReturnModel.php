@@ -144,7 +144,7 @@ class ReturnModel
     public function getItems($returnId)
     {
         $stmt = $this->db->prepare("
-            SELECT ri.*, p.model AS product_model
+            SELECT ri.*, p.model AS product_model, p.name AS product_db_name
             FROM return_items ri
             LEFT JOIN products p ON ri.product_id = p.id
             WHERE ri.return_id = ?
@@ -433,12 +433,12 @@ class ReturnModel
         $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute(array($returnId));
 
         $stmt = $this->db->prepare("
-            INSERT INTO return_items (return_id, product_id, product_name, quantity, unit_price, tax_amount, amount, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO return_items (return_id, product_id, product_name, model, spec, unit, quantity, unit_price, tax_amount, amount, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($items as $item) {
-            if (empty($item['product_name']) && empty($item['product_id'])) {
+            if (empty($item['product_name']) && empty($item['product_id']) && empty($item['model'])) {
                 continue;
             }
             $qty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
@@ -450,6 +450,9 @@ class ReturnModel
                 $returnId,
                 !empty($item['product_id']) ? $item['product_id'] : null,
                 !empty($item['product_name']) ? $item['product_name'] : null,
+                !empty($item['model']) ? $item['model'] : null,
+                !empty($item['spec']) ? $item['spec'] : null,
+                !empty($item['unit']) ? $item['unit'] : null,
                 $qty,
                 $price,
                 $tax,
