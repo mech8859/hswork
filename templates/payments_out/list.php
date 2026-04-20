@@ -116,6 +116,7 @@ $statusBadgeMap = array(
                     <th>建立日期</th>
                     <th>付款日期</th>
                     <th>廠商名稱</th>
+                    <th>廠商類別</th>
                     <th>主分類</th>
                     <th class="text-right">付款金額</th>
                     <th>狀態</th>
@@ -140,6 +141,7 @@ $statusBadgeMap = array(
                     <td><?= e(!empty($r['create_date']) ? $r['create_date'] : '-') ?></td>
                     <td><?= e(!empty($r['payment_date']) ? $r['payment_date'] : '-') ?></td>
                     <td><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></td>
+                    <td style="font-size:.85rem;color:#666"><?= e(!empty($r['vendor_category']) ? $r['vendor_category'] : '-') ?></td>
                     <td><?= e(!empty($r['main_category']) ? $r['main_category'] : '-') ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
                     <td><span class="badge <?= $badgeCls ?>"><?= e(!empty($r['status']) ? $r['status'] : '-') ?></span></td>
