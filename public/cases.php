@@ -608,7 +608,15 @@ switch ($action) {
         $generatedReceiptNo = null;
         if (empty($payReceiptNo)) {
             try {
-                $caseStmt = $db->prepare('SELECT case_number, customer_id, customer_no, customer_name, sales_id, branch_id FROM cases WHERE id = ?');
+                // customer_no 優先用 cases 自身，空時 fallback 到 customers 主檔（避免關聯客戶但 customer_no 沒同步寫進來）
+                $caseStmt = $db->prepare('
+                    SELECT c.case_number, c.customer_id,
+                           COALESCE(NULLIF(c.customer_no, ""), cu.customer_no) AS customer_no,
+                           c.customer_name, c.sales_id, c.branch_id
+                    FROM cases c
+                    LEFT JOIN customers cu ON c.customer_id = cu.id
+                    WHERE c.id = ?
+                ');
                 $caseStmt->execute(array($caseId));
                 $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
                 if ($caseRow) {
