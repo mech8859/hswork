@@ -228,15 +228,14 @@ switch ($action) {
             if (!empty($affectedCaseIds)) {
                 try {
                     foreach ($affectedCaseIds as $cid) {
-                        $stmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount, balance_amount, total_collected, completion_amount, settlement_confirmed FROM cases WHERE id = ?");
+                        $stmt = Database::getInstance()->prepare("SELECT total_amount, balance_amount, total_collected, settlement_confirmed FROM cases WHERE id = ?");
                         $stmt->execute(array($cid));
                         $c = $stmt->fetch(PDO::FETCH_ASSOC);
                         if (!$c) continue;
-                        $base = (int)$c['total_amount'] > 0 ? (int)$c['total_amount'] : (int)$c['deal_amount'];
-                        if ($base > 0
+                        // 自動結清條件：含稅金額 > 0 且 總收款 > 0 且 balance = 0 且尚未結清
+                        if ((int)$c['total_amount'] > 0
                             && (int)$c['balance_amount'] === 0
                             && (int)$c['total_collected'] > 0
-                            && (int)$c['completion_amount'] > 0
                             && (int)$c['settlement_confirmed'] !== 1) {
                             // 結清日 = 該案件 case_payments 最大日期
                             $latestStmt = Database::getInstance()->prepare("SELECT MAX(payment_date) FROM case_payments WHERE case_id = ?");

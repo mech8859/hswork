@@ -60,15 +60,13 @@ function updateTotalCollected($caseId, $changeSource = 'payment') {
     $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ?, balance_amount = ? WHERE id = ?")
         ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $balance, $caseId));
 
-    // 自動結清：完工金額 > 0 且 總收款 > 0 且 balance = 0 且尚未結清 → 標已結清
+    // 自動結清：含稅金額 > 0 且 總收款 > 0 且 balance = 0 且尚未結清 → 標已結清
     // 結清日 = 最後一筆 case_payment 日期
-    if ($base > 0 && (int)$balance === 0 && $total > 0) {
-        $sStmt = $db->prepare("SELECT settlement_confirmed, completion_amount FROM cases WHERE id = ?");
+    if ($totalAmt > 0 && (int)$balance === 0 && $total > 0) {
+        $sStmt = $db->prepare("SELECT settlement_confirmed FROM cases WHERE id = ?");
         $sStmt->execute(array($caseId));
-        $sRow = $sStmt->fetch(PDO::FETCH_ASSOC);
-        $settled = $sRow ? (int)$sRow['settlement_confirmed'] : 0;
-        $compAmt = $sRow ? (int)$sRow['completion_amount'] : 0;
-        if ($settled !== 1 && $compAmt > 0) {
+        $settled = (int)$sStmt->fetchColumn();
+        if ($settled !== 1) {
             $latestStmt = $db->prepare("SELECT MAX(payment_date) FROM case_payments WHERE case_id = ?");
             $latestStmt->execute(array($caseId));
             $latestDate = $latestStmt->fetchColumn() ?: date('Y-m-d');
