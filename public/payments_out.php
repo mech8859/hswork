@@ -214,7 +214,7 @@ switch ($action) {
         $q = trim($_GET['q'] ?? '');
         if (strlen($q) < 1) { echo '[]'; exit; }
         $kw = '%' . $q . '%';
-        $stmt = $db->prepare("SELECT id, vendor_code, name, contact_person, phone, tax_id, fax, email, address FROM vendors WHERE (name LIKE ? OR vendor_code LIKE ? OR contact_person LIKE ?) AND is_active = 1 ORDER BY name LIMIT 10");
+        $stmt = $db->prepare("SELECT id, vendor_code, name, contact_person, phone, tax_id, fax, email, address, category FROM vendors WHERE (name LIKE ? OR vendor_code LIKE ? OR contact_person LIKE ?) AND is_active = 1 ORDER BY name LIMIT 10");
         $stmt->execute(array($kw, $kw, $kw));
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // fallback: 也搜 outsource_vendors

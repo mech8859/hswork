@@ -540,7 +540,7 @@ calcVoucherTotal();
                 if (data.length === 0) { list.classList.remove('show'); return; }
                 var html = '';
                 for (var i = 0; i < data.length; i++) {
-                    html += '<div class="autocomplete-item" data-name="' + (data[i].name||'').replace(/"/g,'&quot;') + '" data-code="' + (data[i].vendor_code||'') + '">';
+                    html += '<div class="autocomplete-item" data-name="' + (data[i].name||'').replace(/"/g,'&quot;') + '" data-code="' + (data[i].vendor_code||'') + '" data-category="' + ((data[i].category||'').replace(/"/g,'&quot;')) + '">';
                     html += '<div class="ac-main">' + (data[i].name||'') + '</div>';
                     html += '<div class="ac-sub">' + (data[i].vendor_code ? '編號:' + data[i].vendor_code + ' | ' : '') + (data[i].contact_person||'') + ' ' + (data[i].phone||'') + '</div>';
                     html += '</div>';
@@ -552,6 +552,8 @@ calcVoucherTotal();
                     el.addEventListener('click', function() {
                         input.value = this.getAttribute('data-name');
                         codeInput.value = this.getAttribute('data-code');
+                        var catEl = document.getElementById('vendorCategory');
+                        if (catEl) catEl.value = this.getAttribute('data-category') || '';
                         list.classList.remove('show');
                     });
                 });

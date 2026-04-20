@@ -356,7 +356,7 @@ switch ($action) {
         $q = trim($_GET['q'] ?? '');
         if (mb_strlen($q) < 1) { echo json_encode(array()); break; }
         $like = '%' . $q . '%';
-        $stmt = Database::getInstance()->prepare("SELECT id, vendor_code, name, short_name, contact_person, phone FROM vendors WHERE is_active = 1 AND (name LIKE ? OR short_name LIKE ? OR vendor_code LIKE ?) ORDER BY name LIMIT 15");
+        $stmt = Database::getInstance()->prepare("SELECT id, vendor_code, name, short_name, contact_person, phone, category FROM vendors WHERE is_active = 1 AND (name LIKE ? OR short_name LIKE ? OR vendor_code LIKE ?) ORDER BY name LIMIT 15");
         $stmt->execute(array($like, $like, $like));
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;

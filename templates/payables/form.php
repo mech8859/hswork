@@ -1210,6 +1210,8 @@ function updatePP() {
 function selectVendor(v) {
     document.getElementById('vendorNameInput').value = v.name;
     document.getElementById('vendorCodeInput').value = v.vendor_code || '';
+    var catEl = document.querySelector('input[name="vendor_category"]');
+    if (catEl) catEl.value = v.category || '';
     document.getElementById('vendorDropdown').style.display = 'none';
 }
 
