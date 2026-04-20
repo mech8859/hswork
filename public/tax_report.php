@@ -25,9 +25,12 @@ $defaultPeriod = $currentYear . '-' . $bimonthMap[$currentMonth];
 $period = !empty($_GET['period']) ? $_GET['period'] : $defaultPeriod;
 $taxPeriodOptions = $model->getTaxPeriodOptions();
 
-$summary = $model->getTaxSummary($period);
-$purchaseDetail = $model->getTaxDetail($period, 'purchase');
-$salesDetail = $model->getTaxDetail($period, 'sales');
+// 公司統編過濾（預設禾順 94081455；選「全部」會送空字串）
+$companyTaxId = isset($_GET['company_tax_id']) ? $_GET['company_tax_id'] : '94081455';
+
+$summary = $model->getTaxSummary($period, $companyTaxId);
+$purchaseDetail = $model->getTaxDetail($period, 'purchase', $companyTaxId);
+$salesDetail = $model->getTaxDetail($period, 'sales', $companyTaxId);
 
 // 上期累積留抵（格108）：依 period 存/讀 system_settings
 $_prevCreditKey = 'tax_prev_credit_' . $period;

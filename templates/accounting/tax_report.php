@@ -7,6 +7,14 @@
     <form method="GET" action="/tax_report.php" class="filter-form">
         <div class="filter-row">
             <div class="form-group">
+                <label>統一編號</label>
+                <select name="company_tax_id" class="form-control" onchange="this.form.submit()">
+                    <option value="" <?= $companyTaxId === '' ? 'selected' : '' ?>>全部</option>
+                    <option value="94081455" <?= $companyTaxId === '94081455' ? 'selected' : '' ?>>94081455 禾順監視數位科技有限公司</option>
+                    <option value="97002927" <?= $companyTaxId === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>申報期間</label>
                 <select name="period" class="form-control" onchange="this.form.submit()">
                     <?php foreach ($taxPeriodOptions as $opt): ?>

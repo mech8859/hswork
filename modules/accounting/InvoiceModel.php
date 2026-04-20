@@ -623,7 +623,7 @@ class InvoiceModel
      * 取得稅務彙總
      * @param string $period 期間 e.g. '202603-04' (year + bimonth)
      */
-    public function getTaxSummary($period)
+    public function getTaxSummary($period, $companyTaxId = null)
     {
         // 解析期間 → 起迄月
         $parsed = $this->parseTaxPeriod($period);
@@ -632,6 +632,20 @@ class InvoiceModel
         }
         $startMonth = $parsed['start'];
         $endMonth = $parsed['end'];
+        $months = $this->getMonthsInRange($startMonth, $endMonth);
+        $placeholders = implode(',', array_fill(0, count($months), '?'));
+
+        // 公司統編過濾（銷項比 seller_tax_id / 進項比 buyer_tax_id）
+        $salesExtra = '';
+        $purchExtra = '';
+        $salesParams = $months;
+        $purchParams = $months;
+        if (!empty($companyTaxId)) {
+            $salesExtra = ' AND seller_tax_id = ?';
+            $salesParams[] = $companyTaxId;
+            $purchExtra = ' AND buyer_tax_id = ?';
+            $purchParams[] = $companyTaxId;
+        }
 
         // 銷項 - 應稅銷售額 & 稅額；33/34 為銷貨退回折讓，應從合計扣除
         $sql = "SELECT
@@ -648,10 +662,9 @@ class InvoiceModel
                     COUNT(CASE WHEN status != 'voided' THEN 1 END) AS sales_count,
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS sales_voided_count
                 FROM sales_invoices
-                WHERE period IN (" . implode(',', array_fill(0, count($this->getMonthsInRange($startMonth, $endMonth)), '?')) . ")";
-        $months = $this->getMonthsInRange($startMonth, $endMonth);
+                WHERE period IN ($placeholders)$salesExtra";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($months);
+        $stmt->execute($salesParams);
         $salesRow = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // 進項 - 可扣抵 & 不可扣抵；23/24 為進貨退出折讓，應從合計扣除
@@ -670,9 +683,9 @@ class InvoiceModel
                     COUNT(CASE WHEN status != 'voided' THEN 1 END) AS purchase_count,
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS purchase_voided_count
                 FROM purchase_invoices
-                WHERE period IN (" . implode(',', array_fill(0, count($months), '?')) . ")";
+                WHERE period IN ($placeholders)$purchExtra";
         $stmt2 = $this->db->prepare($sql2);
-        $stmt2->execute($months);
+        $stmt2->execute($purchParams);
         $purchaseRow = $stmt2->fetch(PDO::FETCH_ASSOC);
 
         $salesTax = (int) $salesRow['sales_tax'];
@@ -688,7 +701,7 @@ class InvoiceModel
     /**
      * 取得稅務明細 (進項或銷項)
      */
-    public function getTaxDetail($period, $type = 'purchase')
+    public function getTaxDetail($period, $type = 'purchase', $companyTaxId = null)
     {
         $parsed = $this->parseTaxPeriod($period);
         if (!$parsed) {
@@ -696,22 +709,26 @@ class InvoiceModel
         }
         $months = $this->getMonthsInRange($parsed['start'], $parsed['end']);
         $placeholders = implode(',', array_fill(0, count($months), '?'));
+        $params = $months;
+        $extra = '';
 
         if ($type === 'purchase') {
+            if (!empty($companyTaxId)) { $extra = ' AND pi.buyer_tax_id = ?'; $params[] = $companyTaxId; }
             $sql = "SELECT pi.*, u.real_name AS created_by_name
                     FROM purchase_invoices pi
                     LEFT JOIN users u ON u.id = pi.created_by
-                    WHERE pi.period IN ($placeholders)
+                    WHERE pi.period IN ($placeholders)$extra
                     ORDER BY pi.invoice_date ASC, pi.id ASC";
         } else {
+            if (!empty($companyTaxId)) { $extra = ' AND si.seller_tax_id = ?'; $params[] = $companyTaxId; }
             $sql = "SELECT si.*, u.real_name AS created_by_name
                     FROM sales_invoices si
                     LEFT JOIN users u ON u.id = si.created_by
-                    WHERE si.period IN ($placeholders)
+                    WHERE si.period IN ($placeholders)$extra
                     ORDER BY si.invoice_date ASC, si.id ASC";
         }
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($months);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
