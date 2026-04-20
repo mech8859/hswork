@@ -223,25 +223,36 @@ switch ($action) {
                 NotificationDispatcher::dispatch('receipts', 'status_changed', $data, $userId, $record);
             }
 
-            // 自動結清：狀態改為「已收款」且尾款=0 時，將案件帳款標示已結清
-            if ($data['status'] === '已收款' && $record['status'] !== '已收款' && !empty($affectedCaseIds)) {
+            // 自動結清：完工金額 > 0 且 總收款 > 0 且 balance = 0 且尚未結清 → 標已結清
+            // 結清日 = 該案件最後一筆 case_payment 日期
+            if (!empty($affectedCaseIds)) {
                 try {
-                    $settleDate = $data['register_date'] ?: date('Y-m-d');
                     foreach ($affectedCaseIds as $cid) {
-                        $stmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount, balance_amount, settlement_confirmed FROM cases WHERE id = ?");
+                        $stmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount, balance_amount, total_collected, completion_amount, settlement_confirmed FROM cases WHERE id = ?");
                         $stmt->execute(array($cid));
                         $c = $stmt->fetch(PDO::FETCH_ASSOC);
                         if (!$c) continue;
                         $base = (int)$c['total_amount'] > 0 ? (int)$c['total_amount'] : (int)$c['deal_amount'];
-                        if ($base > 0 && (int)$c['balance_amount'] === 0 && (int)$c['settlement_confirmed'] !== 1) {
+                        if ($base > 0
+                            && (int)$c['balance_amount'] === 0
+                            && (int)$c['total_collected'] > 0
+                            && (int)$c['completion_amount'] > 0
+                            && (int)$c['settlement_confirmed'] !== 1) {
+                            // 結清日 = 該案件 case_payments 最大日期
+                            $latestStmt = Database::getInstance()->prepare("SELECT MAX(payment_date) FROM case_payments WHERE case_id = ?");
+                            $latestStmt->execute(array($cid));
+                            $latestPayDate = $latestStmt->fetchColumn();
+                            $settleDate = $latestPayDate ?: ($data['register_date'] ?: date('Y-m-d'));
                             Database::getInstance()->prepare("UPDATE cases SET settlement_confirmed = 1, settlement_date = ? WHERE id = ?")
                                 ->execute(array($settleDate, $cid));
                         }
-                        // 嘗試自動結案
-                        tryAutoCloseCase($cid);
+                        // 嘗試自動結案（只有狀態改為已收款才觸發，避免每次更新都重複跑）
+                        if ($data['status'] === '已收款' && $record['status'] !== '已收款') {
+                            tryAutoCloseCase($cid);
+                        }
                     }
                 } catch (Exception $autoSettleEx) {
-                    error_log('Auto-settle on receipt confirm failed: ' . $autoSettleEx->getMessage());
+                    error_log('Auto-settle on receipt update failed: ' . $autoSettleEx->getMessage());
                 }
             }
 
