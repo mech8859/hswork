@@ -366,14 +366,23 @@ class FinanceModel
     public function createReceivable($data)
     {
         $number = $this->generateNumber('AR', 'receivables', 'invoice_number');
+        // 系統別：用 case_number 從 cases 帶入（覆蓋 user input）
+        $sysType = null;
+        if (!empty($data['case_number'])) {
+            try {
+                $st = $this->db->prepare("SELECT system_type FROM cases WHERE case_number = ? LIMIT 1");
+                $st->execute(array($data['case_number']));
+                $sysType = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         $stmt = $this->db->prepare("
-            INSERT INTO receivables (invoice_number, voucher_number, invoice_date, case_id, case_number, customer_no, customer_name, branch_id, sales_id,
+            INSERT INTO receivables (invoice_number, voucher_number, invoice_date, case_id, case_number, system_type, customer_no, customer_name, branch_id, sales_id,
                 invoice_category, status, invoice_title, tax_id, phone, mobile, invoice_email, invoice_address,
                 payment_method, payment_terms,
                 deposit, discount, subtotal, tax, shipping, total_amount,
                 real_invoice_number, voucher_type, tax_rate,
                 registrar, note, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
@@ -381,6 +390,7 @@ class FinanceModel
             $data['invoice_date'],
             !empty($data['case_id']) ? $data['case_id'] : null,
             !empty($data['case_number']) ? $data['case_number'] : null,
+            $sysType,
             !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,
@@ -415,9 +425,18 @@ class FinanceModel
     public function updateReceivable($id, $data)
     {
         // 註：registrar 由建立時寫入，更新時不變動
+        // 系統別：用 case_number 從 cases 重新帶入
+        $sysType = null;
+        if (!empty($data['case_number'])) {
+            try {
+                $st = $this->db->prepare("SELECT system_type FROM cases WHERE case_number = ? LIMIT 1");
+                $st->execute(array($data['case_number']));
+                $sysType = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         $stmt = $this->db->prepare("
             UPDATE receivables SET
-                voucher_number=?, invoice_date=?, case_id=?, case_number=?, customer_no=?, customer_name=?, branch_id=?, sales_id=?,
+                voucher_number=?, invoice_date=?, case_id=?, case_number=?, system_type=?, customer_no=?, customer_name=?, branch_id=?, sales_id=?,
                 invoice_category=?, status=?, invoice_title=?, tax_id=?, phone=?, mobile=?,
                 invoice_email=?, invoice_address=?, payment_method=?, payment_terms=?,
                 deposit=?, discount=?, subtotal=?, tax=?, shipping=?, total_amount=?,
@@ -430,6 +449,7 @@ class FinanceModel
             $data['invoice_date'],
             !empty($data['case_id']) ? $data['case_id'] : null,
             !empty($data['case_number']) ? $data['case_number'] : null,
+            $sysType,
             !empty($data['customer_no']) ? $data['customer_no'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['branch_id']) ? $data['branch_id'] : null,

@@ -59,6 +59,10 @@ $paymentTermsOptions = FinanceModel::paymentTermsOptions();
                 <input type="text" name="case_number" class="form-control" value="<?= e($record['case_number'] ?? '') ?>" placeholder="例：2026-1729">
             </div>
             <div class="form-group">
+                <label>系統別 <small style="color:#888">(由案件帶入)</small></label>
+                <input type="text" name="system_type" class="form-control" value="<?= e($record['system_type'] ?? '') ?>" readonly style="background:#f5f5f5">
+            </div>
+            <div class="form-group">
                 <label>客戶編號</label>
                 <input type="text" name="customer_no" class="form-control" value="<?= e($record['customer_no'] ?? '') ?>">
             </div>
