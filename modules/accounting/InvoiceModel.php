@@ -161,6 +161,11 @@ class InvoiceModel
             $where[] = "pi.deduction_type = ?";
             $params[] = $filters['deduction_type'];
         }
+        // 買方統一編號（公司端）
+        if (!empty($filters['buyer_tax_id'])) {
+            $where[] = "pi.buyer_tax_id = ?";
+            $params[] = trim($filters['buyer_tax_id']);
+        }
 
         $whereStr = implode(' AND ', $where);
 

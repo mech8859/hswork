@@ -8,6 +8,18 @@
 <div class="card">
     <form method="GET" action="/purchase_invoices.php" class="filter-form">
         <div class="filter-row">
+            <?php
+            // 未提交搜尋時預設禾順 94081455；有提交過就維持使用者選擇
+            $_buyerTaxDefault = isset($_GET['buyer_tax_id']) ? $_GET['buyer_tax_id'] : '94081455';
+            ?>
+            <div class="form-group">
+                <label>買方統一編號</label>
+                <select name="buyer_tax_id" class="form-control">
+                    <option value="" <?= $_buyerTaxDefault === '' ? 'selected' : '' ?>>全部買方</option>
+                    <option value="94081455" <?= $_buyerTaxDefault === '94081455' ? 'selected' : '' ?>>94081455 禾順監視數位科技有限公司</option>
+                    <option value="97002927" <?= $_buyerTaxDefault === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
+                </select>
+            </div>
             <div class="form-group">
                 <label>期間</label>
                 <select name="period" class="form-control">

@@ -22,6 +22,8 @@ switch ($action) {
             'keyword'        => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
             'invoice_format' => !empty($_GET['invoice_format']) ? $_GET['invoice_format'] : '',
             'deduction_type' => !empty($_GET['deduction_type']) ? $_GET['deduction_type'] : '',
+            // buyer_tax_id 預設禾順；若使用者主動切「全部」會送空字串
+            'buyer_tax_id'   => isset($_GET['buyer_tax_id']) ? $_GET['buyer_tax_id'] : '94081455',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getPurchaseInvoices($filters, $page);
