@@ -308,19 +308,19 @@ if ($canManage && !empty($quote['case_id'])) {
     $viewMaterialCost = (int)$quote['total_cost'] - $viewLaborCost - (int)($quote['cable_cost'] ?: 0);
     ?>
     <?php
-    // 即時計算施工時數與人力成本（時數=單人工時，成本=人數×時數×時薪）
+    // 即時計算總施工時數與人力成本（時數=總人時=天×人×8，成本=時數×時薪）
     $viewDays = (float)($quote['labor_days'] ?: 0);
     $viewPeople = (int)($quote['labor_people'] ?: 0);
     $viewHours = (float)($quote['labor_hours'] ?: 0);
     if (!$viewHours && $viewDays > 0 && $viewPeople > 0) {
-        $viewHours = $viewDays * 8;
+        $viewHours = $viewDays * $viewPeople * 8;
     }
-    if ($viewLaborCost == 0 && $viewHours > 0 && $viewPeople > 0) {
+    if ($viewLaborCost == 0 && $viewHours > 0) {
         $hrStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
         $hrStmt->execute();
         $hrVal = $hrStmt->fetchColumn();
         $viewHourlyCost = ($hrVal !== false && $hrVal !== null) ? (int)$hrVal : 560;
-        $viewLaborCost = (int)round($viewPeople * $viewHours * $viewHourlyCost);
+        $viewLaborCost = (int)round($viewHours * $viewHourlyCost);
     }
     // 營運成本
     $_vOpModeStmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'operation_cost_mode' LIMIT 1");
@@ -357,7 +357,7 @@ if ($canManage && !empty($quote['case_id'])) {
     <div class="info-grid">
         <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
         <div><span class="info-label">施工人數</span><span><?= $viewPeople ?: '-' ?></span></div>
-        <div><span class="info-label">施工時數</span><span><?= $viewHours ? $viewHours : '-' ?></span></div>
+        <div><span class="info-label">總施工時數</span><span><?= $viewHours ? $viewHours : '-' ?></span></div>
         <div><span class="info-label">人力成本</span><span>$<?= number_format($viewLaborCost) ?></span></div>
         <div><span class="info-label">器材成本</span><span>$<?= number_format($viewMaterialCost) ?></span></div>
         <div><span class="info-label">線材成本<?= !empty($quote['cable_not_used']) ? ' <small style="color:#888">(無使用)</small>' : '' ?></span><span>$<?= number_format($viewCableCost) ?></span></div>

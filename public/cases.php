@@ -34,6 +34,10 @@ function updateTotalCollected($caseId, $changeSource = 'payment') {
     $stmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?");
     $stmt->execute(array($caseId));
     $total = (int)$stmt->fetchColumn();
+    // 匯費合計（客人扣匯費，計算尾款時當作已收）
+    $wireStmt = $db->prepare("SELECT COALESCE(SUM(wire_fee), 0) FROM case_payments WHERE case_id = ?");
+    $wireStmt->execute(array($caseId));
+    $wireTotal = (int)$wireStmt->fetchColumn();
     // 訂金（類別=訂金的合計 + 最新一筆的支付方式）
     $depStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ? AND payment_type = '訂金'");
     $depStmt->execute(array($caseId));
@@ -45,14 +49,14 @@ function updateTotalCollected($caseId, $changeSource = 'payment') {
     $depDateStmt = $db->prepare("SELECT payment_date FROM case_payments WHERE case_id = ? AND payment_type = '訂金' ORDER BY payment_date DESC, id DESC LIMIT 1");
     $depDateStmt->execute(array($caseId));
     $depositDate = $depDateStmt->fetchColumn() ?: null;
-    // 尾款 = (含稅金額 > 0 ? 含稅金額 : 成交金額) - 總收款金額
+    // 尾款 = (含稅金額 > 0 ? 含稅金額 : 成交金額) - 總收款金額 - 匯費總額
     $caseStmt = $db->prepare("SELECT deal_amount, total_amount FROM cases WHERE id = ?");
     $caseStmt->execute(array($caseId));
     $caseRow = $caseStmt->fetch(PDO::FETCH_ASSOC);
     $dealAmt  = $caseRow ? (int)$caseRow['deal_amount'] : 0;
     $totalAmt = $caseRow ? (int)$caseRow['total_amount'] : 0;
     $base = $totalAmt > 0 ? $totalAmt : $dealAmt;
-    $balance = $base > 0 ? max(0, $base - $total) : null;
+    $balance = $base > 0 ? max(0, $base - $total - $wireTotal) : null;
     $db->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, deposit_method = ?, deposit_payment_date = ?, balance_amount = ? WHERE id = ?")
         ->execute(array($total, $depositAmount ?: null, $depositMethod, $depositDate, $balance, $caseId));
 
@@ -582,10 +586,14 @@ switch ($action) {
         $payTax = (int)($_POST['tax_amount'] ?? 0);
         $payNote = $_POST['note'] ?? '';
         $payReceiptNo = $_POST['receipt_number'] ?? null;
+        // 匯費僅限會計人員 / 會計主管 / boss 可填
+        $__addRole = Auth::user() ? Auth::user()['role'] : '';
+        $payWireFee = (in_array($__addRole, array('boss','accounting_supervisor','accountant'), true))
+                      ? (int)($_POST['wire_fee'] ?? 0) : 0;
 
         $db = Database::getInstance();
-        $stmt = $db->prepare('INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, untaxed_amount, tax_amount, receipt_number, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute(array($caseId, $payDate, $payType, $payMethod, $payAmount, $payUntaxed, $payTax, $payReceiptNo, $payNote, Auth::id()));
+        $stmt = $db->prepare('INSERT INTO case_payments (case_id, payment_date, payment_type, transaction_type, amount, untaxed_amount, tax_amount, wire_fee, receipt_number, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array($caseId, $payDate, $payType, $payMethod, $payAmount, $payUntaxed, $payTax, $payWireFee, $payReceiptNo, $payNote, Auth::id()));
         $newId = (int)$db->lastInsertId();
 
         // Handle images
@@ -683,8 +691,8 @@ switch ($action) {
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         // 權限保護：只有 boss 可編輯（前端 readonly + 後端雙重檢查）
         $__editUser = Auth::user();
-        if (!$__editUser || $__editUser['role'] !== 'boss') {
-            echo json_encode(array('success' => false, 'error' => '無編輯權限，僅系統管理者可修改已存的帳款交易'));
+        if (!$__editUser || !in_array($__editUser['role'], array('boss','accounting_supervisor'), true)) {
+            echo json_encode(array('success' => false, 'error' => '無編輯權限，僅系統管理者或會計主管可修改已存的帳款交易'));
             break;
         }
         try {
@@ -704,9 +712,11 @@ switch ($action) {
         // ⚠ 連動保護：receipt_number 永遠不可修改（用原值），避免破壞與 receipts 表的連動
         $newReceiptNo = $pay['receipt_number'];
         $newNote = $_POST['note'] ?? '';
+        // 匯費（已被外層 boss-only 守住，此處僅做型別轉換；未送則保留原值）
+        $newWireFee = isset($_POST['wire_fee']) ? (int)$_POST['wire_fee'] : (int)$pay['wire_fee'];
 
-        $db->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, note=? WHERE id=?')
-            ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newNote, $pid));
+        $db->prepare('UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, wire_fee=?, note=? WHERE id=?')
+            ->execute(array($newDate, $newType, $newMethod, $newAmount, $newUntaxed, $newTax, $newWireFee, $newNote, $pid));
 
         // 同步更新對應的收款單（若有 receipt_number）
         // note 格式：「案件帳款自動產生 - {類別} / {使用者備註}」；使用者備註取自 case_payments
@@ -872,10 +882,10 @@ switch ($action) {
     case 'delete_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
-        // 權限保護：只有 boss 可刪除
+        // 權限保護：boss / 會計主管 可刪除
         $__delUser = Auth::user();
-        if (!$__delUser || $__delUser['role'] !== 'boss') {
-            echo json_encode(array('success' => false, 'error' => '無刪除權限，僅系統管理者可刪除已存的帳款交易'));
+        if (!$__delUser || !in_array($__delUser['role'], array('boss','accounting_supervisor'), true)) {
+            echo json_encode(array('success' => false, 'error' => '無刪除權限，僅系統管理者或會計主管可刪除已存的帳款交易'));
             break;
         }
         $pid = (int)($_POST['payment_id'] ?? 0);

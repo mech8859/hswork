@@ -87,6 +87,10 @@ $canEdit = array(
     'contacts' => Auth::canEditSection('contacts'),
     'skills'   => Auth::canEditSection('skills'),
 );
+// 會計主管自動有 finance 區的編輯權（含請款流程編輯/刪除）
+if (Auth::user() && Auth::user()['role'] === 'accounting_supervisor') {
+    $canEdit['finance'] = true;
+}
 // 新增案件時全部可編輯
 if (!$case) { foreach ($canEdit as $k => $v) { $canEdit[$k] = true; } }
 
@@ -740,6 +744,19 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <label>尾款 <small style="color:#999">(自動計算)</small></label>
                 <input type="text" name="balance_amount" id="balanceInput" class="form-control" value="<?= !empty($case['balance_amount']) ? number_format($case['balance_amount']) : '' ?>" readonly style="background:#f5f5f5">
             </div>
+            <?php
+            // 折讓/匯費：合計案件帳款交易中的 wire_fee
+            $_caseWireTotal = 0;
+            if (!empty($case['case_payments'])) {
+                foreach ($case['case_payments'] as $_cp) {
+                    $_caseWireTotal += isset($_cp['wire_fee']) ? (float)$_cp['wire_fee'] : 0;
+                }
+            }
+            ?>
+            <div class="form-group">
+                <label>折讓/匯費 <small style="color:#999">(交易合計)</small></label>
+                <input type="text" id="wireFeeTotalDisplay" class="form-control" value="<?= $_caseWireTotal > 0 ? number_format($_caseWireTotal) : '' ?>" readonly style="background:#f5f5f5">
+            </div>
             <div class="form-group">
                 <label>完工金額 (含稅)</label>
                 <input type="number" name="completion_amount" class="form-control" value="<?= e($case['completion_amount'] ?? '') ?>" readonly style="background:#f5f5f5">
@@ -813,7 +830,10 @@ require __DIR__ . '/../_readonly_form_helper.php';
         // 編輯/刪除權限：只有 boss（系統管理者）可以修改或刪除已存的交易
         // 新增權限：維持 finance section 編輯權限（業務/行政/助理都能新增）
         $_pmtUser = Auth::user();
-        $_canEditPayment = $_pmtUser && $_pmtUser['role'] === 'boss';
+        // 編輯/刪除已存帳款：boss / 會計主管
+        $_canEditPayment = $_pmtUser && in_array($_pmtUser['role'], array('boss','accounting_supervisor'), true);
+        // 匯費填寫權限：boss / 會計主管 / 會計人員
+        $_canEditWireFee = $_pmtUser && in_array($_pmtUser['role'], array('boss','accounting_supervisor','accountant'), true);
     ?>
     <div class="card" id="sec-case-payments">
         <div class="card-header d-flex justify-between align-center">
@@ -822,12 +842,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <small style="color:#888;font-weight:normal">（存檔後僅系統管理者可修改/刪除）</small>
                 <?php endif; ?>
             </span>
-            <?php if (Auth::canEditSection('finance')): ?>
+            <?php if ($canEdit['finance']): ?>
             <button type="button" class="btn btn-primary btn-sm" onclick="togglePaymentForm()">+ 新增交易</button>
             <?php endif; ?>
         </div>
 
-        <?php if (Auth::canEditSection('finance')): ?>
+        <?php if ($canEdit['finance']): ?>
         <div id="payment-add-form" style="display:none;padding:12px;border-bottom:1px solid var(--gray-200);background:#fafafa">
             <div class="form-row">
                 <div class="form-group">
@@ -874,6 +894,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 </div>
             </div>
             <div class="form-row">
+                <?php if ($_canEditWireFee): ?>
+                <div class="form-group">
+                    <label>折讓/匯費 <small style="color:#888">(扣除後計尾款)</small></label>
+                    <input type="number" id="pay_wire_fee" class="form-control" placeholder="0" min="0" step="1">
+                </div>
+                <?php endif; ?>
                 <div class="form-group" style="flex:2">
                     <label>備註</label>
                     <input type="text" id="pay_note" class="form-control" placeholder="選填">
@@ -895,9 +921,9 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <?php else: ?>
         <div class="table-responsive">
             <table class="table" style="font-size:.9rem">
-                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">未稅</th><th class="text-right" style="width:70px">稅額</th><th class="text-right" style="width:90px">總金額</th><th style="width:120px">收款單號</th><th>備註</th><th style="width:50px">憑證</th><?php if ($_canEditPayment): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
+                <thead><tr><th style="width:100px">日期</th><th style="width:60px">類別</th><th style="width:80px">方式</th><th class="text-right" style="width:90px">未稅</th><th class="text-right" style="width:70px">稅額</th><th class="text-right" style="width:90px">總金額</th><th class="text-right" style="width:80px">折讓/匯費</th><th style="width:120px">收款單號</th><th>備註</th><th style="width:50px">憑證</th><?php if ($_canEditPayment): ?><th style="width:60px">操作</th><?php endif; ?></tr></thead>
                 <tbody>
-                    <?php $payTotal = 0; $payUntaxedTotal = 0; $payTaxTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; $payUntaxedTotal += isset($cp['untaxed_amount']) ? $cp['untaxed_amount'] : 0; $payTaxTotal += isset($cp['tax_amount']) ? $cp['tax_amount'] : 0; ?>
+                    <?php $payTotal = 0; $payUntaxedTotal = 0; $payTaxTotal = 0; $payWireTotal = 0; foreach ($casePayments as $cp): $payTotal += $cp['amount']; $payUntaxedTotal += isset($cp['untaxed_amount']) ? $cp['untaxed_amount'] : 0; $payTaxTotal += isset($cp['tax_amount']) ? $cp['tax_amount'] : 0; $payWireTotal += isset($cp['wire_fee']) ? $cp['wire_fee'] : 0; ?>
                     <tr style="cursor:pointer" onclick="openPaymentDetail(<?= $cp['id'] ?>)">
                         <td><?= e($cp['payment_date']) ?></td>
                         <td><span class="badge"><?= e($cp['payment_type'] ?: '-') ?></span></td>
@@ -905,6 +931,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                         <td class="text-right"><?= !empty($cp['untaxed_amount']) ? '$' . number_format($cp['untaxed_amount']) : '-' ?></td>
                         <td class="text-right"><?= !empty($cp['tax_amount']) ? '$' . number_format($cp['tax_amount']) : '-' ?></td>
                         <td class="text-right" style="font-weight:600">$<?= number_format($cp['amount']) ?></td>
+                        <td class="text-right" style="color:<?= !empty($cp['wire_fee']) ? '#e65100' : '#999' ?>"><?= !empty($cp['wire_fee']) ? '-$' . number_format($cp['wire_fee']) : '-' ?></td>
                         <td style="font-size:.8rem;color:var(--primary)"><?= e($cp['receipt_number'] ?: '-') ?></td>
                         <td style="white-space:pre-line"><?= e($cp['note'] ?: '-') ?></td>
                         <td><?php
@@ -925,7 +952,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right">$<?= number_format($payUntaxedTotal) ?></td><td class="text-right">$<?= number_format($payTaxTotal) ?></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td colspan="<?= $_canEditPayment ? '4' : '3' ?>"></td></tr></tfoot>
+                <tfoot><tr><td colspan="3" class="text-right"><strong>合計</strong></td><td class="text-right">$<?= number_format($payUntaxedTotal) ?></td><td class="text-right">$<?= number_format($payTaxTotal) ?></td><td class="text-right" style="font-weight:700;color:var(--primary)">$<?= number_format($payTotal) ?></td><td class="text-right" style="color:<?= $payWireTotal > 0 ? '#e65100' : '#999' ?>;font-weight:600"><?= $payWireTotal > 0 ? '-$' . number_format($payWireTotal) : '-' ?></td><td colspan="<?= $_canEditPayment ? '4' : '3' ?>"></td></tr></tfoot>
             </table>
         </div>
         <?php endif; ?>
@@ -2617,6 +2644,12 @@ var CASE_DATA = {
                     <label>總金額 *</label>
                     <input type="number" id="pd_amount" class="form-control">
                 </div>
+                <?php if ($_canEditWireFee): ?>
+                <div class="form-group">
+                    <label>折讓/匯費 <small style="color:#888">(扣除後計尾款)</small></label>
+                    <input type="number" id="pd_wire_fee" class="form-control" min="0" step="1" <?= $_canEditPayment ? '' : 'readonly style="background:#f5f5f5"' ?>>
+                </div>
+                <?php endif; ?>
                 <div class="form-group" style="flex:2">
                     <label>收款單號 <small style="color:#888">(連動鎖定，不可修改)</small></label>
                     <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-..." readonly style="background:#f5f5f5">
@@ -3206,6 +3239,8 @@ function saveCasePayment() {
     fd.append('payment_type', document.getElementById('pay_type').value);
     fd.append('transaction_type', document.getElementById('pay_method').value);
     fd.append('amount', amount);
+    var wireEl = document.getElementById('pay_wire_fee');
+    if (wireEl) fd.append('wire_fee', wireEl.value || 0);
     fd.append('note', document.getElementById('pay_note').value);
     var img = document.getElementById('pay_image');
     for (var fi = 0; fi < img.files.length; fi++) {
@@ -3862,6 +3897,12 @@ function saveNewCustomer() {
                     <label>總金額 *</label>
                     <input type="number" id="pd_amount" class="form-control">
                 </div>
+                <?php if ($_canEditWireFee): ?>
+                <div class="form-group">
+                    <label>折讓/匯費 <small style="color:#888">(扣除後計尾款)</small></label>
+                    <input type="number" id="pd_wire_fee" class="form-control" min="0" step="1" <?= $_canEditPayment ? '' : 'readonly style="background:#f5f5f5"' ?>>
+                </div>
+                <?php endif; ?>
                 <div class="form-group" style="flex:2">
                     <label>收款單號 <small style="color:#888">(連動鎖定，不可修改)</small></label>
                     <input type="text" id="pd_receipt_number" class="form-control" placeholder="S2-..." readonly style="background:#f5f5f5">
@@ -3955,6 +3996,8 @@ function openPaymentDetail(id) {
         document.getElementById('pd_tax_amount').value = d.tax_amount || '';
         document.getElementById('pd_receipt_number').value = d.receipt_number || '';
         document.getElementById('pd_note').value = d.note || '';
+        var pdWireFill = document.getElementById('pd_wire_fee');
+        if (pdWireFill) pdWireFill.value = (d.wire_fee && Number(d.wire_fee) > 0) ? Number(d.wire_fee) : '';
 
         // Set selects
         var typeEl = document.getElementById('pd_type');
@@ -4038,6 +4081,8 @@ function savePaymentEdit() {
     fd.append('payment_type', document.getElementById('pd_type').value);
     fd.append('transaction_type', document.getElementById('pd_method').value);
     fd.append('amount', document.getElementById('pd_amount').value);
+    var pdWireEl = document.getElementById('pd_wire_fee');
+    if (pdWireEl) fd.append('wire_fee', pdWireEl.value || 0);
     fd.append('note', document.getElementById('pd_note').value);
     var imgFiles = document.getElementById('pd_image').files;
     for (var fi = 0; fi < imgFiles.length; fi++) {

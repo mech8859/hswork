@@ -410,14 +410,14 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
             $_hoursStyle = $_preLockHours ? 'background:#f5f5f5;cursor:not-allowed' : '';
             ?>
             <div class="form-group">
-                <label>施工時數</label>
+                <label>總施工時數</label>
                 <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="1" oninput="recalcLaborCost()" <?= $_hoursReadonly ?> style="<?= $_hoursStyle ?>">
-                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">單人工時，天數×8（天數+人數都填時鎖定）</small>
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">總人時，天數×人數×8（天數+人數都填時鎖定）</small>
             </div>
             <div class="form-group">
                 <label>人力成本</label>
                 <input type="number" name="labor_cost_total" id="laborCostTotal" class="form-control" value="<?= e($quote['labor_cost_total'] ?? '') ?>" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
-                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">人數×時數×$<?= $_qfHourly ?></small>
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">總時數×$<?= $_qfHourly ?></small>
             </div>
             <div class="form-group">
                 <label>線材成本</label>
@@ -1115,9 +1115,9 @@ function recalcLaborCost() {
     var costEl = document.getElementById('laborCostTotal');
     if (!costEl) return;
     var hours = parseFloat(document.getElementById('laborHours').value) || 0;
-    var people = parseFloat(document.getElementById('laborPeople').value) || 0;
     if (hours > 0 && hours < 1) hours = 1;
-    var cost = (hours > 0 && people > 0) ? Math.round(people * hours * laborHourlyCost) : 0;
+    // 時數 已是總人時，直接 × 時薪（不再 × 人數）
+    var cost = (hours > 0) ? Math.round(hours * laborHourlyCost) : 0;
     costEl.value = cost || '';
     calcGrandTotal();
 }
@@ -1165,9 +1165,13 @@ function autoCalcHours() {
     var people = parseFloat(document.getElementById('laborPeople').value) || 0;
     var hoursInput = document.getElementById('laborHours');
     if (days > 0 && people > 0) {
-        var h = days * 8;
+        // 總人時 = 天 × 人 × 8
+        var h = days * people * 8;
         if (h < 1) h = 1;
+        // Chrome 對 readonly number input 改 value 不刷新顯示，先解鎖再寫值再鎖回
+        hoursInput.readOnly = false;
         hoursInput.value = h;
+        hoursInput.setAttribute('value', h);
         hoursInput.readOnly = true;
         hoursInput.style.background = '#f5f5f5';
         hoursInput.style.cursor = 'not-allowed';
@@ -1177,6 +1181,7 @@ function autoCalcHours() {
         hoursInput.style.cursor = '';
         if (days === 0 && people === 0) {
             hoursInput.value = '';
+            hoursInput.setAttribute('value', '');
         }
     }
     recalcLaborCost();

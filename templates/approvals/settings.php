@@ -121,8 +121,10 @@
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="sales_assistant"> 業務助理</label>
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="admin_staff"> 行政人員</label>
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="accountant"> 會計人員</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="accounting_supervisor"> 會計主管</label>
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="purchaser"> 採購</label>
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="vice_president"> 副總</label>
+                        <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="manager"> 分公司／部門管理者</label>
                         <label class="checkbox-label"><input type="checkbox" name="condition_user_roles[]" value="hq"> 總公司</label>
                     </div>
                 </div>
@@ -385,8 +387,10 @@
                             $roleOptions = array(
                                 'engineer' => '工程師', 'eng_manager' => '工程主管',
                                 'sales' => '業務', 'sales_manager' => '業務主管', 'sales_assistant' => '業務助理',
-                                'admin_staff' => '行政人員', 'accountant' => '會計人員',
-                                'purchaser' => '採購', 'vice_president' => '副總', 'hq' => '總公司',
+                                'admin_staff' => '行政人員',
+                                'accountant' => '會計人員', 'accounting_supervisor' => '會計主管',
+                                'purchaser' => '採購', 'vice_president' => '副總',
+                                'manager' => '分公司／部門管理者', 'hq' => '總公司',
                             );
                             ?>
                             <div style="margin-top:10px;padding:10px;background:#f0f7ff;border-radius:4px">
