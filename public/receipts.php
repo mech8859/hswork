@@ -196,14 +196,18 @@ switch ($action) {
                         $sumRow = $totalStmt->fetch(PDO::FETCH_NUM);
                         $cTotal = (int)$sumRow[0];
                         $cWire  = (int)$sumRow[1];
+                        // 訂金合計
+                        $depStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0) FROM case_payments WHERE case_id = ? AND payment_type = '訂金'");
+                        $depStmt->execute(array($cid));
+                        $cDeposit = (int)$depStmt->fetchColumn();
                         // 重算尾款
                         $cInfoStmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount FROM cases WHERE id = ?");
                         $cInfoStmt->execute(array($cid));
                         $cInfo = $cInfoStmt->fetch(PDO::FETCH_ASSOC);
                         $base = $cInfo ? ((int)$cInfo['total_amount'] > 0 ? (int)$cInfo['total_amount'] : (int)$cInfo['deal_amount']) : 0;
                         $cBalance = $base > 0 ? max(0, $base - $cTotal - $cWire) : null;
-                        Database::getInstance()->prepare("UPDATE cases SET total_collected = ?, balance_amount = ? WHERE id = ?")
-                            ->execute(array($cTotal, $cBalance, $cid));
+                        Database::getInstance()->prepare("UPDATE cases SET total_collected = ?, deposit_amount = ?, balance_amount = ? WHERE id = ?")
+                            ->execute(array($cTotal, $cDeposit ?: null, $cBalance, $cid));
                     }
                 }
             } catch (Exception $e) {
