@@ -41,8 +41,8 @@
                 <input type="text" name="voucher_number" class="form-control" value="<?= e($record['voucher_number'] ?? '') ?>" placeholder="AR2-...">
             </div>
             <div class="form-group" style="flex:0 0 auto;min-width:200px">
-                <label>請款單號</label>
-                <input type="text" name="billing_number" class="form-control" value="<?= e($record['billing_number'] ?? '') ?>">
+                <label>系統別 <small style="color:#888">(由案件帶入)</small></label>
+                <input type="text" name="system_type" class="form-control" value="<?= e($record['system_type'] ?? '') ?>" readonly style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>登記日期 *</label>

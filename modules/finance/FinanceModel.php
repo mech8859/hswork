@@ -606,16 +606,26 @@ class FinanceModel
     public function createReceipt($data)
     {
         $number = $this->generateNumber('RC', 'receipts', 'receipt_number');
+        // 系統別：用 case_number 從 cases 帶入
+        $sysType = null;
+        if (!empty($data['case_number'])) {
+            try {
+                $st = $this->db->prepare("SELECT system_type FROM cases WHERE case_number = ? LIMIT 1");
+                $st->execute(array($data['case_number']));
+                $sysType = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         $stmt = $this->db->prepare("
-            INSERT INTO receipts (receipt_number, voucher_number, billing_number, register_date, deposit_date, customer_name, receivable_id,
+            INSERT INTO receipts (receipt_number, voucher_number, billing_number, system_type, register_date, deposit_date, customer_name, receivable_id,
                 case_id, case_number, customer_no, sales_id, branch_id, subtotal, tax, discount, total_amount, receipt_method,
                 invoice_category, status, bank_ref, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
             !empty($data['voucher_number']) ? $data['voucher_number'] : null,
             !empty($data['billing_number']) ? $data['billing_number'] : null,
+            $sysType,
             $data['register_date'],
             !empty($data['deposit_date']) ? $data['deposit_date'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
@@ -644,9 +654,18 @@ class FinanceModel
     public function updateReceipt($id, $data)
     {
         // 註：registrar 由建立時寫入，更新時不變動
+        // 系統別：用 case_number 從 cases 重新帶入
+        $sysType = null;
+        if (!empty($data['case_number'])) {
+            try {
+                $st = $this->db->prepare("SELECT system_type FROM cases WHERE case_number = ? LIMIT 1");
+                $st->execute(array($data['case_number']));
+                $sysType = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         $stmt = $this->db->prepare("
             UPDATE receipts SET
-                voucher_number=?, billing_number=?, register_date=?, deposit_date=?, customer_name=?, receivable_id=?, case_id=?, case_number=?, customer_no=?,
+                voucher_number=?, billing_number=?, system_type=?, register_date=?, deposit_date=?, customer_name=?, receivable_id=?, case_id=?, case_number=?, customer_no=?,
                 sales_id=?, branch_id=?, subtotal=?, tax=?, discount=?, total_amount=?,
                 receipt_method=?, invoice_category=?, status=?, bank_ref=?, note=?, updated_by=?
             WHERE id=?
@@ -654,6 +673,7 @@ class FinanceModel
         $stmt->execute(array(
             !empty($data['voucher_number']) ? $data['voucher_number'] : null,
             !empty($data['billing_number']) ? $data['billing_number'] : null,
+            $sysType,
             $data['register_date'],
             !empty($data['deposit_date']) ? $data['deposit_date'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
