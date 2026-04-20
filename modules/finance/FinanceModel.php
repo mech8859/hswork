@@ -799,13 +799,18 @@ class FinanceModel
     public function createPayable($data)
     {
         $number = $this->generateNumber('AP', 'payables', 'payable_number');
-        // 廠商類別：用 vendor_code 從 vendors 帶入
+        // 廠商編號 + 類別：以 vendor_name 為主從 vendors 重抓（避免歷史 vendor_code 殘留錯誤）
+        $vendorCode = !empty($data['vendor_code']) ? $data['vendor_code'] : null;
         $vendorCategory = null;
-        if (!empty($data['vendor_code'])) {
+        if (!empty($data['vendor_name'])) {
             try {
-                $st = $this->db->prepare("SELECT category FROM vendors WHERE vendor_code = ? LIMIT 1");
-                $st->execute(array($data['vendor_code']));
-                $vendorCategory = $st->fetchColumn() ?: null;
+                $st = $this->db->prepare("SELECT vendor_code, category FROM vendors WHERE name = ? LIMIT 1");
+                $st->execute(array($data['vendor_name']));
+                $vrow = $st->fetch(PDO::FETCH_ASSOC);
+                if ($vrow) {
+                    $vendorCode = $vrow['vendor_code'] ?: $vendorCode;
+                    $vendorCategory = $vrow['category'] ?: null;
+                }
             } catch (Exception $e) {}
         }
         // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
@@ -818,7 +823,7 @@ class FinanceModel
             $number,
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+            $vendorCode,
             $vendorCategory,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -837,13 +842,18 @@ class FinanceModel
 
     public function updatePayable($id, $data)
     {
-        // 廠商類別：用 vendor_code 從 vendors 重新帶入
+        // 廠商編號 + 類別：以 vendor_name 為主從 vendors 重抓
+        $vendorCode = !empty($data['vendor_code']) ? $data['vendor_code'] : null;
         $vendorCategory = null;
-        if (!empty($data['vendor_code'])) {
+        if (!empty($data['vendor_name'])) {
             try {
-                $st = $this->db->prepare("SELECT category FROM vendors WHERE vendor_code = ? LIMIT 1");
-                $st->execute(array($data['vendor_code']));
-                $vendorCategory = $st->fetchColumn() ?: null;
+                $st = $this->db->prepare("SELECT vendor_code, category FROM vendors WHERE name = ? LIMIT 1");
+                $st->execute(array($data['vendor_name']));
+                $vrow = $st->fetch(PDO::FETCH_ASSOC);
+                if ($vrow) {
+                    $vendorCode = $vrow['vendor_code'] ?: $vendorCode;
+                    $vendorCategory = $vrow['category'] ?: null;
+                }
             } catch (Exception $e) {}
         }
         // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
@@ -856,7 +866,7 @@ class FinanceModel
         $stmt->execute(array(
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-            !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+            $vendorCode,
             $vendorCategory,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1098,14 +1108,28 @@ class FinanceModel
     public function createPaymentOut($data)
     {
         $number = $this->generateNumber('PO', 'payments_out', 'payment_number');
+        // 廠商編號 + 類別：以 vendor_name 為主從 vendors 重抓（避免歷史 vendor_code 殘留錯誤）
+        $vendorCode = !empty($data['vendor_code']) ? $data['vendor_code'] : null;
+        $vendorCategory = null;
+        if (!empty($data['vendor_name'])) {
+            try {
+                $st = $this->db->prepare("SELECT vendor_code, category FROM vendors WHERE name = ? LIMIT 1");
+                $st->execute(array($data['vendor_name']));
+                $vrow = $st->fetch(PDO::FETCH_ASSOC);
+                if ($vrow) {
+                    $vendorCode = $vrow['vendor_code'] ?: $vendorCode;
+                    $vendorCategory = $vrow['category'] ?: null;
+                }
+            } catch (Exception $e) {}
+        }
         // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
-        // 防呆：exclude_from_branch_stats 欄位可能還沒建立（migration 112 未跑）→ try/catch
+        // 防呆：exclude_from_branch_stats / vendor_category 欄位可能還沒建立 → try/catch
         try {
             $stmt = $this->db->prepare("
-                INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
+                INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code, vendor_category,
                     payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
                     total_amount, main_category, sub_category, note, exclude_from_branch_stats, registrar, created_by, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ");
             $stmt->execute(array(
                 $number,
@@ -1113,7 +1137,8 @@ class FinanceModel
                 !empty($data['payment_date']) ? $data['payment_date'] : null,
                 !empty($data['payable_id']) ? $data['payable_id'] : null,
                 !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                $vendorCode,
+                $vendorCategory,
                 !empty($data['payment_method']) ? $data['payment_method'] : null,
                 !empty($data['payment_type']) ? $data['payment_type'] : null,
                 !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1131,7 +1156,7 @@ class FinanceModel
                 $data['created_by'],
             ));
         } catch (Exception $e) {
-            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats
+            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats / vendor_category
             $stmt = $this->db->prepare("
                 INSERT INTO payments_out (payment_number, create_date, payment_date, payable_id, vendor_name, vendor_code,
                     payment_method, payment_type, payment_terms, status, subtotal, tax, remittance_fee,
@@ -1144,7 +1169,7 @@ class FinanceModel
                 !empty($data['payment_date']) ? $data['payment_date'] : null,
                 !empty($data['payable_id']) ? $data['payable_id'] : null,
                 !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                $vendorCode,
                 !empty($data['payment_method']) ? $data['payment_method'] : null,
                 !empty($data['payment_type']) ? $data['payment_type'] : null,
                 !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1166,12 +1191,26 @@ class FinanceModel
 
     public function updatePaymentOut($id, $data)
     {
+        // 廠商編號 + 類別：以 vendor_name 為主從 vendors 重抓
+        $vendorCode = !empty($data['vendor_code']) ? $data['vendor_code'] : null;
+        $vendorCategory = null;
+        if (!empty($data['vendor_name'])) {
+            try {
+                $st = $this->db->prepare("SELECT vendor_code, category FROM vendors WHERE name = ? LIMIT 1");
+                $st->execute(array($data['vendor_name']));
+                $vrow = $st->fetch(PDO::FETCH_ASSOC);
+                if ($vrow) {
+                    $vendorCode = $vrow['vendor_code'] ?: $vendorCode;
+                    $vendorCategory = $vrow['category'] ?: null;
+                }
+            } catch (Exception $e) {}
+        }
         // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
-        // 防呆：exclude_from_branch_stats 欄位可能還沒建立 → try/catch
+        // 防呆：exclude_from_branch_stats / vendor_category 欄位可能還沒建立 → try/catch
         try {
             $stmt = $this->db->prepare("
                 UPDATE payments_out SET
-                    create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
+                    create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?, vendor_category=?,
                     payment_method=?, payment_type=?, payment_terms=?, status=?,
                     subtotal=?, tax=?, remittance_fee=?, total_amount=?,
                     main_category=?, sub_category=?, note=?, exclude_from_branch_stats=?, updated_by=?
@@ -1182,7 +1221,8 @@ class FinanceModel
                 !empty($data['payment_date']) ? $data['payment_date'] : null,
                 !empty($data['payable_id']) ? $data['payable_id'] : null,
                 !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                $vendorCode,
+                $vendorCategory,
                 !empty($data['payment_method']) ? $data['payment_method'] : null,
                 !empty($data['payment_type']) ? $data['payment_type'] : null,
                 !empty($data['payment_terms']) ? $data['payment_terms'] : null,
@@ -1199,7 +1239,7 @@ class FinanceModel
                 $id,
             ));
         } catch (Exception $e) {
-            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats
+            // Fallback：欄位不存在 → 不寫入 exclude_from_branch_stats / vendor_category
             $stmt = $this->db->prepare("
                 UPDATE payments_out SET
                     create_date=?, payment_date=?, payable_id=?, vendor_name=?, vendor_code=?,
@@ -1213,7 +1253,7 @@ class FinanceModel
                 !empty($data['payment_date']) ? $data['payment_date'] : null,
                 !empty($data['payable_id']) ? $data['payable_id'] : null,
                 !empty($data['vendor_name']) ? $data['vendor_name'] : null,
-                !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+                $vendorCode,
                 !empty($data['payment_method']) ? $data['payment_method'] : null,
                 !empty($data['payment_type']) ? $data['payment_type'] : null,
                 !empty($data['payment_terms']) ? $data['payment_terms'] : null,

@@ -60,6 +60,7 @@
                     <th>付款單號</th>
                     <th>建立日期</th>
                     <th>廠商名稱</th>
+                    <th>廠商類別</th>
                     <th>付款期間</th>
                     <th class="text-right">未稅總額</th>
                     <th class="text-right">稅金</th>
@@ -78,6 +79,7 @@
                     <td><a href="/payables.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['payable_number']) ? $r['payable_number'] : '') ?></a></td>
                     <td><?= e(!empty($r['create_date']) ? $r['create_date'] : '') ?></td>
                     <td><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></td>
+                    <td style="font-size:.85rem;color:#666"><?= e(!empty($r['vendor_category']) ? $r['vendor_category'] : '-') ?></td>
                     <td><?= e(!empty($r['payment_period']) ? $r['payment_period'] : (!empty($r['payment_terms']) ? $r['payment_terms'] : '-')) ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['subtotal']) ? $r['subtotal'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['tax']) ? $r['tax'] : 0) ?></td>

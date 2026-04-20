@@ -66,6 +66,10 @@
                 <label>廠商編號</label>
                 <input type="text" name="vendor_code" id="vendorCode" class="form-control" value="<?= e($record['vendor_code'] ?? '') ?>" readonly style="background:#f5f5f5">
             </div>
+            <div class="form-group">
+                <label>廠商類別 <small style="color:#888">(由廠商帶入)</small></label>
+                <input type="text" name="vendor_category" id="vendorCategory" class="form-control" value="<?= e($record['vendor_category'] ?? '') ?>" readonly style="background:#f5f5f5">
+            </div>
         </div>
         <div class="form-row">
             <div class="form-group">
