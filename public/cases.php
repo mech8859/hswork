@@ -720,11 +720,12 @@ switch ($action) {
 
         // 同步更新對應的收款單（若有 receipt_number）
         // note 格式：「案件帳款自動產生 - {類別} / {使用者備註}」；使用者備註取自 case_payments
+        // wire_fee → discount 雙向同步
         if (!empty($newReceiptNo)) {
             try {
                 $syncNote = '案件帳款自動產生 - ' . $newType . ($newNote ? ' / ' . $newNote : '');
-                $db->prepare("UPDATE receipts SET register_date=?, deposit_date=?, receipt_method=?, invoice_category=?, subtotal=?, tax=?, total_amount=?, note=? WHERE receipt_number=?")
-                   ->execute(array($newDate, $newDate, $newMethod, $newType, $newUntaxed, $newTax, $newAmount, $syncNote, $newReceiptNo));
+                $db->prepare("UPDATE receipts SET register_date=?, deposit_date=?, receipt_method=?, invoice_category=?, subtotal=?, tax=?, total_amount=?, discount=?, note=? WHERE receipt_number=?")
+                   ->execute(array($newDate, $newDate, $newMethod, $newType, $newUntaxed, $newTax, $newAmount, $newWireFee, $syncNote, $newReceiptNo));
             } catch (Exception $e) {
                 error_log('sync receipt failed: ' . $e->getMessage());
             }

@@ -173,7 +173,8 @@ switch ($action) {
                 $rnStmt->execute(array($id));
                 $rNum = $rnStmt->fetchColumn();
                 if ($rNum) {
-                    Database::getInstance()->prepare("UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, note=? WHERE receipt_number=?")
+                    // 同步含 discount → wire_fee（折讓/匯費）
+                    Database::getInstance()->prepare("UPDATE case_payments SET payment_date=?, payment_type=?, transaction_type=?, amount=?, untaxed_amount=?, tax_amount=?, wire_fee=?, note=? WHERE receipt_number=?")
                        ->execute(array(
                            $data['register_date'],
                            $data['invoice_category'],
@@ -181,23 +182,26 @@ switch ($action) {
                            (int)$data['total_amount'],
                            (int)$data['subtotal'],
                            (int)$data['tax'],
+                           (int)($data['discount'] ?? 0),
                            $syncCaseNote,
                            $rNum,
                        ));
-                    // 同步後重算對應案件的總收款 + 尾款
+                    // 同步後重算對應案件的總收款 + 尾款（要扣折讓/匯費）
                     $caseStmt = Database::getInstance()->prepare('SELECT DISTINCT case_id FROM case_payments WHERE receipt_number = ?');
                     $caseStmt->execute(array($rNum));
                     $affectedCaseIds = array_filter($caseStmt->fetchAll(PDO::FETCH_COLUMN));
                     foreach ($affectedCaseIds as $cid) {
-                        $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0) FROM case_payments WHERE case_id = ?");
+                        $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0), COALESCE(SUM(wire_fee),0) FROM case_payments WHERE case_id = ?");
                         $totalStmt->execute(array($cid));
-                        $cTotal = (int)$totalStmt->fetchColumn();
+                        $sumRow = $totalStmt->fetch(PDO::FETCH_NUM);
+                        $cTotal = (int)$sumRow[0];
+                        $cWire  = (int)$sumRow[1];
                         // 重算尾款
                         $cInfoStmt = Database::getInstance()->prepare("SELECT deal_amount, total_amount FROM cases WHERE id = ?");
                         $cInfoStmt->execute(array($cid));
                         $cInfo = $cInfoStmt->fetch(PDO::FETCH_ASSOC);
                         $base = $cInfo ? ((int)$cInfo['total_amount'] > 0 ? (int)$cInfo['total_amount'] : (int)$cInfo['deal_amount']) : 0;
-                        $cBalance = $base > 0 ? max(0, $base - $cTotal) : null;
+                        $cBalance = $base > 0 ? max(0, $base - $cTotal - $cWire) : null;
                         Database::getInstance()->prepare("UPDATE cases SET total_collected = ?, balance_amount = ? WHERE id = ?")
                             ->execute(array($cTotal, $cBalance, $cid));
                     }
