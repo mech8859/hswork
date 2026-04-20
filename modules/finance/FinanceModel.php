@@ -799,17 +799,27 @@ class FinanceModel
     public function createPayable($data)
     {
         $number = $this->generateNumber('AP', 'payables', 'payable_number');
+        // 廠商類別：用 vendor_code 從 vendors 帶入
+        $vendorCategory = null;
+        if (!empty($data['vendor_code'])) {
+            try {
+                $st = $this->db->prepare("SELECT category FROM vendors WHERE vendor_code = ? LIMIT 1");
+                $st->execute(array($data['vendor_code']));
+                $vendorCategory = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         // 註：case_number / customer_no 已從表單移除（DB 欄位保留以相容舊資料）
         $stmt = $this->db->prepare("
-            INSERT INTO payables (payable_number, create_date, vendor_name, vendor_code, payment_period, payment_terms,
+            INSERT INTO payables (payable_number, create_date, vendor_name, vendor_code, vendor_category, payment_period, payment_terms,
                 subtotal, tax, total_amount, prepaid, payable_amount, note, registrar, created_by, updated_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute(array(
             $number,
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+            $vendorCategory,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
@@ -827,10 +837,19 @@ class FinanceModel
 
     public function updatePayable($id, $data)
     {
+        // 廠商類別：用 vendor_code 從 vendors 重新帶入
+        $vendorCategory = null;
+        if (!empty($data['vendor_code'])) {
+            try {
+                $st = $this->db->prepare("SELECT category FROM vendors WHERE vendor_code = ? LIMIT 1");
+                $st->execute(array($data['vendor_code']));
+                $vendorCategory = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
         // 註：case_number / customer_no 不在 UPDATE 範圍，舊資料原值保留
         $stmt = $this->db->prepare("
             UPDATE payables SET
-                create_date=?, vendor_name=?, vendor_code=?, payment_period=?, payment_terms=?,
+                create_date=?, vendor_name=?, vendor_code=?, vendor_category=?, payment_period=?, payment_terms=?,
                 subtotal=?, tax=?, total_amount=?, prepaid=?, payable_amount=?, note=?, updated_by=?
             WHERE id=?
         ");
@@ -838,6 +857,7 @@ class FinanceModel
             $data['create_date'],
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_code']) ? $data['vendor_code'] : null,
+            $vendorCategory,
             !empty($data['payment_period']) ? $data['payment_period'] : null,
             !empty($data['payment_terms']) ? $data['payment_terms'] : null,
             !empty($data['subtotal']) ? $data['subtotal'] : 0,
