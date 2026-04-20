@@ -1068,6 +1068,18 @@ switch ($action) {
         break;
 
     // ---- AJAX: 搜尋客戶 ----
+    // ---- AJAX: 依進件編號查案件基本資訊（給請款單/收款單即時帶入系統別等用）----
+    case 'ajax_get_case_by_number':
+        header('Content-Type: application/json');
+        $cn = trim($_GET['case_number'] ?? '');
+        if ($cn === '') { echo json_encode(array('found' => false)); break; }
+        $stmt = Database::getInstance()->prepare("SELECT id, case_number, system_type, customer_id, customer_no, customer_name FROM cases WHERE case_number = ? LIMIT 1");
+        $stmt->execute(array($cn));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { echo json_encode(array('found' => false)); break; }
+        echo json_encode(array('found' => true, 'data' => $row));
+        break;
+
     case 'ajax_search_customer':
         header('Content-Type: application/json');
         $keyword = $_GET['keyword'] ?? '';

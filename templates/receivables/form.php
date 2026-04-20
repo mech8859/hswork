@@ -371,4 +371,29 @@ function calcTotal() {
     document.getElementById('totalInput').value = s + t + sh - dep - disc;
 }
 calcTotal();
+
+// ---- 進件編號變動時即時抓案件系統別 ----
+(function() {
+    var caseInp = document.querySelector('input[name="case_number"]');
+    var sysInp = document.querySelector('input[name="system_type"]');
+    if (!caseInp || !sysInp) return;
+    var lastQ = '';
+    function fetchSysType() {
+        var q = (caseInp.value || '').trim();
+        if (q === lastQ) return;
+        lastQ = q;
+        if (q === '') { sysInp.value = ''; return; }
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/cases.php?action=ajax_get_case_by_number&case_number=' + encodeURIComponent(q));
+        xhr.onload = function() {
+            try {
+                var res = JSON.parse(xhr.responseText);
+                sysInp.value = (res.found && res.data && res.data.system_type) ? res.data.system_type : '';
+            } catch (e) {}
+        };
+        xhr.send();
+    }
+    caseInp.addEventListener('change', fetchSysType);
+    caseInp.addEventListener('blur', fetchSysType);
+})();
 </script>
