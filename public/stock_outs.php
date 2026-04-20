@@ -304,6 +304,7 @@ switch ($action) {
                 'quantity'   => $qty,
                 'unit_price' => isset($item['unit_cost']) ? $item['unit_cost'] : (isset($item['unit_price']) ? $item['unit_price'] : 0),
                 'note'       => $itemNote,
+                'source_item_id' => $itemId,
             );
         }
 

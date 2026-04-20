@@ -285,14 +285,15 @@ class StockModel
 
         $stmt = $this->db->prepare("
             INSERT INTO stock_in_items
-                (stock_in_id, product_id, model, product_name, spec, unit, quantity, unit_price, note, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (stock_in_id, source_item_id, product_id, model, product_name, spec, unit, quantity, unit_price, note, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $sort = 0;
         foreach ($items as $item) {
             if (empty($item['product_name']) && empty($item['model'])) continue;
             $stmt->execute(array(
                 $stockInId,
+                !empty($item['source_item_id']) ? (int)$item['source_item_id'] : null,
                 !empty($item['product_id']) ? $item['product_id'] : null,
                 !empty($item['model']) ? $item['model'] : null,
                 !empty($item['product_name']) ? $item['product_name'] : null,
@@ -477,12 +478,39 @@ class StockModel
     }
 
     /**
-     * 統計每個 product_id 已退回的數量（從此出庫單衍生的入庫單）
+     * 統計此出庫單已退回的數量（從手動餘料入庫單衍生）
      * 排除已取消的入庫單
-     * @return array [product_id => total_returned_qty]
+     *
+     * 新格式回傳：
+     *   array(
+     *     'by_item'    => array(stock_out_item_id => qty),  // 精準對應（有 source_item_id）
+     *     'by_product' => array(product_id => qty),         // 舊資料 fallback（source_item_id IS NULL）
+     *   )
+     *
+     * @return array
      */
     public function getReturnedQtyMap($stockOutId)
     {
+        $byItem = array();
+        $byProduct = array();
+
+        // 精準（新版）：依 source_item_id 統計
+        $stmt = $this->db->prepare("
+            SELECT sii.source_item_id, COALESCE(SUM(sii.quantity),0) AS qty
+            FROM stock_in_items sii
+            JOIN stock_ins si ON sii.stock_in_id = si.id
+            WHERE si.source_type = 'manual_return'
+              AND si.source_id = ?
+              AND si.status != '已取消'
+              AND sii.source_item_id IS NOT NULL
+            GROUP BY sii.source_item_id
+        ");
+        $stmt->execute(array($stockOutId));
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $byItem[(int)$row['source_item_id']] = (int)$row['qty'];
+        }
+
+        // 舊資料 fallback：依 product_id 統計（僅 source_item_id IS NULL 的歷史紀錄）
         $stmt = $this->db->prepare("
             SELECT sii.product_id, COALESCE(SUM(sii.quantity),0) AS qty
             FROM stock_in_items sii
@@ -490,15 +518,19 @@ class StockModel
             WHERE si.source_type = 'manual_return'
               AND si.source_id = ?
               AND si.status != '已取消'
+              AND sii.source_item_id IS NULL
               AND sii.product_id IS NOT NULL
             GROUP BY sii.product_id
         ");
         $stmt->execute(array($stockOutId));
-        $map = array();
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $map[(int)$row['product_id']] = (int)$row['qty'];
+            $byProduct[(int)$row['product_id']] = (int)$row['qty'];
         }
-        return $map;
+
+        return array(
+            'by_item'    => $byItem,
+            'by_product' => $byProduct,
+        );
     }
 
     public function getStockOutItems($stockOutId)

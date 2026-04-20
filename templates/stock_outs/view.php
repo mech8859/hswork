@@ -288,6 +288,22 @@ document.addEventListener('click', function(e) {
         <p class="text-muted text-center mt-2">無明細</p>
     <?php else: ?>
     <?php
+    // 退回數量解構（向下相容兩種格式）：
+    //   新格式：array('by_item' => [...], 'by_product' => [...])
+    //   舊格式：[product_id => qty]
+    $returnedByItem = array();
+    $returnedByProductLegacy = array();
+    if (!empty($returnedQtyMap)) {
+        if (isset($returnedQtyMap['by_item']) || isset($returnedQtyMap['by_product'])) {
+            $returnedByItem = isset($returnedQtyMap['by_item']) ? $returnedQtyMap['by_item'] : array();
+            $returnedByProductLegacy = isset($returnedQtyMap['by_product']) ? $returnedQtyMap['by_product'] : array();
+        } else {
+            // 舊呼叫端可能仍傳純 product_id map
+            $returnedByProductLegacy = $returnedQtyMap;
+        }
+    }
+    $hasReturned = !empty($returnedByItem) || !empty($returnedByProductLegacy);
+
     // 查詢各產品庫存（依出庫單倉庫）
     $stockMap = array();
     $whId = isset($record['warehouse_id']) ? (int)$record['warehouse_id'] : 0;
@@ -310,7 +326,7 @@ document.addEventListener('click', function(e) {
             <thead><tr>
                 <?php if ($canManage && $canConfirmItems): ?><th class="print-hide-col" style="width:35px"><input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)"></th><?php endif; ?>
                 <th class="return-col" style="width:35px;display:none"><input type="checkbox" id="returnCheckAll" onchange="toggleReturnCheckAll(this)"></th>
-                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><th class="text-right" style="width:60px">已出</th><th class="text-right" style="width:60px">剩餘</th><?php if (!empty($returnedQtyMap)): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">本次出貨</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:90px">狀態</th>
+                <th style="width:30px">#</th><th>品名</th><th>型號</th><th>單位</th><th class="text-right">庫存</th><th class="text-right">需求</th><th class="text-right" style="width:60px">已出</th><th class="text-right" style="width:60px">剩餘</th><?php if ($hasReturned): ?><th class="text-right" style="width:70px">已退回</th><th class="text-right" style="width:70px">實際使用</th><?php endif; ?><?php if ($canConfirmItems): ?><th class="text-right print-hide-col" style="width:80px">本次出貨</th><?php endif; ?><th class="text-right">單價</th><th class="text-right">小計</th><th style="width:90px">狀態</th>
                 <th class="return-col" style="width:80px;display:none">入庫數量</th>
                 <th class="return-col" style="width:140px;display:none">備註</th>
             </tr></thead>
@@ -368,8 +384,16 @@ document.addEventListener('click', function(e) {
                     <td class="text-right need-cell" style="font-weight:600"><?= $needQty ?></td>
                     <td class="text-right" style="color:<?= $shippedQty > 0 ? '#1565c0' : '#999' ?>"><?= $shippedQty ?></td>
                     <td class="text-right" style="color:<?= $remainingQty > 0 ? '#e65100' : '#999' ?>;font-weight:<?= $remainingQty > 0 ? '600' : 'normal' ?>"><?= $remainingQty ?></td>
-                    <?php if (!empty($returnedQtyMap)):
-                        $itemReturned = isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
+                    <?php if ($hasReturned):
+                        $rowItemId = (int)$item['id'];
+                        if (isset($returnedByItem[$rowItemId])) {
+                            $itemReturned = (int)$returnedByItem[$rowItemId];
+                        } elseif (!$isSpare && isset($returnedByProductLegacy[$pid])) {
+                            // 舊資料 fallback：僅套用到非備品列
+                            $itemReturned = (int)$returnedByProductLegacy[$pid];
+                        } else {
+                            $itemReturned = 0;
+                        }
                         $actualUsed = max(0, $shippedQty - $itemReturned);
                     ?>
                     <td class="text-right" style="color:<?= $itemReturned > 0 ? '#e65100' : '#999' ?>"><?= $itemReturned > 0 ? $itemReturned : '-' ?></td>
@@ -391,7 +415,14 @@ document.addEventListener('click', function(e) {
                     <td>
                         <?php
                         // 新狀態顯示邏輯
-                        $itmRet = !empty($returnedQtyMap) && isset($returnedQtyMap[$pid]) ? $returnedQtyMap[$pid] : 0;
+                        $rowItemId2 = (int)$item['id'];
+                        if (isset($returnedByItem[$rowItemId2])) {
+                            $itmRet = (int)$returnedByItem[$rowItemId2];
+                        } elseif (!$isSpare && isset($returnedByProductLegacy[$pid])) {
+                            $itmRet = (int)$returnedByProductLegacy[$pid];
+                        } else {
+                            $itmRet = 0;
+                        }
                         if ($isFullyShipped):
                             if ($itmRet >= $shippedQty && $shippedQty > 0): ?>
                         <span style="color:#e65100;font-weight:600;font-size:.75rem">已出庫｜全退</span>
@@ -422,7 +453,7 @@ document.addEventListener('click', function(e) {
                     <?php
                     $colSpan = 9; // # 品名 型號 單位 庫存 需求 已出 剩餘 + 合計前佔位
                     if ($canManage && $canConfirmItems) $colSpan++; // checkbox
-                    if (!empty($returnedQtyMap)) $colSpan += 2; // 已退回 + 實際使用
+                    if ($hasReturned) $colSpan += 2; // 已退回 + 實際使用
                     if ($canConfirmItems) $colSpan++; // 本次出貨
                     ?>
                     <td colspan="<?= $colSpan ?>" class="text-right"><strong>合計</strong></td>
@@ -1189,7 +1220,7 @@ document.addEventListener('click', function(e) {
         html += '<td class="text-right need-cell"><input type="number" class="edit-input edit-qty" min="1" value="' + qty + '" onchange="onRowQtyChange(this)"></td>';
         html += '<td class="text-right" style="color:#999">0</td>';
         html += '<td class="text-right" style="color:#e65100;font-weight:600">' + qty + '</td>';
-        <?php if (!empty($returnedQtyMap)): ?>
+        <?php if ($hasReturned): ?>
         html += '<td></td><td></td>';
         <?php endif; ?>
         <?php if ($canConfirmItems): ?>
