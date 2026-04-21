@@ -244,6 +244,8 @@ switch ($action) {
             'date_from'    => isset($_GET['date_from']) ? $_GET['date_from'] : '',
             'date_to'      => isset($_GET['date_to']) ? $_GET['date_to'] : '',
             'keyword'      => isset($_GET['keyword']) ? $_GET['keyword'] : '',
+            'created_by'   => isset($_GET['created_by']) ? $_GET['created_by'] : '',
+            'sort'         => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
         );
         $perPage = 100;
         $page = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
@@ -255,6 +257,7 @@ switch ($action) {
         $stats = $model->getJournalStats();
         $voucherTypeOptions = AccountingModel::voucherTypeOptions();
         $statusOptions = AccountingModel::statusOptions();
+        $creators = $model->getJournalCreators();
 
         $pageTitle = '傳票管理';
         $currentPage = 'accounting';
