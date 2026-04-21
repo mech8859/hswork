@@ -54,7 +54,7 @@ var img = document.getElementById('photo');
 var pz;
 function initPz() {
     if (pz) { try { pz.destroy(); } catch(e) {} }
-    pz = Panzoom(img, { maxScale: 8, minScale: 1, contain: 'outside' });
+    pz = Panzoom(img, { maxScale: 8, minScale: 1 });
     document.getElementById('wrap').addEventListener('wheel', pz.zoomWithWheel);
 }
 if (img.complete) initPz();

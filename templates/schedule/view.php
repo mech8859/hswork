@@ -484,6 +484,7 @@ function joinSchedule(scheduleId) {
 // ===== 行事曆檢視照片 lightbox =====
 var schLbImages = [], schLbIndex = 0;
 function openSchLightbox(src) {
+    // 收集頁面所有照片
     schLbImages = [];
     document.querySelectorAll('.sch-photo').forEach(function(img) {
         var oc = img.getAttribute('onclick') || '';
@@ -493,6 +494,14 @@ function openSchLightbox(src) {
     if (schLbImages.length === 0) schLbImages = [src];
     schLbIndex = schLbImages.indexOf(src);
     if (schLbIndex < 0) schLbIndex = 0;
+
+    // 手機：跳獨立檢視頁（支援雙指縮放）。電腦：走原 lightbox
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        var params = 'idx=' + schLbIndex + '&images=' + encodeURIComponent(JSON.stringify(schLbImages)) + '&back=' + encodeURIComponent(location.href);
+        location.href = '/photo_view.php?' + params;
+        return;
+    }
+
     showSchLbImage();
     document.getElementById('schLightbox').classList.add('active');
 }

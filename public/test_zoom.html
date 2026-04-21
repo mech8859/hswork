@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Panzoom 診斷 v2</title>
+<script src="/js/panzoom.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#222; color:#fff; height:100vh; overflow:hidden; font-family:-apple-system,sans-serif; }
+#top { background:#000; padding:6px 10px; font-size:11px; font-family:monospace; border-bottom:1px solid #444; }
+#top div { line-height:1.4; }
+.ok { color:#0f0; }
+.err { color:#f66; }
+.warn { color:#ff0; }
+#modes { background:#111; padding:6px; display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid #444; }
+.mode-btn { flex:1; min-width:70px; padding:8px 4px; background:#333; color:#fff; border:1px solid #555; border-radius:4px; font-size:11px; cursor:pointer; }
+.mode-btn.active { background:#1565c0; border-color:#64b5f6; font-weight:bold; }
+#stage { position:absolute; top:210px; left:0; right:0; bottom:40px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#111; }
+#target-box { width:250px; height:250px; background:linear-gradient(135deg,#ff6b6b,#4ecdc4,#45b7d1,#f9ca24); border-radius:16px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; font-weight:bold; }
+#target-img-fixed { width:300px; height:200px; object-fit:cover; border-radius:8px; background:#555; }
+#target-img-flex { max-width:100%; max-height:100%; background:#555; }
+#bottom { position:absolute; bottom:0; left:0; right:0; padding:6px 10px; background:#000; font-size:10px; font-family:monospace; min-height:32px; max-height:60px; overflow:hidden; border-top:1px solid #444; }
+.back { position:fixed; top:6px; right:6px; background:#1565c0; color:#fff; padding:4px 10px; border-radius:12px; text-decoration:none; font-size:11px; z-index:100; }
+</style>
+</head>
+<body>
+<a class="back" href="javascript:history.back()">← 返回</a>
+<div id="top">
+    <div id="env"></div>
+    <div id="lib"></div>
+    <div id="scale">scale: -</div>
+    <div id="evt">事件: -</div>
+    <div id="touches">touches: 0 | gesture: -</div>
+</div>
+<div id="modes">
+    <button class="mode-btn" data-mode="A">A: div 固定</button>
+    <button class="mode-btn" data-mode="B">B: img 相對</button>
+    <button class="mode-btn" data-mode="C">C: img 固定px</button>
+    <button class="mode-btn" data-mode="D">D: img 無contain</button>
+</div>
+<div id="stage"></div>
+<div id="bottom"></div>
+
+<script>
+var envEl = document.getElementById('env');
+var libEl = document.getElementById('lib');
+var scaleEl = document.getElementById('scale');
+var evtEl = document.getElementById('evt');
+var touchEl = document.getElementById('touches');
+var logEl = document.getElementById('bottom');
+var stageEl = document.getElementById('stage');
+
+// 環境
+var ua = navigator.userAgent;
+var iosMatch = ua.match(/iPhone OS (\d+)_(\d+)/);
+envEl.innerHTML = 'iOS: ' + (iosMatch ? iosMatch[1] + '.' + iosMatch[2] : '?') + ' | W: ' + window.innerWidth + ' | devicePixelRatio: ' + window.devicePixelRatio;
+libEl.innerHTML = (typeof Panzoom === 'undefined') ? '<span class="err">Panzoom 未載入</span>' : '<span class="ok">Panzoom OK</span>';
+
+var pz = null;
+var curMode = '';
+var iosGestureSeen = false;
+
+function destroyPz() {
+    if (pz) { try { pz.destroy(); } catch(e) {} pz = null; }
+    stageEl.innerHTML = '';
+    iosGestureSeen = false;
+    touchEl.innerHTML = 'touches: 0 | gesture: -';
+    scaleEl.innerHTML = 'scale: -';
+    logEl.textContent = '';
+}
+
+// 用一張本地可取得的小圖當測試（/favicon.ico 或遠端）
+// 這邊用線上 placeholder，確保能 load
+var TEST_IMG_URL = 'https://picsum.photos/800/600';
+
+function setMode(mode) {
+    destroyPz();
+    curMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+
+    var target = null, opts = { maxScale: 6, minScale: 1, contain: 'outside' };
+
+    if (mode === 'A') {
+        // div 固定尺寸
+        var div = document.createElement('div');
+        div.id = 'target-box';
+        div.textContent = '雙指放大我';
+        stageEl.appendChild(div);
+        target = div;
+        initPz(target, opts, 'A: div 固定 + contain:outside');
+    } else if (mode === 'B') {
+        // img 相對尺寸 (模擬 photo_view.php)
+        var img = document.createElement('img');
+        img.id = 'target-img-flex';
+        img.alt = '照片';
+        stageEl.appendChild(img);
+        img.onload = function() {
+            logEl.textContent = 'img 載入完成 | 實際尺寸: ' + img.offsetWidth + 'x' + img.offsetHeight;
+            initPz(img, opts, 'B: img max-width 相對 + contain:outside');
+        };
+        img.src = TEST_IMG_URL;
+    } else if (mode === 'C') {
+        // img 固定 px
+        var img2 = document.createElement('img');
+        img2.id = 'target-img-fixed';
+        img2.alt = '照片';
+        stageEl.appendChild(img2);
+        img2.onload = function() {
+            logEl.textContent = 'img 載入完成 | 實際尺寸: ' + img2.offsetWidth + 'x' + img2.offsetHeight;
+            initPz(img2, opts, 'C: img 300x200 固定 + contain:outside');
+        };
+        img2.src = TEST_IMG_URL;
+    } else if (mode === 'D') {
+        // img 相對尺寸 + 無 contain
+        var img3 = document.createElement('img');
+        img3.id = 'target-img-flex';
+        img3.alt = '照片';
+        stageEl.appendChild(img3);
+        img3.onload = function() {
+            logEl.textContent = 'img 載入完成 | 實際尺寸: ' + img3.offsetWidth + 'x' + img3.offsetHeight;
+            initPz(img3, { maxScale: 6, minScale: 1 }, 'D: img 相對 + 無 contain');
+        };
+        img3.src = TEST_IMG_URL;
+    }
+}
+
+function initPz(target, opts, label) {
+    try {
+        pz = Panzoom(target, opts);
+        target.addEventListener('panzoomchange', function(e) {
+            scaleEl.innerHTML = 'scale: <span class="ok">' + e.detail.scale.toFixed(2) + '</span> | x:' + e.detail.x.toFixed(0) + ' y:' + e.detail.y.toFixed(0);
+        });
+        var ta = window.getComputedStyle(target).touchAction;
+        logEl.textContent = label + ' | touch-action: ' + ta;
+    } catch(e) {
+        logEl.innerHTML = '<span class="err">初始化失敗: ' + e.message + '</span>';
+    }
+}
+
+// 綁定按鈕
+document.querySelectorAll('.mode-btn').forEach(function(b) {
+    b.addEventListener('click', function() { setMode(b.dataset.mode); });
+});
+
+// 預設進 A
+setMode('A');
+
+// 事件監聽
+['touchstart', 'touchmove', 'touchend'].forEach(function(name) {
+    document.addEventListener(name, function(e) {
+        var n = (e.touches && e.touches.length) || 0;
+        evtEl.innerHTML = '事件: <span class="ok">' + name + '</span>';
+        touchEl.innerHTML = 'touches: <span class="' + (n >= 2 ? 'ok' : 'warn') + '">' + n + '</span> | gesture: ' + (iosGestureSeen ? '<span class="warn">曾觸發</span>' : '-');
+    }, { passive: true });
+});
+['gesturestart', 'gesturechange', 'gestureend'].forEach(function(name) {
+    document.addEventListener(name, function(e) {
+        iosGestureSeen = true;
+        evtEl.innerHTML = '事件: <span class="warn">' + name + ' (iOS 原生)</span> scale=' + (e.scale ? e.scale.toFixed(2) : '?');
+    }, { passive: true });
+});
+</script>
+</body>
+</html>
