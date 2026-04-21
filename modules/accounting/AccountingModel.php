@@ -328,12 +328,18 @@ class AccountingModel
             $where .= ' AND je.source_module = ?';
             $params[] = $filters['source_module'];
         }
+        if (!empty($filters['created_by'])) {
+            $where .= ' AND je.created_by = ?';
+            $params[] = (int)$filters['created_by'];
+        }
         return array($where, $params);
     }
 
     public function getJournalEntries($filters = array(), $limit = 100, $offset = 0)
     {
         list($where, $params) = $this->buildJournalWhere($filters);
+
+        $sort = (isset($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
 
         $params[] = (int)$offset;
         $params[] = (int)$limit;
@@ -342,11 +348,24 @@ class AccountingModel
                 LEFT JOIN users u ON je.created_by = u.id
                 LEFT JOIN users up ON je.posted_by = up.id
                 WHERE {$where}
-                ORDER BY je.voucher_date DESC, je.id DESC
+                ORDER BY je.voucher_date {$sort}, je.id {$sort}
                 LIMIT ?, ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 取得曾建立過傳票的使用者清單（for filter 下拉）
+     */
+    public function getJournalCreators()
+    {
+        $sql = "SELECT DISTINCT u.id, u.real_name
+                FROM journal_entries je
+                JOIN users u ON u.id = je.created_by
+                WHERE je.created_by IS NOT NULL
+                ORDER BY u.real_name";
+        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function countJournalEntries($filters = array())

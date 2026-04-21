@@ -42,9 +42,19 @@
             <option value="<?= e($k) ?>" <?= $filters['voucher_type'] === $k ? 'selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
         </select>
+        <select name="created_by" class="form-control" style="width:140px">
+            <option value="">全部建立者</option>
+            <?php foreach ($creators as $c): ?>
+            <option value="<?= (int)$c['id'] ?>" <?= (string)$filters['created_by'] === (string)$c['id'] ? 'selected' : '' ?>><?= e($c['real_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
         <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:140px">
         <span>~</span>
         <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:140px">
+        <select name="sort" class="form-control" style="width:110px" title="排序">
+            <option value="desc" <?= $filters['sort'] === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
+            <option value="asc"  <?= $filters['sort'] === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
+        </select>
         <button type="submit" class="btn btn-secondary">篩選</button>
     </form>
 </div>
