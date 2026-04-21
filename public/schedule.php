@@ -68,8 +68,25 @@ switch ($action) {
 
         $pageTitle = '工程行事曆';
         $currentPage = 'schedule';
+
+        // 裝置判斷：手機載入 calendar_mobile.php，桌面載入 calendar.php
+        // URL 強制：?view=mobile 或 ?view=desktop
+        $forceView = isset($_GET['view']) ? $_GET['view'] : '';
+        if ($forceView === 'mobile') {
+            $useMobile = true;
+        } elseif ($forceView === 'desktop') {
+            $useMobile = false;
+        } else {
+            $ua = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+            $useMobile = (bool)preg_match('/Mobile|Android|iPhone|iPod/i', $ua) && !preg_match('/iPad/i', $ua);
+        }
+
         require __DIR__ . '/../templates/layouts/header.php';
-        require __DIR__ . '/../templates/schedule/calendar.php';
+        if ($useMobile) {
+            require __DIR__ . '/../templates/schedule/calendar_mobile.php';
+        } else {
+            require __DIR__ . '/../templates/schedule/calendar.php';
+        }
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
