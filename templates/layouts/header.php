@@ -164,6 +164,7 @@
         <li><a href="/accounting.php?action=income_statement" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'income_statement' ? 'active' : '' ?>">📈 損益表</a></li>
         <li><a href="/accounting.php?action=balance_sheet" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'balance_sheet' ? 'active' : '' ?>">📊 資產負債表</a></li>
         <li><a href="/accounting.php?action=reconciliation" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'reconciliation' ? 'active' : '' ?>">🏦 銀行對帳</a></li>
+        <li><a href="/accounting.php?action=voucher_reconciliation" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'voucher_reconciliation' ? 'active' : '' ?>">✅ 傳票核對</a></li>
         <li><a href="/accounting.php?action=financial_reports" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'financial_reports' ? 'active' : '' ?>">📊 財務報表</a></li>
         <li><a href="/accounting.php?action=budget" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'budget' ? 'active' : '' ?>">📝 預算編輯</a></li>
         <?php endif; ?>
