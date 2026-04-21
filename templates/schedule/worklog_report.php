@@ -504,6 +504,10 @@ document.querySelector('form[method="POST"][enctype]').addEventListener('submit'
 }
 .form-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .form-row .form-group { flex: 1; min-width: 80px; }
+/* 手機隱藏單價欄位 */
+@media (max-width: 767px) {
+    .form-group:has(> input[name$="[unit_cost]"]) { display: none; }
+}
 .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; }
 

@@ -454,7 +454,8 @@ class ScheduleModel
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
         $params = array_merge($branchIds, $branchIds);
         $stmt = $this->db->prepare("
-            SELECT svc.*, c.case_number, c.title AS case_title
+            SELECT svc.*, c.case_number, c.title AS case_title, c.customer_name,
+                   (SELECT MIN(s.schedule_date) FROM schedules s WHERE s.case_id = svc.case_id AND s.visit_number = svc.visit_number AND s.status != 'cancelled') AS visit_date
             FROM schedule_visit_check svc
             JOIN cases c ON svc.case_id = c.id
             WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
