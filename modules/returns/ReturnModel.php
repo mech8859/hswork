@@ -144,7 +144,8 @@ class ReturnModel
     public function getItems($returnId)
     {
         $stmt = $this->db->prepare("
-            SELECT ri.*, p.model AS product_model, p.name AS product_db_name
+            SELECT ri.*, p.model AS product_model, p.name AS product_db_name,
+                   p.pack_qty, p.pack_unit
             FROM return_items ri
             LEFT JOIN products p ON ri.product_id = p.id
             WHERE ri.return_id = ?
@@ -433,8 +434,8 @@ class ReturnModel
         $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute(array($returnId));
 
         $stmt = $this->db->prepare("
-            INSERT INTO return_items (return_id, product_id, product_name, model, spec, unit, quantity, unit_price, tax_amount, amount, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO return_items (return_id, product_id, product_name, model, spec, unit, input_unit, input_qty, quantity, unit_price, tax_amount, amount, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($items as $item) {
@@ -443,8 +444,12 @@ class ReturnModel
             }
             $qty = !empty($item['quantity']) ? (float)$item['quantity'] : 0;
             $price = !empty($item['unit_price']) ? (float)$item['unit_price'] : 0;
-            $tax = isset($item['tax_amount']) ? (float)$item['tax_amount'] : round($qty * $price * 0.05);
-            $amount = !empty($item['amount']) ? (float)$item['amount'] : ($qty * $price + $tax);
+            $inputUnit = !empty($item['input_unit']) ? $item['input_unit'] : null;
+            $inputQty = isset($item['input_qty']) && $item['input_qty'] !== '' ? (float)$item['input_qty'] : null;
+            // 以使用者視角數量計算稅和金額（有包裝單位時，unit_price 為每包單價）
+            $viewQty = ($inputUnit && $inputQty !== null) ? $inputQty : $qty;
+            $tax = isset($item['tax_amount']) ? (float)$item['tax_amount'] : round($viewQty * $price * 0.05);
+            $amount = !empty($item['amount']) ? (float)$item['amount'] : ($viewQty * $price + $tax);
 
             $stmt->execute(array(
                 $returnId,
@@ -453,6 +458,8 @@ class ReturnModel
                 !empty($item['model']) ? $item['model'] : null,
                 !empty($item['spec']) ? $item['spec'] : null,
                 !empty($item['unit']) ? $item['unit'] : null,
+                !empty($item['input_unit']) ? $item['input_unit'] : null,
+                isset($item['input_qty']) && $item['input_qty'] !== '' ? (float)$item['input_qty'] : null,
                 $qty,
                 $price,
                 $tax,

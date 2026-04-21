@@ -72,9 +72,19 @@ function pv($product, $field, $default = '') {
             </div>
         </div>
 
-        <div class="form-grid-2">
+        <div class="form-grid-3">
             <div class="form-group">
-                <label>每箱/每捲數量 <span style="color:var(--gray-400);font-size:.8rem">(如 305米/箱，非箱裝留空)</span></label>
+                <label>包裝單位 <span style="color:var(--gray-400);font-size:.8rem">(非箱裝留空)</span></label>
+                <?php $curPackUnit = pv($product, 'pack_unit', ''); ?>
+                <select name="pack_unit" id="prodPackUnit" class="form-control">
+                    <option value="">— 無包裝單位 —</option>
+                    <?php foreach (array('箱','卷','包','盒') as $pu): ?>
+                    <option value="<?= $pu ?>" <?= $curPackUnit === $pu ? 'selected' : '' ?>><?= $pu ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>箱／卷／包／盒數量 <span style="color:var(--gray-400);font-size:.8rem">(如 305/箱，非箱裝留空)</span></label>
                 <input type="number" name="pack_qty" id="prodPackQty" class="form-control" value="<?= pv($product, 'pack_qty') ? (float)pv($product, 'pack_qty') : '' ?>" min="0" step="0.01" placeholder="非箱裝留空" oninput="calcCostPerUnit()">
             </div>
             <div class="form-group">
@@ -188,7 +198,8 @@ function pv($product, $field, $default = '') {
 
 <style>
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 480px) { .form-grid-2 { grid-template-columns: 1fr; } }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 480px) { .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; } }
 .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .price-history-table { width: 100%; border-collapse: collapse; }
 .price-history-table th { font-size: .75rem; color: var(--gray-500); font-weight: 500; padding: 4px 4px 8px; text-align: left; }

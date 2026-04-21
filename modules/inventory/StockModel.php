@@ -285,8 +285,8 @@ class StockModel
 
         $stmt = $this->db->prepare("
             INSERT INTO stock_in_items
-                (stock_in_id, source_item_id, product_id, model, product_name, spec, unit, quantity, unit_price, note, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (stock_in_id, source_item_id, product_id, model, product_name, spec, unit, input_unit, input_qty, quantity, unit_price, note, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $sort = 0;
         foreach ($items as $item) {
@@ -299,6 +299,8 @@ class StockModel
                 !empty($item['product_name']) ? $item['product_name'] : null,
                 !empty($item['spec']) ? $item['spec'] : null,
                 !empty($item['unit']) ? $item['unit'] : null,
+                !empty($item['input_unit']) ? $item['input_unit'] : null,
+                isset($item['input_qty']) && $item['input_qty'] !== '' ? (float)$item['input_qty'] : null,
                 !empty($item['quantity']) ? $item['quantity'] : 0,
                 !empty($item['unit_price']) ? $item['unit_price'] : 0,
                 !empty($item['note']) ? $item['note'] : null,
@@ -594,8 +596,8 @@ class StockModel
 
         $stmt = $this->db->prepare("
             INSERT INTO stock_out_items
-                (stock_out_id, product_id, model, product_name, spec, unit, quantity, unit_price, note, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (stock_out_id, product_id, model, product_name, spec, unit, input_unit, input_qty, quantity, unit_price, note, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $sort = 0;
         foreach ($items as $item) {
@@ -607,6 +609,8 @@ class StockModel
                 !empty($item['product_name']) ? $item['product_name'] : null,
                 !empty($item['spec']) ? $item['spec'] : null,
                 !empty($item['unit']) ? $item['unit'] : null,
+                !empty($item['input_unit']) ? $item['input_unit'] : null,
+                isset($item['input_qty']) && $item['input_qty'] !== '' ? (float)$item['input_qty'] : null,
                 !empty($item['quantity']) ? $item['quantity'] : 0,
                 !empty($item['unit_price']) ? $item['unit_price'] : 0,
                 !empty($item['note']) ? $item['note'] : null,

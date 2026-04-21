@@ -314,7 +314,7 @@ switch ($action) {
         if (strlen($q) < 1) { echo json_encode(array()); break; }
         $db = Database::getInstance();
         $like = '%' . $q . '%';
-        $stmt = $db->prepare("SELECT id, name, model, CAST(COALESCE(NULLIF(cost,0), price, 0) AS SIGNED) as price, unit FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ?) ORDER BY name LIMIT 15");
+        $stmt = $db->prepare("SELECT id, name, model, CAST(COALESCE(NULLIF(cost,0), price, 0) AS SIGNED) as price, unit, pack_qty, pack_unit, cost_per_unit FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ?) ORDER BY name LIMIT 15");
         $stmt->execute(array($like, $like));
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // 查庫存

@@ -247,24 +247,31 @@ document.addEventListener('click', function(e) {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($record['items'] as $idx => $item): ?>
+                <?php foreach ($record['items'] as $idx => $item):
+                    // 有關聯產品時優先用產品主檔名稱（避免歷史資料中存到不完整的 product_name）
+                    if (!empty($item['product_id']) && !empty($item['product_db_name'])) {
+                        $displayName = $item['product_db_name'];
+                    } elseif (!empty($item['product_name'])) {
+                        $displayName = $item['product_name'];
+                    } else {
+                        $displayName = '-';
+                    }
+                    $displayModel = !empty($item['model']) ? $item['model']
+                                   : (!empty($item['product_model']) ? $item['product_model'] : '-');
+                    $hasInputUnit = !empty($item['input_unit']) && isset($item['input_qty']) && $item['input_qty'] !== null;
+                    $displayUnit = $hasInputUnit ? $item['input_unit'] : (!empty($item['unit']) ? $item['unit'] : '');
+                    $displayQty = $hasInputUnit ? (float)$item['input_qty'] : (float)($item['quantity'] ?? 0);
+                ?>
                 <tr>
                     <td><?= $idx + 1 ?></td>
-                    <?php
-                        // 有關聯產品時優先用產品主檔名稱（避免歷史資料中存到不完整的 product_name）
-                        if (!empty($item['product_id']) && !empty($item['product_db_name'])) {
-                            $displayName = $item['product_db_name'];
-                        } elseif (!empty($item['product_name'])) {
-                            $displayName = $item['product_name'];
-                        } else {
-                            $displayName = '-';
-                        }
-                        $displayModel = !empty($item['model']) ? $item['model']
-                                       : (!empty($item['product_model']) ? $item['product_model'] : '-');
-                    ?>
                     <td><?= e($displayName) ?></td>
                     <td><?= e($displayModel) ?></td>
-                    <td class="text-right"><?= (int)$item['quantity'] ?></td>
+                    <td class="text-right">
+                        <?= number_format($displayQty, $displayQty == floor($displayQty) ? 0 : 2) ?> <?= e($displayUnit) ?>
+                        <?php if ($hasInputUnit): ?>
+                        <div style="font-size:.7rem;color:var(--gray-500)">= <?= number_format((float)($item['quantity'] ?? 0)) ?> <?= e($item['unit'] ?? '') ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['tax_amount']) ? $item['tax_amount'] : 0) ?></td>
                     <td class="text-right">$<?= number_format(!empty($item['amount']) ? $item['amount'] : 0) ?></td>

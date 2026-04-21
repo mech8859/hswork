@@ -1,8 +1,9 @@
 <?php $isEdit = !empty($record); ?>
+<?php require __DIR__ . '/../layouts/_pack_unit_js.php'; ?>
 
 <h2><?= $isEdit ? '編輯退貨單 - ' . e($record['return_number']) : '新增退貨單' ?></h2>
 
-<form method="POST" class="mt-2" id="returnForm">
+<form method="POST" class="mt-2" id="returnForm" onsubmit="return hswPackUnitPrepareSubmit(this)">
     <?= csrf_field() ?>
 
     <!-- 退貨單資訊 -->
@@ -100,6 +101,7 @@
                         <th style="width:50px">序號</th>
                         <th style="min-width:120px">型號</th>
                         <th style="min-width:180px">品名</th>
+                        <th style="width:80px">單位</th>
                         <th style="width:80px">數量</th>
                         <th style="width:100px">未稅單價</th>
                         <th style="width:110px">未稅總額</th>
@@ -113,7 +115,7 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="5" class="text-right"><strong>合計</strong></td>
+                        <td colspan="6" class="text-right"><strong>合計</strong></td>
                         <td><strong id="untaxedTotalDisplay" style="color:var(--primary)">$0</strong></td>
                         <td></td>
                         <td><strong id="totalDisplay">$0</strong></td>
@@ -157,21 +159,35 @@ function toggleTypeFields() {
 function addItem(data) {
     var tbody = document.getElementById('itemsBody');
     var tr = document.createElement('tr');
+    tr.className = 'pack-unit-row';
     var idx = rowIndex++;
     var productId = (data && data.product_id) ? data.product_id : '';
     var model = (data && data.model) ? data.model : '';
     var productName = (data && data.product_name) ? data.product_name : '';
-    var qty = (data && data.quantity) ? parseInt(data.quantity) || '' : '';
+    var baseUnit = (data && data.unit) ? data.unit : '';
+    var packUnit = (data && data.pack_unit) ? data.pack_unit : '';
+    var packQty = (data && data.pack_qty) ? data.pack_qty : '';
+    var inputUnit = (data && data.input_unit) ? data.input_unit : '';
+    var rawInputQty = (data && data.input_qty !== undefined && data.input_qty !== null && data.input_qty !== '') ? data.input_qty : null;
+    var quantity = (data && data.quantity) ? parseFloat(data.quantity) || 0 : 0;
+    var displayUnit = inputUnit || baseUnit;
+    var displayQty = rawInputQty !== null ? rawInputQty : (quantity || '');
     var price = (data && data.unit_price) ? parseInt(data.unit_price) || '' : '';
     var tax = (data && data.tax_amount) ? parseInt(data.tax_amount) || '' : '';
     var amount = (data && data.amount) ? parseInt(data.amount) || '' : '';
     var reason = (data && data.reason) ? data.reason : '';
 
-    var untaxedTotal = (qty && price) ? (qty * price) : '';
+    var untaxedTotal = (displayQty && price) ? (displayQty * price) : '';
     tr.innerHTML = '<td>' + (idx + 1) + '</td>' +
         '<td><input type="hidden" name="items[' + idx + '][product_id]" class="rt-product-id" value="' + escHtml(productId) + '"><input type="text" name="items[' + idx + '][model]" class="form-control rt-model" value="' + escHtml(model) + '" placeholder="型號" readonly></td>' +
         '<td style="position:relative"><input type="text" name="items[' + idx + '][product_name]" class="form-control rt-product-name" value="' + escHtml(productName) + '" placeholder="輸入關鍵字搜尋..." autocomplete="off" oninput="searchProduct(this)"><div class="rt-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></td>' +
-        '<td><input type="number" name="items[' + idx + '][quantity]" class="form-control item-qty" value="' + escHtml(qty) + '" min="0" step="1" oninput="calcRow(this)"></td>' +
+        '<td><select class="form-control pack-unit-select" data-preselect="' + escHtml(displayUnit) + '" data-base-unit="' + escHtml(baseUnit) + '" data-pack-unit="' + escHtml(packUnit) + '" data-pack-qty="' + packQty + '"></select>' +
+            '<input type="hidden" name="items[' + idx + '][unit]" class="pack-unit-hidden-unit" value="' + escHtml(baseUnit) + '">' +
+            '<input type="hidden" name="items[' + idx + '][input_unit]" class="pack-unit-hidden-input-unit" value="' + escHtml(inputUnit) + '">' +
+            '<input type="hidden" name="items[' + idx + '][input_qty]" class="pack-unit-hidden-input-qty" value="' + (rawInputQty !== null ? escHtml(rawInputQty) : '') + '"></td>' +
+        '<td><input type="number" class="form-control pack-unit-qty item-qty" value="' + escHtml(displayQty) + '" min="0" step="0.01" oninput="hswPackUnitRowSync(this); calcRow(this)">' +
+            '<input type="hidden" name="items[' + idx + '][quantity]" class="pack-unit-hidden-qty" value="' + quantity + '">' +
+            '<div class="pack-unit-hint" style="display:none"></div></td>' +
         '<td><input type="number" name="items[' + idx + '][unit_price]" class="form-control item-price" value="' + escHtml(price) + '" min="0" step="1" oninput="calcRow(this)"></td>' +
         '<td><input type="number" class="form-control item-untaxed" value="' + escHtml(untaxedTotal) + '" readonly style="background:#f5f5f5"></td>' +
         '<td><input type="number" name="items[' + idx + '][tax_amount]" class="form-control item-tax" value="' + escHtml(tax) + '" min="0" step="1" readonly style="background:#f5f5f5"></td>' +
@@ -179,6 +195,8 @@ function addItem(data) {
         '<td><input type="text" name="items[' + idx + '][reason]" class="form-control" value="' + escHtml(reason) + '" placeholder="原因"></td>' +
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">&times;</button></td>';
     tbody.appendChild(tr);
+    // 初始化該列單位 select
+    if (typeof hswPackUnitInitFromDOM === 'function') hswPackUnitInitFromDOM(tr);
     calcTotal();
 }
 
@@ -189,9 +207,9 @@ function removeItem(btn) {
 
 function calcRow(el) {
     var tr = el.closest('tr');
-    var qty = parseInt(tr.querySelector('.item-qty').value) || 0;
+    var qty = parseFloat(tr.querySelector('.item-qty').value) || 0;
     var price = parseInt(tr.querySelector('.item-price').value) || 0;
-    var untaxed = qty * price;
+    var untaxed = Math.round(qty * price);
     var tax = Math.round(untaxed * 0.05);
     tr.querySelector('.item-untaxed').value = untaxed || '';
     tr.querySelector('.item-tax').value = tax;
@@ -250,12 +268,13 @@ function searchProduct(inp) {
             if (!list.length) { dd.innerHTML = '<div style="padding:8px;color:#999;font-size:.85rem">無符合產品，可直接手動輸入</div>'; dd.style.display = 'block'; return; }
             var html = '';
             for (var i = 0; i < list.length; i++) {
-                html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" data-id="' + (list[i].id||'') + '" data-name="' + escHtml(list[i].name||'') + '" data-model="' + escHtml(list[i].model||'') + '" data-price="' + (list[i].price||0) + '" onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">' +
+                html += '<div style="padding:6px 10px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #eee" data-id="' + (list[i].id||'') + '" data-name="' + escHtml(list[i].name||'') + '" data-model="' + escHtml(list[i].model||'') + '" data-price="' + (list[i].price||0) + '" data-unit="' + escHtml(list[i].unit||'') + '" data-pack-unit="' + escHtml(list[i].pack_unit||'') + '" data-pack-qty="' + (list[i].pack_qty||'') + '" onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">' +
                     '<div style="font-weight:600">' + escHtml(list[i].name||'') + '</div>' +
                     '<div style="font-size:.75rem;color:#888">' +
                     (list[i].model ? '<span style="color:#1565c0">' + escHtml(list[i].model) + '</span> | ' : '') +
                     '$' + Number(list[i].price||0).toLocaleString() +
                     ' | <span style="color:' + (Number(list[i].stock||0) > 0 ? '#2e7d32' : '#c62828') + '">庫存:' + Number(list[i].stock||0) + '</span>' +
+                    (list[i].pack_unit && list[i].pack_qty ? ' | 1'+list[i].pack_unit+'='+list[i].pack_qty+(list[i].unit||'') : '') +
                     '</div></div>';
             }
             dd.innerHTML = html;
@@ -275,6 +294,11 @@ document.addEventListener('click', function(e) {
         if (pidEl) pidEl.value = item.dataset.id || '';
         var priceEl = row.querySelector('.item-price');
         if (priceEl && item.dataset.price) priceEl.value = Math.round(Number(item.dataset.price));
+        hswPackUnitSetupRow(row, {
+            unit: item.dataset.unit || '',
+            pack_unit: item.dataset.packUnit || '',
+            pack_qty: item.dataset.packQty || 0
+        });
         calcRow(row.querySelector('.item-qty'));
         item.closest('.rt-product-dropdown').style.display = 'none';
         return;

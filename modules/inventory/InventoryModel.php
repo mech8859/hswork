@@ -912,6 +912,7 @@ class InventoryModel
     {
         $stmt = $this->db->prepare("
             SELECT p.id, p.name, p.model, p.unit, p.cost, p.price,
+                   p.pack_qty, p.pack_unit, p.cost_per_unit,
                    pc.name AS category_name,
                    COALESCE(inv.stock, 0) AS stock
             FROM products p

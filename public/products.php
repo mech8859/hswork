@@ -128,7 +128,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, cost_per_unit, category_id, stock, is_active, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, pack_unit, cost_per_unit, category_id, stock, is_active, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
@@ -144,6 +144,7 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
+                !empty($_POST['pack_unit']) ? trim($_POST['pack_unit']) : null,
                 null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 (int)($_POST['stock'] ?? 0),
@@ -201,7 +202,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, cost_per_unit=?, category_id=?, is_active=?, image=?, datasheet=? WHERE id=?")->execute(array(
+            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, pack_unit=?, cost_per_unit=?, category_id=?, is_active=?, image=?, datasheet=? WHERE id=?")->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
                 trim($_POST['vendor_model'] ?? ''),
@@ -216,6 +217,7 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
+                !empty($_POST['pack_unit']) ? trim($_POST['pack_unit']) : null,
                 null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 isset($_POST['is_active']) ? 1 : 0,
@@ -317,6 +319,9 @@ switch ($action) {
                 'model_number' => $p['model_number'] ?? '',
                 'price' => $p['price'] ?? 0,
                 'unit' => $p['unit'] ?? '',
+                'pack_qty' => $p['pack_qty'] ?? null,
+                'pack_unit' => $p['pack_unit'] ?? null,
+                'cost_per_unit' => $p['cost_per_unit'] ?? null,
             );
         }
         json_response(array('data' => $items));
