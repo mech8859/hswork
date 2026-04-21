@@ -149,7 +149,8 @@ class GoodsReceiptModel
     public function getItems($goodsReceiptId)
     {
         $stmt = $this->db->prepare("
-            SELECT gi.*, p.name AS db_product_name, p.model AS db_model
+            SELECT gi.*, p.name AS db_product_name, p.model AS db_model,
+                   p.pack_qty AS product_pack_qty, p.pack_unit AS product_pack_unit
             FROM goods_receipt_items gi
             LEFT JOIN products p ON gi.product_id = p.id
             WHERE gi.goods_receipt_id = ?
@@ -221,9 +222,16 @@ class GoodsReceiptModel
             foreach ($items as $it) {
                 $qty = isset($it['received_qty']) ? (float)$it['received_qty'] : 0;
                 $amount = isset($it['amount']) ? (float)$it['amount'] : 0;
-                // 若未帶 amount，從單價 x 數量算
-                if (!$amount && isset($it['unit_price']) && $qty) {
-                    $amount = round((float)$it['unit_price'] * $qty, 2);
+                // 若未帶 amount：包裝單位用 input_qty × unit_price，否則用基本單位 × unit_price
+                if (!$amount && isset($it['unit_price'])) {
+                    $price = (float)$it['unit_price'];
+                    $inputUnit = !empty($it['input_unit']) ? $it['input_unit'] : null;
+                    $inputQty = isset($it['input_qty']) && $it['input_qty'] !== '' ? (float)$it['input_qty'] : null;
+                    if ($inputUnit && $inputQty !== null) {
+                        $amount = round($inputQty * $price, 2);
+                    } elseif ($qty) {
+                        $amount = round($price * $qty, 2);
+                    }
                 }
                 $totalQty += $qty;
                 $subtotal += $amount;
@@ -301,15 +309,22 @@ class GoodsReceiptModel
 
         $stmt = $this->db->prepare("
             INSERT INTO goods_receipt_items
-                (goods_receipt_id, product_id, model, product_name, spec, unit,
+                (goods_receipt_id, product_id, model, product_name, spec, unit, input_unit, input_qty,
                  po_qty, received_qty, unit_price, amount, note, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $sort = 0;
         foreach ($items as $item) {
             if (empty($item['product_name']) && empty($item['model'])) continue;
-            $receivedQty = !empty($item['received_qty']) ? $item['received_qty'] : 0;
-            $unitPrice = !empty($item['unit_price']) ? $item['unit_price'] : 0;
+            $receivedQty = !empty($item['received_qty']) ? (float)$item['received_qty'] : 0;
+            $unitPrice = !empty($item['unit_price']) ? (float)$item['unit_price'] : 0;
+            $inputUnit = !empty($item['input_unit']) ? $item['input_unit'] : null;
+            $inputQty = isset($item['input_qty']) && $item['input_qty'] !== '' ? (float)$item['input_qty'] : null;
+            // 有包裝單位：amount = 使用者輸入數量 × unit_price（unit_price 為使用者視角單價，如每箱價）
+            // 無包裝單位：amount = 基本單位數量 × unit_price
+            $amount = ($inputUnit && $inputQty !== null)
+                ? round($inputQty * $unitPrice)
+                : round($receivedQty * $unitPrice);
             $stmt->execute(array(
                 $goodsReceiptId,
                 !empty($item['product_id']) ? $item['product_id'] : null,
@@ -317,10 +332,12 @@ class GoodsReceiptModel
                 !empty($item['product_name']) ? $item['product_name'] : null,
                 !empty($item['spec']) ? $item['spec'] : null,
                 !empty($item['unit']) ? $item['unit'] : null,
+                $inputUnit,
+                $inputQty,
                 !empty($item['po_qty']) ? $item['po_qty'] : 0,
                 $receivedQty,
                 $unitPrice,
-                round($receivedQty * $unitPrice),
+                $amount,
                 !empty($item['note']) ? $item['note'] : null,
                 $sort++,
             ));

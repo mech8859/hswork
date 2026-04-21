@@ -530,6 +530,7 @@ switch ($action) {
 
         $stmt = $db->prepare("
             SELECT p.id, p.name, p.model, p.unit, p.price, p.cost, p.brand,
+                   p.pack_qty, p.pack_unit, p.cost_per_unit,
                    pc.name AS category_name, $stockCol
             FROM products p
             LEFT JOIN product_categories pc ON p.category_id = pc.id

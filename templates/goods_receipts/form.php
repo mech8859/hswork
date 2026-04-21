@@ -1,8 +1,9 @@
 <?php $isEdit = !empty($record) && !empty($record['id']); ?>
+<?php require __DIR__ . '/../layouts/_pack_unit_js.php'; ?>
 
 <h2><?= $isEdit ? '編輯進貨單 - ' . e($record['gr_number']) : '新增進貨單' ?></h2>
 
-<form method="POST" class="mt-2" id="grForm" onsubmit="return grValidateVendorBeforeSubmit()">
+<form method="POST" class="mt-2" id="grForm" onsubmit="return grValidateVendorBeforeSubmit() && hswPackUnitPrepareSubmit(this)">
     <?= csrf_field() ?>
 
     <?php
@@ -169,8 +170,15 @@
                 </thead>
                 <tbody id="itemBody">
                     <?php if (!empty($items)): ?>
-                        <?php foreach ($items as $idx => $item): ?>
-                        <tr>
+                        <?php foreach ($items as $idx => $item):
+                            $editInputUnit = !empty($item['input_unit']) ? $item['input_unit'] : '';
+                            $editInputQty = isset($item['input_qty']) && $item['input_qty'] !== null ? (float)$item['input_qty'] : null;
+                            $editBaseUnit = !empty($item['unit']) ? $item['unit'] : '';
+                            // 顯示給使用者看的「單位＋數量」：優先用 input_unit/input_qty
+                            $displayUnit = $editInputUnit ?: $editBaseUnit;
+                            $displayQty = $editInputQty !== null ? $editInputQty : (!empty($item['received_qty']) ? (float)$item['received_qty'] : 0);
+                        ?>
+                        <tr class="pack-unit-row">
                             <td class="item-seq"><?= $idx + 1 ?></td>
                             <td>
                                 <input type="hidden" name="items[<?= $idx ?>][product_id]" value="<?= e(!empty($item['product_id']) ? $item['product_id'] : '') ?>">
@@ -178,16 +186,29 @@
                             </td>
                             <td style="position:relative"><input type="text" name="items[<?= $idx ?>][product_name]" class="form-control product-name-input" value="<?= e(!empty($item['product_name']) ? $item['product_name'] : '') ?>" placeholder="搜尋品名..." autocomplete="off" oninput="searchProductByName(this, <?= $idx ?>)"></td>
                             <td><input type="text" name="items[<?= $idx ?>][spec]" class="form-control" value="<?= e(!empty($item['spec']) ? $item['spec'] : '') ?>"></td>
-                            <td><input type="text" name="items[<?= $idx ?>][unit]" class="form-control" value="<?= e(!empty($item['unit']) ? $item['unit'] : '') ?>" style="width:60px"></td>
+                            <td>
+                                <select class="form-control pack-unit-select" style="width:75px"
+                                        data-preselect="<?= e($displayUnit) ?>"
+                                        data-pack-unit="<?= e(!empty($item['product_pack_unit']) ? $item['product_pack_unit'] : '') ?>"
+                                        data-pack-qty="<?= !empty($item['product_pack_qty']) ? (float)$item['product_pack_qty'] : '' ?>"
+                                        data-base-unit="<?= e($editBaseUnit) ?>"></select>
+                                <input type="hidden" name="items[<?= $idx ?>][unit]" class="pack-unit-hidden-unit" value="<?= e($editBaseUnit) ?>">
+                                <input type="hidden" name="items[<?= $idx ?>][input_unit]" class="pack-unit-hidden-input-unit" value="<?= e($editInputUnit) ?>">
+                                <input type="hidden" name="items[<?= $idx ?>][input_qty]" class="pack-unit-hidden-input-qty" value="<?= $editInputQty !== null ? e($editInputQty) : '' ?>">
+                            </td>
                             <td><input type="number" name="items[<?= $idx ?>][po_qty]" class="form-control" step="1" min="0" value="<?= !empty($item['po_qty']) ? (int)$item['po_qty'] : 0 ?>" readonly></td>
-                            <td><input type="number" name="items[<?= $idx ?>][received_qty]" class="form-control item-qty" step="1" min="0" value="<?= !empty($item['received_qty']) ? (int)$item['received_qty'] : 0 ?>" oninput="calcRowAmount(this.closest('tr'))"></td>
+                            <td>
+                                <input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="<?= e($displayQty) ?>" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
+                                <input type="hidden" name="items[<?= $idx ?>][received_qty]" class="pack-unit-hidden-qty" value="<?= !empty($item['received_qty']) ? (int)$item['received_qty'] : 0 ?>">
+                                <div class="pack-unit-hint" style="display:none"></div>
+                            </td>
                             <td><input type="number" name="items[<?= $idx ?>][unit_price]" class="form-control item-price" step="1" min="0" value="<?= !empty($item['unit_price']) ? (int)$item['unit_price'] : 0 ?>" oninput="calcRowAmount(this.closest('tr'))"></td>
                             <td><input type="number" name="items[<?= $idx ?>][amount]" class="form-control item-amount" step="1" min="0" value="<?= !empty($item['amount']) ? (int)$item['amount'] : 0 ?>" readonly></td>
                             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr>
+                        <tr class="pack-unit-row">
                             <td class="item-seq">1</td>
                             <td>
                                 <input type="hidden" name="items[0][product_id]" value="">
@@ -195,9 +216,18 @@
                             </td>
                             <td style="position:relative"><input type="text" name="items[0][product_name]" class="form-control product-name-input" value="" placeholder="搜尋品名..." autocomplete="off" oninput="searchProductByName(this, 0)"></td>
                             <td><input type="text" name="items[0][spec]" class="form-control" value=""></td>
-                            <td><input type="text" name="items[0][unit]" class="form-control" value="" style="width:60px"></td>
+                            <td>
+                                <select class="form-control pack-unit-select" style="width:75px"></select>
+                                <input type="hidden" name="items[0][unit]" class="pack-unit-hidden-unit" value="">
+                                <input type="hidden" name="items[0][input_unit]" class="pack-unit-hidden-input-unit" value="">
+                                <input type="hidden" name="items[0][input_qty]" class="pack-unit-hidden-input-qty" value="">
+                            </td>
                             <td><input type="number" name="items[0][po_qty]" class="form-control" step="1" min="0" value="0" readonly></td>
-                            <td><input type="number" name="items[0][received_qty]" class="form-control item-qty" step="1" min="0" value="0" oninput="calcRowAmount(this.closest('tr'))"></td>
+                            <td>
+                                <input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
+                                <input type="hidden" name="items[0][received_qty]" class="pack-unit-hidden-qty" value="0">
+                                <div class="pack-unit-hint" style="display:none"></div>
+                            </td>
                             <td><input type="number" name="items[0][unit_price]" class="form-control item-price" step="1" min="0" value="0" oninput="calcRowAmount(this.closest('tr'))"></td>
                             <td><input type="number" name="items[0][amount]" class="form-control item-amount" step="1" min="0" value="0" readonly></td>
                             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>
@@ -277,15 +307,21 @@ var itemIdx = <?= !empty($items) ? count($items) : 1 ?>;
 function addItemRow() {
     var tbody = document.getElementById('itemBody');
     var tr = document.createElement('tr');
+    tr.className = 'pack-unit-row';
     var seq = tbody.querySelectorAll('tr').length + 1;
     tr.innerHTML = '<td class="item-seq">' + seq + '</td>'
         + '<td><input type="hidden" name="items['+itemIdx+'][product_id]" value="">'
         + '<input type="text" name="items['+itemIdx+'][model]" class="form-control" value=""></td>'
         + '<td style="position:relative"><input type="text" name="items['+itemIdx+'][product_name]" class="form-control product-name-input" value="" placeholder="搜尋品名..." autocomplete="off" oninput="searchProductByName(this,'+itemIdx+')"></td>'
         + '<td><input type="text" name="items['+itemIdx+'][spec]" class="form-control" value=""></td>'
-        + '<td><input type="text" name="items['+itemIdx+'][unit]" class="form-control" value="" style="width:60px"></td>'
+        + '<td><select class="form-control pack-unit-select" style="width:75px"></select>'
+        + '<input type="hidden" name="items['+itemIdx+'][unit]" class="pack-unit-hidden-unit" value="">'
+        + '<input type="hidden" name="items['+itemIdx+'][input_unit]" class="pack-unit-hidden-input-unit" value="">'
+        + '<input type="hidden" name="items['+itemIdx+'][input_qty]" class="pack-unit-hidden-input-qty" value=""></td>'
         + '<td><input type="number" name="items['+itemIdx+'][po_qty]" class="form-control" step="1" min="0" value="0" readonly></td>'
-        + '<td><input type="number" name="items['+itemIdx+'][received_qty]" class="form-control item-qty" step="1" min="0" value="0" oninput="calcRowAmount(this.closest(\'tr\'))"></td>'
+        + '<td><input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest(\'tr\'))">'
+        + '<input type="hidden" name="items['+itemIdx+'][received_qty]" class="pack-unit-hidden-qty" value="0">'
+        + '<div class="pack-unit-hint" style="display:none"></div></td>'
         + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control item-price" step="1" min="0" value="0" oninput="calcRowAmount(this.closest(\'tr\'))"></td>'
         + '<td><input type="number" name="items['+itemIdx+'][amount]" class="form-control item-amount" step="1" min="0" value="0" readonly></td>'
         + '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>';
@@ -370,10 +406,11 @@ function searchProductByName(input, idx) {
                 var p = results[i];
                 var pModel = p.model || p.model_number || '';
                 var pCost  = p.cost || p.price || 0;
-                html += '<div class="pn-item" data-id="' + (p.id||'') + '" data-model="' + escAttr(pModel) + '" data-name="' + escAttr(p.name||'') + '" data-unit="' + escAttr(p.unit||'') + '" data-cost="' + pCost + '">';
+                html += '<div class="pn-item" data-id="' + (p.id||'') + '" data-model="' + escAttr(pModel) + '" data-name="' + escAttr(p.name||'') + '" data-unit="' + escAttr(p.unit||'') + '" data-cost="' + pCost + '" data-pack-unit="' + escAttr(p.pack_unit||'') + '" data-pack-qty="' + (p.pack_qty||'') + '">';
                 html += '<b>' + escH(p.name) + '</b>';
                 if (pModel) html += ' <small style="color:#888">' + escH(pModel) + '</small>';
                 if (pCost) html += ' <small style="color:#e53935">$' + Number(pCost).toLocaleString() + '</small>';
+                if (p.pack_unit && p.pack_qty) html += ' <small style="color:#1565c0">1'+p.pack_unit+'='+p.pack_qty+(p.unit||'')+'</small>';
                 html += '</div>';
             }
             dd.innerHTML = html;
@@ -396,8 +433,11 @@ function searchProductByName(input, idx) {
                     if (modelInput) modelInput.value = this.getAttribute('data-model');
                     var pidInput = row.querySelector('input[name*="[product_id]"]');
                     if (pidInput) pidInput.value = this.getAttribute('data-id');
-                    var unitInput = row.querySelector('input[name*="[unit]"]');
-                    if (unitInput && !unitInput.value) unitInput.value = this.getAttribute('data-unit');
+                    hswPackUnitSetupRow(row, {
+                        unit: this.getAttribute('data-unit') || '',
+                        pack_unit: this.getAttribute('data-pack-unit') || '',
+                        pack_qty: this.getAttribute('data-pack-qty') || 0
+                    });
                     var priceInput = row.querySelector('.item-price');
                     if (priceInput && (!priceInput.value || priceInput.value == '0')) {
                         priceInput.value = this.getAttribute('data-cost');

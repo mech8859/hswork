@@ -220,14 +220,23 @@ document.addEventListener('click', function(e) {
             </thead>
             <tbody>
                 <?php $totalQty = 0; ?>
-                <?php foreach ($items as $idx => $item): ?>
+                <?php foreach ($items as $idx => $item):
+                    $hasInputUnit = !empty($item['input_unit']) && isset($item['input_qty']) && $item['input_qty'] !== null;
+                    $displayUnit = $hasInputUnit ? $item['input_unit'] : (!empty($item['unit']) ? $item['unit'] : '');
+                    $displayQty = $hasInputUnit ? (float)$item['input_qty'] : (float)($item['quantity'] ?? 0);
+                ?>
                 <tr>
                     <td><?= $idx + 1 ?></td>
                     <td><?= e(!empty($item['model']) ? $item['model'] : '-') ?></td>
                     <td><?= e(!empty($item['product_name']) ? $item['product_name'] : '-') ?></td>
                     <td><?= e(!empty($item['spec']) ? $item['spec'] : '') ?></td>
-                    <td><?= e(!empty($item['unit']) ? $item['unit'] : '') ?></td>
-                    <td class="text-right"><?= number_format(!empty($item['quantity']) ? $item['quantity'] : 0) ?></td>
+                    <td><?= e($displayUnit) ?></td>
+                    <td class="text-right">
+                        <?= number_format($displayQty, $displayQty == floor($displayQty) ? 0 : 2) ?>
+                        <?php if ($hasInputUnit): ?>
+                        <div style="font-size:.7rem;color:var(--gray-500)">= <?= number_format((float)$item['quantity']) ?> <?= e($item['unit'] ?? '') ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></td>
                 </tr>
                 <?php $totalQty += (!empty($item['quantity']) ? $item['quantity'] : 0); ?>
