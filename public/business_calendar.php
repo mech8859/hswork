@@ -53,8 +53,25 @@ switch ($action) {
 
         $pageTitle = '業務行事曆';
         $currentPage = 'business_calendar';
+
+        // 裝置判斷：手機載 calendar_mobile.php、電腦載 calendar.php
+        // URL 強制：?view=mobile 或 ?view=desktop
+        $forceView = isset($_GET['view']) ? $_GET['view'] : '';
+        if ($forceView === 'mobile') {
+            $useMobile = true;
+        } elseif ($forceView === 'desktop') {
+            $useMobile = false;
+        } else {
+            $ua = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+            $useMobile = (bool)preg_match('/Mobile|Android|iPhone|iPod/i', $ua) && !preg_match('/iPad/i', $ua);
+        }
+
         require __DIR__ . '/../templates/layouts/header.php';
-        require __DIR__ . '/../templates/business_calendar/calendar.php';
+        if ($useMobile) {
+            require __DIR__ . '/../templates/business_calendar/calendar_mobile.php';
+        } else {
+            require __DIR__ . '/../templates/business_calendar/calendar.php';
+        }
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
