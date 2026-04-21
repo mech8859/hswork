@@ -157,12 +157,51 @@ switch ($action) {
         }
         $salespeople = $model->getSalespeople();
 
+        // 若有關聯案件，撈該案件現場照片（site_photo）供顯示
+        $sitePhotos = array();
+        if (!empty($event['case_id'])) {
+            $sitePhotos = $model->getCaseSitePhotos((int)$event['case_id']);
+        }
+
         $pageTitle = $canEdit ? '編輯業務行程' : '檢視業務行程';
         $currentPage = 'business_calendar';
         require __DIR__ . '/../templates/layouts/header.php';
         require __DIR__ . '/../templates/business_calendar/form.php';
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
+
+    // ---- 現場照片上傳（連動案件 site_photo） ----
+    case 'upload_site_photo':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verify_csrf()) { echo json_encode(array('ok'=>false,'message'=>'安全驗證失敗')); exit; }
+        $bcId = (int)($_POST['event_id'] ?? 0);
+        $event = $bcId ? $model->getById($bcId) : null;
+        if (!$event || empty($event['case_id'])) { echo json_encode(array('ok'=>false,'message'=>'此行程未關聯案件，無法上傳')); exit; }
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss','manager','vice_president'));
+        $hasManage = Auth::hasPermission('business_calendar.manage');
+        $isOwn = ((int)$event['staff_id'] === (int)Auth::id()) || ((int)$event['created_by'] === (int)Auth::id());
+        if (!($isAdmin || $hasManage || $isOwn)) { echo json_encode(array('ok'=>false,'message'=>'權限不足')); exit; }
+        if (empty($_FILES['photo'])) { echo json_encode(array('ok'=>false,'message'=>'無檔案')); exit; }
+        $result = $model->uploadCaseSitePhoto((int)$event['case_id'], $_FILES['photo']);
+        echo json_encode($result);
+        exit;
+
+    // ---- 現場照片刪除 ----
+    case 'delete_site_photo':
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verify_csrf()) { echo json_encode(array('ok'=>false,'message'=>'安全驗證失敗')); exit; }
+        $attId = (int)($_POST['attachment_id'] ?? 0);
+        $bcId = (int)($_POST['event_id'] ?? 0);
+        $event = $bcId ? $model->getById($bcId) : null;
+        if (!$event || empty($event['case_id'])) { echo json_encode(array('ok'=>false,'message'=>'行程不存在')); exit; }
+        $cu = Auth::user();
+        $isAdmin = in_array($cu['role'], array('boss','manager','vice_president'));
+        $hasManage = Auth::hasPermission('business_calendar.manage');
+        $isOwn = ((int)$event['staff_id'] === (int)Auth::id()) || ((int)$event['created_by'] === (int)Auth::id());
+        if (!($isAdmin || $hasManage || $isOwn)) { echo json_encode(array('ok'=>false,'message'=>'權限不足')); exit; }
+        echo json_encode($model->deleteCaseSitePhoto($attId, (int)$event['case_id']));
+        exit;
 
     // ---- 刪除行程 ----
     case 'delete':
