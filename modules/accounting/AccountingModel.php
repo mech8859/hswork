@@ -873,6 +873,218 @@ class AccountingModel
      * Generate next voucher number (preview only)
      * @return string
      */
+    /**
+     * 傳票核對：對四大源頭 (bank/petty_cash/reserve_fund/cash_details) 找出對應傳票
+     * 回傳結構：array of records with match_status, voucher_number, voucher_id
+     *
+     * match_status:
+     *   'matched_precise' — source_module+source_id 精準匹配（僅 petty_cash 有）
+     *   'matched_fuzzy'   — 模糊匹配（日期+金額+單號關鍵字）
+     *   'matched_amount_mismatch' — 匹配單號但金額對不上（警示）
+     *   'unmatched'       — 找不到對應傳票
+     */
+    public function getVoucherReconciliation($source, $startDate, $endDate, $branchId = null)
+    {
+        switch ($source) {
+            case 'bank':
+                return $this->_reconcileBankTransactions($startDate, $endDate);
+            case 'petty_cash':
+                return $this->_reconcilePettyCash($startDate, $endDate, $branchId);
+            case 'reserve_fund':
+                return $this->_reconcileReserveFund($startDate, $endDate, $branchId);
+            case 'cash_details':
+                return $this->_reconcileCashDetails($startDate, $endDate, $branchId);
+        }
+        return array();
+    }
+
+    private function _reconcileBankTransactions($startDate, $endDate)
+    {
+        $stmt = $this->db->prepare("SELECT id, sys_number, upload_number, bank_account, transaction_date, summary, debit_amount, credit_amount, description FROM bank_transactions WHERE transaction_date BETWEEN ? AND ? ORDER BY transaction_date, id");
+        $stmt->execute(array($startDate, $endDate));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = array();
+        foreach ($rows as $r) {
+            $amount = max((float)$r['debit_amount'], (float)$r['credit_amount']);
+            $match = $this->_fuzzyMatchVoucher(
+                $r['transaction_date'], $amount,
+                array($r['sys_number'], $r['upload_number'])
+            );
+            $out[] = array(
+                'source_id' => (int)$r['id'],
+                'date'      => $r['transaction_date'],
+                'number'    => $r['sys_number'] ?: $r['upload_number'],
+                'description' => $r['summary'] ?: $r['description'],
+                'extra'     => $r['bank_account'],
+                'debit'     => (float)$r['debit_amount'],
+                'credit'    => (float)$r['credit_amount'],
+                'match_status'   => $match['status'],
+                'voucher_id'     => $match['voucher_id'],
+                'voucher_number' => $match['voucher_number'],
+                'voucher_amount' => $match['voucher_amount'],
+            );
+        }
+        return $out;
+    }
+
+    private function _reconcilePettyCash($startDate, $endDate, $branchId = null)
+    {
+        $sql = "SELECT id, entry_number, upload_number, expense_date, description, expense_amount, income_amount, branch_id FROM petty_cash WHERE expense_date BETWEEN ? AND ?";
+        $params = array($startDate, $endDate);
+        if ($branchId) { $sql .= " AND branch_id = ?"; $params[] = (int)$branchId; }
+        $sql .= " ORDER BY expense_date, id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = array();
+        foreach ($rows as $r) {
+            // 精準匹配：source_module + source_id
+            $precise = $this->_findPreciseMatch('petty_cash', (int)$r['id']);
+            if ($precise) {
+                $match = array(
+                    'status' => 'matched_precise',
+                    'voucher_id' => $precise['id'],
+                    'voucher_number' => $precise['voucher_number'],
+                    'voucher_amount' => (float)$precise['total_debit'],
+                );
+            } else {
+                $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+                $match = $this->_fuzzyMatchVoucher(
+                    $r['expense_date'], $amount,
+                    array($r['entry_number'], $r['upload_number'])
+                );
+            }
+            $out[] = array(
+                'source_id' => (int)$r['id'],
+                'date'      => $r['expense_date'],
+                'number'    => $r['entry_number'] ?: $r['upload_number'],
+                'description' => $r['description'],
+                'extra'     => '',
+                'debit'     => (float)$r['expense_amount'],
+                'credit'    => (float)$r['income_amount'],
+                'match_status'   => $match['status'],
+                'voucher_id'     => $match['voucher_id'],
+                'voucher_number' => $match['voucher_number'],
+                'voucher_amount' => $match['voucher_amount'],
+            );
+        }
+        return $out;
+    }
+
+    private function _reconcileReserveFund($startDate, $endDate, $branchId = null)
+    {
+        $sql = "SELECT id, entry_number, upload_number, expense_date, description, expense_amount, income_amount, branch_id FROM reserve_fund WHERE expense_date BETWEEN ? AND ?";
+        $params = array($startDate, $endDate);
+        if ($branchId) { $sql .= " AND branch_id = ?"; $params[] = (int)$branchId; }
+        $sql .= " ORDER BY expense_date, id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = array();
+        foreach ($rows as $r) {
+            $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+            $match = $this->_fuzzyMatchVoucher(
+                $r['expense_date'], $amount,
+                array($r['entry_number'], $r['upload_number'])
+            );
+            $out[] = array(
+                'source_id' => (int)$r['id'],
+                'date'      => $r['expense_date'],
+                'number'    => $r['entry_number'] ?: $r['upload_number'],
+                'description' => $r['description'],
+                'extra'     => '',
+                'debit'     => (float)$r['expense_amount'],
+                'credit'    => (float)$r['income_amount'],
+                'match_status'   => $match['status'],
+                'voucher_id'     => $match['voucher_id'],
+                'voucher_number' => $match['voucher_number'],
+                'voucher_amount' => $match['voucher_amount'],
+            );
+        }
+        return $out;
+    }
+
+    private function _reconcileCashDetails($startDate, $endDate, $branchId = null)
+    {
+        $sql = "SELECT id, entry_number, upload_number, transaction_date, description, income_amount, expense_amount, branch_id FROM cash_details WHERE transaction_date BETWEEN ? AND ?";
+        $params = array($startDate, $endDate);
+        if ($branchId) { $sql .= " AND branch_id = ?"; $params[] = (int)$branchId; }
+        $sql .= " ORDER BY transaction_date, id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = array();
+        foreach ($rows as $r) {
+            $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+            $match = $this->_fuzzyMatchVoucher(
+                $r['transaction_date'], $amount,
+                array($r['entry_number'], $r['upload_number'])
+            );
+            $out[] = array(
+                'source_id' => (int)$r['id'],
+                'date'      => $r['transaction_date'],
+                'number'    => $r['entry_number'] ?: $r['upload_number'],
+                'description' => $r['description'],
+                'extra'     => '',
+                'debit'     => (float)$r['expense_amount'],
+                'credit'    => (float)$r['income_amount'],
+                'match_status'   => $match['status'],
+                'voucher_id'     => $match['voucher_id'],
+                'voucher_number' => $match['voucher_number'],
+                'voucher_amount' => $match['voucher_amount'],
+            );
+        }
+        return $out;
+    }
+
+    private function _findPreciseMatch($sourceModule, $sourceId)
+    {
+        $stmt = $this->db->prepare("SELECT id, voucher_number, voucher_date, total_debit FROM journal_entries WHERE source_module = ? AND source_id = ? AND status != 'voided' ORDER BY id DESC LIMIT 1");
+        $stmt->execute(array($sourceModule, $sourceId));
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 模糊匹配：日期+金額+單號關鍵字
+     * 在 journal_entries.description 或 journal_entry_lines.description 搜尋關鍵字
+     */
+    private function _fuzzyMatchVoucher($date, $amount, $keywords)
+    {
+        $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
+        $keys = array_filter(array_map('trim', $keywords));
+        if (empty($keys) || !$date) return $unmatched;
+
+        // 在 description 搜尋任一關鍵字（LIKE），同日期、未作廢
+        $likes = array();
+        $params = array($date);
+        foreach ($keys as $k) {
+            $likes[] = "(je.description LIKE ? OR EXISTS(SELECT 1 FROM journal_entry_lines jl WHERE jl.journal_entry_id = je.id AND jl.description LIKE ?))";
+            $params[] = '%' . $k . '%';
+            $params[] = '%' . $k . '%';
+        }
+        $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
+                FROM journal_entries je
+                WHERE je.voucher_date = ? AND je.status != 'voided'
+                  AND (" . implode(' OR ', $likes) . ")
+                ORDER BY je.id DESC LIMIT 5";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 金額對比（容許 1 元誤差）
+        foreach ($matches as $m) {
+            if (abs((float)$m['total_debit'] - (float)$amount) <= 1) {
+                return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+            }
+        }
+        // 有找到關鍵字但金額不符
+        if (!empty($matches)) {
+            $m = $matches[0];
+            return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+        }
+        return $unmatched;
+    }
+
     public function generateVoucherNumber($date = null)
     {
         return peek_next_doc_number('journal_entries', $date);

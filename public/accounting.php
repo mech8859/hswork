@@ -1273,6 +1273,36 @@ switch ($action) {
     // ============================================================
     // 銀行對帳
     // ============================================================
+    case 'voucher_reconciliation':
+        $source = isset($_GET['source']) ? $_GET['source'] : 'bank';
+        $validSources = array('bank','petty_cash','reserve_fund','cash_details');
+        if (!in_array($source, $validSources)) $source = 'bank';
+        $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+        $endDate   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-d');
+        $statusFilter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
+        $branchFilter = isset($_GET['branch_id']) ? (int)$_GET['branch_id'] : 0;
+
+        $branches = $model->getBranches();
+        $records = $model->getVoucherReconciliation($source, $startDate, $endDate, $branchFilter ?: null);
+
+        // 統計 + 狀態篩選
+        $stats = array('matched_precise'=>0, 'matched_fuzzy'=>0, 'matched_amount_mismatch'=>0, 'unmatched'=>0, 'total'=>count($records));
+        foreach ($records as $r) {
+            if (isset($stats[$r['match_status']])) $stats[$r['match_status']]++;
+        }
+        if ($statusFilter) {
+            $records = array_values(array_filter($records, function($r) use ($statusFilter) {
+                return $r['match_status'] === $statusFilter;
+            }));
+        }
+
+        $pageTitle = '傳票核對報表';
+        $currentPage = 'accounting';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/accounting/voucher_reconciliation.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     case 'reconciliation':
         require_once __DIR__ . '/../modules/accounting/ReconciliationModel.php';
         $reconModel = new ReconciliationModel();
