@@ -334,20 +334,20 @@ class ProductModel
     /**
      * 建立分類
      */
-    public function createCategory($name, $parentId, $excludeStockout = 0)
+    public function createCategory($name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0)
     {
-        $stmt = $this->db->prepare("INSERT INTO product_categories (name, parent_id, exclude_from_stockout) VALUES (?, ?, ?)");
-        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout));
+        $stmt = $this->db->prepare("INSERT INTO product_categories (name, parent_id, exclude_from_stockout, show_in_material_estimate) VALUES (?, ?, ?, ?)");
+        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate));
         return $this->db->lastInsertId();
     }
 
     /**
      * 更新分類
      */
-    public function updateCategory($id, $name, $parentId, $excludeStockout = 0)
+    public function updateCategory($id, $name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0)
     {
-        $stmt = $this->db->prepare("UPDATE product_categories SET name = ?, parent_id = ?, exclude_from_stockout = ? WHERE id = ?");
-        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$id));
+        $stmt = $this->db->prepare("UPDATE product_categories SET name = ?, parent_id = ?, exclude_from_stockout = ?, show_in_material_estimate = ? WHERE id = ?");
+        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate, (int)$id));
     }
 
     /**
