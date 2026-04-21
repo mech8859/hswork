@@ -118,7 +118,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
                             <input type="hidden" name="items[0][input_qty]" class="pack-unit-hidden-input-qty" value="">
                         </td>
                         <td>
-                            <input type="number" class="form-control pack-unit-qty" step="0.01" min="0" value="1" oninput="hswPackUnitRowSync(this)">
+                            <input type="number" class="form-control pack-unit-qty" step="any" min="0" value="1" oninput="hswPackUnitRowSync(this)">
                             <input type="hidden" name="items[0][quantity]" class="pack-unit-hidden-qty" value="">
                             <div class="pack-unit-hint" style="display:none"></div>
                         </td>
@@ -214,7 +214,7 @@ function addItemRow() {
         + '<input type="hidden" name="items['+itemIdx+'][unit]" class="pack-unit-hidden-unit" value="">'
         + '<input type="hidden" name="items['+itemIdx+'][input_unit]" class="pack-unit-hidden-input-unit" value="">'
         + '<input type="hidden" name="items['+itemIdx+'][input_qty]" class="pack-unit-hidden-input-qty" value=""></td>'
-        + '<td><input type="number" class="form-control pack-unit-qty" step="0.01" min="0" value="1" oninput="hswPackUnitRowSync(this)">'
+        + '<td><input type="number" class="form-control pack-unit-qty" step="any" min="0" value="1" oninput="hswPackUnitRowSync(this)">'
         + '<input type="hidden" name="items['+itemIdx+'][quantity]" class="pack-unit-hidden-qty" value="">'
         + '<div class="pack-unit-hint" style="display:none"></div></td>'
         + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control" step="1" min="0" value="0"></td>'

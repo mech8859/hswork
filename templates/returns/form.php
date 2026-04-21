@@ -185,7 +185,7 @@ function addItem(data) {
             '<input type="hidden" name="items[' + idx + '][unit]" class="pack-unit-hidden-unit" value="' + escHtml(baseUnit) + '">' +
             '<input type="hidden" name="items[' + idx + '][input_unit]" class="pack-unit-hidden-input-unit" value="' + escHtml(inputUnit) + '">' +
             '<input type="hidden" name="items[' + idx + '][input_qty]" class="pack-unit-hidden-input-qty" value="' + (rawInputQty !== null ? escHtml(rawInputQty) : '') + '"></td>' +
-        '<td><input type="number" class="form-control pack-unit-qty item-qty" value="' + escHtml(displayQty) + '" min="0" step="0.01" oninput="hswPackUnitRowSync(this); calcRow(this)">' +
+        '<td><input type="number" class="form-control pack-unit-qty item-qty" value="' + escHtml(displayQty) + '" min="0" step="any" oninput="hswPackUnitRowSync(this); calcRow(this)">' +
             '<input type="hidden" name="items[' + idx + '][quantity]" class="pack-unit-hidden-qty" value="' + quantity + '">' +
             '<div class="pack-unit-hint" style="display:none"></div></td>' +
         '<td><input type="number" name="items[' + idx + '][unit_price]" class="form-control item-price" value="' + escHtml(price) + '" min="0" step="1" oninput="calcRow(this)"></td>' +
