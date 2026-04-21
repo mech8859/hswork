@@ -661,6 +661,7 @@ function addLine(data) {
     var desc = data ? (data.description || '') : '';
     var offsetFlag = data ? (data.offset_flag || 0) : 0;
     var offsetAmt = data && parseFloat(data.offset_amount) > 0 ? parseInt(data.offset_amount) : '';
+    var offsetLedgerId = data && data.offset_ledger_id ? data.offset_ledger_id : '';
 
     var relTypeSelect = '<select name="lines[' + idx + '][relation_type]" class="form-control rel-type-sel" data-idx="' + idx + '" onchange="onRelTypeChange(' + idx + ')" style="font-size:.85rem;padding:4px">' +
         '<option value="">--</option>' +
@@ -697,7 +698,8 @@ function addLine(data) {
         '<td><select name="lines[' + idx + '][offset_flag]" class="form-control offset-flag-sel" id="offset_flag_' + idx + '" style="font-size:.8rem;padding:4px" disabled>' +
             '<option value="0">--</option><option value="1"' + (offsetFlag == 1 ? ' selected' : '') + '>立帳</option><option value="2"' + (offsetFlag == 2 ? ' selected' : '') + '>沖帳</option></select></td>' +
         '<td><span id="unoffset_amt_' + idx + '" style="display:block;text-align:right;font-size:.85rem;color:#999;padding:6px 0">--</span></td>' +
-        '<td><input type="number" name="lines[' + idx + '][offset_amount]" class="form-control offset-amt-input" id="offset_amt_' + idx + '" style="text-align:right;font-size:.85rem" step="1" min="0" value="' + offsetAmt + '" disabled></td>' +
+        '<td><input type="number" name="lines[' + idx + '][offset_amount]" class="form-control offset-amt-input" id="offset_amt_' + idx + '" style="text-align:right;font-size:.85rem" step="1" min="0" value="' + offsetAmt + '" disabled>' +
+            (offsetLedgerId ? '<input type="hidden" name="lines[' + idx + '][offset_ledger_id]" value="' + offsetLedgerId + '">' : '') + '</td>' +
         '<td><input type="text" name="lines[' + idx + '][description]" class="form-control" value="' + desc.replace(/"/g, '&quot;') + '" style="font-size:.85rem"></td>' +
         '<td style="white-space:nowrap"><button type="button" class="btn btn-sm btn-outline" onclick="insertLineBefore(' + idx + ')" title="插入行" style="padding:2px 6px;font-size:.75rem;margin-right:2px">+</button><button type="button" class="btn btn-sm btn-danger" onclick="removeLine(' + idx + ')" title="刪除">&times;</button></td>';
     document.getElementById('linesBody').appendChild(tr);
