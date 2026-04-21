@@ -199,6 +199,73 @@ class BusinessCalendarModel
     }
 
     /**
+     * 取得案件的現場照片（file_type='site_photo'），供業務行事曆顯示用
+     */
+    public function getCaseSitePhotos($caseId)
+    {
+        $stmt = $this->db->prepare("SELECT id, file_name, file_path, file_size, uploaded_by, created_at FROM case_attachments WHERE case_id = ? AND file_type = 'site_photo' ORDER BY created_at DESC");
+        $stmt->execute(array($caseId));
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 上傳現場照片到案件（寫入 case_attachments 表）
+     * 回傳：array('ok'=>bool, 'message'=>string, 'id'=>int|null, 'path'=>string|null)
+     */
+    public function uploadCaseSitePhoto($caseId, $fileField)
+    {
+        if (empty($fileField) || !isset($fileField['tmp_name']) || !is_uploaded_file($fileField['tmp_name'])) {
+            return array('ok'=>false, 'message'=>'無檔案上傳');
+        }
+        if (!empty($fileField['error']) && $fileField['error'] !== UPLOAD_ERR_OK) {
+            return array('ok'=>false, 'message'=>'上傳失敗 (error='.$fileField['error'].')');
+        }
+        $allowed = array('image/jpeg','image/png','image/gif','image/webp','image/heic','image/heif');
+        $mime = mime_content_type($fileField['tmp_name']);
+        if (!in_array($mime, $allowed)) {
+            $ext = strtolower(pathinfo($fileField['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, array('jpg','jpeg','png','gif','webp','heic','heif','bmp'))) {
+                return array('ok'=>false, 'message'=>'只接受圖片檔');
+            }
+        }
+        $maxSize = 20 * 1024 * 1024;
+        if (!empty($fileField['size']) && $fileField['size'] > $maxSize) {
+            return array('ok'=>false, 'message'=>'檔案超過 20MB');
+        }
+
+        $dir = __DIR__ . '/../../public/uploads/cases/' . (int)$caseId;
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+
+        $ext = strtolower(pathinfo($fileField['name'], PATHINFO_EXTENSION));
+        if (!$ext) $ext = 'jpg';
+        $baseName = 'site_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6) . '.' . $ext;
+        $destFull = $dir . '/' . $baseName;
+        if (!move_uploaded_file($fileField['tmp_name'], $destFull)) {
+            return array('ok'=>false, 'message'=>'檔案移動失敗');
+        }
+
+        $relPath = '/uploads/cases/' . (int)$caseId . '/' . $baseName;
+        $ins = $this->db->prepare("INSERT INTO case_attachments (case_id, file_type, file_name, file_path, file_size, uploaded_by) VALUES (?, 'site_photo', ?, ?, ?, ?)");
+        $ins->execute(array((int)$caseId, $fileField['name'], $relPath, (int)$fileField['size'], Auth::id()));
+        return array('ok'=>true, 'message'=>'已上傳', 'id'=>(int)$this->db->lastInsertId(), 'path'=>$relPath);
+    }
+
+    /**
+     * 刪除業務行程關聯的現場照片（僅限 file_type='site_photo'）
+     */
+    public function deleteCaseSitePhoto($attachmentId, $caseId)
+    {
+        $stmt = $this->db->prepare("SELECT file_path FROM case_attachments WHERE id = ? AND case_id = ? AND file_type = 'site_photo'");
+        $stmt->execute(array((int)$attachmentId, (int)$caseId));
+        $path = $stmt->fetchColumn();
+        if (!$path) return array('ok'=>false, 'message'=>'找不到附件');
+        $full = __DIR__ . '/../../public' . $path;
+        if (file_exists($full)) @unlink($full);
+        $this->db->prepare("DELETE FROM case_attachments WHERE id = ?")->execute(array((int)$attachmentId));
+        return array('ok'=>true);
+    }
+
+    /**
      * 取得業務人員
      */
     public function getSalespeople()
