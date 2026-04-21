@@ -198,9 +198,17 @@ if (!empty($quote['case_id'])) {
         </tr>
         <?php endforeach; ?>
         <?php if ($quote['format'] === 'project'): ?>
+        <?php $secHasDisc = isset($sec['discount_amount']) && $sec['discount_amount'] !== null && $sec['discount_amount'] !== ''; ?>
         <tr class="subtotal-row">
             <td colspan="4" class="text-right"><strong>小計</strong></td>
-            <td class="text-right"><strong><?= number_format((int)$sec['subtotal']) ?></strong></td>
+            <td class="text-right">
+                <?php if ($secHasDisc): ?>
+                    <span style="text-decoration:line-through;color:#999;font-weight:400;font-size:.85em"><?= number_format((int)$sec['subtotal']) ?></span>
+                    <strong style="color:#c62828;margin-left:4px"><?= number_format((int)$sec['discount_amount']) ?></strong>
+                <?php else: ?>
+                    <strong><?= number_format((int)$sec['subtotal']) ?></strong>
+                <?php endif; ?>
+            </td>
         </tr>
         <?php endif; ?>
     <?php endforeach; ?>
