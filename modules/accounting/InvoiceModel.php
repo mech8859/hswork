@@ -163,8 +163,12 @@ class InvoiceModel
         }
         // 買方統一編號（公司端）
         if (!empty($filters['buyer_tax_id'])) {
-            $where[] = "pi.buyer_tax_id = ?";
-            $params[] = trim($filters['buyer_tax_id']);
+            if ($filters['buyer_tax_id'] === '__empty__') {
+                $where[] = "(pi.buyer_tax_id IS NULL OR TRIM(pi.buyer_tax_id) = '')";
+            } else {
+                $where[] = "pi.buyer_tax_id = ?";
+                $params[] = trim($filters['buyer_tax_id']);
+            }
         }
 
         $whereStr = implode(' AND ', $where);
@@ -245,13 +249,16 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 買方預設為禾順 94081455
+        $buyerTaxId = !empty($data['buyer_tax_id']) ? $data['buyer_tax_id'] : '94081455';
+
         $sql = "INSERT INTO purchase_invoices
-                (invoice_number, invoice_date, vendor_id, vendor_name, vendor_tax_id,
+                (invoice_number, invoice_date, vendor_id, vendor_name, vendor_tax_id, buyer_tax_id,
                  invoice_type, amount_untaxed, tax_amount, total_amount, tax_rate,
                  reference_type, reference_id, deduction_type, period, status, note,
                  report_period, invoice_format, deduction_category,
                  created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
@@ -259,6 +266,7 @@ class InvoiceModel
             !empty($data['vendor_id']) ? $data['vendor_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_tax_id']) ? $data['vendor_tax_id'] : null,
+            $buyerTaxId,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
@@ -293,8 +301,12 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 買方預設為禾順 94081455
+        $buyerTaxId = !empty($data['buyer_tax_id']) ? $data['buyer_tax_id'] : '94081455';
+
         $sql = "UPDATE purchase_invoices SET
                 invoice_number = ?, invoice_date = ?, vendor_id = ?, vendor_name = ?, vendor_tax_id = ?,
+                buyer_tax_id = ?,
                 invoice_type = ?, amount_untaxed = ?, tax_amount = ?, total_amount = ?, tax_rate = ?,
                 reference_type = ?, reference_id = ?, deduction_type = ?, period = ?, status = ?,
                 note = ?, report_period = ?, invoice_format = ?, deduction_category = ?,
@@ -307,6 +319,7 @@ class InvoiceModel
             !empty($data['vendor_id']) ? $data['vendor_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_tax_id']) ? $data['vendor_tax_id'] : null,
+            $buyerTaxId,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,

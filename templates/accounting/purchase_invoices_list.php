@@ -18,6 +18,7 @@
                     <option value="" <?= $_buyerTaxDefault === '' ? 'selected' : '' ?>>全部買方</option>
                     <option value="94081455" <?= $_buyerTaxDefault === '94081455' ? 'selected' : '' ?>>94081455 禾順監視數位科技有限公司</option>
                     <option value="97002927" <?= $_buyerTaxDefault === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
+                    <option value="__empty__" <?= $_buyerTaxDefault === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定買方</option>
                 </select>
             </div>
             <div class="form-group">
