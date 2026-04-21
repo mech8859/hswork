@@ -128,7 +128,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, pack_unit, cost_per_unit, category_id, stock, is_active, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, pack_unit, cost_per_unit, category_id, stock, is_active, discontinue_when_empty, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
@@ -149,6 +149,7 @@ switch ($action) {
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 (int)($_POST['stock'] ?? 0),
                 1,
+                !empty($_POST['discontinue_when_empty']) ? 1 : 0,
                 $imageUrl,
                 $datasheetUrl,
             ));
@@ -202,7 +203,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, pack_unit=?, cost_per_unit=?, category_id=?, is_active=?, image=?, datasheet=? WHERE id=?")->execute(array(
+            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, pack_unit=?, cost_per_unit=?, category_id=?, is_active=?, discontinue_when_empty=?, image=?, datasheet=? WHERE id=?")->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
                 trim($_POST['vendor_model'] ?? ''),
@@ -221,6 +222,7 @@ switch ($action) {
                 null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 isset($_POST['is_active']) ? 1 : 0,
+                !empty($_POST['discontinue_when_empty']) ? 1 : 0,
                 $imageUrl,
                 $datasheetUrl,
                 $id,

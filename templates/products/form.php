@@ -180,14 +180,19 @@ function pv($product, $field, $default = '') {
         </div>
         <?php endif; ?>
 
-        <?php if ($product): ?>
-        <div class="form-group">
-            <label class="checkbox-label">
+        <div class="form-group" style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+            <?php if ($product): ?>
+            <label class="checkbox-label" style="cursor:pointer">
                 <input type="checkbox" name="is_active" value="1" <?= (!empty($product['is_active'])) ? 'checked' : '' ?>>
                 啟用
             </label>
+            <?php endif; ?>
+            <label class="checkbox-label" style="cursor:pointer">
+                <input type="checkbox" name="discontinue_when_empty" value="1" <?= (!empty($product['discontinue_when_empty'])) ? 'checked' : '' ?>>
+                <span style="color:#c5221f;font-weight:600">庫存用完不再進貨</span>
+                <small style="color:#888;margin-left:4px">（庫存歸 0 時自動停用，報價單禁止選用）</small>
+            </label>
         </div>
-        <?php endif; ?>
 
         <div class="d-flex gap-1 mt-2">
             <button type="submit" class="btn btn-primary"><?= $product ? '更新' : '新增' ?></button>

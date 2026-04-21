@@ -147,6 +147,7 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
                             <?php endif; ?>
                             <a href="/products.php?action=view&id=<?= $p['id'] ?>" style="font-weight:600<?= empty($p['is_active']) ? ';opacity:.5' : '' ?>"><?= e($p['name']) ?></a>
                             <?php if (empty($p['is_active'])): ?><span class="badge" style="background:var(--gray-200);color:var(--gray-500);font-size:.65rem;margin-left:4px">停用</span><?php endif; ?>
+                            <?php if (!empty($p['discontinue_when_empty'])): ?><span class="badge" style="background:#ffebee;color:#c5221f;font-size:.65rem;margin-left:4px" title="庫存用完不再進貨">⚠ 不再進貨</span><?php endif; ?>
                         </div>
                     </td>
                     <td style="color:var(--gray-500)"><?= e($p['model'] ?? '-') ?></td>
