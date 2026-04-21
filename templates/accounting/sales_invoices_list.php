@@ -15,6 +15,7 @@
             <option value="" <?= $_sellerTaxDefault === '' ? 'selected' : '' ?>>全部賣方</option>
             <option value="94081455" <?= $_sellerTaxDefault === '94081455' ? 'selected' : '' ?>>94081455 禾順監視數位科技有限公司</option>
             <option value="97002927" <?= $_sellerTaxDefault === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
+            <option value="__empty__" <?= $_sellerTaxDefault === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定賣方</option>
         </select>
         <select name="period" class="form-control" style="width:auto;min-width:100px">
             <option value="">全部期間</option>

@@ -430,10 +430,14 @@ class InvoiceModel
             $where[] = "si.invoice_number <= ?";
             $params[] = trim($filters['invoice_no_to']);
         }
-        // 賣方統一編號
+        // 賣方統一編號（特殊值 __empty__ 代表篩未設定賣方）
         if (!empty($filters['seller_tax_id'])) {
-            $where[] = "si.seller_tax_id LIKE ?";
-            $params[] = '%' . trim($filters['seller_tax_id']) . '%';
+            if ($filters['seller_tax_id'] === '__empty__') {
+                $where[] = "(si.seller_tax_id IS NULL OR TRIM(si.seller_tax_id) = '')";
+            } else {
+                $where[] = "si.seller_tax_id LIKE ?";
+                $params[] = '%' . trim($filters['seller_tax_id']) . '%';
+            }
         }
 
         $whereStr = implode(' AND ', $where);
@@ -511,19 +515,27 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 賣方預設為禾順 94081455
+        $sellerTaxId = !empty($data['seller_tax_id']) ? $data['seller_tax_id'] : '94081455';
+        $sellerName = !empty($data['seller_name']) ? $data['seller_name']
+            : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
+
         $sql = "INSERT INTO sales_invoices
                 (invoice_number, invoice_date, customer_name, customer_tax_id,
+                 seller_tax_id, seller_name,
                  invoice_type, amount_untaxed, tax_amount, total_amount, tax_rate,
                  reference_type, reference_id, period, status, note,
                  report_period, invoice_format, deduction_category,
                  created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
+            $sellerTaxId,
+            $sellerName,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
@@ -557,8 +569,14 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 賣方預設為禾順 94081455
+        $sellerTaxId = !empty($data['seller_tax_id']) ? $data['seller_tax_id'] : '94081455';
+        $sellerName = !empty($data['seller_name']) ? $data['seller_name']
+            : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
+
         $sql = "UPDATE sales_invoices SET
                 invoice_number = ?, invoice_date = ?, customer_name = ?, customer_tax_id = ?,
+                seller_tax_id = ?, seller_name = ?,
                 invoice_type = ?, amount_untaxed = ?, tax_amount = ?, total_amount = ?, tax_rate = ?,
                 reference_type = ?, reference_id = ?, period = ?, status = ?,
                 note = ?, report_period = ?, invoice_format = ?, deduction_category = ?,
@@ -570,6 +588,8 @@ class InvoiceModel
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
+            $sellerTaxId,
+            $sellerName,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
