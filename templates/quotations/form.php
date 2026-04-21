@@ -1131,6 +1131,7 @@ function keywordSearch(input) {
             for (var i = 0; i < data.length; i++) {
                 var stockColor = data[i].stock_qty > 0 ? '#2e7d32' : '#999';
                 var stockText = '庫存: ' + data[i].stock_qty;
+                var disc = data[i].discontinue_when_empty ? 1 : 0;
                 html += '<div class="product-dropdown-item" onclick="selectProduct(this)" ' +
                     'data-id="' + data[i].id + '" ' +
                     'data-name="' + escHtml(data[i].name) + '" ' +
@@ -1138,8 +1139,9 @@ function keywordSearch(input) {
                     'data-unit="' + escHtml(data[i].unit || '式') + '" ' +
                     'data-price="' + (data[i].price || 0) + '" ' +
                     'data-cost="' + (data[i].cost_per_unit || (data[i].pack_qty > 0 ? Math.round(data[i].cost / data[i].pack_qty * 100) / 100 : data[i].cost) || 0) + '" ' +
-                    'data-stock="' + (data[i].stock_qty || 0) + '">' +
-                    '<div style="font-weight:600">' + escHtml(data[i].name) + '</div>' +
+                    'data-stock="' + (data[i].stock_qty || 0) + '" ' +
+                    'data-discontinue="' + disc + '">' +
+                    '<div style="font-weight:600">' + escHtml(data[i].name) + (disc ? ' <span style="color:#c5221f;font-size:.75rem;font-weight:600">⚠ 庫存用完不再進貨</span>' : '') + '</div>' +
                     '<div class="product-meta">' +
                         (data[i].model ? '<span style="color:#1565c0">' + escHtml(data[i].model) + '</span> | ' : '') +
                         '<span style="color:' + stockColor + '">' + stockText + '</span> | ' +
@@ -1161,6 +1163,7 @@ function selectProduct(el) {
     var name = el.getAttribute('data-name');
     var model = el.getAttribute('data-model') || '';
     var stock = el.getAttribute('data-stock') || '0';
+    var disc = el.getAttribute('data-discontinue') === '1';
 
     dataRow.querySelector('input[name*="product_id"]').value = el.getAttribute('data-id');
     dataRow.querySelector('.item-name').value = name;
@@ -1181,7 +1184,8 @@ function selectProduct(el) {
     var stockDisp = pselRow.querySelector('.psel-stock-display');
     if (stockDisp) {
         var stockColor = parseInt(stock) > 0 ? '#2e7d32' : '#c62828';
-        stockDisp.innerHTML = '<span style="color:' + stockColor + '">庫存: ' + stock + '</span>';
+        var discMsg = disc ? ' <span style="color:#c5221f;font-weight:600">⚠ 庫存用完不再進貨</span>' : '';
+        stockDisp.innerHTML = '<span style="color:' + stockColor + '">庫存: ' + stock + '</span>' + discMsg;
     }
 }
 

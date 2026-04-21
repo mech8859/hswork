@@ -1,5 +1,9 @@
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
-    <h2>產品詳情</h2>
+    <h2>產品詳情
+        <?php if (!empty($product['discontinue_when_empty'])): ?>
+        <span class="badge" style="background:#ffebee;color:#c5221f;font-size:.7rem;padding:3px 8px;margin-left:6px;font-weight:600;vertical-align:middle">⚠ 庫存用完不再進貨</span>
+        <?php endif; ?>
+    </h2>
     <div class="d-flex gap-1">
         <?php if (Auth::hasPermission('products.manage') || in_array(Auth::user()['role'], array('boss','manager'))): ?>
         <a href="/products.php?action=edit&id=<?= $product['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
