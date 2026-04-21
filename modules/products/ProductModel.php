@@ -25,6 +25,7 @@ class ProductModel
             'price_desc'    => 'p.price DESC',
             'stock_desc'    => 'COALESCE(inv.total_stock, 0) DESC, p.name ASC',
             'stock_asc'     => 'COALESCE(inv.total_stock, 0) ASC, p.name ASC',
+            'starred_first' => 'p.is_starred DESC, p.name ASC',
         );
         $sort = isset($filters['sort']) ? $filters['sort'] : 'stock_desc';
         $orderBy = isset($sortMap[$sort]) ? $sortMap[$sort] : $sortMap['stock_desc'];
@@ -137,6 +138,23 @@ class ProductModel
         }
 
         return $product;
+    }
+
+    /**
+     * 切換星標（產品分類用）
+     * 回傳新的 is_starred 值（0 或 1）
+     */
+    public function toggleStar($id)
+    {
+        $id = (int)$id;
+        $stmt = $this->db->prepare('SELECT is_starred FROM products WHERE id = ?');
+        $stmt->execute(array($id));
+        $row = $stmt->fetch();
+        if (!$row) return null;
+        $newVal = ((int)$row['is_starred']) ? 0 : 1;
+        $this->db->prepare('UPDATE products SET is_starred = ? WHERE id = ?')
+            ->execute(array($newVal, $id));
+        return $newVal;
     }
 
     /**

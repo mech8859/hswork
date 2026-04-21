@@ -1,6 +1,9 @@
 <?php
 $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['role'], array('boss','manager'));
 ?>
+<?php if ($canManage): ?>
+<input type="hidden" id="productStarCsrf" value="<?= e(Session::getCsrfToken()) ?>">
+<?php endif; ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>產品目錄 <span class="text-muted" style="font-size:.85rem;font-weight:400">(共 <?= number_format($result['total']) ?> 筆)</span></h2>
     <?php if ($canManage): ?>
@@ -49,6 +52,9 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
                     <option value="name_desc" <?= $curSort === 'name_desc' ? 'selected' : '' ?>>名稱 Z→A</option>
                     <option value="price_desc" <?= $curSort === 'price_desc' ? 'selected' : '' ?>>價格高→低</option>
                     <option value="price_asc" <?= $curSort === 'price_asc' ? 'selected' : '' ?>>價格低→高</option>
+                    <?php if ($canManage): ?>
+                    <option value="starred_first" <?= $curSort === 'starred_first' ? 'selected' : '' ?>>★ 星標優先</option>
+                    <?php endif; ?>
                 </select>
             </div>
             <div class="form-group" style="flex:0">
@@ -128,6 +134,12 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
                 <tr>
                     <td>
                         <div style="display:flex;align-items:center;gap:8px">
+                            <?php if ($canManage): ?>
+                                <?php $starred = !empty($p['is_starred']); ?>
+                                <span class="star-toggle <?= $starred ? 'is-on' : '' ?>" data-id="<?= (int)$p['id'] ?>" onclick="toggleProductStar(this, event)" title="<?= $starred ? '取消星標' : '加入星標' ?>">
+                                    <?= $starred ? '★' : '☆' ?>
+                                </span>
+                            <?php endif; ?>
                             <?php if (!empty($p['image'])): ?>
                             <img src="<?= e($p['image']) ?>" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:4px;border:1px solid #eee;flex-shrink:0" onerror="this.style.display='none'">
                             <?php else: ?>
@@ -168,6 +180,12 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
 <div class="product-grid" id="viewCard" style="display:none">
     <?php foreach ($result['data'] as $p): ?>
     <a href="/products.php?action=view&id=<?= $p['id'] ?>" class="product-card">
+        <?php if ($canManage): ?>
+            <?php $starred = !empty($p['is_starred']); ?>
+            <span class="star-toggle star-card <?= $starred ? 'is-on' : '' ?>" data-id="<?= (int)$p['id'] ?>" onclick="toggleProductStar(this, event)" title="<?= $starred ? '取消星標' : '加入星標' ?>">
+                <?= $starred ? '★' : '☆' ?>
+            </span>
+        <?php endif; ?>
         <div class="product-img">
             <?php if ($p['image']): ?>
             <img src="<?= e($p['image']) ?>" alt="<?= e($p['name']) ?>" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\'product-img-placeholder\'>📦</div>'">
@@ -261,6 +279,11 @@ function goToPage() {
 .pagination { display:flex; gap:4px; justify-content:center; flex-wrap:wrap; }
 .pagination-dots { padding:4px 8px; color:var(--gray-400); }
 .cat-select { min-width:130px; }
+.star-toggle { cursor:pointer; font-size:1.2rem; line-height:1; color:var(--gray-300); user-select:none; transition:color .15s, transform .15s; flex-shrink:0; }
+.star-toggle:hover { color:#f59e0b; transform:scale(1.15); }
+.star-toggle.is-on { color:#f59e0b; }
+.product-card { position:relative; }
+.star-card { position:absolute; top:6px; right:8px; z-index:2; background:rgba(255,255,255,.9); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,.12); font-size:1rem; }
 @media (max-width:991px) { .product-grid { grid-template-columns:repeat(3, 1fr); } }
 @media (max-width:767px) { .product-grid { grid-template-columns:repeat(2, 1fr); } }
 @media (max-width:480px) { .product-grid { grid-template-columns:1fr; } }
@@ -347,6 +370,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+<?php if ($canManage): ?>
+// 切換產品星標（管理權限）
+function toggleProductStar(el, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    if (el.dataset.busy === '1') return;
+    el.dataset.busy = '1';
+    var pid = el.getAttribute('data-id');
+    var token = document.getElementById('productStarCsrf').value;
+    var fd = new FormData();
+    fd.append('id', pid);
+    fd.append('csrf_token', token);
+    fetch('/products.php?action=ajax_toggle_star', { method:'POST', body: fd, credentials:'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            el.dataset.busy = '0';
+            if (!d.success) { alert('切換失敗：' + (d.error || '未知錯誤')); return; }
+            if (d.is_starred) {
+                el.textContent = '★';
+                el.classList.add('is-on');
+                el.title = '取消星標';
+            } else {
+                el.textContent = '☆';
+                el.classList.remove('is-on');
+                el.title = '加入星標';
+            }
+        })
+        .catch(function(err) {
+            el.dataset.busy = '0';
+            alert('網路錯誤：' + err);
+        });
+}
+<?php endif; ?>
 
 // 切換顯示模式
 function toggleView(mode) {
