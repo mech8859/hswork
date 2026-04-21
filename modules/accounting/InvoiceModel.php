@@ -179,6 +179,14 @@ class InvoiceModel
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
+        // 選了發票聯式時回傳合計
+        $summary = null;
+        if (!empty($filters['invoice_format'])) {
+            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM purchase_invoices pi WHERE " . $whereStr);
+            $sumStmt->execute($params);
+            $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
+        }
+
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
         $offset = ($page - 1) * $perPage;
@@ -198,6 +206,7 @@ class InvoiceModel
             'page'     => $page,
             'lastPage' => $lastPage,
             'perPage'  => $perPage,
+            'summary'  => $summary,
         );
     }
 
@@ -460,6 +469,14 @@ class InvoiceModel
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
+        // 選了發票聯式時回傳合計
+        $summary = null;
+        if (!empty($filters['invoice_format'])) {
+            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM sales_invoices si WHERE " . $whereStr);
+            $sumStmt->execute($params);
+            $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
+        }
+
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
         $offset = ($page - 1) * $perPage;
@@ -479,6 +496,7 @@ class InvoiceModel
             'page'     => $page,
             'lastPage' => $lastPage,
             'perPage'  => $perPage,
+            'summary'  => $summary,
         );
     }
 

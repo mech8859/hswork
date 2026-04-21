@@ -158,14 +158,17 @@ switch ($action) {
 
             // 同步更新對應的案件帳款交易（用 receipt_number 反查）
             // 備註剝掉「案件帳款自動產生 - {類別} / 」系統前綴，只同步使用者部分
+            // 嚴格匹配已知帳款類別，避免誤吃使用者直接寫在類別後的內容
             $syncCaseNote = $data['note'] ?? '';
             if ($syncCaseNote !== null && $syncCaseNote !== '') {
-                if (preg_match('/^案件帳款自動產生\s*-\s*[^\/]*?\s*\/\s*(.*)$/us', $syncCaseNote, $m)) {
+                $knownTypes = '訂金|第一期款|第二期款|第三期款|尾款|保留款|全款|退款';
+                if (preg_match('/^案件帳款自動產生\s*-\s*(?:' . $knownTypes . ')\s*\/\s*(.*)$/us', $syncCaseNote, $m)) {
                     $syncCaseNote = trim($m[1]);
-                } elseif (preg_match('/^案件帳款自動產生\s*-\s*[^\/]*$/us', $syncCaseNote)) {
-                    // 只有前綴沒有使用者備註
+                } elseif (preg_match('/^案件帳款自動產生\s*-\s*(?:' . $knownTypes . ')\s*$/us', $syncCaseNote)) {
+                    // 純系統前綴沒有使用者備註
                     $syncCaseNote = '';
                 }
+                // 其他情況保留完整備註（使用者可能直接寫在類別後沒用 / 分隔）
             }
             $affectedCaseIds = array();
             try {

@@ -73,6 +73,17 @@
     </form>
 </div>
 
+<?php if (!empty($result['summary'])): ?>
+<div class="card" style="padding:10px 14px;margin-bottom:10px;background:#e3f2fd;border-left:4px solid #1565c0">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:.95rem">
+        <span>📊 <strong>聯式篩選合計</strong>（<?= number_format($result['total']) ?> 筆）</span>
+        <span>未稅：<strong>$<?= number_format((int)$result['summary']['subtotal']) ?></strong></span>
+        <span>稅額：<strong>$<?= number_format((int)$result['summary']['tax']) ?></strong></span>
+        <span>含稅：<strong style="color:var(--primary)">$<?= number_format((int)$result['summary']['total']) ?></strong></span>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <?php if (empty($records)): ?>
         <p class="text-muted text-center mt-2">目前無進項發票資料</p>
