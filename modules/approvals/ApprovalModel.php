@@ -670,6 +670,19 @@ class ApprovalModel
                     $row['amount'] = 0;
                 }
                 return $row ?: array();
+            case 'overtime':
+                $stmt = $this->db->prepare("SELECT o.*, u.real_name FROM overtimes o LEFT JOIN users u ON o.user_id = u.id WHERE o.id = ?");
+                $stmt->execute(array($targetId));
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $otLabels = array('weekday'=>'平日','weekend'=>'週末','holiday'=>'國定假日');
+                    $otLabel = isset($otLabels[$row['overtime_type']]) ? $otLabels[$row['overtime_type']] : $row['overtime_type'];
+                    $row['label'] = '#' . $targetId . ' ' . $row['real_name'] . ' ' . $otLabel . ' ' . $row['overtime_date']
+                        . ' ' . ($row['start_time'] ?: '') . '~' . ($row['end_time'] ?: '') . ' (' . $row['hours'] . 'h)';
+                    $row['url'] = '/overtimes.php?action=view&id=' . $targetId;
+                    $row['amount'] = 0;
+                }
+                return $row ?: array();
             default:
                 return array('label' => $module . ' #' . $targetId, 'url' => '#');
         }
