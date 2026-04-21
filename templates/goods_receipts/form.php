@@ -198,7 +198,7 @@
                             </td>
                             <td><input type="number" name="items[<?= $idx ?>][po_qty]" class="form-control" step="1" min="0" value="<?= !empty($item['po_qty']) ? (int)$item['po_qty'] : 0 ?>" readonly></td>
                             <td>
-                                <input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="<?= e($displayQty) ?>" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
+                                <input type="number" class="form-control pack-unit-qty item-qty" step="any" min="0" value="<?= e($displayQty) ?>" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
                                 <input type="hidden" name="items[<?= $idx ?>][received_qty]" class="pack-unit-hidden-qty" value="<?= !empty($item['received_qty']) ? (int)$item['received_qty'] : 0 ?>">
                                 <div class="pack-unit-hint" style="display:none"></div>
                             </td>
@@ -224,7 +224,7 @@
                             </td>
                             <td><input type="number" name="items[0][po_qty]" class="form-control" step="1" min="0" value="0" readonly></td>
                             <td>
-                                <input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
+                                <input type="number" class="form-control pack-unit-qty item-qty" step="any" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest('tr'))">
                                 <input type="hidden" name="items[0][received_qty]" class="pack-unit-hidden-qty" value="0">
                                 <div class="pack-unit-hint" style="display:none"></div>
                             </td>
@@ -319,7 +319,7 @@ function addItemRow() {
         + '<input type="hidden" name="items['+itemIdx+'][input_unit]" class="pack-unit-hidden-input-unit" value="">'
         + '<input type="hidden" name="items['+itemIdx+'][input_qty]" class="pack-unit-hidden-input-qty" value=""></td>'
         + '<td><input type="number" name="items['+itemIdx+'][po_qty]" class="form-control" step="1" min="0" value="0" readonly></td>'
-        + '<td><input type="number" class="form-control pack-unit-qty item-qty" step="0.01" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest(\'tr\'))">'
+        + '<td><input type="number" class="form-control pack-unit-qty item-qty" step="any" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest(\'tr\'))">'
         + '<input type="hidden" name="items['+itemIdx+'][received_qty]" class="pack-unit-hidden-qty" value="0">'
         + '<div class="pack-unit-hint" style="display:none"></div></td>'
         + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control item-price" step="1" min="0" value="0" oninput="calcRowAmount(this.closest(\'tr\'))"></td>'
