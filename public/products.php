@@ -276,6 +276,32 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- AJAX: 切換星標（需管理權限）----
+    case 'ajax_toggle_star':
+        header('Content-Type: application/json');
+        $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['role'], array('boss','manager'));
+        if (!$canManage) {
+            echo json_encode(array('success' => false, 'error' => '權限不足'));
+            exit;
+        }
+        if (!verify_csrf()) {
+            echo json_encode(array('success' => false, 'error' => 'CSRF'));
+            exit;
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(array('success' => false, 'error' => '無效的產品 ID'));
+            exit;
+        }
+        $newVal = $model->toggleStar($id);
+        if ($newVal === null) {
+            echo json_encode(array('success' => false, 'error' => '產品不存在'));
+            exit;
+        }
+        AuditLog::log('products', 'toggle_star', $id, 'is_starred=' . $newVal);
+        echo json_encode(array('success' => true, 'is_starred' => $newVal));
+        exit;
+
     // ---- AJAX: 產品搜尋（施工回報材料用）----
     case 'ajax_search':
         $keyword = trim($_GET['keyword'] ?? '');
