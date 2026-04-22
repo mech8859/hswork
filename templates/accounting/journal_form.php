@@ -3,6 +3,14 @@
 $src = isset($prefillEntry) ? $prefillEntry : $entry;
 $isCopy = isset($prefillEntry) && !$entry;
 ?>
+<style>
+/* 借方/貸方金額欄位：隱藏上下箭頭 */
+.debit-input::-webkit-outer-spin-button,
+.debit-input::-webkit-inner-spin-button,
+.credit-input::-webkit-outer-spin-button,
+.credit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.debit-input, .credit-input { -moz-appearance: textfield; appearance: textfield; }
+</style>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1><?= $entry ? '編輯傳票 - ' . e($entry['voucher_number']) : ($isCopy ? '複製傳票' : '新增傳票') ?></h1>
     <?= back_button('/accounting.php') ?>
@@ -64,7 +72,8 @@ $isCopy = isset($prefillEntry) && !$entry;
                     <tr>
                         <th style="width:24px"></th>
                         <th style="width:36px">#</th>
-                        <th style="min-width:180px">會計科目 <span style="color:red">*</span></th>
+                        <th style="min-width:110px">科目編號 <span style="color:red">*</span></th>
+                        <th style="min-width:140px">會計科目</th>
                         <th style="width:110px">部門中心</th>
                         <th style="width:80px">往來類型</th>
                         <th style="width:70px">往來編號</th>
@@ -82,7 +91,7 @@ $isCopy = isset($prefillEntry) && !$entry;
                 </tbody>
                 <tfoot>
                     <tr style="font-weight:bold;background:#f8f9fa">
-                        <td colspan="7" style="text-align:right">合計</td>
+                        <td colspan="8" style="text-align:right">合計</td>
                         <td style="text-align:right" id="totalDebit">0</td>
                         <td style="text-align:right" id="totalCredit">0</td>
                         <td colspan="4">
@@ -128,21 +137,270 @@ var _acctPickerTarget = null; // 目前要填入的欄位 uid
 
 function buildAccountSelect(name, selectedId) {
     var uid = 'acct_' + Math.random().toString(36).substr(2, 6);
-    var selectedText = '';
+    var selectedCode = '', selectedName = '';
     if (selectedId) {
         for (var i = 0; i < accounts.length; i++) {
             if (accounts[i].id == selectedId) {
-                selectedText = accounts[i].code + ' ' + accounts[i].name;
+                selectedCode = accounts[i].code;
+                selectedName = accounts[i].name;
                 break;
             }
         }
     }
-    var html = '<div class="acct-picker">' +
+    var codeEsc = String(selectedCode).replace(/"/g, '&quot;');
+    var nameEsc = String(selectedName).replace(/</g, '&lt;');
+    // 回傳兩個 <td>：第一個為科目編號輸入，第二個為科目名稱顯示
+    // 快顯清單 append 到 body，避免被表格 overflow 截斷
+    var cell1 = '<td style="overflow:visible"><div class="acct-picker" style="position:relative">' +
         '<input type="hidden" name="' + name + '" id="' + uid + '_val" value="' + (selectedId || '') + '" required>' +
-        '<div class="acct-display" id="' + uid + '_txt" onclick="openAcctModal(\'' + uid + '\')">' +
-        (selectedText || '<span style="color:#999">點擊選擇科目</span>') +
-        '</div></div>';
-    return html;
+        '<input type="text" id="' + uid + '_code" class="form-control acct-code-input" value="' + codeEsc + '" placeholder="科目編號" autocomplete="off" style="padding-right:22px;font-size:.85rem" onfocus="this.select()" oninput="onAcctCodeInput(\'' + uid + '\')" onkeydown="onAcctCodeKeydown(event, \'' + uid + '\')" onblur="onAcctCodeBlur(\'' + uid + '\')" ondblclick="openAcctModal(\'' + uid + '\')">' +
+        '<span onclick="openAcctModal(\'' + uid + '\')" title="選擇科目" style="position:absolute;right:4px;top:8px;cursor:pointer;color:#888;padding:0 4px;user-select:none">▾</span>' +
+        '</div></td>';
+    var cell2 = '<td><div id="' + uid + '_name" class="acct-name-label" style="font-size:.85rem;color:#333;padding:6px 4px;line-height:1.3;min-height:1.3em">' + nameEsc + '</div></td>';
+    return cell1 + cell2;
+}
+
+// 全域建議清單容器（動態定位於 code input 下方，避免被表格 overflow 裁切）
+function _getAcctSuggestBox() {
+    var box = document.getElementById('acctSuggestGlobal');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'acctSuggestGlobal';
+        box.style.cssText = 'display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #ccc;box-shadow:0 6px 20px rgba(0,0,0,.18);max-height:320px;overflow-y:auto;font-size:.9rem;min-width:320px';
+        document.body.appendChild(box);
+    }
+    return box;
+}
+
+function _positionAcctSuggest(uid) {
+    var input = document.getElementById(uid + '_code');
+    if (!input) return;
+    var box = _getAcctSuggestBox();
+    var rect = input.getBoundingClientRect();
+    box.style.left = rect.left + 'px';
+    box.style.top = (rect.bottom + 2) + 'px';
+    box.style.minWidth = Math.max(320, rect.width) + 'px';
+}
+
+// 當前每個 picker 在 suggest 清單中的 highlighted index
+var _acctSuggestIdx = {};
+var _acctSuggestMatches = {};
+
+var _acctSuggestActiveUid = null;
+
+function onAcctCodeInput(uid) {
+    var input = document.getElementById(uid + '_code');
+    if (!input) return;
+    var kw = (input.value || '').trim().toLowerCase();
+    if (!kw) { closeAcctSuggest(uid); return; }
+
+    var matches = [];
+    for (var i = 0; i < accounts.length && matches.length < 100; i++) {
+        var a = accounts[i];
+        if (a.is_parent) continue;
+        var code = String(a.code).toLowerCase();
+        var name = String(a.name).toLowerCase();
+        if (code.indexOf(kw) === -1 && name.indexOf(kw) === -1) continue;
+        matches.push(a);
+    }
+    _acctSuggestMatches[uid] = matches;
+    _acctSuggestIdx[uid] = 0;
+    _acctSuggestActiveUid = uid;
+    renderAcctSuggest(uid);
+}
+
+function renderAcctSuggest(uid) {
+    var box = _getAcctSuggestBox();
+    var matches = _acctSuggestMatches[uid] || [];
+    _positionAcctSuggest(uid);
+    if (matches.length === 0) {
+        box.innerHTML = '<div style="padding:10px;color:#999;text-align:center">無符合的科目</div>';
+        box.style.display = '';
+        return;
+    }
+    var hi = _acctSuggestIdx[uid] || 0;
+    var html = '';
+    for (var i = 0; i < matches.length; i++) {
+        var a = matches[i];
+        var active = i === hi ? 'background:#e3f2fd' : '';
+        html += '<div class="acct-suggest-item" data-idx="' + i + '" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #f0f0f0;' + active + '"'
+            + ' onmousedown="pickAcctById(\'' + uid + '\',' + a.id + ');return false"'
+            + ' onmouseover="_acctSuggestIdx[\'' + uid + '\']=' + i + ';renderAcctSuggest(\'' + uid + '\')">'
+            + '<span style="font-family:monospace;font-weight:600">' + a.code + '</span>'
+            + '<span style="margin-left:8px;color:#555">' + a.name + '</span>'
+            + '</div>';
+    }
+    box.innerHTML = html;
+    box.style.display = '';
+    // 將 highlighted 項目捲入可視區
+    var activeItem = box.querySelector('.acct-suggest-item[data-idx="' + hi + '"]');
+    if (activeItem && activeItem.scrollIntoView) {
+        activeItem.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function closeAcctSuggest(uid) {
+    if (_acctSuggestActiveUid && _acctSuggestActiveUid !== uid) return;
+    var box = document.getElementById('acctSuggestGlobal');
+    if (box) box.style.display = 'none';
+    _acctSuggestActiveUid = null;
+}
+
+// 離開科目編號欄位時驗證：必須比對到有效科目才可放行，否則紅框並重新聚焦
+function onAcctCodeBlur(uid) {
+    setTimeout(function() {
+        var input = document.getElementById(uid + '_code');
+        var hidden = document.getElementById(uid + '_val');
+        if (!input || !hidden) return;
+        closeAcctSuggest(uid);
+
+        var code = (input.value || '').trim();
+        if (!code) {
+            // 清空 → 同步清掉 hidden/名稱
+            hidden.value = '';
+            var lbl = document.getElementById(uid + '_name');
+            if (lbl) lbl.textContent = '';
+            input.style.borderColor = '';
+            return;
+        }
+        // 比對精準編號
+        var match = null;
+        for (var i = 0; i < accounts.length; i++) {
+            if (String(accounts[i].code) === code) { match = accounts[i]; break; }
+        }
+        if (match) {
+            applyAcctCode(uid);
+            return;
+        }
+        // 若使用者是點 pick 項目觸發的 blur，稍等一下；若 hidden 已由 pickAcctById 填好則放行
+        if (hidden.value) {
+            // pickAcctById 已處理
+            var lbl2 = document.getElementById(uid + '_name');
+            input.style.borderColor = '';
+            return;
+        }
+        // 無效 → 紅框 + 重新聚焦
+        input.style.borderColor = '#e53e3e';
+        input.focus();
+        if (input.select) input.select();
+    }, 180);
+}
+
+// 捲動或縮放時重新定位
+window.addEventListener('scroll', function() {
+    if (_acctSuggestActiveUid) _positionAcctSuggest(_acctSuggestActiveUid);
+}, true);
+window.addEventListener('resize', function() {
+    if (_acctSuggestActiveUid) _positionAcctSuggest(_acctSuggestActiveUid);
+});
+
+function pickAcctById(uid, id) {
+    _acctPickerTarget = uid;
+    // 找 label（for pickAcct）
+    var a = null;
+    for (var i = 0; i < accounts.length; i++) {
+        if (accounts[i].id == id) { a = accounts[i]; break; }
+    }
+    if (!a) return;
+    pickAcct(id, a.code + ' ' + a.name);
+    closeAcctSuggest(uid);
+    // 把焦點移回 code input 再讓 form Enter handler 判斷後續（這邊主動 advance）
+    var input = document.getElementById(uid + '_code');
+    if (input) {
+        // 模擬 Enter 成功後的 advance：找下一個可 focus 元素
+        var form = document.getElementById('journalForm');
+        if (form) {
+            var sel = 'input:not([type=hidden]):not([readonly]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
+            var list = Array.prototype.slice.call(form.querySelectorAll(sel)).filter(function(el) { return el.offsetParent !== null; });
+            var idx = list.indexOf(input);
+            if (idx !== -1 && list[idx + 1]) {
+                list[idx + 1].focus();
+                try { list[idx + 1].select(); } catch (e) {}
+            }
+        }
+    }
+}
+
+// 以科目編號比對並套用（給 _code input 的 Enter / blur 用）
+function applyAcctCode(uid) {
+    var input = document.getElementById(uid + '_code');
+    var hidden = document.getElementById(uid + '_val');
+    var label = document.getElementById(uid + '_name');
+    if (!input || !hidden) return false;
+    var code = (input.value || '').trim();
+    if (!code) {
+        hidden.value = '';
+        if (label) label.textContent = '';
+        input.style.borderColor = '';
+        return true; // 允許清空
+    }
+    var match = null;
+    for (var i = 0; i < accounts.length; i++) {
+        if (String(accounts[i].code) === code) { match = accounts[i]; break; }
+    }
+    if (match) {
+        hidden.value = match.id;
+        input.value = match.code;
+        if (label) label.textContent = match.name;
+        input.style.borderColor = '';
+        // 套用立沖規則
+        var tr = hidden.closest('tr');
+        if (tr) {
+            var idx = tr.id.replace('line_', '');
+            if (typeof offsetAutoSet !== 'undefined') delete offsetAutoSet[idx];
+            if (typeof applyOffsetRules === 'function') applyOffsetRules(idx, match);
+        }
+        return true;
+    } else {
+        input.style.borderColor = '#e53e3e';
+        return false;
+    }
+}
+
+function onAcctCodeKeydown(e, uid) {
+    var box = document.getElementById('acctSuggestGlobal');
+    var suggestOpen = box && box.style.display !== 'none' && _acctSuggestActiveUid === uid;
+    var matches = _acctSuggestMatches[uid] || [];
+
+    // 方向鍵：操作建議清單
+    if (suggestOpen && matches.length > 0) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault(); e.stopPropagation();
+            _acctSuggestIdx[uid] = Math.min((_acctSuggestIdx[uid] || 0) + 1, matches.length - 1);
+            renderAcctSuggest(uid);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault(); e.stopPropagation();
+            _acctSuggestIdx[uid] = Math.max((_acctSuggestIdx[uid] || 0) - 1, 0);
+            renderAcctSuggest(uid);
+            return;
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault(); e.stopPropagation();
+            closeAcctSuggest(uid);
+            return;
+        }
+    }
+
+    if (e.key !== 'Enter' && e.keyCode !== 13) return;
+
+    // Enter：若建議清單有結果 → 選取 highlighted（或第一筆）
+    if (suggestOpen && matches.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        var hi = _acctSuggestIdx[uid] || 0;
+        var picked = matches[hi] || matches[0];
+        pickAcctById(uid, picked.id);
+        return;
+    }
+
+    // 沒有建議清單 → 嘗試以輸入值精準比對編號
+    if (!applyAcctCode(uid)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openAcctModal(uid);
+    }
 }
 
 function openAcctModal(uid) {
@@ -190,8 +448,6 @@ function pickAcct(id, label) {
     if (!_acctPickerTarget) return;
     var uid = _acctPickerTarget;
     document.getElementById(uid + '_val').value = id;
-    document.getElementById(uid + '_txt').innerHTML = label;
-    document.getElementById(uid + '_txt').style.color = '';
     closeAcctModal();
 
     // 找科目資料並套用立沖規則
@@ -200,6 +456,12 @@ function pickAcct(id, label) {
         if (accounts[i].id == id) { acct = accounts[i]; break; }
     }
     if (!acct) return;
+
+    // 更新顯示：code input + name label
+    var codeInput = document.getElementById(uid + '_code');
+    var nameLbl = document.getElementById(uid + '_name');
+    if (codeInput) { codeInput.value = acct.code; codeInput.style.borderColor = ''; }
+    if (nameLbl) nameLbl.textContent = acct.name;
 
     // 找行 index
     var hiddenInput = document.getElementById(uid + '_val');
@@ -425,7 +687,7 @@ function addLine(data) {
     tr.draggable = true;
     tr.innerHTML = '<td class="drag-handle" style="cursor:grab;text-align:center;color:#aaa;font-size:1.1rem;user-select:none" title="拖曳排序">&#9776;</td>' +
         '<td class="line-num">' + (idx + 1) + '</td>' +
-        '<td>' + buildAccountSelect('lines[' + idx + '][account_id]', accountId) + '</td>' +
+        buildAccountSelect('lines[' + idx + '][account_id]', accountId) +
         '<td>' + buildCcSelect('lines[' + idx + '][cost_center_id]', ccId) + '</td>' +
         '<td>' + relTypeSelect + '</td>' +
         '<td>' + relIdCell + '</td>' +
@@ -651,6 +913,16 @@ function onRelSearch() {
             acctSearch.addEventListener('compositionstart', function() { acctComposing = true; });
             acctSearch.addEventListener('compositionend', function() { acctComposing = false; onAcctSearch(); });
             acctSearch.addEventListener('input', function() { if (!acctComposing) onAcctSearch(); });
+            // Enter：若結果只剩一筆（或第一筆為明細科目）→ 自動選取
+            acctSearch.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter' && e.keyCode !== 13) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var rows = document.querySelectorAll('#acctModalBody tr.acct-row[onclick]');
+                if (rows.length >= 1) {
+                    rows[0].click();
+                }
+            });
         }
 
         var relSearch = document.getElementById('relModalSearch');
@@ -1391,6 +1663,131 @@ function closeOffsetModal() {
     if (modal) modal.style.display = 'none';
     // 立沖由借貸方自動決定，取消時不改變立沖旗標
 }
+
+// ===== 鍵盤快捷：Enter 跳下一欄、方向鍵在表格內跳動、最後一行自動新增 =====
+(function() {
+    var form = document.getElementById('journalForm');
+    if (!form) return;
+
+    var FOCUSABLE_SEL = 'input:not([type=hidden]):not([readonly]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
+
+    function getFocusables() {
+        var list = Array.prototype.slice.call(form.querySelectorAll(FOCUSABLE_SEL));
+        return list.filter(function(el) { return el.offsetParent !== null; });
+    }
+
+    function focusNext(current, direction) {
+        var list = getFocusables();
+        var idx = list.indexOf(current);
+        if (idx === -1) return false;
+        var next = list[idx + (direction || 1)];
+        if (next) { next.focus(); if (next.select) try { next.select(); } catch (e) {} return true; }
+        return false;
+    }
+
+    function visibleRows() {
+        var tbody = document.getElementById('linesBody');
+        if (!tbody) return [];
+        return Array.prototype.slice.call(tbody.querySelectorAll('tr')).filter(function(r) { return r.style.display !== 'none'; });
+    }
+
+    function isLastRow(tr) {
+        var rows = visibleRows();
+        return rows.length > 0 && rows[rows.length - 1] === tr;
+    }
+
+    function isLastInputOfRow(el, tr) {
+        var arr = Array.prototype.slice.call(tr.querySelectorAll(FOCUSABLE_SEL)).filter(function(e) { return e.offsetParent !== null; });
+        return arr.length > 0 && arr[arr.length - 1] === el;
+    }
+
+    function focusCellOfNewLastRow(colIdx) {
+        setTimeout(function() {
+            var rows = visibleRows();
+            var lastTr = rows[rows.length - 1];
+            if (!lastTr) return;
+            var el;
+            if (typeof colIdx === 'number') {
+                var cell = lastTr.children[colIdx];
+                el = cell && cell.querySelector(FOCUSABLE_SEL);
+            }
+            if (!el) {
+                el = lastTr.querySelector(FOCUSABLE_SEL);
+            }
+            if (el) { el.focus(); if (el.select) try { el.select(); } catch (err) {} }
+        }, 0);
+    }
+
+    // Enter：跳下一個欄位（最後一行的最後一欄 → 自動新增行）
+    form.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter' && e.keyCode !== 13) return;
+        var t = e.target;
+        if (!t) return;
+        var tag = (t.tagName || '').toUpperCase();
+        if (tag === 'TEXTAREA') return;
+        if (tag === 'BUTTON' || t.type === 'submit') return;
+        e.preventDefault();
+
+        var tr = t.closest('tr');
+        if (tr && tr.closest('#linesTable') && isLastRow(tr) && isLastInputOfRow(t, tr)) {
+            if (typeof addLine === 'function') addLine();
+            focusCellOfNewLastRow();
+            return;
+        }
+        focusNext(t, 1);
+    });
+
+    // 方向鍵：#linesTable 內上下跳列（同欄位），最後一行按 ↓ 自動新增
+    var linesTable = document.getElementById('linesTable');
+    if (linesTable) {
+        linesTable.addEventListener('keydown', function(e) {
+            var t = e.target;
+            if (!t) return;
+            var tag = (t.tagName || '').toUpperCase();
+            if (tag === 'TEXTAREA') return;
+            if (tag === 'SELECT' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
+
+            var td = t.closest('td');
+            var tr = t.closest('tr');
+            if (!td || !tr) return;
+            var tds = Array.prototype.slice.call(tr.children);
+            var colIdx = tds.indexOf(td);
+
+            function focusCellInRow(row, col) {
+                if (!row) return false;
+                var cell = row.children[col];
+                if (!cell) return false;
+                var el = cell.querySelector(FOCUSABLE_SEL);
+                if (!el) return false;
+                el.focus();
+                if (el.select) try { el.select(); } catch (err) {}
+                return true;
+            }
+
+            if (e.key === 'ArrowUp') {
+                if (focusCellInRow(tr.previousElementSibling, colIdx)) e.preventDefault();
+            } else if (e.key === 'ArrowDown') {
+                if (tr.nextElementSibling) {
+                    if (focusCellInRow(tr.nextElementSibling, colIdx)) e.preventDefault();
+                } else if (isLastRow(tr)) {
+                    // 最後一行按 ↓ → 新增一行並移到同欄位
+                    e.preventDefault();
+                    if (typeof addLine === 'function') addLine();
+                    focusCellOfNewLastRow(colIdx);
+                }
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                if ((t.type === 'text' || t.type === 'number' || t.type === 'date') && typeof t.selectionStart === 'number') {
+                    var atStart = t.selectionStart === 0 && t.selectionEnd === 0;
+                    var atEnd = t.selectionStart === (t.value || '').length && t.selectionEnd === (t.value || '').length;
+                    if (e.key === 'ArrowLeft' && !atStart) return;
+                    if (e.key === 'ArrowRight' && !atEnd) return;
+                }
+                var dir = (e.key === 'ArrowLeft') ? -1 : 1;
+                if (focusNext(t, dir)) e.preventDefault();
+            }
+        });
+    }
+})();
 </script>
 
 <!-- 會計科目選擇彈窗 -->
