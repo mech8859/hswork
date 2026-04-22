@@ -857,14 +857,8 @@ class ApprovalModel
         $chk->execute(array($caseId));
         if ((int)$chk->fetchColumn() > 0) return array('already_pending' => true);
 
-        // 只送 level 1（工程主管）
-        $stmt = $this->db->prepare("
-            SELECT * FROM approval_rules
-            WHERE module = 'case_completion' AND is_active = 1 AND level_order = 1
-            ORDER BY id LIMIT 1
-        ");
-        $stmt->execute();
-        $rule = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 只送 level 1（工程主管）— 依案件分公司優先挑選規則
+        $rule = $this->pickCompletionRuleForCase($caseId, 1);
 
         if (!$rule) return array('auto_approved' => true);
 
@@ -983,13 +977,7 @@ class ApprovalModel
      */
     private function buildNextCompletionLevel($caseId, $level)
     {
-        $rule = $this->db->prepare("
-            SELECT * FROM approval_rules
-            WHERE module='case_completion' AND is_active=1 AND level_order=?
-            ORDER BY id LIMIT 1
-        ");
-        $rule->execute(array($level));
-        $ruleRow = $rule->fetch(PDO::FETCH_ASSOC);
+        $ruleRow = $this->pickCompletionRuleForCase($caseId, $level);
         if (!$ruleRow) {
             return array('next_level' => null, 'status' => 'no_rule', 'error' => null);
         }
@@ -1175,6 +1163,43 @@ class ApprovalModel
     /**
      * 確保 case_completion 三條規則都存在（Level 1/2/3）
      */
+    /**
+     * 依案件所屬分公司挑選完工簽核規則
+     * 優先順序：有設定 condition_branch_ids 且命中案件 branch_id > 未設定（通用規則）
+     */
+    private function pickCompletionRuleForCase($caseId, $level)
+    {
+        $bStmt = $this->db->prepare("SELECT branch_id FROM cases WHERE id = ?");
+        $bStmt->execute(array($caseId));
+        $branchId = (int)$bStmt->fetchColumn();
+
+        $stmt = $this->db->prepare("
+            SELECT * FROM approval_rules
+            WHERE module='case_completion' AND is_active=1 AND level_order=?
+            ORDER BY id
+        ");
+        $stmt->execute(array($level));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($rows)) return null;
+
+        $branchMatched = null;
+        $generic = null;
+        foreach ($rows as $row) {
+            $cond = isset($row['condition_branch_ids']) ? trim((string)$row['condition_branch_ids']) : '';
+            if ($cond === '') {
+                if ($generic === null) $generic = $row;
+            } else {
+                $ids = array_map('intval', array_filter(explode(',', $cond)));
+                if ($branchId > 0 && in_array($branchId, $ids, true)) {
+                    if ($branchMatched === null) $branchMatched = $row;
+                }
+            }
+        }
+        if ($branchMatched) return $branchMatched;
+        if ($generic) return $generic;
+        return $rows[0];
+    }
+
     private function ensureCaseCompletionRules()
     {
         $defaults = array(

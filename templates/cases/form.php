@@ -43,7 +43,8 @@
         <?php endif; ?>
         <?php
         if (function_exists('get_readiness_warnings')) {
-            $warnings = get_readiness_warnings($case['readiness'] ?: array(), $case['case_type'] ?: 'new_install');
+            $liveReadiness = function_exists('compute_case_readiness_live') ? compute_case_readiness_live($case) : ($case['readiness'] ?: array());
+            $warnings = get_readiness_warnings($liveReadiness, $case['case_type'] ?: 'new_install');
             if (!empty($warnings)):
         ?>
         <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?></span>

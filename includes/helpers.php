@@ -194,6 +194,35 @@ function get_readiness_warnings(array $readiness, $caseType = 'new_install'): ar
 }
 
 /**
+ * 由案件現況資料即時推算排工條件（不依賴 case_readiness 表）
+ * 使 header 警示與排工條件驗證區塊保持一致（不用等重新儲存）
+ */
+function compute_case_readiness_live(array $case): array
+{
+    $attachments = isset($case['attachments']) && is_array($case['attachments']) ? $case['attachments'] : array();
+    $hasQuotation = false;
+    $hasSitePhotos = false;
+    foreach ($attachments as $a) {
+        $t = isset($a['file_type']) ? $a['file_type'] : '';
+        if ($t === 'quotation')  $hasQuotation = true;
+        if ($t === 'site_photo') $hasSitePhotos = true;
+    }
+    $dealAmount = isset($case['deal_amount']) ? (float)$case['deal_amount'] : 0;
+    $sc = isset($case['site_conditions']) && is_array($case['site_conditions']) ? $case['site_conditions'] : array();
+    $hasSiteInfo = !empty($sc['structure_type']) || !empty($sc['conduit_type']) || !empty($sc['floor_count']);
+    $stored = isset($case['readiness']) && is_array($case['readiness']) ? $case['readiness'] : array();
+
+    return array(
+        'has_quotation'        => $hasQuotation ? 1 : 0,
+        'has_site_photos'      => $hasSitePhotos ? 1 : 0,
+        'has_amount_confirmed' => $dealAmount > 0 ? 1 : 0,
+        'has_site_info'        => $hasSiteInfo ? 1 : 0,
+        // 保留「允許無現場照片」的人工標記（儲存在 case_readiness）
+        'no_photo_allowed'     => !empty($stored['no_photo_allowed']) ? 1 : 0,
+    );
+}
+
+/**
  * 產生案件編號
  */
 function generate_case_number(string $branchCode): string

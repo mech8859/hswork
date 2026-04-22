@@ -12,7 +12,8 @@ $currentStage = $caseModel->syncStage($case['id']);
         <span class="badge"><?= e($case['case_number']) ?></span>
         <span class="badge" style="background:<?= CaseModel::stageColor($currentStage) ?>;color:#fff"><?= e(isset($stageLabels[$currentStage]) ? $stageLabels[$currentStage] : '') ?></span>
         <?php
-        $warnings = get_readiness_warnings(isset($case['readiness']) ? $case['readiness'] : array(), isset($case['case_type']) ? $case['case_type'] : 'new_install');
+        $liveReadiness = function_exists('compute_case_readiness_live') ? compute_case_readiness_live($case) : (isset($case['readiness']) ? $case['readiness'] : array());
+        $warnings = get_readiness_warnings($liveReadiness, isset($case['case_type']) ? $case['case_type'] : 'new_install');
         if (!empty($warnings)):
         ?>
         <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?></span>

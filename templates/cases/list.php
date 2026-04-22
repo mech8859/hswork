@@ -248,6 +248,9 @@ $subStatusOptions = CaseModel::subStatusOptions();
                         <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['customer_name'] ?: $row['title'] ?: '') ?></a>
                         <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.65em">黑名單</span><?php endif; ?>
                         <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.65em">未成交</span><?php endif; ?>
+                        <?php if (!empty($row['sales_note'])): ?>
+                        <div style="font-size:.7rem;color:#aaa;margin-top:2px;line-height:1.3;white-space:pre-wrap"><?= e($row['sales_note']) ?></div>
+                        <?php endif; ?>
                         <?php if (!empty($filters['keyword'])):
                             $details = array();
                             if (!empty($row['address'])) $details[] = $row['address'];
