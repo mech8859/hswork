@@ -43,10 +43,27 @@
         <p class="text-muted text-center mt-2">目前無報價單</p>
     <?php else: ?>
     <div class="staff-cards show-mobile">
-        <?php foreach ($quotations as $q): ?>
+        <?php foreach ($quotations as $q):
+            if (!function_exists('_quoteProfitBadge')) {
+                function _quoteProfitBadge($pr) {
+                    if ($pr === null || $pr === '') return null;
+                    $pr = (float)$pr;
+                    if ($pr >= 15)   return array('label' => '優質', 'bg' => '#e6f4ea', 'color' => '#137333');
+                    if ($pr >= 10)   return array('label' => '警戒', 'bg' => '#fef7e0', 'color' => '#b26a00');
+                    if ($pr >= 0)    return array('label' => '警告', 'bg' => '#fde7e7', 'color' => '#c5221f');
+                    return array('label' => '虧損', 'bg' => '#fce8e6', 'color' => '#c5221f');
+                }
+            }
+            $pb = _quoteProfitBadge(isset($q['profit_rate']) ? $q['profit_rate'] : null);
+        ?>
         <div class="staff-card" onclick="location.href='/quotations.php?action=view&id=<?= $q['id'] ?>'">
             <div class="d-flex justify-between align-center">
-                <strong><?= e($q['customer_name']) ?></strong>
+                <span>
+                    <strong><?= e($q['customer_name']) ?></strong>
+                    <?php if ($pb): ?>
+                    <span class="badge" style="background:<?= $pb['bg'] ?>;color:<?= $pb['color'] ?>;font-size:.65em;margin-left:4px;padding:2px 6px" title="利潤率 <?= number_format((float)$q['profit_rate'], 1) ?>%"><?= $pb['label'] ?></span>
+                    <?php endif; ?>
+                </span>
                 <span class="badge badge-<?= QuotationModel::statusBadge($q['status']) ?>"><?= e(QuotationModel::statusLabel($q['status'])) ?></span>
             </div>
             <div class="staff-card-meta">
@@ -65,11 +82,16 @@
                 <th>單號</th><th>日期</th><th>客戶</th><th>案場</th><th>格式</th><th>業務</th><th>金額</th><th>狀態</th><th>操作</th>
             </tr></thead>
             <tbody>
-                <?php foreach ($quotations as $q): ?>
+                <?php foreach ($quotations as $q): $pb = _quoteProfitBadge(isset($q['profit_rate']) ? $q['profit_rate'] : null); ?>
                 <tr>
                     <td><a href="/quotations.php?action=view&id=<?= $q['id'] ?>"><?= e($q['quotation_number']) ?></a></td>
                     <td><?= e($q['quote_date']) ?></td>
-                    <td><?= e($q['customer_name']) ?></td>
+                    <td>
+                        <?= e($q['customer_name']) ?>
+                        <?php if ($pb): ?>
+                        <span class="badge" style="background:<?= $pb['bg'] ?>;color:<?= $pb['color'] ?>;font-size:.7em;margin-left:4px;padding:2px 6px" title="利潤率 <?= number_format((float)$q['profit_rate'], 1) ?>%"><?= $pb['label'] ?></span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= e(mb_substr($q['site_name'] ?: '-', 0, 15)) ?></td>
                     <td><?= QuotationModel::formatLabel($q['format']) ?></td>
                     <td><?= e($q['sales_name'] ?: '-') ?></td>
