@@ -106,11 +106,14 @@ class ApprovalModel
             if (!empty($clean)) $userRolesStr = implode(',', $clean);
         }
 
+        $maxProfitRate = (isset($data['max_profit_rate']) && $data['max_profit_rate'] !== '' && $data['max_profit_rate'] !== null) ? (float)$data['max_profit_rate'] : null;
+        $minProfitRate = (isset($data['min_profit_rate']) && $data['min_profit_rate'] !== '' && $data['min_profit_rate'] !== null) ? (float)$data['min_profit_rate'] : null;
+
         if (!empty($data['id'])) {
             $stmt = $this->db->prepare("
                 UPDATE approval_rules SET
                     module = ?, rule_name = ?, min_amount = ?, max_amount = ?,
-                    min_profit_rate = ?, condition_type = ?, product_ids = ?, product_category_id = ?,
+                    min_profit_rate = ?, max_profit_rate = ?, condition_type = ?, product_ids = ?, product_category_id = ?,
                     case_types = ?, condition_branch_ids = ?, condition_user_roles = ?,
                     approver_role = ?, approver_id = ?, extra_approver_ids = ?,
                     level_order = ?, is_active = ?
@@ -121,7 +124,8 @@ class ApprovalModel
                 $data['rule_name'],
                 $data['min_amount'] ?: 0,
                 $data['max_amount'] ?: null,
-                $data['min_profit_rate'] ?: null,
+                $minProfitRate,
+                $maxProfitRate,
                 $data['condition_type'] ?: 'amount',
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
@@ -139,17 +143,18 @@ class ApprovalModel
         } else {
             $stmt = $this->db->prepare("
                 INSERT INTO approval_rules (module, rule_name, min_amount, max_amount,
-                    min_profit_rate, condition_type, product_ids, product_category_id,
+                    min_profit_rate, max_profit_rate, condition_type, product_ids, product_category_id,
                     case_types, condition_branch_ids, condition_user_roles,
                     approver_role, approver_id, extra_approver_ids, level_order, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute(array(
                 $data['module'],
                 $data['rule_name'],
                 $data['min_amount'] ?: 0,
                 $data['max_amount'] ?: null,
-                $data['min_profit_rate'] ?: null,
+                $minProfitRate,
+                $maxProfitRate,
                 $data['condition_type'] ?: 'amount',
                 $data['product_ids'] ?: null,
                 $data['product_category_id'] ?: null,
@@ -280,8 +285,11 @@ class ApprovalModel
 
             // 利潤率檢查（如果有設定）
             $profitMatch = true;
-            if ($rule['min_profit_rate'] !== null && $profitRate !== null) {
-                if ($profitRate < $rule['min_profit_rate']) $profitMatch = false;
+            if (isset($rule['min_profit_rate']) && $rule['min_profit_rate'] !== null && $profitRate !== null) {
+                if ($profitRate < (float)$rule['min_profit_rate']) $profitMatch = false;
+            }
+            if (isset($rule['max_profit_rate']) && $rule['max_profit_rate'] !== null && $profitRate !== null) {
+                if ($profitRate > (float)$rule['max_profit_rate']) $profitMatch = false;
             }
 
             // 分公司條件（空=全部，有設定則需匹配）

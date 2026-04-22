@@ -65,15 +65,37 @@
         <?php
         // 以下進度不顯示排工按鈕：已完工結案 / 已完工待簽核 / 待追蹤 / 毀約 / 客戶取消 / 無效
         $hideScheduleStatuses = array('closed','completed_pending','unpaid','tracking','pending','breach','customer_cancel','cancelled','lost');
+        // 虧損尚未簽核擋排工：該案件有 profit_rate<0 的報價單且狀態在 draft/pending_approval 等未過關階段
+        $lossBlockReason = '';
+        if ($case) {
+            $_lbStmt = Database::getInstance()->prepare("
+                SELECT quotation_number, status, profit_rate
+                FROM quotations
+                WHERE case_id = ? AND profit_rate < 0
+                  AND status IN ('draft','pending_approval','rejected_internal','revision_needed','pending_revision')
+                LIMIT 1
+            ");
+            $_lbStmt->execute(array($case['id']));
+            $_lbRow = $_lbStmt->fetch(PDO::FETCH_ASSOC);
+            if ($_lbRow) {
+                $_lbStatusLabel = $_lbRow['status'] === 'pending_approval' ? '簽核中' : ($_lbRow['status'] === 'draft' ? '未送簽核' : '待重送簽核');
+                $lossBlockReason = '報價單 ' . $_lbRow['quotation_number'] . ' 為虧損，' . $_lbStatusLabel . '，需完成簽核才能排工';
+            }
+        }
         ?>
         <?php if ($case && Auth::hasPermission('schedule.manage') && !in_array($case['status'], $hideScheduleStatuses)): ?>
+        <?php if ($lossBlockReason): ?>
+        <button type="button" class="btn btn-sm" style="background:#9e9e9e;color:#fff;cursor:not-allowed" onclick="alert('<?= e($lossBlockReason) ?>')" title="<?= e($lossBlockReason) ?>">手動排工 🔒</button>
+        <button type="button" class="btn btn-sm" style="background:#9e9e9e;color:#fff;cursor:not-allowed" onclick="alert('<?= e($lossBlockReason) ?>')" title="<?= e($lossBlockReason) ?>">智慧排工 🔒</button>
+        <?php else: ?>
         <a href="/schedule.php?action=create&case_id=<?= $case['id'] ?>" class="btn btn-sm" style="background:#FF9800;color:#fff">手動排工</a>
         <?php if (!empty($warnings)): ?>
         <button type="button" class="btn btn-success btn-sm" onclick="alert('排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?>\n\n請先補齊資料再使用智慧排工。')">智慧排工</button>
         <?php else: ?>
         <a href="/schedule.php?action=smart&case_id=<?= $case['id'] ?>" class="btn btn-success btn-sm">智慧排工</a>
         <?php endif; ?>
-        <?php endif; ?>
+        <?php endif; /* loss block end */ ?>
+        <?php endif; /* schedule permission end */ ?>
         <?php if ($case && Auth::canEditSection('delete')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteCase(<?= $case['id'] ?>, '<?= e($case['case_number']) ?>')">刪除</button>
         <?php endif; ?>

@@ -54,7 +54,11 @@
             </div>
             <div class="form-group" id="condition-profit">
                 <label>最低利潤率 %（選填）</label>
-                <input type="number" name="min_profit_rate" class="form-control" step="0.1" min="0" max="100">
+                <input type="number" name="min_profit_rate" class="form-control" step="0.1" min="-100" max="100" placeholder="如 10 表示 ≥10%">
+            </div>
+            <div class="form-group" id="condition-profit-max">
+                <label>最高利潤率 %（選填）</label>
+                <input type="number" name="max_profit_rate" class="form-control" step="0.1" min="-100" max="100" placeholder="如 0 表示 ≤0%（虧損）">
             </div>
         </div>
         <!-- 條件類型切換（請購單/採購單用） -->
@@ -280,7 +284,16 @@
                         $<?= number_format($rule['min_amount']) ?>
                         ~ <?= $rule['max_amount'] !== null ? '$' . number_format($rule['max_amount']) : '無上限' ?>
                     </td>
-                    <td><?= $rule['min_profit_rate'] !== null ? $rule['min_profit_rate'] . '%' : '-' ?></td>
+                    <td>
+                        <?php
+                        $_minP = isset($rule['min_profit_rate']) && $rule['min_profit_rate'] !== null ? $rule['min_profit_rate'] . '%' : null;
+                        $_maxP = isset($rule['max_profit_rate']) && $rule['max_profit_rate'] !== null ? $rule['max_profit_rate'] . '%' : null;
+                        if ($_minP && $_maxP) echo '≥' . $_minP . ' ～ ≤' . $_maxP;
+                        elseif ($_minP) echo '≥' . $_minP;
+                        elseif ($_maxP) echo '≤' . $_maxP;
+                        else echo '-';
+                        ?>
+                    </td>
                     <td>
                         <?php if ($rule['approver_role'] === 'auto_approve'): ?>
                             <span style="color:#e67e22;font-weight:bold">免簽核（自動通過）</span>
@@ -335,7 +348,11 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>最低利潤率 %</label>
-                                    <input type="number" name="min_profit_rate" class="form-control" step="0.1" min="0" max="100" value="<?= $rule['min_profit_rate'] !== null ? $rule['min_profit_rate'] : '' ?>">
+                                    <input type="number" name="min_profit_rate" class="form-control" step="0.1" min="-100" max="100" value="<?= $rule['min_profit_rate'] !== null ? $rule['min_profit_rate'] : '' ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label>最高利潤率 %</label>
+                                    <input type="number" name="max_profit_rate" class="form-control" step="0.1" min="-100" max="100" value="<?= isset($rule['max_profit_rate']) && $rule['max_profit_rate'] !== null ? $rule['max_profit_rate'] : '' ?>">
                                 </div>
                                 <div class="form-group">
                                     <label>簽核人角色</label>

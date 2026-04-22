@@ -325,7 +325,33 @@ switch ($action) {
             $amount = (float)$quote['total_amount'];
             $profitRate = $quote['profit_rate'] ? (float)$quote['profit_rate'] : null;
 
+            // 虧損（profit_rate < 0）必須填寫虧損原因
+            if ($profitRate !== null && $profitRate < 0) {
+                $lossReason = isset($_POST['loss_reason']) ? trim((string)$_POST['loss_reason']) : '';
+                if ($lossReason === '') {
+                    Session::flash('error', '虧損報價單送簽核必須填寫虧損原因');
+                    redirect('/quotations.php?action=view&id=' . $id);
+                    break;
+                }
+                // 寫入 quotations.loss_reason
+                Database::getInstance()->prepare("UPDATE quotations SET loss_reason = ? WHERE id = ?")
+                    ->execute(array($lossReason, $id));
+            }
+
             $result = $approvalModel->submitForApproval('quotations', $id, $amount, $profitRate);
+
+            // 寫入簽核 comment（讓簽核人看到原因）
+            if ($profitRate !== null && $profitRate < 0 && !empty($result) && is_array($result)) {
+                $lossReason = isset($_POST['loss_reason']) ? trim((string)$_POST['loss_reason']) : '';
+                if ($lossReason !== '' && empty($result['auto_approved'])) {
+                    foreach ($result as $flow) {
+                        if (is_array($flow) && !empty($flow['id'])) {
+                            Database::getInstance()->prepare("UPDATE approval_flows SET comment = ? WHERE id = ?")
+                                ->execute(array('虧損原因：' . $lossReason, $flow['id']));
+                        }
+                    }
+                }
+            }
 
             if (isset($result['auto_approved']) && $result['auto_approved']) {
                 // 沒有簽核規則或免簽核，直接核准

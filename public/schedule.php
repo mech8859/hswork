@@ -80,8 +80,24 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/schedule.php'); }
 
-            // 排工條件檢查：無訂金 + 符合簽核規則 才需簽核通過
+            // 虧損報價未簽核擋排工
             $checkCaseId = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+            if ($checkCaseId > 0) {
+                $_lbStmt = Database::getInstance()->prepare("
+                    SELECT quotation_number FROM quotations
+                    WHERE case_id = ? AND profit_rate < 0
+                      AND status IN ('draft','pending_approval','rejected_internal','revision_needed','pending_revision')
+                    LIMIT 1
+                ");
+                $_lbStmt->execute(array($checkCaseId));
+                $_lbRow = $_lbStmt->fetch(PDO::FETCH_ASSOC);
+                if ($_lbRow) {
+                    Session::flash('error', '報價單 ' . $_lbRow['quotation_number'] . ' 為虧損且尚未完成簽核，不可排工');
+                    redirect('/cases.php?action=edit&id=' . $checkCaseId);
+                }
+            }
+
+            // 排工條件檢查：無訂金 + 符合簽核規則 才需簽核通過
             if ($checkCaseId > 0) {
                 $checkDb = Database::getInstance();
                 $checkStmt = $checkDb->prepare("SELECT deposit_amount FROM cases WHERE id = ?");
@@ -358,6 +374,20 @@ switch ($action) {
         Auth::requirePermission('schedule.manage');
         $caseId = (int)($_GET['case_id'] ?? 0);
         if (!$caseId) { Session::flash('error', '請指定案件'); redirect('/cases.php'); }
+
+        // 虧損報價未簽核擋排工
+        $_lbStmt = Database::getInstance()->prepare("
+            SELECT quotation_number FROM quotations
+            WHERE case_id = ? AND profit_rate < 0
+              AND status IN ('draft','pending_approval','rejected_internal','revision_needed','pending_revision')
+            LIMIT 1
+        ");
+        $_lbStmt->execute(array($caseId));
+        $_lbRow = $_lbStmt->fetch(PDO::FETCH_ASSOC);
+        if ($_lbRow) {
+            Session::flash('error', '報價單 ' . $_lbRow['quotation_number'] . ' 為虧損且尚未完成簽核，不可智慧排工');
+            redirect('/cases.php?action=edit&id=' . $caseId);
+        }
 
         require_once __DIR__ . '/../modules/cases/CaseModel.php';
         $caseModel = new CaseModel();

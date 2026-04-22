@@ -24,7 +24,12 @@ foreach ($approvalStatus['flows'] as $af) {
             <?php if ($canEditQuote && $quote['status'] !== 'approved'): ?>
             <a href="/quotations.php?action=edit&id=<?= $quote['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
             <?php if (!empty($quote['case_id'])): ?>
-            <a href="/quotations.php?action=submit_approval&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#2196F3;color:#fff" onclick="return confirm('確定送出簽核？')">送簽核</a>
+                <?php $_isLoss = isset($quote['profit_rate']) && (float)$quote['profit_rate'] < 0; ?>
+                <?php if ($_isLoss): ?>
+                <button type="button" class="btn btn-sm" style="background:#c5221f;color:#fff" onclick="openLossSubmitModal()">⚠ 送簽核（虧損）</button>
+                <?php else: ?>
+                <a href="/quotations.php?action=submit_approval&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#2196F3;color:#fff" onclick="return confirm('確定送出簽核？')">送簽核</a>
+                <?php endif; ?>
             <?php endif; ?>
             <?php endif; ?>
 
@@ -429,3 +434,34 @@ if ($canManage && !empty($quote['case_id'])) {
 .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; padding: 8px 12px; }
 .info-label { display: block; font-size: .75rem; color: var(--gray-500); margin-bottom: 2px; }
 </style>
+
+<!-- 虧損送簽 Modal -->
+<div id="lossSubmitModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+    <div class="card" style="width:460px;margin:0">
+        <div class="card-header" style="background:#c5221f;color:#fff">⚠ 虧損報價單送簽核</div>
+        <form method="POST" action="/quotations.php?action=submit_approval&id=<?= (int)$quote['id'] ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
+            <div style="padding:14px 16px">
+                <div style="font-size:.9rem;color:#666;margin-bottom:8px">
+                    此報價單利潤率為 <strong style="color:#c5221f"><?= number_format((float)($quote['profit_rate'] ?? 0), 1) ?>%</strong>（虧損），送簽前請填寫虧損原因以利主管審核。
+                </div>
+                <label style="font-weight:600;display:block;margin-bottom:4px">虧損原因 <span style="color:#c5221f">*</span></label>
+                <textarea name="loss_reason" class="form-control" rows="4" required placeholder="例：戰略客戶、後續維保可回收、拓展新系統別…"><?= e($quote['loss_reason'] ?? '') ?></textarea>
+            </div>
+            <div style="padding:0 16px 14px;display:flex;gap:8px;justify-content:flex-end">
+                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('lossSubmitModal').style.display='none'">取消</button>
+                <button type="submit" class="btn btn-sm" style="background:#c5221f;color:#fff">確定送簽核</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function openLossSubmitModal() {
+    var m = document.getElementById('lossSubmitModal');
+    if (m) m.style.display = 'flex';
+}
+document.getElementById('lossSubmitModal') && document.getElementById('lossSubmitModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
