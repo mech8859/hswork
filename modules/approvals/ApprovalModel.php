@@ -670,6 +670,22 @@ class ApprovalModel
                     $row['amount'] = 0;
                 }
                 return $row ?: array();
+            case 'overtime':
+                $stmt = $this->db->prepare("SELECT o.*, u.real_name FROM overtimes o LEFT JOIN users u ON o.user_id = u.id WHERE o.id = ?");
+                $stmt->execute(array($targetId));
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $typeLabels = array('weekday'=>'平日延長','rest_day'=>'例假日','holiday'=>'國定假日','other'=>'其他');
+                    $typeLabel = isset($typeLabels[$row['overtime_type']]) ? $typeLabels[$row['overtime_type']] : $row['overtime_type'];
+                    $st = isset($row['start_time']) ? substr($row['start_time'], 0, 5) : '';
+                    $et = isset($row['end_time']) ? substr($row['end_time'], 0, 5) : '';
+                    $hoursStr = !empty($row['hours']) ? ' ' . rtrim(rtrim(number_format((float)$row['hours'], 2), '0'), '.') . 'h' : '';
+                    $row['label'] = '#' . $targetId . ' ' . $row['real_name'] . ' ' . $typeLabel . ' ' . $row['overtime_date']
+                        . ($st ? ' ' . $st . '~' . $et : '') . $hoursStr;
+                    $row['url'] = '/overtimes.php#overtime-' . $targetId;
+                    $row['amount'] = 0;
+                }
+                return $row ?: array();
             default:
                 return array('label' => $module . ' #' . $targetId, 'url' => '#');
         }

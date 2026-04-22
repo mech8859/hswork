@@ -258,7 +258,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                     $engNames = array();
                     foreach ($ds['engineers'] as $eng) $engNames[] = $eng['real_name'];
                 ?>
-                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= isset($ds['display_status']) ? e($ds['display_status']) : e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>" data-case-number="<?= e($ds['case_number'] ?: '') ?>"></div>
+                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= isset($ds['display_status']) ? e($ds['display_status']) : e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>" data-case-number="<?= e($ds['case_number'] ?: '') ?>" data-designated-time="<?= e(!empty($ds['designated_time']) ? substr($ds['designated_time'], 0, 5) : '') ?>"></div>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
@@ -826,6 +826,7 @@ function showSchedulePopup(dateStr) {
         var engineers = it.getAttribute('data-engineers');
         var count = it.getAttribute('data-count');
         var caseNo = it.getAttribute('data-case-number') || '';
+        var designated = it.getAttribute('data-designated-time') || '';
         var color = statusColors[status] || '#3b82f6';
         var label = statusLabels[status] || status;
         html += '<a href="/schedule.php?action=view&id=' + id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
@@ -835,6 +836,7 @@ function showSchedulePopup(dateStr) {
             '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + color + ';color:#fff;font-size:.7rem">' + label + '</span>' +
             (caseNo ? '<span>' + caseNo + '</span>' : '') +
             '<span>' + count + '人</span>' +
+            (designated ? '<span style="color:#d84315;font-weight:600">🕐 ' + designated + '</span>' : '') +
             '</div>' +
             '<div style="font-size:.8rem;color:#666;margin-top:2px">' + engineers + '</div>' +
             '</a>';

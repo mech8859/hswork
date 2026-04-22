@@ -499,6 +499,126 @@ switch ($action) {
         redirect('/quotations.php');
         break;
 
+    case 'create_additional_stock_out':
+        // 追加出庫單：針對前次出庫單之後新增的項目/追加數量建立新出庫單
+        if (!$canManage) { Session::flash('error', '無權限'); redirect('/quotations.php'); }
+        if (verify_csrf()) {
+            $qId = (int)($_GET['id'] ?? 0);
+            $quote = $model->getById($qId);
+            if (!$quote || $quote['status'] !== 'customer_accepted') {
+                Session::flash('error', '報價單不存在或狀態不正確');
+                redirect('/quotations.php');
+            }
+
+            $db = Database::getInstance();
+
+            // 必須已建立過出庫單
+            $existSo = $db->prepare("SELECT id FROM stock_outs WHERE source_type = 'quotation' AND source_id = ? LIMIT 1");
+            $existSo->execute(array($qId));
+            if (!$existSo->fetch(PDO::FETCH_ASSOC)) {
+                Session::flash('error', '尚未建立過出庫單，請使用「建立出庫單」');
+                redirect('/quotations.php?action=view&id=' . $qId);
+            }
+
+            // 累加已出庫數量（依 product_id，排除備品 is_spare=1）
+            $prevStmt = $db->prepare("
+                SELECT soi.product_id, SUM(soi.quantity) AS total_qty
+                FROM stock_out_items soi
+                JOIN stock_outs so ON so.id = soi.stock_out_id
+                WHERE so.source_type = 'quotation' AND so.source_id = ?
+                  AND (soi.is_spare IS NULL OR soi.is_spare = 0)
+                GROUP BY soi.product_id
+            ");
+            $prevStmt->execute(array($qId));
+            $prevQtyMap = array();
+            foreach ($prevStmt->fetchAll(PDO::FETCH_ASSOC) as $pr) {
+                if (!empty($pr['product_id'])) {
+                    $prevQtyMap[(int)$pr['product_id']] = (float)$pr['total_qty'];
+                }
+            }
+
+            // 取得預設倉庫
+            $wh = $db->query("SELECT id FROM warehouses ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            $warehouseId = $wh ? (int)$wh['id'] : 0;
+
+            // 被排除的分類（與 create_stock_out 相同邏輯）
+            $excludedCatIds = array();
+            $_ecAll = $db->query("SELECT id, parent_id, exclude_from_stockout FROM product_categories")->fetchAll(PDO::FETCH_ASSOC);
+            $_ecMap = array();
+            foreach ($_ecAll as $_ec) { $_ecMap[(int)$_ec['id']] = $_ec; }
+            foreach ($_ecMap as $_ecId => $_ec) {
+                $cid = $_ecId;
+                while ($cid) {
+                    if (!empty($_ecMap[$cid]['exclude_from_stockout'])) { $excludedCatIds[$_ecId] = true; break; }
+                    $cid = !empty($_ecMap[$cid]['parent_id']) ? (int)$_ecMap[$cid]['parent_id'] : 0;
+                }
+            }
+
+            // 逐項計算差額，只取正差額
+            $items = array();
+            $totalQty = 0;
+            $skippedCount = 0;
+            if (!empty($quote['sections'])) {
+                foreach ($quote['sections'] as $sec) {
+                    if (empty($sec['items'])) continue;
+                    foreach ($sec['items'] as $item) {
+                        $qty = (float)($item['quantity'] ?? 0);
+                        if ($qty <= 0) continue;
+                        $pid = !empty($item['product_id']) ? (int)$item['product_id'] : null;
+                        if (!$pid) { $skippedCount++; continue; }
+
+                        $catId = $db->prepare("SELECT category_id FROM products WHERE id = ?");
+                        $catId->execute(array($pid));
+                        $pCatId = (int)$catId->fetchColumn();
+                        if ($pCatId && isset($excludedCatIds[$pCatId])) { $skippedCount++; continue; }
+
+                        $prevQty = isset($prevQtyMap[$pid]) ? $prevQtyMap[$pid] : 0;
+                        $diff = $qty - $prevQty;
+                        if ($diff <= 0) continue; // 減少或相等 → 忽略（餘料由退庫處理）
+
+                        $items[] = array(
+                            'product_id' => $pid,
+                            'product_name' => $item['item_name'] ?? '',
+                            'model' => $item['model_number'] ?? '',
+                            'unit' => $item['unit'] ?? '式',
+                            'quantity' => $diff,
+                            'unit_price' => (float)($item['unit_price'] ?? 0),
+                            'note' => $item['remark'] ?? '',
+                        );
+                        $totalQty += $diff;
+                    }
+                }
+            }
+
+            if (empty($items)) {
+                Session::flash('error', '無可追加項目（現有數量未超過已出庫數量）');
+                redirect('/quotations.php?action=view&id=' . $qId);
+            }
+
+            require_once __DIR__ . '/../modules/inventory/StockModel.php';
+            $stockModel = new StockModel();
+            $soId = $stockModel->createStockOut(array(
+                'so_date' => date('Y-m-d'),
+                'status' => '待確認',
+                'source_type' => 'quotation',
+                'source_id' => $qId,
+                'source_number' => $quote['quotation_number'],
+                'warehouse_id' => $warehouseId,
+                'customer_name' => $quote['customer_name'] ?? null,
+                'customer_id' => $quote['customer_id'] ?? null,
+                'note' => '報價單 ' . $quote['quotation_number'] . ' 追加出庫，' . date('Y-m-d') . '建立',
+                'total_qty' => $totalQty,
+                'created_by' => Auth::id(),
+                'items' => $items,
+            ));
+
+            AuditLog::log('stock_outs', 'create', $soId, '從報價單 ' . $quote['quotation_number'] . ' 建立追加出庫單');
+            Session::flash('success', '追加出庫單已建立');
+            redirect('/stock_outs.php?action=view&id=' . $soId);
+        }
+        redirect('/quotations.php');
+        break;
+
     case 'duplicate':
         if (!$canManage) { Session::flash('error', '無權限'); redirect('/quotations.php'); }
         if (verify_csrf()) {

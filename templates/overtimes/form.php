@@ -57,9 +57,9 @@
                    value="<?= e($isEdit ? substr($record['end_time'], 0, 5) : '20:00') ?>" oninput="calcOtHours()">
         </div>
         <div class="form-group">
-            <label>加班時數 <small style="color:#888">(自動計算，可手改)</small></label>
+            <label>加班時數 <small style="color:#888">(自動計算)</small></label>
             <input type="number" step="0.25" min="0" name="hours" id="otHours" class="form-control"
-                   value="<?= e($isEdit ? $record['hours'] : '2.00') ?>">
+                   value="<?= e($isEdit ? $record['hours'] : '2.00') ?>" readonly>
         </div>
     </div>
 

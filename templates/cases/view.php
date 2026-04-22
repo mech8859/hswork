@@ -18,7 +18,7 @@
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
-        <?php if (Auth::hasPermission('schedule.manage') && in_array($case['status'], ['pending','ready','scheduled','in_progress','tracking','incomplete'])): ?>
+        <?php if (Auth::hasPermission('schedule.manage') && in_array($case['status'], ['ready','scheduled','in_progress','incomplete'])): ?>
         <a href="/schedule.php?action=create&case_id=<?= $case['id'] ?>" class="btn btn-sm" style="background:#FF9800;color:#fff">手動排工</a>
         <?php if (!empty($warnings)): ?>
         <button type="button" class="btn btn-success btn-sm" onclick="alert('排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?>\n\n請先補齊資料再使用智慧排工。')">智慧排工</button>

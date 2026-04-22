@@ -47,6 +47,7 @@ foreach ($approvalStatus['flows'] as $af) {
             <?php if (!empty($relatedStockOuts)): ?>
                 <?php $_latestSo = $relatedStockOuts[0]; ?>
                 <a href="/stock_outs.php?action=view&id=<?= $_latestSo['id'] ?>" class="btn btn-sm" style="background:var(--success);color:#fff" title="點選前往出庫單 <?= e($_latestSo['so_number']) ?>">✓ 出庫單已建立</a>
+                <a href="/quotations.php?action=create_additional_stock_out&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('將比對本報價單目前項目與已出庫數量，針對新增/追加的部分建立新的出庫單。確定？')">追加出庫單</a>
                 <?php if (!empty($_GET['show_force_stock_out'])): ?>
                 <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&force=1&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="return confirm('已有出庫單，確定要再次建立？')">確認再次建立出庫單</a>
                 <?php endif; ?>

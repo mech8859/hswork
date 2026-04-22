@@ -211,6 +211,20 @@ $subStatusOptions = CaseModel::subStatusOptions();
                 <?= e($row['customer_name'] ?: $row['title'] ?: '') ?>
                 <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.6em">黑名單</span><?php endif; ?>
                 <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.6em">未成交</span><?php endif; ?>
+                <?php
+                $showReadinessCheck = in_array($row['sub_status'] ?? '', array('電話報價成交','已成交','跨月成交','現簽'));
+                if ($showReadinessCheck):
+                    $rowReadiness = array(
+                        'has_quotation'        => $row['has_quotation'] ?? 0,
+                        'has_site_photos'      => $row['has_site_photos'] ?? 0,
+                        'has_amount_confirmed' => $row['has_amount_confirmed'] ?? 0,
+                        'has_site_info'        => $row['has_site_info'] ?? 0,
+                        'no_photo_allowed'     => $row['no_photo_allowed'] ?? 0,
+                    );
+                    $rowWarnings = function_exists('get_readiness_warnings') ? get_readiness_warnings($rowReadiness, $row['case_type'] ?: 'new_install') : array();
+                    if (!empty($rowWarnings)): ?>
+                <span class="badge" style="background:#e65100;color:#fff;font-size:.6em" title="<?= e(implode('、', $rowWarnings)) ?>">資料不齊</span>
+                <?php endif; endif; ?>
             </div>
             <div class="case-card-meta">
                 <span><?= e($row['branch_name'] ?: '') ?></span>
@@ -248,6 +262,20 @@ $subStatusOptions = CaseModel::subStatusOptions();
                         <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['customer_name'] ?: $row['title'] ?: '') ?></a>
                         <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.65em">黑名單</span><?php endif; ?>
                         <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.65em">未成交</span><?php endif; ?>
+                        <?php
+                        $showReadinessCheck = in_array($row['sub_status'] ?? '', array('電話報價成交','已成交','跨月成交','現簽'));
+                        if ($showReadinessCheck):
+                            $rowReadiness = array(
+                                'has_quotation'        => $row['has_quotation'] ?? 0,
+                                'has_site_photos'      => $row['has_site_photos'] ?? 0,
+                                'has_amount_confirmed' => $row['has_amount_confirmed'] ?? 0,
+                                'has_site_info'        => $row['has_site_info'] ?? 0,
+                                'no_photo_allowed'     => $row['no_photo_allowed'] ?? 0,
+                            );
+                            $rowWarnings = function_exists('get_readiness_warnings') ? get_readiness_warnings($rowReadiness, $row['case_type'] ?: 'new_install') : array();
+                            if (!empty($rowWarnings)): ?>
+                        <span class="badge" style="background:#e65100;color:#fff;font-size:.65em" title="<?= e(implode('、', $rowWarnings)) ?>">資料不齊</span>
+                        <?php endif; endif; ?>
                         <?php if (!empty($row['sales_note'])): ?>
                         <div style="font-size:.7rem;color:#aaa;margin-top:2px;line-height:1.3;white-space:pre-wrap"><?= e($row['sales_note']) ?></div>
                         <?php endif; ?>

@@ -98,10 +98,21 @@ class CaseModel
         $totalDeal = (float)$countRow[2];
 
         $offset = ($page - 1) * $perPage;
+        // 排工條件改以現況即時推算（避免 case_readiness 表不同步）
         $stmt = $this->db->prepare("
             SELECT c.*, b.name AS branch_name,
                    u.real_name AS sales_name,
-                   cr.has_quotation, cr.has_site_photos, cr.has_amount_confirmed, cr.has_site_info,
+                   EXISTS(SELECT 1 FROM case_attachments ca WHERE ca.case_id = c.id AND ca.file_type = 'quotation') AS has_quotation,
+                   EXISTS(SELECT 1 FROM case_attachments ca WHERE ca.case_id = c.id AND ca.file_type = 'site_photo') AS has_site_photos,
+                   CASE WHEN c.deal_amount > 0 THEN 1 ELSE 0 END AS has_amount_confirmed,
+                   EXISTS(
+                       SELECT 1 FROM case_site_conditions csc
+                       WHERE csc.case_id = c.id
+                         AND ((csc.structure_type IS NOT NULL AND csc.structure_type <> '')
+                              OR (csc.conduit_type IS NOT NULL AND csc.conduit_type <> '')
+                              OR (csc.floor_count IS NOT NULL AND csc.floor_count > 0))
+                   ) AS has_site_info,
+                   cr.no_photo_allowed,
                    cust.is_blacklisted, cust.blacklist_reason,
                    EXISTS(SELECT 1 FROM cases c2 WHERE c2.customer_id = c.customer_id AND ( c2.sub_status IN ('已成交','跨月成交','現簽','電話報價成交') OR c2.case_type IN ('old_repair','addition') )) as customer_has_deal
             FROM cases c
