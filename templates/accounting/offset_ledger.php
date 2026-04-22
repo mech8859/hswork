@@ -128,6 +128,7 @@ foreach ($offsetRecords as $r) {
                 <th>科目</th>
                 <th>成本中心</th>
                 <th>往來類型</th>
+                <th>往來編號</th>
                 <th>往來對象</th>
                 <th>借/貸</th>
                 <th style="text-align:right">原始金額</th>
@@ -139,7 +140,7 @@ foreach ($offsetRecords as $r) {
         </thead>
         <tbody>
             <?php if (empty($offsetRecords)): ?>
-            <tr><td colspan="13" style="text-align:center;padding:20px;color:#999">無符合的立帳記錄</td></tr>
+            <tr><td colspan="14" style="text-align:center;padding:20px;color:#999">無符合的立帳記錄</td></tr>
             <?php endif; ?>
             <?php
             $relTypeLabels = array('customer' => '客戶', 'vendor' => '廠商', 'other' => '其他');
@@ -154,6 +155,7 @@ foreach ($offsetRecords as $r) {
                 <td><?= e($r['account_code']) ?> <?= e($r['account_name']) ?></td>
                 <td><?= e($r['cost_center_name'] ?? '') ?></td>
                 <td><?= isset($relTypeLabels[$r['relation_type']]) ? $relTypeLabels[$r['relation_type']] : e($r['relation_type']) ?></td>
+                <td><?= e(!empty($r['relation_display_code']) ? $r['relation_display_code'] : ($r['relation_id'] ?? '')) ?></td>
                 <td><?= e($r['relation_name'] ?? '') ?></td>
                 <td><?= $r['direction'] === 'debit' ? '借' : '貸' ?></td>
                 <td style="text-align:right"><?= number_format((float)$r['original_amount']) ?></td>
@@ -168,7 +170,7 @@ foreach ($offsetRecords as $r) {
             </tr>
             <?php if (!empty($offsetDetails[$r['id']])): ?>
             <tr id="detail-<?= $r['id'] ?>" style="display:none">
-                <td colspan="13" style="padding:0 16px 8px 40px;background:#fafafa">
+                <td colspan="14" style="padding:0 16px 8px 40px;background:#fafafa">
                     <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:4px">
                         <thead><tr style="color:#666"><th style="padding:4px 8px">沖帳日期</th><th style="padding:4px 8px">沖帳傳票</th><th style="padding:4px 8px;text-align:right">沖帳金額</th></tr></thead>
                         <tbody>

@@ -1224,6 +1224,7 @@ function distributeOffsetAmounts(entryAmount, ledgers) {
                 ledger_id: ledgers[i].id,
                 remaining_amount: parseInt(ledgers[i].remaining_amount),
                 voucher_number: ledgers[i].voucher_number || '',
+                description: ledgers[i].original_description || '',
                 allocated: alloc
             });
             remaining -= alloc;
@@ -1311,11 +1312,13 @@ function confirmMultiOffset() {
     amtInput.removeAttribute('data-over');
     if (unoffsetSpan) unoffsetSpan.textContent = first.remaining_amount.toLocaleString();
 
-    // 第一筆也設定摘要：沖 原傳票號 往來對象
+    // 第一筆也設定摘要：沖 原傳票號 往來對象 | 原立帳摘要
     var descInput = tr.querySelector('input[name="lines[' + idx + '][description]"]');
     if (descInput) {
         var relNameVal = relName || '';
-        descInput.value = '沖 ' + first.voucher_number + (relNameVal ? ' ' + relNameVal : '');
+        var desc = '沖 ' + first.voucher_number + (relNameVal ? ' ' + relNameVal : '');
+        if (first.description) desc += ' | ' + first.description;
+        descInput.value = desc;
     }
 
     // 標記已設定
@@ -1334,7 +1337,7 @@ function confirmMultiOffset() {
             credit_amount: isDebit ? 0 : d.allocated,
             offset_flag: 2,
             offset_amount: d.allocated,
-            description: '沖 ' + d.voucher_number + (relName ? ' ' + relName : '')
+            description: '沖 ' + d.voucher_number + (relName ? ' ' + relName : '') + (d.description ? ' | ' + d.description : '')
         };
         addLine(lineData);
 

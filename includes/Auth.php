@@ -595,8 +595,8 @@ class Auth
         $user = Session::getUser();
         if (!$user) return [];
 
-        // boss/manager 或勾選全區 → 全部分公司
-        if ($user['can_view_all_branches'] || in_array($user['role'], array('boss', 'vice_president', 'manager'))) {
+        // boss/manager/會計（屬管理處但管所有分公司帳）或勾選全區 → 全部分公司
+        if ($user['can_view_all_branches'] || in_array($user['role'], array('boss', 'vice_president', 'manager', 'accountant', 'accounting_supervisor'))) {
             $db = Database::getInstance();
             $stmt = $db->query('SELECT id FROM branches WHERE is_active = 1');
             return array_column($stmt->fetchAll(), 'id');

@@ -201,9 +201,14 @@ if ($isLocked) {
         <div class="card-header d-flex justify-between align-center">
             <span>分公司拆帳</span>
             <div class="d-flex gap-1 align-center">
+                <span id="branchMismatchWarn" style="display:none;color:#c62828;font-size:.85rem;margin-right:8px;font-weight:600"></span>
                 <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">合計：<strong id="branchSumDisplay" style="color:var(--primary);font-size:1rem">$0</strong></span>
                 <button type="button" class="btn btn-primary btn-sm" onclick="addBranchRow()">+ 新增</button>
             </div>
+        </div>
+        <div id="branchSubtotalSummary" style="padding:8px 16px;background:#f0f7ff;border-bottom:1px solid var(--gray-200);font-size:.85rem;color:#555;display:none">
+            <strong style="color:#1565c0">各分公司小計：</strong>
+            <span id="branchSubtotalContent"></span>
         </div>
         <div class="table-responsive">
             <table class="table" id="branchTable">
@@ -259,6 +264,7 @@ if ($isLocked) {
             <div class="d-flex gap-1 align-center">
                 <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">未稅合計：<strong id="pdSumDisplay" style="color:var(--primary);font-size:1rem">$0</strong></span>
                 <span style="font-size:.9rem;color:var(--gray-600);margin-right:8px">進貨淨額：<strong id="pdNetDisplay" style="color:#2e7d32;font-size:1rem">$0</strong></span>
+                <span id="pdMismatchWarn" style="display:none;color:#c62828;font-size:.85rem;margin-right:8px;font-weight:600"></span>
                 <button type="button" class="btn btn-outline btn-sm" onclick="openGrPickerModal()" title="依本單廠商搜尋進貨單，可多選後帶入">📋 從進貨單帶入</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="addPurchaseDetailRow()">+ 新增</button>
             </div>
@@ -581,18 +587,74 @@ function addBranchRow() {
     recalcBranchSum();
 }
 
-// ---- 分公司拆帳合計 ----
+// ---- 分公司拆帳合計 + 各分公司小計 + 與未稅合計比對 ----
 function recalcBranchSum() {
     var sum = 0;
-    document.querySelectorAll('#branchBody input[name^="branches"][name$="[amount]"]').forEach(function(el) {
-        sum += parseInt(String(el.value || '').replace(/,/g, '')) || 0;
+    var branchMap = {};
+    document.querySelectorAll('#branchBody tr').forEach(function(row) {
+        var amtEl = row.querySelector('input[name^="branches"][name$="[amount]"]');
+        var selEl = row.querySelector('select[name^="branches"][name$="[branch_id]"]');
+        if (!amtEl) return;
+        var amt = parseInt(String(amtEl.value || '').replace(/,/g, '')) || 0;
+        var brName = '';
+        if (selEl && selEl.selectedIndex > 0) {
+            brName = selEl.options[selEl.selectedIndex].text || '';
+        }
+        if (!brName) brName = '(未指定)';
+        sum += amt;
+        if (!branchMap[brName]) branchMap[brName] = 0;
+        branchMap[brName] += amt;
     });
     var disp = document.getElementById('branchSumDisplay');
     if (disp) disp.textContent = '$' + sum.toLocaleString();
+
+    // 各分公司小計
+    var summary = document.getElementById('branchSubtotalSummary');
+    var content = document.getElementById('branchSubtotalContent');
+    if (summary && content) {
+        var keys = Object.keys(branchMap);
+        if (keys.length === 0 || (keys.length === 1 && keys[0] === '(未指定)' && branchMap[keys[0]] === 0)) {
+            summary.style.display = 'none';
+        } else {
+            summary.style.display = '';
+            keys.sort(function(a,b){ return branchMap[b] - branchMap[a]; });
+            var html = '';
+            for (var i = 0; i < keys.length; i++) {
+                if (i > 0) html += '　|　';
+                html += '<span style="margin:0 4px">' + escapeHtmlPd(keys[i]) + '</span>';
+                html += '<strong style="color:#1565c0">$' + branchMap[keys[i]].toLocaleString() + '</strong>';
+            }
+            content.innerHTML = html;
+        }
+    }
+
+    // 與未稅合計比對
+    var sub = _num('fldSubtotal');
+    var warn = document.getElementById('branchMismatchWarn');
+    if (warn) {
+        if (sub > 0 && sum !== sub) {
+            warn.style.display = '';
+            warn.textContent = '⚠ 與未稅合計差 $' + (sub - sum).toLocaleString();
+            if (disp) disp.style.color = '#c62828';
+        } else {
+            warn.style.display = 'none';
+            warn.textContent = '';
+            if (disp) disp.style.color = '';
+        }
+    }
 }
 document.addEventListener('DOMContentLoaded', recalcBranchSum);
 document.addEventListener('input', function(e) {
     if (e.target && e.target.name && /^branches\[\d+\]\[amount\]$/.test(e.target.name)) {
+        recalcBranchSum();
+    }
+    // 未稅總額 / 稅金 變動時也要重算比對
+    if (e.target && (e.target.id === 'fldSubtotal' || e.target.id === 'fldTax')) {
+        recalcBranchSum();
+    }
+});
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.name && /^branches\[\d+\]\[branch_id\]$/.test(e.target.name)) {
         recalcBranchSum();
     }
 });
@@ -909,11 +971,29 @@ function recalcPdNet() {
     var net = pdSum - rdSum;
     var netDisp = document.getElementById('pdNetDisplay');
     if (netDisp) netDisp.textContent = '$' + net.toLocaleString();
+
+    // 與未稅合計比對
+    var sub = _num('fldSubtotal');
+    var warn = document.getElementById('pdMismatchWarn');
+    if (warn) {
+        if (sub > 0 && net !== sub) {
+            warn.style.display = '';
+            warn.textContent = '⚠ 與未稅合計差 $' + (sub - net).toLocaleString();
+            if (netDisp) netDisp.style.color = '#c62828';
+        } else {
+            warn.style.display = 'none';
+            warn.textContent = '';
+            if (netDisp) netDisp.style.color = '#2e7d32';
+        }
+    }
 }
 document.addEventListener('DOMContentLoaded', recalcPdSum);
 // 用事件委派監聽變動 + 刪除
 document.addEventListener('input', function(e) {
     if (e.target && e.target.name && /^pd\[\d+\]\[(amount_untaxed|branch_name)\]$/.test(e.target.name)) {
+        recalcPdSum();
+    }
+    if (e.target && e.target.id === 'fldSubtotal') {
         recalcPdSum();
     }
 });

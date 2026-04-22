@@ -245,6 +245,7 @@ switch ($action) {
             'date_to'      => isset($_GET['date_to']) ? $_GET['date_to'] : '',
             'keyword'      => isset($_GET['keyword']) ? $_GET['keyword'] : '',
             'created_by'   => isset($_GET['created_by']) ? $_GET['created_by'] : '',
+            'amount'       => isset($_GET['amount']) ? $_GET['amount'] : '',
             'sort'         => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
         );
         $perPage = 100;
@@ -1259,10 +1260,12 @@ switch ($action) {
         }
 
         $stmt = Database::getInstance()->prepare("
-            SELECT ol.*, coa.account_code, coa.account_name, cc.name as cost_center_name
+            SELECT ol.*, coa.account_code, coa.account_name, cc.name as cost_center_name,
+                   orig.description AS original_description
             FROM offset_ledger ol
             LEFT JOIN chart_of_accounts coa ON ol.account_id = coa.id
             LEFT JOIN cost_centers cc ON ol.cost_center_id = cc.id
+            LEFT JOIN journal_entry_lines orig ON orig.id = ol.journal_line_id
             WHERE {$where}
             ORDER BY ol.id ASC
         ");

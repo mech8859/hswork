@@ -307,6 +307,18 @@ class AccountingModel
         }
         if (!empty($filters['keyword'])) {
             // 搜傳票號 / 描述 / 分錄摘要 / 會計科目代碼或名稱
+            // 若關鍵字為金額（含 $、逗號、純數字）→ 同時比對借/貸金額
+            $kwRaw = (string)$filters['keyword'];
+            $kwAmt = null;
+            $stripped = str_replace(array('$', ',', ' '), '', $kwRaw);
+            if ($stripped !== '' && is_numeric($stripped)) {
+                $kwAmt = (float)$stripped;
+            }
+            $amountClause = '';
+            if ($kwAmt !== null && $kwAmt > 0) {
+                $amountClause = ' OR je.total_debit = ? OR je.total_credit = ?'
+                              . ' OR EXISTS(SELECT 1 FROM journal_entry_lines jl2 WHERE jl2.journal_entry_id = je.id AND (jl2.debit_amount = ? OR jl2.credit_amount = ?))';
+            }
             $where .= ' AND (
                 je.voucher_number LIKE ?
                 OR je.description LIKE ?
@@ -315,14 +327,20 @@ class AccountingModel
                     LEFT JOIN chart_of_accounts coa ON jl.account_id = coa.id
                     WHERE jl.journal_entry_id = je.id
                       AND (jl.description LIKE ? OR coa.code LIKE ? OR coa.name LIKE ?)
-                )
+                )' . $amountClause . '
             )';
-            $kw = '%' . $filters['keyword'] . '%';
+            $kw = '%' . $kwRaw . '%';
             $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
             $params[] = $kw;
+            if ($kwAmt !== null && $kwAmt > 0) {
+                $params[] = $kwAmt;
+                $params[] = $kwAmt;
+                $params[] = $kwAmt;
+                $params[] = $kwAmt;
+            }
         }
         if (!empty($filters['source_module'])) {
             $where .= ' AND je.source_module = ?';
@@ -331,6 +349,25 @@ class AccountingModel
         if (!empty($filters['created_by'])) {
             $where .= ' AND je.created_by = ?';
             $params[] = (int)$filters['created_by'];
+        }
+        if (!empty($filters['amount'])) {
+            // 搜尋金額：比對借方合計/貸方合計，或任一分錄行的借/貸金額
+            $amt = (float)str_replace(array(',', '$'), '', $filters['amount']);
+            if ($amt > 0) {
+                $where .= ' AND (
+                    je.total_debit = ?
+                    OR je.total_credit = ?
+                    OR EXISTS(
+                        SELECT 1 FROM journal_entry_lines jl
+                        WHERE jl.journal_entry_id = je.id
+                          AND (jl.debit_amount = ? OR jl.credit_amount = ?)
+                    )
+                )';
+                $params[] = $amt;
+                $params[] = $amt;
+                $params[] = $amt;
+                $params[] = $amt;
+            }
         }
         return array($where, $params);
     }
@@ -526,6 +563,41 @@ class AccountingModel
      * @param array $data
      * @throws Exception
      */
+    /**
+     * 為指定日期產生傳票號碼，優先遞補空缺號碼
+     * @param string $date  YYYY-MM-DD
+     * @param int|null $excludeId 排除此 id（更新時避免與自己碰撞）
+     */
+    private function generateJournalVoucherNumberForDate($date, $excludeId = null)
+    {
+        $seqStmt = $this->db->prepare("SELECT prefix, date_format, `separator`, seq_digits FROM number_sequences WHERE module = ?");
+        $seqStmt->execute(array('journal_entries'));
+        $seq = $seqStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$seq) {
+            $seq = array('prefix' => 'JV', 'date_format' => 'Ymd', 'separator' => '-', 'seq_digits' => 3);
+        }
+        $sep = $seq['separator'];
+        $digits = (int)$seq['seq_digits'];
+        $datePart = !empty($seq['date_format']) ? date($seq['date_format'], strtotime($date)) : '';
+        $prefixFull = ($seq['prefix'] !== '' ? $seq['prefix'] . $sep : '') . ($datePart !== '' ? $datePart . $sep : '');
+
+        $sql = "SELECT voucher_number FROM journal_entries WHERE voucher_number LIKE ?";
+        $params = array($prefixFull . '%');
+        if ($excludeId) { $sql .= " AND id != ?"; $params[] = (int)$excludeId; }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $used = array();
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $vn) {
+            $parts = explode($sep, $vn);
+            $n = (int)end($parts);
+            if ($n > 0) $used[$n] = true;
+        }
+        $n = 1;
+        while (isset($used[$n])) $n++;
+        return $prefixFull . str_pad($n, $digits, '0', STR_PAD_LEFT);
+    }
+
     public function updateJournalEntry($id, $data)
     {
         $entry = $this->getJournalEntryById($id);
@@ -549,10 +621,20 @@ class AccountingModel
 
         $this->db->beginTransaction();
         try {
+            // 若日期改變 → 重新產生傳票號碼（優先填補該日期的空缺號），並同步更新相關表
+            $oldDate = $entry['voucher_date'];
+            $newDate = $data['voucher_date'];
+            $oldVoucher = $entry['voucher_number'];
+            $newVoucher = $oldVoucher;
+            if ($oldDate !== $newDate) {
+                $newVoucher = $this->generateJournalVoucherNumberForDate($newDate, $id);
+            }
+
             $stmt = $this->db->prepare(
-                "UPDATE journal_entries SET voucher_date = ?, voucher_type = ?, description = ?, total_debit = ?, total_credit = ?, attachment = ?, updated_by = ?, updated_at = NOW() WHERE id = ?"
+                "UPDATE journal_entries SET voucher_number = ?, voucher_date = ?, voucher_type = ?, description = ?, total_debit = ?, total_credit = ?, attachment = ?, updated_by = ?, updated_at = NOW() WHERE id = ?"
             );
             $stmt->execute(array(
+                $newVoucher,
                 $data['voucher_date'],
                 isset($data['voucher_type']) ? $data['voucher_type'] : 'general',
                 isset($data['description']) ? $data['description'] : '',
@@ -562,6 +644,20 @@ class AccountingModel
                 $data['updated_by'],
                 $id,
             ));
+
+            // 傳票號碼變更 → 同步更新立沖帳、沖帳明細、以及其他行參照此號碼的摘要
+            if ($newVoucher !== $oldVoucher) {
+                $this->db->prepare("UPDATE offset_ledger SET voucher_number = ?, voucher_date = ? WHERE journal_entry_id = ?")
+                         ->execute(array($newVoucher, $newDate, $id));
+                $this->db->prepare("UPDATE offset_details SET voucher_number = ?, voucher_date = ? WHERE journal_entry_id = ?")
+                         ->execute(array($newVoucher, $newDate, $id));
+                // 更新其他行描述：凡是「沖 {舊號}」開頭的，換成「沖 {新號}」
+                $pattern = '沖 ' . $oldVoucher;
+                $replace = '沖 ' . $newVoucher;
+                $this->db->prepare(
+                    "UPDATE journal_entry_lines SET description = REPLACE(description, ?, ?) WHERE description LIKE ?"
+                )->execute(array($pattern, $replace, $pattern . '%'));
+            }
 
             // Delete old lines and re-insert
             $this->db->prepare("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?")->execute(array($id));

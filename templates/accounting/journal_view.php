@@ -178,12 +178,16 @@ $statusColor = isset($statusColors[$entry['status']]) ? $statusColors[$entry['st
                 <td style="text-align:right"><?= $offsetAmt > 0 ? number_format($offsetAmt) : '' ?></td>
                 <td style="font-size:0.9em;color:#666"><?php
                     if ((int)$line['offset_flag'] === 2 && !empty($line['offset_voucher_number'])) {
-                        // 沖帳摘要：顯示原立帳傳票號+往來對象
-                        $desc = '沖 ' . $line['offset_voucher_number'];
-                        if (!empty($line['offset_relation_name'])) {
-                            $desc .= ' ' . $line['offset_relation_name'];
+                        // 沖帳摘要：優先顯示儲存的描述（含原立帳摘要），否則組「沖 原傳票號 往來對象」
+                        if (!empty($line['description'])) {
+                            echo e($line['description']);
+                        } else {
+                            $desc = '沖 ' . $line['offset_voucher_number'];
+                            if (!empty($line['offset_relation_name'])) {
+                                $desc .= ' ' . $line['offset_relation_name'];
+                            }
+                            echo e($desc);
                         }
-                        echo e($desc);
                     } else {
                         echo e($line['description']);
                     }

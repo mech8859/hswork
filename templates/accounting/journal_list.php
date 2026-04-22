@@ -29,7 +29,7 @@
 <div class="card" style="margin-bottom:16px;padding:12px">
     <form method="get" action="/accounting.php" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input type="hidden" name="action" value="journals">
-        <input type="text" name="keyword" value="<?= e($filters['keyword']) ?>" placeholder="搜尋傳票號/備註" class="form-control" style="width:180px">
+        <input type="text" name="keyword" value="<?= e($filters['keyword']) ?>" placeholder="搜尋傳票號/備註/金額" class="form-control" style="width:180px" title="可輸入傳票號、備註、科目代碼/名稱、金額（如 $14715）">
         <select name="status" class="form-control" style="width:120px">
             <option value="">全部狀態</option>
             <?php foreach ($statusOptions as $k => $v): ?>
@@ -48,6 +48,7 @@
             <option value="<?= (int)$c['id'] ?>" <?= (string)$filters['created_by'] === (string)$c['id'] ? 'selected' : '' ?>><?= e($c['real_name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <input type="number" name="amount" value="<?= e($filters['amount'] ?? '') ?>" placeholder="$ 金額" class="form-control" style="width:110px" step="1" min="0" title="依金額搜尋（借/貸方合計或單行金額）">
         <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:140px">
         <span>~</span>
         <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:140px">
