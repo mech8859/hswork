@@ -10,6 +10,7 @@ $nextMonth = $month + 1; $nextYear = $year;
 if ($nextMonth > 12) { $nextMonth = 1; $nextYear++; }
 
 $filterDate = isset($_GET['date']) ? $_GET['date'] : '';
+$currentKeyword = isset($filterKeyword) ? $filterKeyword : '';
 $weekdayLabels = array('日','一','二','三','四','五','六');
 $firstDay = mktime(0, 0, 0, $month, 1, $year);
 $daysInMonth = (int)date('t', $firstDay);
@@ -29,11 +30,12 @@ ksort($listDates);
 
 // URL helper 保留篩選
 function _scMobileUrl($extra = array()) {
-    global $year, $month, $filterBranchId, $filterUserId, $filterDate;
+    global $year, $month, $filterBranchId, $filterUserId, $filterDate, $currentKeyword;
     $params = array('year' => $year, 'month' => $month);
     if ($filterBranchId) $params['branch_id'] = $filterBranchId;
     if ($filterUserId) $params['user_id'] = $filterUserId;
     if ($filterDate) $params['date'] = $filterDate;
+    if ($currentKeyword !== '') $params['keyword'] = $currentKeyword;
     foreach ($extra as $k => $v) {
         if ($v === null) unset($params[$k]);
         else $params[$k] = $v;
@@ -52,8 +54,14 @@ function _scMobileUrl($extra = array()) {
 .scm-tabs { display:flex; background:#f1f3f5; border-radius:8px; padding:3px; margin-bottom:10px; }
 .scm-tab { flex:1; text-align:center; padding:8px 0; font-size:.9rem; border-radius:6px; color:#666; text-decoration:none; font-weight:500; }
 .scm-tab.active { background:#fff; color:#1565c0; box-shadow:0 1px 3px rgba(0,0,0,.1); font-weight:600; }
-.scm-filters { display:flex; gap:6px; margin-bottom:10px; }
+.scm-filters { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
 .scm-filters select { flex:1; min-width:0; font-size:.85rem; padding:8px 8px; }
+.scm-keyword-wrap { display:flex; gap:4px; flex:1 1 100%; }
+.scm-keyword-wrap input { flex:1; min-width:0; font-size:.85rem; padding:8px; border:1px solid #ccc; border-radius:6px; }
+.scm-keyword-wrap button { padding:8px 14px; background:#1565c0; color:#fff; border:none; border-radius:6px; font-size:.85rem; cursor:pointer; }
+.scm-keyword-wrap button:active { opacity:.85; }
+.scm-kw-badge { display:inline-block; font-size:.75rem; background:#e3f2fd; color:#1565c0; padding:3px 10px; border-radius:12px; margin-bottom:8px; }
+.scm-kw-badge a { color:#c62828; margin-left:6px; text-decoration:none; font-weight:600; }
 .scm-month-nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:4px; }
 .scm-month-nav a { flex:1; padding:10px 8px; background:#fff; border:1px solid #ddd; border-radius:6px; text-align:center; text-decoration:none; color:#333; font-size:.9rem; }
 .scm-month-nav a.current { font-weight:700; flex:1.5; background:#e3f2fd; border-color:#1565c0; color:#1565c0; }
@@ -135,7 +143,7 @@ function _scMobileUrl($extra = array()) {
         <a href="<?= _scMobileUrl(array('mode' => 'grid', 'date' => null)) ?>" class="scm-tab <?= $defaultMode === 'grid' ? 'active' : '' ?>">📅 月曆</a>
     </div>
 
-    <!-- 篩選：分公司 + 人員 -->
+    <!-- 篩選：分公司 + 人員 + 關鍵字 -->
     <?php if ($canManage): ?>
     <div class="scm-filters">
         <?php if (count($branchList) > 1): ?>
@@ -152,7 +160,15 @@ function _scMobileUrl($extra = array()) {
             <option value="<?= $eng['id'] ?>" <?= $filterUserId == $eng['id'] ? 'selected' : '' ?>><?= e($eng['real_name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <div class="scm-keyword-wrap">
+            <input type="text" id="scmKeyword" placeholder="搜尋客戶/案件/地址"
+                   value="<?= e($currentKeyword) ?>" onkeydown="if(event.key==='Enter')scmApplyKeyword()">
+            <button type="button" onclick="scmApplyKeyword()">搜尋</button>
+        </div>
     </div>
+    <?php if ($currentKeyword !== ''): ?>
+    <span class="scm-kw-badge">🔍 <?= e($currentKeyword) ?> <a href="javascript:void(0)" onclick="scmClearKeyword()">✕</a></span>
+    <?php endif; ?>
     <?php endif; ?>
 
     <!-- 月份切換 -->
@@ -327,6 +343,21 @@ function scmChangeFilter(key, value) {
     if (value && value !== '0') url.searchParams.set(key, value);
     else url.searchParams.delete(key);
     url.searchParams.delete('date'); // 切篩選清掉單日
+    window.location.href = url.toString();
+}
+
+function scmApplyKeyword() {
+    var kw = (document.getElementById('scmKeyword').value || '').trim();
+    var url = new URL(window.location.href);
+    if (kw !== '') url.searchParams.set('keyword', kw);
+    else url.searchParams.delete('keyword');
+    url.searchParams.delete('date'); // 搜尋時清掉單日篩選
+    window.location.href = url.toString();
+}
+
+function scmClearKeyword() {
+    var url = new URL(window.location.href);
+    url.searchParams.delete('keyword');
     window.location.href = url.toString();
 }
 

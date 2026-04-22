@@ -20,14 +20,22 @@ class ScheduleModel
     /**
      * 取得日期範圍內的排工 (行事曆用)
      */
-    public function getByDateRange(array $branchIds, string $startDate, string $endDate): array
+    public function getByDateRange(array $branchIds, string $startDate, string $endDate, $keyword = ''): array
     {
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
         $params = array_merge($branchIds, $branchIds, [$startDate, $endDate]);
 
+        $kwSql = '';
+        $keyword = is_string($keyword) ? trim($keyword) : '';
+        if ($keyword !== '') {
+            $kwSql = " AND (c.customer_name LIKE ? OR c.title LIKE ? OR c.address LIKE ? OR c.case_number LIKE ?)";
+            $kw = '%' . $keyword . '%';
+            $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+        }
+
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
-                   c.case_type, c.total_visits, c.max_engineers,
+                   c.case_type, c.total_visits, c.max_engineers, c.customer_name,
                    c.planned_start_time AS case_designated_time,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name, b.code AS branch_code
@@ -37,6 +45,7 @@ class ScheduleModel
             LEFT JOIN vehicles v ON s.vehicle_id = v.id
             WHERE (c.branch_id IN ($ph) OR c.id IN (SELECT case_id FROM case_branch_support WHERE branch_id IN ($ph)))
               AND s.schedule_date BETWEEN ? AND ?
+              {$kwSql}
             ORDER BY s.schedule_date ASC, COALESCE(s.designated_time, s.start_time, '23:59') ASC
         ");
         $stmt->execute($params);
@@ -681,11 +690,20 @@ class ScheduleModel
     /**
      * 取得指定人員的排工（依人員查詢用）
      */
-    public function getByPerson($userId, $startDate, $endDate)
+    public function getByPerson($userId, $startDate, $endDate, $keyword = '')
     {
+        $kwSql = '';
+        $params = array($userId, $startDate, $endDate);
+        $keyword = is_string($keyword) ? trim($keyword) : '';
+        if ($keyword !== '') {
+            $kwSql = " AND (c.customer_name LIKE ? OR c.title LIKE ? OR c.address LIKE ? OR c.case_number LIKE ?)";
+            $kw = '%' . $keyword . '%';
+            $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+        }
+
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
-                   c.case_type, c.total_visits, c.max_engineers,
+                   c.case_type, c.total_visits, c.max_engineers, c.customer_name,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name, b.code AS branch_code
             FROM schedules s
@@ -695,9 +713,10 @@ class ScheduleModel
             JOIN schedule_engineers se ON s.id = se.schedule_id
             WHERE se.user_id = ?
               AND s.schedule_date BETWEEN ? AND ?
+              {$kwSql}
             ORDER BY s.schedule_date ASC, s.created_at ASC
         ");
-        $stmt->execute(array($userId, $startDate, $endDate));
+        $stmt->execute($params);
         $schedules = $stmt->fetchAll();
 
         foreach ($schedules as &$s) {

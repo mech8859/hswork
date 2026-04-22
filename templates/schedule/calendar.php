@@ -12,6 +12,13 @@ $today = date('Y-m-d');
 // 容量閥值
 $capYellow = max(1, (int)ceil($totalEngineers * 0.6));
 $capRed    = $totalEngineers;
+
+// 保留篩選字串（上/下月/今天/各下拉切換時保留關鍵字）
+$currentKeyword = isset($filterKeyword) ? $filterKeyword : '';
+$keepQs = '';
+if (!empty($filterBranchId)) $keepQs .= '&branch_id=' . $filterBranchId;
+if (!empty($filterUserId))   $keepQs .= '&user_id=' . $filterUserId;
+if ($currentKeyword !== '')  $keepQs .= '&keyword=' . urlencode($currentKeyword);
 ?>
 
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
@@ -36,6 +43,11 @@ $capRed    = $totalEngineers;
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="cal-filter-wrap">
+            <input type="text" id="keywordFilter" class="form-control form-control-sm" placeholder="搜尋客戶/案件/地址"
+                   value="<?= e($currentKeyword) ?>" onkeydown="if(event.key==='Enter')applyFilters()" style="min-width:140px;max-width:200px">
+            <button type="button" class="btn btn-primary btn-sm" onclick="applyFilters()" style="margin-left:4px">搜尋</button>
+        </div>
         <?php endif; ?>
         <?php if (Auth::hasPermission('schedule.manage')): ?>
         <button type="button" class="btn btn-primary btn-sm" onclick="openCaseSearchModal()">+ 新增排工</button>
@@ -57,6 +69,9 @@ $capRed    = $totalEngineers;
     <?php if ($filterUserId): ?>
     <span class="badge badge-primary">篩選中：<?= e(array_reduce($engineerList, function($carry, $e) use ($filterUserId) { return $e['id'] == $filterUserId ? $e['real_name'] : $carry; }, '')) ?></span>
     <?php endif; ?>
+    <?php if ($currentKeyword !== ''): ?>
+    <span class="badge badge-primary">搜尋：<?= e($currentKeyword) ?></span>
+    <?php endif; ?>
 </div>
 
 <!-- 多次施工人員不同組通知 -->
@@ -73,9 +88,9 @@ $capRed    = $totalEngineers;
 
 <!-- 月份切換 -->
 <div class="d-flex justify-between align-center mb-1 hide-mobile">
-    <a href="/schedule.php?year=<?= $prevYear ?>&month=<?= $prevMonth ?><?= $filterBranchId ? '&branch_id='.$filterBranchId : '' ?><?= $filterUserId ? '&user_id='.$filterUserId : '' ?>" class="btn btn-outline btn-sm">&laquo; 上月</a>
-    <a href="/schedule.php?year=<?= date('Y') ?>&month=<?= date('m') ?><?= $filterBranchId ? '&branch_id='.$filterBranchId : '' ?><?= $filterUserId ? '&user_id='.$filterUserId : '' ?>" class="btn btn-outline btn-sm">今天</a>
-    <a href="/schedule.php?year=<?= $nextYear ?>&month=<?= $nextMonth ?><?= $filterBranchId ? '&branch_id='.$filterBranchId : '' ?><?= $filterUserId ? '&user_id='.$filterUserId : '' ?>" class="btn btn-outline btn-sm">下月 &raquo;</a>
+    <a href="/schedule.php?year=<?= $prevYear ?>&month=<?= $prevMonth ?><?= $keepQs ?>" class="btn btn-outline btn-sm">&laquo; 上月</a>
+    <a href="/schedule.php?year=<?= date('Y') ?>&month=<?= date('m') ?><?= $keepQs ?>" class="btn btn-outline btn-sm">今天</a>
+    <a href="/schedule.php?year=<?= $nextYear ?>&month=<?= $nextMonth ?><?= $keepQs ?>" class="btn btn-outline btn-sm">下月 &raquo;</a>
 </div>
 
 <?php
@@ -788,8 +803,10 @@ function getFilterParams() {
     var params = '';
     var branchSel = document.getElementById('branchFilter');
     var personSel = document.getElementById('personFilter');
+    var kwInput = document.getElementById('keywordFilter');
     if (branchSel && branchSel.value && branchSel.value !== '0') params += '&branch_id=' + branchSel.value;
     if (personSel && personSel.value && personSel.value !== '0') params += '&user_id=' + personSel.value;
+    if (kwInput && kwInput.value.trim() !== '') params += '&keyword=' + encodeURIComponent(kwInput.value.trim());
     return params;
 }
 function filterByBranch(branchId) {
@@ -797,6 +814,8 @@ function filterByBranch(branchId) {
     if (branchId && branchId !== '0') url += '&branch_id=' + branchId;
     var personSel = document.getElementById('personFilter');
     if (personSel) personSel.value = '0'; // 切分公司時重設人員篩選
+    var kwInput = document.getElementById('keywordFilter');
+    if (kwInput && kwInput.value.trim() !== '') url += '&keyword=' + encodeURIComponent(kwInput.value.trim());
     window.location.href = url;
 }
 function filterByPerson(userId) {
@@ -804,6 +823,18 @@ function filterByPerson(userId) {
     var branchSel = document.getElementById('branchFilter');
     if (branchSel && branchSel.value && branchSel.value !== '0') url += '&branch_id=' + branchSel.value;
     if (userId && userId !== '0') url += '&user_id=' + userId;
+    var kwInput = document.getElementById('keywordFilter');
+    if (kwInput && kwInput.value.trim() !== '') url += '&keyword=' + encodeURIComponent(kwInput.value.trim());
+    window.location.href = url;
+}
+function applyFilters() {
+    var url = '/schedule.php?year=<?= $year ?>&month=<?= $month ?>';
+    var branchSel = document.getElementById('branchFilter');
+    var personSel = document.getElementById('personFilter');
+    var kwInput = document.getElementById('keywordFilter');
+    if (branchSel && branchSel.value && branchSel.value !== '0') url += '&branch_id=' + branchSel.value;
+    if (personSel && personSel.value && personSel.value !== '0') url += '&user_id=' + personSel.value;
+    if (kwInput && kwInput.value.trim() !== '') url += '&keyword=' + encodeURIComponent(kwInput.value.trim());
     window.location.href = url;
 }
 

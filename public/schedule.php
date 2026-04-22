@@ -31,10 +31,12 @@ switch ($action) {
 
         // 人員篩選
         $filterUserId = (int)($_GET['user_id'] ?? 0);
+        // 關鍵字篩選（客戶/案件/地址/案件編號）
+        $filterKeyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
         if ($filterUserId) {
-            $schedules = $model->getByPerson($filterUserId, $startDate, $endDate);
+            $schedules = $model->getByPerson($filterUserId, $startDate, $endDate, $filterKeyword);
         } else {
-            $schedules = $model->getByDateRange($branchIds, $startDate, $endDate);
+            $schedules = $model->getByDateRange($branchIds, $startDate, $endDate, $filterKeyword);
         }
         $visitWarnings = $model->getVisitWarnings($branchIds);
 
