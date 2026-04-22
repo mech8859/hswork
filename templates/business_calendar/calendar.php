@@ -18,7 +18,7 @@ $currentKeyword = isset($filters['keyword']) ? $filters['keyword'] : '';
 
 <style>
 /* 篩選列 */
-.bc-filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.bc-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .bc-region-pills { display: flex; gap: 4px; flex-wrap: wrap; }
 .bc-pill {
     display: inline-block; padding: 4px 12px; border-radius: 20px;
@@ -185,25 +185,21 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
 <!-- 篩選列 -->
 <div class="card mb-1">
     <div class="bc-filter-bar">
-        <div class="d-flex gap-1 align-center">
-            <select id="bcBranchFilter" class="form-control form-control-sm" onchange="bcFilterByBranch(this.value)" style="min-width:140px">
-                <option value="">全部分公司</option>
-                <?php foreach ($regionOptions as $branchId => $branchName): ?>
-                <option value="<?= $branchId ?>" <?= $currentRegion == $branchId ? 'selected' : '' ?>><?= e($branchName) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="d-flex gap-1 flex-wrap align-center">
-            <select id="bcStaffFilter" class="form-control form-control-sm" onchange="bcApplyFilters()" style="min-width:120px">
-                <option value="">全部業務</option>
-                <?php foreach ($salespeople as $sp): ?>
-                <option value="<?= $sp['id'] ?>" <?= $currentStaff == $sp['id'] ? 'selected' : '' ?>><?= e($sp['real_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <input type="text" id="bcKeywordFilter" class="form-control form-control-sm" placeholder="搜尋客戶/備註"
-                   value="<?= e($currentKeyword) ?>" onkeydown="if(event.key==='Enter')bcApplyFilters()" style="min-width:120px;max-width:180px">
-            <button type="button" class="btn btn-primary btn-sm" onclick="bcApplyFilters()">搜尋</button>
-        </div>
+        <select id="bcBranchFilter" class="form-control form-control-sm" onchange="bcFilterByBranch(this.value)" style="min-width:140px">
+            <option value="">全部分公司</option>
+            <?php foreach ($regionOptions as $branchId => $branchName): ?>
+            <option value="<?= $branchId ?>" <?= $currentRegion == $branchId ? 'selected' : '' ?>><?= e($branchName) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select id="bcStaffFilter" class="form-control form-control-sm" onchange="bcApplyFilters()" style="min-width:120px">
+            <option value="">全部業務</option>
+            <?php foreach ($salespeople as $sp): ?>
+            <option value="<?= $sp['id'] ?>" <?= $currentStaff == $sp['id'] ? 'selected' : '' ?>><?= e($sp['real_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <input type="text" id="bcKeywordFilter" class="form-control form-control-sm" placeholder="搜尋客戶/備註"
+               value="<?= e($currentKeyword) ?>" onkeydown="if(event.key==='Enter')bcApplyFilters()" style="min-width:120px;max-width:180px">
+        <button type="button" class="btn btn-primary btn-sm" onclick="bcApplyFilters()">搜尋</button>
     </div>
 </div>
 
