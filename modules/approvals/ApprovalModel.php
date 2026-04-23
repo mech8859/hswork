@@ -537,18 +537,26 @@ class ApprovalModel
             return array('flows' => array(), 'overall' => 'none');
         }
 
+        // 只計入「有效狀態」判斷 overall：
+        //  - 有任一 pending  → 目前仍在簽核中
+        //  - 無 pending 且有 approved → 已核准（歷史 rejected 不影響：因為使用者
+        //    退回後編輯再送簽會補建新的 approved flow，舊 rejected 屬歷史紀錄）
+        //  - 無 pending 無 approved，但有 rejected → 目前為退回
+        //  - 其餘（全部 cancelled 或空） → none
         $hasPending = false;
+        $hasApproved = false;
         $hasRejected = false;
-        $allApproved = true;
-
         foreach ($flows as $f) {
-            if ($f['status'] === 'pending') { $hasPending = true; $allApproved = false; }
-            if ($f['status'] === 'rejected') { $hasRejected = true; $allApproved = false; }
+            if ($f['status'] === 'pending') $hasPending = true;
+            elseif ($f['status'] === 'approved') $hasApproved = true;
+            elseif ($f['status'] === 'rejected') $hasRejected = true;
+            // 'cancelled' 視為無效，忽略
         }
 
-        $overall = 'pending';
-        if ($hasRejected) $overall = 'rejected';
-        elseif ($allApproved) $overall = 'approved';
+        if ($hasPending) $overall = 'pending';
+        elseif ($hasApproved) $overall = 'approved';
+        elseif ($hasRejected) $overall = 'rejected';
+        else $overall = 'none';
 
         return array('flows' => $flows, 'overall' => $overall);
     }
