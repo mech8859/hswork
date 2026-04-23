@@ -167,6 +167,8 @@ if ($user['is_engineer']) {
 
 // 業務提醒 — 新進件（指派給我的、狀態待聯絡）
 $mySalesReminders = array();
+$mySalesTodaySchedules = array();
+$mySalesTodayEvents = array();
 if (in_array($user['role'], array('sales', 'sales_manager', 'sales_assistant', 'boss'))) {
     $stmt = $db->prepare("
         SELECT c.id, c.case_number, c.title, c.customer_name, c.sub_status, c.created_at
@@ -177,6 +179,31 @@ if (in_array($user['role'], array('sales', 'sales_manager', 'sales_assistant', '
     ");
     $stmt->execute(array($user['id']));
     $mySalesReminders = $stmt->fetchAll();
+
+    // 業務提醒 — 我的案件今日有施工
+    $stmt = $db->prepare("
+        SELECT DISTINCT c.id, c.case_number, c.title, c.customer_name, c.address,
+               s.id AS schedule_id, s.schedule_date, s.visit_number
+        FROM schedules s
+        JOIN cases c ON s.case_id = c.id
+        WHERE c.sales_id = ? AND s.schedule_date = CURDATE() AND s.status != 'cancelled'
+        ORDER BY s.id
+        LIMIT 20
+    ");
+    $stmt->execute(array($user['id']));
+    $mySalesTodaySchedules = $stmt->fetchAll();
+
+    // 業務提醒 — 我今日的業務行事曆行程
+    $stmt = $db->prepare("
+        SELECT bc.id, bc.customer_name, bc.activity_type, bc.start_time, bc.end_time,
+               bc.address, bc.case_id, bc.status
+        FROM business_calendar bc
+        WHERE bc.staff_id = ? AND bc.event_date = CURDATE()
+        ORDER BY bc.start_time, bc.id
+        LIMIT 20
+    ");
+    $stmt->execute(array($user['id']));
+    $mySalesTodayEvents = $stmt->fetchAll();
 }
 
 // 主管可看所有人提醒
@@ -363,6 +390,43 @@ require __DIR__ . '/../templates/layouts/header.php';
         <?php endforeach; ?>
         <?php endif; ?>
 
+        <?php if (!empty($mySalesTodaySchedules)): ?>
+        <div style="font-size:.8rem;font-weight:600;color:#1565c0;padding:8px 12px 4px">今日我的案件施工</div>
+        <?php foreach ($mySalesTodaySchedules as $r): ?>
+        <div class="reminder-item">
+            <div class="d-flex justify-between align-center">
+                <a href="/cases.php?action=edit&id=<?= $r['id'] ?>" style="font-weight:500"><?= e($r['case_number']) ?> <?= e($r['customer_name'] ?: $r['title']) ?><?php if (!empty($r['visit_number']) && $r['visit_number'] > 1): ?> <small style="color:#888">第<?= (int)$r['visit_number'] ?>次</small><?php endif; ?></a>
+                <span class="badge" style="font-size:.65rem;background:#1976D2;color:#fff">今日施工</span>
+            </div>
+            <?php if (!empty($r['address'])): ?>
+            <div class="text-muted" style="font-size:.75rem"><?= e($r['address']) ?></div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
+
+        <?php if (!empty($mySalesTodayEvents)): ?>
+        <?php
+        $_actTypes = array('visit'=>'拜訪','survey'=>'場勘','follow_up'=>'跟催','quotation'=>'報價','signing'=>'簽約','other'=>'其他');
+        ?>
+        <div style="font-size:.8rem;font-weight:600;color:#2e7d32;padding:8px 12px 4px">今日業務行程</div>
+        <?php foreach ($mySalesTodayEvents as $r):
+            $_typeLabel = isset($_actTypes[$r['activity_type']]) ? $_actTypes[$r['activity_type']] : $r['activity_type'];
+            $_time = !empty($r['start_time']) ? substr($r['start_time'], 0, 5) : '';
+            $_link = !empty($r['case_id']) ? '/cases.php?action=edit&id=' . (int)$r['case_id'] : '/business_calendar.php?action=edit&id=' . (int)$r['id'];
+        ?>
+        <div class="reminder-item">
+            <div class="d-flex justify-between align-center">
+                <a href="<?= $_link ?>" style="font-weight:500"><?php if ($_time): ?><span style="color:#e65100;margin-right:4px"><?= $_time ?></span><?php endif; ?><?= e($r['customer_name'] ?: '(無客戶名稱)') ?></a>
+                <span class="badge" style="font-size:.65rem;background:#2e7d32;color:#fff"><?= e($_typeLabel) ?></span>
+            </div>
+            <?php if (!empty($r['address'])): ?>
+            <div class="text-muted" style="font-size:.75rem"><?= e($r['address']) ?></div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
+
         <?php if (!empty($myReminders)): ?>
         <div style="font-size:.8rem;font-weight:600;color:var(--gray-500);padding:8px 12px 4px">排工待回報</div>
         <?php foreach ($myReminders as $r): ?>
@@ -376,7 +440,7 @@ require __DIR__ . '/../templates/layouts/header.php';
         <?php endforeach; ?>
         <?php endif; ?>
 
-        <?php if (empty($mySalesReminders) && empty($myReminders)): ?>
+        <?php if (empty($mySalesReminders) && empty($myReminders) && empty($mySalesTodaySchedules) && empty($mySalesTodayEvents)): ?>
         <p class="text-muted text-center" style="padding:16px">目前無待辦提醒</p>
         <?php endif; ?>
 
