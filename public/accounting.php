@@ -643,6 +643,8 @@ switch ($action) {
     // ============================================================
     case 'offset_ledger':
         $olAccountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+        $olAccountCodeFrom = isset($_GET['account_code_from']) ? trim($_GET['account_code_from']) : '';
+        $olAccountCodeTo   = isset($_GET['account_code_to'])   ? trim($_GET['account_code_to'])   : '';
         $olRelType = isset($_GET['relation_type']) ? $_GET['relation_type'] : '';
         $olRelName = isset($_GET['relation_name']) ? trim($_GET['relation_name']) : '';
         $olRelIdFrom = isset($_GET['rel_id_from']) ? trim($_GET['rel_id_from']) : '';
@@ -676,6 +678,18 @@ switch ($action) {
         $where = '1=1';
         $params = array();
         if ($olAccountId) { $where .= ' AND ol.account_id = ?'; $params[] = $olAccountId; }
+        // 會計科目起迄（依 code）
+        if ($olAccountCodeFrom !== '' && $olAccountCodeTo !== '') {
+            $where .= ' AND coa.code BETWEEN ? AND ?';
+            $params[] = $olAccountCodeFrom;
+            $params[] = $olAccountCodeTo;
+        } elseif ($olAccountCodeFrom !== '') {
+            $where .= ' AND coa.code >= ?';
+            $params[] = $olAccountCodeFrom;
+        } elseif ($olAccountCodeTo !== '') {
+            $where .= ' AND coa.code <= ?';
+            $params[] = $olAccountCodeTo;
+        }
         if ($olRelType) { $where .= ' AND ol.relation_type = ?'; $params[] = $olRelType; }
         if ($olRelIdFrom && $olRelIdTo) {
             $where .= ' AND CAST(ol.relation_id AS UNSIGNED) BETWEEN ? AND ?';
@@ -1054,6 +1068,8 @@ switch ($action) {
 
     case 'offset_reports':
         $orAccountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+        $orAccountCodeFrom = isset($_GET['account_code_from']) ? trim($_GET['account_code_from']) : '';
+        $orAccountCodeTo   = isset($_GET['account_code_to'])   ? trim($_GET['account_code_to'])   : '';
         $orRelType = isset($_GET['relation_type']) ? $_GET['relation_type'] : '';
         $orRelIdFrom = isset($_GET['rel_id_from']) ? trim($_GET['rel_id_from']) : '';
         $orRelIdTo = isset($_GET['rel_id_to']) ? trim($_GET['rel_id_to']) : '';
@@ -1089,6 +1105,18 @@ switch ($action) {
         $where = '1=1';
         $params = array();
         if ($orAccountId) { $where .= ' AND ol.account_id = ?'; $params[] = $orAccountId; }
+        // 會計科目起迄（依 code）
+        if ($orAccountCodeFrom !== '' && $orAccountCodeTo !== '') {
+            $where .= ' AND coa.code BETWEEN ? AND ?';
+            $params[] = $orAccountCodeFrom;
+            $params[] = $orAccountCodeTo;
+        } elseif ($orAccountCodeFrom !== '') {
+            $where .= ' AND coa.code >= ?';
+            $params[] = $orAccountCodeFrom;
+        } elseif ($orAccountCodeTo !== '') {
+            $where .= ' AND coa.code <= ?';
+            $params[] = $orAccountCodeTo;
+        }
         if ($orRelType) { $where .= ' AND ol.relation_type = ?'; $params[] = $orRelType; }
         if ($orRelIdFrom && $orRelIdTo) {
             $where .= ' AND CAST(ol.relation_id AS UNSIGNED) BETWEEN ? AND ?';

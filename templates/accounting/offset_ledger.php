@@ -15,11 +15,20 @@
             <input type="text" name="keyword" value="<?= e($olKeyword ?? '') ?>" class="form-control" placeholder="傳票號/往來對象/科目/廠商編號" style="width:100%">
         </div>
         <div>
-            <label style="font-size:0.85em">會計科目</label>
-            <select name="account_id" class="form-control" style="width:220px">
-                <option value="">全部科目</option>
+            <label style="font-size:0.85em">會計科目（從）</label>
+            <select name="account_code_from" class="form-control" style="width:200px">
+                <option value="">-- 起始 --</option>
                 <?php foreach ($accounts as $a): ?>
-                <option value="<?= $a['id'] ?>" <?= $olAccountId == $a['id'] ? 'selected' : '' ?>><?= e($a['code']) ?> <?= e($a['name']) ?></option>
+                <option value="<?= e($a['code']) ?>" <?= ($olAccountCodeFrom ?? '') === (string)$a['code'] ? 'selected' : '' ?>><?= e($a['code']) ?> <?= e($a['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label style="font-size:0.85em">會計科目（到）</label>
+            <select name="account_code_to" class="form-control" style="width:200px">
+                <option value="">-- 結束 --</option>
+                <?php foreach ($accounts as $a): ?>
+                <option value="<?= e($a['code']) ?>" <?= ($olAccountCodeTo ?? '') === (string)$a['code'] ? 'selected' : '' ?>><?= e($a['code']) ?> <?= e($a['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
