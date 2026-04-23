@@ -19,6 +19,8 @@ $currentKeyword = isset($filters['keyword']) ? $filters['keyword'] : '';
 <style>
 /* 篩選列 */
 .bc-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bc-filter-bar > select, .bc-filter-bar > input { width: auto; flex: 0 0 auto; }
+@media (max-width: 767px) { .bc-filter-bar > select, .bc-filter-bar > input { flex: 1 1 100%; } }
 .bc-region-pills { display: flex; gap: 4px; flex-wrap: wrap; }
 .bc-pill {
     display: inline-block; padding: 4px 12px; border-radius: 20px;
