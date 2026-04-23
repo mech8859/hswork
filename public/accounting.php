@@ -1307,6 +1307,12 @@ switch ($action) {
             $records = array_values(array_filter($records, function($r) use ($statusFilter) {
                 return $r['match_status'] === $statusFilter;
             }));
+        } else {
+            // 預設隱藏「精準匹配」列（已經確認過的不再顯示，減少視覺干擾）
+            // 若要看，點統計卡「精準匹配」進去即可
+            $records = array_values(array_filter($records, function($r) {
+                return $r['match_status'] !== 'matched_precise';
+            }));
         }
 
         // 排序（預設新→舊）
