@@ -13,6 +13,12 @@ foreach ($approvalStatus['flows'] as $af) {
     if ($af['approver_id'] == Auth::id() && $af['status'] === 'pending') $isApprover = true;
 }
 ?>
+<?php if (!empty($quote['loss_reason'])): ?>
+<div class="alert" style="background:#fff3e0;border-left:4px solid #c5221f;padding:10px 14px;margin-bottom:12px;border-radius:4px">
+    <strong style="color:#c5221f">⚠ 虧損原因（送簽人填寫）：</strong>
+    <div style="margin-top:4px;white-space:pre-wrap"><?= e($quote['loss_reason']) ?></div>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>報價單 <?= e($quote['quotation_number']) ?></h2>
     <div class="d-flex gap-1 flex-wrap">

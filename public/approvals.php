@@ -384,6 +384,7 @@ switch ($action) {
                     Session::flash('success', '已退回');
                 } else {
                     // 其他模組退回
+                    $db = Database::getInstance();
                     if ($module === 'quotations' && $targetId) {
                         require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
                         $qm = new QuotationModel();

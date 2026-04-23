@@ -43,6 +43,9 @@
                         <?php else: ?>
                         <?= e($info['label'] ?? $item['module'] . ' #' . $item['target_id']) ?>
                         <?php endif; ?>
+                        <?php if (!empty($item['comment'])): ?>
+                        <div style="font-size:.8rem;color:#c5221f;margin-top:4px;padding:4px 8px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:3px;white-space:pre-wrap"><?= e($item['comment']) ?></div>
+                        <?php endif; ?>
                     </td>
                     <td class="text-right"><?= !empty($info['amount']) ? '$' . number_format($info['amount']) : '-' ?></td>
                     <td><?= e($item['submitter_name'] ?? '-') ?></td>
