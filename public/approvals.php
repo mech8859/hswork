@@ -279,9 +279,18 @@ switch ($action) {
                     } else {
                         Session::flash('success', '已核准，等待其他簽核人');
                     }
-                } elseif ($module && $targetId && $model->isFullyApproved($module, $targetId)) {
-                    // 其他模組：自動更新單據狀態
-                    if ($module === 'quotations') {
+                } elseif ($module === 'quotations' && $targetId) {
+                    // 報價單：同層多人（extra_approver_ids）任一核准即代表該層通過，
+                    // 取消同 level 其他 pending flow，避免狀態卡在 pending_approval
+                    $db = Database::getInstance();
+                    $lvStmt = $db->prepare("SELECT level_order FROM approval_flows WHERE id = ?");
+                    $lvStmt->execute(array($flowId));
+                    $flowLevel = (int)$lvStmt->fetchColumn();
+                    if ($flowLevel > 0) {
+                        $model->cancelSiblingPendingFlows('quotations', $targetId, $flowLevel, $flowId);
+                    }
+
+                    if ($model->isFullyApproved('quotations', $targetId)) {
                         require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
                         $qm = new QuotationModel();
                         // 判斷是否為變更簽核
@@ -296,7 +305,11 @@ switch ($action) {
                         } else {
                             $qm->updateStatus($targetId, 'approved');
                         }
-                    } elseif ($module === 'purchases') {
+                    }
+                    Session::flash('success', '已核准');
+                } elseif ($module && $targetId && $model->isFullyApproved($module, $targetId)) {
+                    // 其他模組：自動更新單據狀態
+                    if ($module === 'purchases') {
                         require_once __DIR__ . '/../modules/procurement/ProcurementModel.php';
                         $pm = new ProcurementModel();
                         $pm->updateRequisition($targetId, array(

@@ -195,6 +195,34 @@ switch ($action) {
             Session::flash('error', '無權限'); redirect('/quotations.php');
         }
 
+        // self-heal：若簽核流程全部已核准但狀態仍卡在 pending_approval，補做狀態轉換
+        // （處理舊 bug 造成的資料卡住 + 同層多人 pending 未取消的情況）
+        if ($quote['status'] === 'pending_approval') {
+            require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+            $_aModel = new ApprovalModel();
+            $_flowStatus = $_aModel->getFlowStatus('quotations', $id);
+            $_hasPendingFlow = false;
+            foreach ($_flowStatus['flows'] as $_f) {
+                if ($_f['status'] === 'pending') { $_hasPendingFlow = true; break; }
+            }
+            if (!$_hasPendingFlow && $_flowStatus['overall'] === 'approved') {
+                // 判斷是否為變更簽核（payload.type=revision）
+                $_db = Database::getInstance();
+                $_pStmt = $_db->prepare("SELECT payload FROM approval_flows WHERE module = 'quotations' AND target_id = ? AND payload IS NOT NULL AND payload != '' LIMIT 1");
+                $_pStmt->execute(array($id));
+                $_pPayload = $_pStmt->fetchColumn();
+                $_pData = $_pPayload ? json_decode($_pPayload, true) : null;
+                if ($_pData && isset($_pData['type']) && $_pData['type'] === 'revision') {
+                    $model->updateStatus($id, 'draft');
+                    AuditLog::log('quotations', 'auto_heal_revision', $id, 'view 時自動修正：全部已核准 → 退回草稿');
+                } else {
+                    $model->updateStatus($id, 'approved');
+                    AuditLog::log('quotations', 'auto_heal_approved', $id, 'view 時自動修正：全部已核准 → 已核准');
+                }
+                $quote = $model->getById($id);
+            }
+        }
+
         // 編輯鎖定（多人同時開啟提醒；view 也納入因為使用者多從這裡進入）
         require_once __DIR__ . '/../includes/EditingLock.php';
         $_curUser = Auth::user();
