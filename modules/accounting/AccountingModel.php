@@ -1056,11 +1056,22 @@ class AccountingModel
                 $descSuffix = '（含手續費 $' . number_format($fee['fee_debit'] + $fee['fee_credit']) . '）';
             }
 
-            $amount = max($debit, $credit);
-            $match = $this->_fuzzyMatchVoucher(
-                $r['transaction_date'], $amount,
-                array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description'])
-            );
+            // 精準匹配優先：已確認過的傳票（source_module='bank' + source_id）
+            $precise = $this->_findPreciseMatch('bank', $rid);
+            if ($precise) {
+                $match = array(
+                    'status' => 'matched_precise',
+                    'voucher_id' => $precise['id'],
+                    'voucher_number' => $precise['voucher_number'],
+                    'voucher_amount' => (float)$precise['total_debit'],
+                );
+            } else {
+                $amount = max($debit, $credit);
+                $match = $this->_fuzzyMatchVoucher(
+                    $r['transaction_date'], $amount,
+                    array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description'])
+                );
+            }
             $out[] = array(
                 'source_id' => $rid,
                 'date'      => $r['transaction_date'],
@@ -1133,11 +1144,22 @@ class AccountingModel
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $out = array();
         foreach ($rows as $r) {
-            $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
-            $match = $this->_fuzzyMatchVoucher(
-                $r['expense_date'], $amount,
-                array($r['entry_number'], $r['upload_number'])
-            );
+            // 精準匹配優先
+            $precise = $this->_findPreciseMatch('reserve_fund', (int)$r['id']);
+            if ($precise) {
+                $match = array(
+                    'status' => 'matched_precise',
+                    'voucher_id' => $precise['id'],
+                    'voucher_number' => $precise['voucher_number'],
+                    'voucher_amount' => (float)$precise['total_debit'],
+                );
+            } else {
+                $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+                $match = $this->_fuzzyMatchVoucher(
+                    $r['expense_date'], $amount,
+                    array($r['entry_number'], $r['upload_number'], $r['description'])
+                );
+            }
             $out[] = array(
                 'source_id' => (int)$r['id'],
                 'date'      => $r['expense_date'],
@@ -1166,11 +1188,22 @@ class AccountingModel
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $out = array();
         foreach ($rows as $r) {
-            $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
-            $match = $this->_fuzzyMatchVoucher(
-                $r['transaction_date'], $amount,
-                array($r['entry_number'], $r['upload_number'], $r['description'])
-            );
+            // 精準匹配優先
+            $precise = $this->_findPreciseMatch('cash_details', (int)$r['id']);
+            if ($precise) {
+                $match = array(
+                    'status' => 'matched_precise',
+                    'voucher_id' => $precise['id'],
+                    'voucher_number' => $precise['voucher_number'],
+                    'voucher_amount' => (float)$precise['total_debit'],
+                );
+            } else {
+                $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+                $match = $this->_fuzzyMatchVoucher(
+                    $r['transaction_date'], $amount,
+                    array($r['entry_number'], $r['upload_number'], $r['description'])
+                );
+            }
             $out[] = array(
                 'source_id' => (int)$r['id'],
                 'date'      => $r['transaction_date'],
