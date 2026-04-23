@@ -858,6 +858,16 @@ function calcGrandTotal() {
     // 內部成本計算（含營運成本；以預估成交金額算利潤）
     if (canManage) {
         var laborCost = parseFloat(document.getElementById('laborCostTotal').value) || 0;
+        // 防禦：若 laborCost 異常偏小（疑似 DOM value 漂移），
+        // 改用 people × hours × 時薪（後端 saveLaborCost 公式）重算
+        var _lp = parseFloat(document.getElementById('laborPeople').value) || 0;
+        var _lh = parseFloat(document.getElementById('laborHours').value) || 0;
+        if (_lp > 0 && _lh > 0) {
+            var _expected = Math.round(_lp * _lh * laborHourlyCost);
+            if (_expected > 0 && laborCost < _expected / 2) {
+                laborCost = _expected;
+            }
+        }
         var cableCost = parseFloat(document.getElementById('cableCost').value) || 0;
         var opsRate = <?= isset($_qfOpRate) ? $_qfOpRate : 128 ?>;
         var opsCost = Math.round(laborCost * opsRate / 100);
