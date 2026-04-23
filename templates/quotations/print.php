@@ -20,6 +20,22 @@ if ($_qCompany === 'lichuang') {
 }
 // 優先用報價單自己的保固月數，沒有則用系統預設
 $warrantyMonths = !empty($quote['warranty_months']) ? $quote['warranty_months'] : (isset($qs['quote_warranty_months']) ? $qs['quote_warranty_months'] : '12');
+
+// 依報價單所屬分公司取「公司抬頭 / 地址 / 電話 / 傳真」
+// 規則：quote_xxx_b{branch_id} > quote_xxx（預設 fallback） > 寫死預設
+$_quoteBranchId = (int)(isset($quote['branch_id']) ? $quote['branch_id'] : 0);
+$_getQsBranch = function($baseKey, $default = '') use ($qs, $_quoteBranchId) {
+    if ($_quoteBranchId > 0) {
+        $bk = $baseKey . '_b' . $_quoteBranchId;
+        if (isset($qs[$bk]) && $qs[$bk] !== '') return $qs[$bk];
+    }
+    if (isset($qs[$baseKey]) && $qs[$baseKey] !== '') return $qs[$baseKey];
+    return $default;
+};
+$_qsCompanyTitle   = $_getQsBranch('quote_company_title',   '禾順監視數位科技-台中分公司');
+$_qsContactAddress = $_getQsBranch('quote_contact_address', '台中市潭子區環中路一段138巷1之5號');
+$_qsContactPhone   = $_getQsBranch('quote_contact_phone',   '04-2534-7007');
+$_qsContactFax     = $_getQsBranch('quote_contact_fax',     '04-2534-7661');
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -91,7 +107,7 @@ body { font-family: "Microsoft JhengHei", "微軟正黑體", Arial, sans-serif; 
 
 <!-- 公司抬頭 -->
 <div class="header">
-    <h1><?= e(isset($qs['quote_company_title']) && $qs['quote_company_title'] ? $qs['quote_company_title'] : '禾順監視數位科技-台中分公司') ?> 報價單</h1>
+    <h1><?= e($_qsCompanyTitle) ?> 報價單</h1>
     <div class="subtitle"><?= e(isset($qs['quote_company_subtitle']) && $qs['quote_company_subtitle'] ? $qs['quote_company_subtitle'] : '監控系統/電話總機/影視對講/門禁管制/商用音響/網路工程') ?></div>
 </div>
 
@@ -240,9 +256,9 @@ if (!empty($quote['case_id'])) {
         </div>
         <div>
             <strong>連絡資訊</strong><br>
-            <span class="bank-label">地址：</span><?= e(isset($qs['quote_contact_address']) ? $qs['quote_contact_address'] : '台中市潭子區環中路一段138巷1之5號') ?><br>
-            <span class="bank-label">電話：</span><?= e(isset($qs['quote_contact_phone']) ? $qs['quote_contact_phone'] : '04-2534-7007') ?><br>
-            <span class="bank-label">傳真：</span><?= e(isset($qs['quote_contact_fax']) ? $qs['quote_contact_fax'] : '04-2534-7661') ?>
+            <span class="bank-label">地址：</span><?= e($_qsContactAddress) ?><br>
+            <span class="bank-label">電話：</span><?= e($_qsContactPhone) ?><br>
+            <span class="bank-label">傳真：</span><?= e($_qsContactFax) ?>
         </div>
     </div>
     <div class="bank-notice"><?= e(isset($qs['quote_bank_reminder']) ? $qs['quote_bank_reminder'] : '溫馨提醒:匯款後記得告知匯款帳號4-6碼及金額') ?></div>
