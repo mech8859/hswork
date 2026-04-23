@@ -1,4 +1,7 @@
-<?php $isEdit = !empty($record); ?>
+<?php
+$isEdit = !empty($record);
+$_ot_canOverrideHours = isset($canOverrideHours) ? $canOverrideHours : false;
+?>
 <div class="d-flex justify-between align-center mb-2">
     <h2><?= $isEdit ? '編輯加班單' : '申請加班' ?></h2>
     <a href="/overtimes.php" class="btn btn-outline btn-sm">返回列表</a>
@@ -57,9 +60,9 @@
                    value="<?= e($isEdit ? substr($record['end_time'], 0, 5) : '20:00') ?>" oninput="calcOtHours()">
         </div>
         <div class="form-group">
-            <label>加班時數 <small style="color:#888">(自動計算)</small></label>
+            <label>加班時數 <small style="color:#888">(<?= $_ot_canOverrideHours ? '可手動修改' : '自動計算' ?>)</small></label>
             <input type="number" step="0.25" min="0" name="hours" id="otHours" class="form-control"
-                   value="<?= e($isEdit ? $record['hours'] : '2.00') ?>" readonly>
+                   value="<?= e($isEdit ? $record['hours'] : '2.00') ?>" <?= $_ot_canOverrideHours ? '' : 'readonly' ?>>
         </div>
     </div>
 
