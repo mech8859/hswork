@@ -186,6 +186,16 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                     <?php if ($r['match_status'] === 'matched_amount_mismatch' && $r['voucher_amount'] !== null): ?>
                     <div style="color:#f59e0b;font-size:.75rem">傳票: <?= number_format($r['voucher_amount']) ?></div>
                     <?php endif; ?>
+                    <?php if (in_array($r['match_status'], array('matched_fuzzy', 'matched_amount_mismatch')) && $canManage): ?>
+                    <form method="POST" action="/accounting.php?action=confirm_voucher_match" style="display:inline;margin-top:4px" onsubmit="return confirm('確認此傳票與此來源對應無誤？確認後下次開啟會直接精準匹配。');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="source_module" value="<?= e($source) ?>">
+                        <input type="hidden" name="source_id" value="<?= (int)$r['source_id'] ?>">
+                        <input type="hidden" name="voucher_id" value="<?= (int)$r['voucher_id'] ?>">
+                        <input type="hidden" name="return_to" value="<?= e($_reconReturnUrl) ?>">
+                        <button type="submit" class="btn btn-sm" style="margin-top:3px;padding:2px 8px;font-size:.72rem;background:#16a34a;color:#fff">✓ 確認匹配</button>
+                    </form>
+                    <?php endif; ?>
                     <?php else: ?>
                     <a href="/accounting.php?action=journal_create&return_to=<?= $_reconReturnEncoded ?>" style="color:#999;text-decoration:none">+ 建立</a>
                     <?php endif; ?>

@@ -1323,6 +1323,40 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    case 'confirm_voucher_match':
+        if (!$canManage || $_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗或無權限');
+            redirect('/accounting.php?action=voucher_reconciliation');
+        }
+        $_cvSource = isset($_POST['source_module']) ? $_POST['source_module'] : '';
+        $_cvSrcId  = isset($_POST['source_id']) ? (int)$_POST['source_id'] : 0;
+        $_cvVid    = isset($_POST['voucher_id']) ? (int)$_POST['voucher_id'] : 0;
+        $_cvValid  = array('bank','petty_cash','reserve_fund','cash_details');
+        if (!in_array($_cvSource, $_cvValid) || $_cvSrcId <= 0 || $_cvVid <= 0) {
+            Session::flash('error', '參數錯誤');
+            redirect('/accounting.php?action=voucher_reconciliation');
+        }
+        try {
+            $_cvDb = Database::getInstance();
+            // 先檢查傳票存在
+            $chk = $_cvDb->prepare("SELECT id FROM journal_entries WHERE id = ? LIMIT 1");
+            $chk->execute(array($_cvVid));
+            if (!$chk->fetchColumn()) {
+                Session::flash('error', '傳票不存在');
+            } else {
+                $_cvDb->prepare("UPDATE journal_entries SET source_module = ?, source_id = ? WHERE id = ?")
+                      ->execute(array($_cvSource, $_cvSrcId, $_cvVid));
+                AuditLog::log('journal_entries', 'confirm_match', $_cvVid, "綁定到 {$_cvSource}#{$_cvSrcId}");
+                Session::flash('success', '已確認匹配');
+            }
+        } catch (Exception $e) {
+            Session::flash('error', '操作失敗: ' . $e->getMessage());
+        }
+        $_cvRtn = isset($_POST['return_to']) ? $_POST['return_to'] : '/accounting.php?action=voucher_reconciliation';
+        if (strpos($_cvRtn, '/accounting.php') !== 0) $_cvRtn = '/accounting.php?action=voucher_reconciliation';
+        redirect($_cvRtn);
+        break;
+
     case 'reconciliation':
         require_once __DIR__ . '/../modules/accounting/ReconciliationModel.php';
         $reconModel = new ReconciliationModel();
