@@ -16,6 +16,7 @@ $statusLabels = array(
     'matched_fuzzy'           => array('模糊匹配', '#3b82f6'),
     'matched_amount_mismatch' => array('金額不符', '#f59e0b'),
     'unmatched'               => array('未建傳票', '#ef4444'),
+    'merged_into_prev'        => array('已合併', '#9ca3af'),
 );
 ?>
 <?php
@@ -102,7 +103,9 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
             <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">狀態</label>
             <select name="status_filter" class="form-control" style="min-width:140px">
                 <option value="">全部</option>
-                <?php foreach ($statusLabels as $sk => $sv): ?>
+                <?php foreach ($statusLabels as $sk => $sv):
+                    if ($sk === 'merged_into_prev') continue;
+                ?>
                 <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($sv[0]) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -126,10 +129,12 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <div style="font-size:.8rem;color:#666">總筆數</div>
         <div style="font-size:1.3rem;font-weight:700"><?= number_format($stats['total']) ?></div>
     </div>
-    <?php foreach ($statusLabels as $sk => $sv): ?>
+    <?php foreach ($statusLabels as $sk => $sv):
+        if ($sk === 'merged_into_prev') continue;
+    ?>
     <a href="/accounting.php?action=voucher_reconciliation&source=<?= e($source) ?>&start_date=<?= e($startDate) ?>&end_date=<?= e($endDate) ?><?= $branchFilter && $source !== 'bank' ? '&branch_id=' . $branchFilter : '' ?>&status_filter=<?= e($sk) ?>" class="card" style="padding:12px;text-align:center;text-decoration:none;color:inherit;border-left:3px solid <?= $sv[1] ?>">
         <div style="font-size:.8rem;color:<?= $sv[1] ?>;font-weight:600"><?= e($sv[0]) ?></div>
-        <div style="font-size:1.3rem;font-weight:700;color:<?= $sv[1] ?>"><?= number_format($stats[$sk]) ?></div>
+        <div style="font-size:1.3rem;font-weight:700;color:<?= $sv[1] ?>"><?= number_format(isset($stats[$sk]) ? $stats[$sk] : 0) ?></div>
     </a>
     <?php endforeach; ?>
 </div>
@@ -158,7 +163,8 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
             <?php foreach ($records as $r):
                 $st = isset($statusLabels[$r['match_status']]) ? $statusLabels[$r['match_status']] : array($r['match_status'], '#666');
                 $bgColor = $r['match_status'] === 'unmatched' ? '#fef2f2'
-                         : ($r['match_status'] === 'matched_amount_mismatch' ? '#fffbeb' : '#fff');
+                         : ($r['match_status'] === 'matched_amount_mismatch' ? '#fffbeb'
+                         : ($r['match_status'] === 'merged_into_prev' ? '#f5f5f5' : '#fff'));
             ?>
             <tr style="border-top:1px solid #eee;background:<?= $bgColor ?>">
                 <td style="padding:8px"><?= e($r['date']) ?></td>

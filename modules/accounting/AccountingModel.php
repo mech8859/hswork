@@ -999,21 +999,76 @@ class AccountingModel
         $stmt = $this->db->prepare("SELECT id, sys_number, upload_number, bank_account, transaction_date, summary, debit_amount, credit_amount, description FROM bank_transactions WHERE transaction_date BETWEEN ? AND ? ORDER BY transaction_date, id");
         $stmt->execute(array($startDate, $endDate));
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 預處理：跨行轉帳 + 下一筆手續費（同帳戶、同日）→ 合併成一筆比對
+        // 條件：當列 summary 含「跨行」，下一列 summary 含「手續費」，同 bank_account + 同日
+        $mergedInto = array(); // fee_row_id => primary_row_id
+        $feeAppend = array();  // primary_row_id => array('fee_id'=>, 'fee_amount'=>)
+        for ($i = 0; $i < count($rows) - 1; $i++) {
+            $cur = $rows[$i];
+            $nxt = $rows[$i + 1];
+            $curSummary = (string)($cur['summary'] ?: '');
+            $nxtSummary = (string)($nxt['summary'] ?: '');
+            $isTransfer = (strpos($curSummary, '跨行') !== false);
+            $isNextFee  = (strpos($nxtSummary, '手續費') !== false);
+            if ($isTransfer && $isNextFee
+                && $cur['bank_account'] === $nxt['bank_account']
+                && $cur['transaction_date'] === $nxt['transaction_date']) {
+                $mergedInto[(int)$nxt['id']] = (int)$cur['id'];
+                $feeAppend[(int)$cur['id']] = array(
+                    'fee_id'     => (int)$nxt['id'],
+                    'fee_debit'  => (float)$nxt['debit_amount'],
+                    'fee_credit' => (float)$nxt['credit_amount'],
+                    'fee_summary'=> $nxtSummary,
+                );
+            }
+        }
+
         $out = array();
         foreach ($rows as $r) {
-            $amount = max((float)$r['debit_amount'], (float)$r['credit_amount']);
+            $rid = (int)$r['id'];
+            // 手續費列已被合併到上一列 → 輸出為合併資訊列，不再進行自己的比對
+            if (isset($mergedInto[$rid])) {
+                $out[] = array(
+                    'source_id'   => $rid,
+                    'date'        => $r['transaction_date'],
+                    'number'      => $r['sys_number'] ?: $r['upload_number'],
+                    'description' => ($r['summary'] ?: $r['description']) . '（已合併至上一筆跨行轉帳比對）',
+                    'extra'       => $r['bank_account'],
+                    'debit'       => (float)$r['debit_amount'],
+                    'credit'      => (float)$r['credit_amount'],
+                    'match_status'   => 'merged_into_prev',
+                    'voucher_id'     => null,
+                    'voucher_number' => null,
+                    'voucher_amount' => null,
+                );
+                continue;
+            }
+
+            $debit  = (float)$r['debit_amount'];
+            $credit = (float)$r['credit_amount'];
+            $descSuffix = '';
+            // 跨行轉帳列：金額合併手續費再比對
+            if (isset($feeAppend[$rid])) {
+                $fee = $feeAppend[$rid];
+                $debit  += $fee['fee_debit'];
+                $credit += $fee['fee_credit'];
+                $descSuffix = '（含手續費 $' . number_format($fee['fee_debit'] + $fee['fee_credit']) . '）';
+            }
+
+            $amount = max($debit, $credit);
             $match = $this->_fuzzyMatchVoucher(
                 $r['transaction_date'], $amount,
                 array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description'])
             );
             $out[] = array(
-                'source_id' => (int)$r['id'],
+                'source_id' => $rid,
                 'date'      => $r['transaction_date'],
                 'number'    => $r['sys_number'] ?: $r['upload_number'],
-                'description' => $r['summary'] ?: $r['description'],
+                'description' => ($r['summary'] ?: $r['description']) . $descSuffix,
                 'extra'     => $r['bank_account'],
-                'debit'     => (float)$r['debit_amount'],
-                'credit'    => (float)$r['credit_amount'],
+                'debit'     => $debit,
+                'credit'    => $credit,
                 'match_status'   => $match['status'],
                 'voucher_id'     => $match['voucher_id'],
                 'voucher_number' => $match['voucher_number'],

@@ -1294,11 +1294,15 @@ switch ($action) {
         $branches = $model->getBranches();
         $records = $model->getVoucherReconciliation($source, $startDate, $endDate, $branchFilter ?: null);
 
-        // 統計 + 狀態篩選
-        $stats = array('matched_precise'=>0, 'matched_fuzzy'=>0, 'matched_amount_mismatch'=>0, 'unmatched'=>0, 'total'=>count($records));
+        // 統計 + 狀態篩選（合併列不計入 total/分類）
+        $_realRecCount = 0;
+        $stats = array('matched_precise'=>0, 'matched_fuzzy'=>0, 'matched_amount_mismatch'=>0, 'unmatched'=>0, 'total'=>0);
         foreach ($records as $r) {
+            if ($r['match_status'] === 'merged_into_prev') continue;
+            $_realRecCount++;
             if (isset($stats[$r['match_status']])) $stats[$r['match_status']]++;
         }
+        $stats['total'] = $_realRecCount;
         if ($statusFilter) {
             $records = array_values(array_filter($records, function($r) use ($statusFilter) {
                 return $r['match_status'] === $statusFilter;
