@@ -145,6 +145,7 @@ var bcAllEvents = <?php
                 'staff' => $ev['staff_name'],
                 'type' => isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'],
                 'color' => BusinessCalendarModel::activityColor($ev['activity_type']),
+                'staff_color' => BusinessCalendarModel::staffColor($ev['staff_name']),
                 'phone' => $ev['phone'] ?: '',
             );
         }
@@ -160,7 +161,7 @@ function showDayPopup(dateStr) {
     var html = '';
     for (var i = 0; i < items.length; i++) {
         var it = items[i];
-        html += '<a href="/business_calendar.php?action=edit&id=' + it.id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + it.color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
+        html += '<a href="/business_calendar.php?action=edit&id=' + it.id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + it.staff_color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
             ' onmouseover="this.style.background=\'#eef1f5\'" onmouseout="this.style.background=\'#f8f9fa\'">' +
             '<div style="font-weight:600;font-size:.95rem">' + it.customer + '</div>' +
             '<div style="display:flex;gap:8px;font-size:.8rem;color:#888;margin-top:2px">' +
@@ -213,12 +214,20 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
     <a href="/business_calendar.php?year=<?= $nextYear ?>&month=<?= $nextMonth ?>&region=<?= e($currentRegion) ?>&staff_id=<?= e($currentStaff) ?>&keyword=<?= urlencode($currentKeyword) ?>" class="btn btn-outline btn-sm">下月 &raquo;</a>
 </div>
 
-<!-- 圖例 -->
+<!-- 圖例：活動類型（徽章顏色） -->
 <div class="d-flex gap-2 flex-wrap mb-1" style="font-size:.8rem">
     <?php foreach ($activityTypes as $atKey => $atLabel): ?>
     <span><span class="bc-dot" style="background:<?= e(BusinessCalendarModel::activityColor($atKey)) ?>"></span> <?= e($atLabel) ?></span>
     <?php endforeach; ?>
     <span style="color:#2e7d32">&#9632; 休假</span>
+</div>
+
+<!-- 圖例：業務人員（側邊色條顏色） -->
+<div class="d-flex gap-2 flex-wrap mb-1" style="font-size:.8rem;color:var(--gray-600)">
+    <span style="color:var(--gray-500)">側邊色條：</span>
+    <?php foreach ($salespeople as $sp): ?>
+    <span><span class="bc-dot" style="background:<?= e(BusinessCalendarModel::staffColor($sp['real_name'])) ?>"></span><?= e($sp['real_name']) ?></span>
+    <?php endforeach; ?>
 </div>
 
 <!-- 行事曆 - 桌面版 -->
@@ -265,10 +274,11 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
                 if ($shown >= $maxShow && $hasMore) break;
                 $shown++;
                 $evColor = BusinessCalendarModel::activityColor($ev['activity_type']);
+                $evStaffColor = BusinessCalendarModel::staffColor($ev['staff_name']);
                 $evLabel = isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'];
             ?>
             <?php $evTime = !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : ''; ?>
-            <a href="/business_calendar.php?action=edit&id=<?= $ev['id'] ?>" class="bc-event" style="border-left:3px solid <?= e($evColor) ?>">
+            <a href="/business_calendar.php?action=edit&id=<?= $ev['id'] ?>" class="bc-event" style="border-left:3px solid <?= e($evStaffColor) ?>">
                 <div class="bc-event-title"><?= e(mb_substr($ev['customer_name'], 0, 8)) ?><?php if ($evTime): ?> <span style="color:#e65100;font-weight:600"><?= $evTime ?></span><?php endif; ?></div>
                 <div class="bc-event-staff"><?= e($ev['staff_name']) ?></div>
             </a>
@@ -294,6 +304,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             'id' => $ev['id'], 'customer' => $ev['customer_name'],
             'type' => isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'],
             'color' => BusinessCalendarModel::activityColor($ev['activity_type']),
+            'staff_color' => BusinessCalendarModel::staffColor($ev['staff_name']),
             'staff' => $ev['staff_name'],
             'phone' => !empty($ev['phone']) ? $ev['phone'] : '',
             'region' => !empty($ev['region']) ? $ev['region'] : '',
@@ -382,7 +393,7 @@ function bcOpenDay(dateStr) {
     }
     for (var i = 0; i < data.events.length; i++) {
         var ev = data.events[i];
-        html += '<div class="mday-item" style="border-left-color:' + ev.color + ';cursor:pointer" onclick="location.href=\'/business_calendar.php?action=edit&id=' + ev.id + '\'">';
+        html += '<div class="mday-item" style="border-left-color:' + ev.staff_color + ';cursor:pointer" onclick="location.href=\'/business_calendar.php?action=edit&id=' + ev.id + '\'">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
         html += '<span style="font-weight:600;font-size:.95rem">' + bcE(ev.customer) + '</span>';
         html += '<span class="bc-badge-type" style="background:' + ev.color + '">' + bcE(ev.type) + '</span>';

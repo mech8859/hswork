@@ -113,6 +113,8 @@ function _bcMobileUrl($extra = array()) {
 .bcm-fab:active { transform:scale(.95); }
 
 .bcm-filter-clear { display:inline-block; font-size:.8rem; background:#e3f2fd; color:#1565c0; padding:4px 10px; border-radius:14px; text-decoration:none; margin-bottom:8px; }
+.bcm-staff-legend { display:flex; flex-wrap:wrap; gap:6px 10px; padding:6px 4px; font-size:.72rem; color:#555; margin-bottom:4px; }
+.bcm-staff-legend .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:3px; vertical-align:middle; }
 </style>
 
 <div class="bcm">
@@ -157,6 +159,15 @@ function _bcMobileUrl($extra = array()) {
 
     <?php if ($filterDate): ?>
     <a class="bcm-filter-clear" href="<?= _bcMobileUrl(array('date' => null)) ?>">✕ 清除日期篩選（只看 <?= $filterDate ?>）</a>
+    <?php endif; ?>
+
+    <?php if ($defaultMode !== 'grid'): ?>
+    <div class="bcm-staff-legend">
+        <span style="color:#888">側邊色條：</span>
+        <?php foreach ($salespeople as $sp): ?>
+        <span><span class="dot" style="background:<?= e(BusinessCalendarModel::staffColor($sp['real_name'])) ?>"></span><?= e($sp['real_name']) ?></span>
+        <?php endforeach; ?>
+    </div>
     <?php endif; ?>
 
     <?php if ($defaultMode === 'grid'): ?>
@@ -219,6 +230,7 @@ function _bcMobileUrl($extra = array()) {
                 }
                 $typeLabel = isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'];
                 $typeColor = BusinessCalendarModel::activityColor($ev['activity_type']);
+                $staffColor = BusinessCalendarModel::staffColor($ev['staff_name']);
 
                 // 未回報判定：planned + 無 result + (今日17:00後 或 過期)
                 $evStatus = isset($ev['status']) ? $ev['status'] : 'planned';
@@ -234,7 +246,7 @@ function _bcMobileUrl($extra = array()) {
                 $statusText = isset($statusLabels[$evStatus]) ? $statusLabels[$evStatus] : $evStatus;
                 $showStatus = ($evStatus !== 'planned' || $hasResult);
             ?>
-            <div class="bcm-card" style="border-left-color:<?= e($typeColor) ?>" onclick="location.href='<?= e($cardUrl) ?>'">
+            <div class="bcm-card" style="border-left-color:<?= e($staffColor) ?>" onclick="location.href='<?= e($cardUrl) ?>'">
                 <div class="bcm-card-row">
                     <div style="flex:1;min-width:0">
                         <div class="bcm-customer">

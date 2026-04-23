@@ -320,6 +320,36 @@ class BusinessCalendarModel
     }
 
     /**
+     * 業務姓名對應顏色（行事曆側邊色條用）
+     * 未列出的業務以姓名 hash 分配備用色，不重複。
+     */
+    public static function staffColor($name)
+    {
+        $map = array(
+            '彭博璋'   => '#1565C0', // 深藍
+            '陳宏璇'   => '#F9A825', // 金黃
+            '詹佳航'   => '#EF6C00', // 橘
+            '許進鑫'   => '#212121', // 黑
+            '小甫偷用' => '#757575', // 灰
+            '張永霖'   => '#2E7D32', // 綠
+            '陳政隆'   => '#039BE5', // 亮藍
+            '張軒瑜'   => '#6A1B9A', // 紫
+            '邱漢澤'   => '#9E9D24', // 橄欖黃
+        );
+        if ($name !== '' && $name !== null && isset($map[$name])) {
+            return $map[$name];
+        }
+        $fallback = array(
+            '#D32F2F', '#00897B', '#5D4037', '#C2185B', '#455A64',
+            '#E91E63', '#00ACC1', '#8E24AA', '#558B2F', '#FB8C00',
+            '#3949AB', '#AD1457', '#00695C', '#4E342E', '#424242',
+        );
+        if ($name === '' || $name === null) return '#9E9E9E';
+        $h = abs(crc32((string)$name));
+        return $fallback[$h % count($fallback)];
+    }
+
+    /**
      * 取得某日事件數
      */
     public function getDayEventCount($date)
