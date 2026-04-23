@@ -1289,6 +1289,7 @@ switch ($action) {
         $endDate   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-d');
         $statusFilter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
         $branchFilter = isset($_GET['branch_id']) ? (int)$_GET['branch_id'] : 0;
+        $sortOrder = isset($_GET['sort']) && $_GET['sort'] === 'asc' ? 'asc' : 'desc'; // 預設：新→舊
 
         $branches = $model->getBranches();
         $records = $model->getVoucherReconciliation($source, $startDate, $endDate, $branchFilter ?: null);
@@ -1303,6 +1304,13 @@ switch ($action) {
                 return $r['match_status'] === $statusFilter;
             }));
         }
+
+        // 排序（預設新→舊）
+        usort($records, function($a, $b) use ($sortOrder) {
+            $cmp = strcmp($b['date'], $a['date']);
+            if ($cmp === 0) $cmp = (int)$b['source_id'] - (int)$a['source_id'];
+            return $sortOrder === 'asc' ? -$cmp : $cmp;
+        });
 
         $pageTitle = '傳票核對報表';
         $currentPage = 'accounting';

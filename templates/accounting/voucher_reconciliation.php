@@ -24,6 +24,7 @@ $_reconReturnUrl = '/accounting.php?action=voucher_reconciliation&source=' . e($
     . '&start_date=' . e($startDate) . '&end_date=' . e($endDate);
 if ($branchFilter && $source !== 'bank') $_reconReturnUrl .= '&branch_id=' . (int)$branchFilter;
 if (!empty($statusFilter)) $_reconReturnUrl .= '&status_filter=' . e($statusFilter);
+if (!empty($sortOrder) && $sortOrder === 'asc') $_reconReturnUrl .= '&sort=asc';
 $_reconReturnEncoded = urlencode($_reconReturnUrl);
 ?>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
@@ -79,6 +80,14 @@ $_reconReturnEncoded = urlencode($_reconReturnUrl);
                 <?php foreach ($statusLabels as $sk => $sv): ?>
                 <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($sv[0]) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">排序</label>
+            <?php $sortOrder = isset($sortOrder) ? $sortOrder : 'desc'; ?>
+            <select name="sort" class="form-control" style="min-width:110px">
+                <option value="desc" <?= $sortOrder === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
+                <option value="asc"  <?= $sortOrder === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">查詢</button>
