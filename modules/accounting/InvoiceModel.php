@@ -163,8 +163,12 @@ class InvoiceModel
         }
         // 買方統一編號（公司端）
         if (!empty($filters['buyer_tax_id'])) {
-            $where[] = "pi.buyer_tax_id = ?";
-            $params[] = trim($filters['buyer_tax_id']);
+            if ($filters['buyer_tax_id'] === '__empty__') {
+                $where[] = "(pi.buyer_tax_id IS NULL OR TRIM(pi.buyer_tax_id) = '')";
+            } else {
+                $where[] = "pi.buyer_tax_id = ?";
+                $params[] = trim($filters['buyer_tax_id']);
+            }
         }
 
         $whereStr = implode(' AND ', $where);
@@ -174,6 +178,14 @@ class InvoiceModel
         $countStmt = $this->db->prepare($countSql);
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
+
+        // 選了發票聯式時回傳合計
+        $summary = null;
+        if (!empty($filters['invoice_format'])) {
+            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM purchase_invoices pi WHERE " . $whereStr);
+            $sumStmt->execute($params);
+            $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
+        }
 
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
@@ -194,6 +206,7 @@ class InvoiceModel
             'page'     => $page,
             'lastPage' => $lastPage,
             'perPage'  => $perPage,
+            'summary'  => $summary,
         );
     }
 
@@ -245,13 +258,16 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 買方預設為禾順 94081455
+        $buyerTaxId = !empty($data['buyer_tax_id']) ? $data['buyer_tax_id'] : '94081455';
+
         $sql = "INSERT INTO purchase_invoices
-                (invoice_number, invoice_date, vendor_id, vendor_name, vendor_tax_id,
+                (invoice_number, invoice_date, vendor_id, vendor_name, vendor_tax_id, buyer_tax_id,
                  invoice_type, amount_untaxed, tax_amount, total_amount, tax_rate,
                  reference_type, reference_id, deduction_type, period, status, note,
                  report_period, invoice_format, deduction_category,
                  created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
@@ -259,6 +275,7 @@ class InvoiceModel
             !empty($data['vendor_id']) ? $data['vendor_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_tax_id']) ? $data['vendor_tax_id'] : null,
+            $buyerTaxId,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
@@ -293,8 +310,12 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 買方預設為禾順 94081455
+        $buyerTaxId = !empty($data['buyer_tax_id']) ? $data['buyer_tax_id'] : '94081455';
+
         $sql = "UPDATE purchase_invoices SET
                 invoice_number = ?, invoice_date = ?, vendor_id = ?, vendor_name = ?, vendor_tax_id = ?,
+                buyer_tax_id = ?,
                 invoice_type = ?, amount_untaxed = ?, tax_amount = ?, total_amount = ?, tax_rate = ?,
                 reference_type = ?, reference_id = ?, deduction_type = ?, period = ?, status = ?,
                 note = ?, report_period = ?, invoice_format = ?, deduction_category = ?,
@@ -307,6 +328,7 @@ class InvoiceModel
             !empty($data['vendor_id']) ? $data['vendor_id'] : null,
             !empty($data['vendor_name']) ? $data['vendor_name'] : null,
             !empty($data['vendor_tax_id']) ? $data['vendor_tax_id'] : null,
+            $buyerTaxId,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
@@ -430,10 +452,14 @@ class InvoiceModel
             $where[] = "si.invoice_number <= ?";
             $params[] = trim($filters['invoice_no_to']);
         }
-        // 賣方統一編號
+        // 賣方統一編號（特殊值 __empty__ 代表篩未設定賣方）
         if (!empty($filters['seller_tax_id'])) {
-            $where[] = "si.seller_tax_id LIKE ?";
-            $params[] = '%' . trim($filters['seller_tax_id']) . '%';
+            if ($filters['seller_tax_id'] === '__empty__') {
+                $where[] = "(si.seller_tax_id IS NULL OR TRIM(si.seller_tax_id) = '')";
+            } else {
+                $where[] = "si.seller_tax_id LIKE ?";
+                $params[] = '%' . trim($filters['seller_tax_id']) . '%';
+            }
         }
 
         $whereStr = implode(' AND ', $where);
@@ -442,6 +468,14 @@ class InvoiceModel
         $countStmt = $this->db->prepare($countSql);
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
+
+        // 選了發票聯式時回傳合計
+        $summary = null;
+        if (!empty($filters['invoice_format'])) {
+            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM sales_invoices si WHERE " . $whereStr);
+            $sumStmt->execute($params);
+            $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
+        }
 
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
@@ -462,6 +496,7 @@ class InvoiceModel
             'page'     => $page,
             'lastPage' => $lastPage,
             'perPage'  => $perPage,
+            'summary'  => $summary,
         );
     }
 
@@ -511,19 +546,27 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 賣方預設為禾順 94081455
+        $sellerTaxId = !empty($data['seller_tax_id']) ? $data['seller_tax_id'] : '94081455';
+        $sellerName = !empty($data['seller_name']) ? $data['seller_name']
+            : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
+
         $sql = "INSERT INTO sales_invoices
                 (invoice_number, invoice_date, customer_name, customer_tax_id,
+                 seller_tax_id, seller_name,
                  invoice_type, amount_untaxed, tax_amount, total_amount, tax_rate,
                  reference_type, reference_id, period, status, note,
                  report_period, invoice_format, deduction_category,
                  created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
+            $sellerTaxId,
+            $sellerName,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,
@@ -557,8 +600,14 @@ class InvoiceModel
             $data['period'] = $this->calculatePeriod($data['invoice_date']);
         }
 
+        // 賣方預設為禾順 94081455
+        $sellerTaxId = !empty($data['seller_tax_id']) ? $data['seller_tax_id'] : '94081455';
+        $sellerName = !empty($data['seller_name']) ? $data['seller_name']
+            : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
+
         $sql = "UPDATE sales_invoices SET
                 invoice_number = ?, invoice_date = ?, customer_name = ?, customer_tax_id = ?,
+                seller_tax_id = ?, seller_name = ?,
                 invoice_type = ?, amount_untaxed = ?, tax_amount = ?, total_amount = ?, tax_rate = ?,
                 reference_type = ?, reference_id = ?, period = ?, status = ?,
                 note = ?, report_period = ?, invoice_format = ?, deduction_category = ?,
@@ -570,6 +619,8 @@ class InvoiceModel
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
+            $sellerTaxId,
+            $sellerName,
             !empty($data['invoice_type']) ? $data['invoice_type'] : '應稅',
             isset($data['amount_untaxed']) ? $data['amount_untaxed'] : 0,
             isset($data['tax_amount']) ? $data['tax_amount'] : 0,

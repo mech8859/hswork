@@ -11,7 +11,8 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
     <?= back_button('/stock_ins.php') ?>
 </div>
 
-<form method="POST" action="/stock_ins.php?action=create" id="siForm">
+<?php require __DIR__ . '/../layouts/_pack_unit_js.php'; ?>
+<form method="POST" action="/stock_ins.php?action=create" id="siForm" onsubmit="return hswPackUnitPrepareSubmit(this)">
     <input type="hidden" name="csrf_token" value="<?= e(Session::getCsrfToken()) ?>">
 
     <div class="card mb-2 si-form">
@@ -102,7 +103,7 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
                     </tr>
                 </thead>
                 <tbody id="itemBody">
-                    <tr>
+                    <tr class="pack-unit-row">
                         <td class="item-seq">1</td>
                         <td>
                             <input type="hidden" name="items[0][product_id]" class="si-product-id" value="">
@@ -113,8 +114,17 @@ $userBranchId = !empty($user['branch_id']) ? $user['branch_id'] : '';
                             <div class="si-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
                         </td>
                         <td><input type="text" name="items[0][spec]" class="form-control" value=""></td>
-                        <td><input type="text" name="items[0][unit]" class="form-control" value=""></td>
-                        <td><input type="number" name="items[0][quantity]" class="form-control" step="1" min="1" value="1"></td>
+                        <td>
+                            <select class="form-control pack-unit-select"></select>
+                            <input type="hidden" name="items[0][unit]" class="pack-unit-hidden-unit" value="">
+                            <input type="hidden" name="items[0][input_unit]" class="pack-unit-hidden-input-unit" value="">
+                            <input type="hidden" name="items[0][input_qty]" class="pack-unit-hidden-input-qty" value="">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control pack-unit-qty" step="any" min="0" value="1" oninput="hswPackUnitRowSync(this)">
+                            <input type="hidden" name="items[0][quantity]" class="pack-unit-hidden-qty" value="">
+                            <div class="pack-unit-hint" style="display:none"></div>
+                        </td>
                         <td><input type="number" name="items[0][unit_price]" class="form-control" step="1" min="0" value="0"></td>
                         <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>
                     </tr>
@@ -141,13 +151,19 @@ var itemIdx = 1;
 function addItemRow() {
     var tbody = document.getElementById('itemBody');
     var tr = document.createElement('tr');
+    tr.className = 'pack-unit-row';
     var seq = tbody.querySelectorAll('tr').length + 1;
     tr.innerHTML = '<td class="item-seq">' + seq + '</td>'
         + '<td><input type="hidden" name="items['+itemIdx+'][product_id]" class="si-product-id" value=""><input type="text" name="items['+itemIdx+'][model]" class="form-control si-model" value="" readonly></td>'
         + '<td style="position:relative"><input type="text" name="items['+itemIdx+'][product_name]" class="form-control si-product-name" value="" autocomplete="off" placeholder="輸入關鍵字搜尋..." oninput="siSearchProduct(this)"><div class="si-product-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div></td>'
         + '<td><input type="text" name="items['+itemIdx+'][spec]" class="form-control" value=""></td>'
-        + '<td><input type="text" name="items['+itemIdx+'][unit]" class="form-control" value=""></td>'
-        + '<td><input type="number" name="items['+itemIdx+'][quantity]" class="form-control" step="1" min="1" value="1"></td>'
+        + '<td><select class="form-control pack-unit-select"></select>'
+        + '<input type="hidden" name="items['+itemIdx+'][unit]" class="pack-unit-hidden-unit" value="">'
+        + '<input type="hidden" name="items['+itemIdx+'][input_unit]" class="pack-unit-hidden-input-unit" value="">'
+        + '<input type="hidden" name="items['+itemIdx+'][input_qty]" class="pack-unit-hidden-input-qty" value=""></td>'
+        + '<td><input type="number" class="form-control pack-unit-qty" step="any" min="0" value="1" oninput="hswPackUnitRowSync(this)">'
+        + '<input type="hidden" name="items['+itemIdx+'][quantity]" class="pack-unit-hidden-qty" value="">'
+        + '<div class="pack-unit-hint" style="display:none"></div></td>'
         + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control" step="1" min="0" value="0"></td>'
         + '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>';
     tbody.appendChild(tr);
@@ -190,11 +206,14 @@ function siSearchProduct(inp) {
                     + 'data-model="' + (list[i].model||'').replace(/"/g,'&quot;') + '" '
                     + 'data-price="' + (list[i].price||0) + '" '
                     + 'data-unit="' + (list[i].unit||'').replace(/"/g,'&quot;') + '" '
+                    + 'data-pack-unit="' + (list[i].pack_unit||'').toString().replace(/"/g,'&quot;') + '" '
+                    + 'data-pack-qty="' + (list[i].pack_qty||'') + '" '
                     + 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'">'
                     + '<div style="font-weight:600">' + (list[i].name||'') + '</div>'
                     + '<div style="font-size:.75rem;color:#888">'
                     + (list[i].model ? '<span style="color:#1565c0">' + list[i].model + '</span> | ' : '')
                     + '$' + Number(list[i].price||0).toLocaleString()
+                    + (list[i].pack_unit && list[i].pack_qty ? ' | 1'+list[i].pack_unit+'='+list[i].pack_qty+(list[i].unit||'') : '')
                     + '</div></div>';
             }
             dd.innerHTML = html;
@@ -214,8 +233,12 @@ document.addEventListener('click', function(e) {
         if (pidInp) pidInp.value = item.dataset.id || '';
         var priceInp = row.querySelector('input[name*="[unit_price]"]');
         if (priceInp && item.dataset.price) priceInp.value = Math.round(Number(item.dataset.price));
-        var unitInp = row.querySelector('input[name*="[unit]"]');
-        if (unitInp && item.dataset.unit) unitInp.value = item.dataset.unit;
+        // 設定單位下拉（含包裝單位）
+        hswPackUnitSetupRow(row, {
+            unit: item.dataset.unit || '',
+            pack_unit: item.dataset.packUnit || '',
+            pack_qty: item.dataset.packQty || 0
+        });
         item.closest('.si-product-dropdown').style.display = 'none';
         return;
     }

@@ -526,27 +526,30 @@ switch ($action) {
         if (mb_strlen($keyword) < 1) { echo json_encode(array()); exit; }
         $db = Database::getInstance();
         $like = '%' . $keyword . '%';
-        // 限定分類：線材&相關配件、五金配件及其所有子分類
+        // 限定分類：所有打勾「預計線材顯示」的分類 + 子孫分類
         $catIds = array();
-        $parentNames = array('線材&相關配件', '五金配件');
-        foreach ($parentNames as $pn) {
-            $pStmt = $db->prepare("SELECT id FROM product_categories WHERE name = ?");
-            $pStmt->execute(array($pn));
-            $parentId = $pStmt->fetchColumn();
-            if ($parentId) {
-                $catIds[] = (int)$parentId;
-                $childStmt = $db->prepare("SELECT id FROM product_categories WHERE parent_id = ?");
-                $childStmt->execute(array($parentId));
-                while ($cid = $childStmt->fetchColumn()) {
-                    $catIds[] = (int)$cid;
-                    // 第三層
-                    $grandStmt = $db->prepare("SELECT id FROM product_categories WHERE parent_id = ?");
-                    $grandStmt->execute(array($cid));
-                    while ($gid = $grandStmt->fetchColumn()) {
-                        $catIds[] = (int)$gid;
+        try {
+            $rootStmt = $db->query("SELECT id FROM product_categories WHERE show_in_material_estimate = 1");
+            $rootIds = array();
+            while ($rid = $rootStmt->fetchColumn()) { $rootIds[] = (int)$rid; }
+            // 遞迴展開子孫
+            $queue = $rootIds;
+            $catIds = $rootIds;
+            while (!empty($queue)) {
+                $parentId = array_shift($queue);
+                $cStmt = $db->prepare("SELECT id FROM product_categories WHERE parent_id = ?");
+                $cStmt->execute(array($parentId));
+                while ($cid = $cStmt->fetchColumn()) {
+                    $cid = (int)$cid;
+                    if (!in_array($cid, $catIds, true)) {
+                        $catIds[] = $cid;
+                        $queue[] = $cid;
                     }
                 }
             }
+        } catch (Exception $e) {
+            // 欄位不存在等錯誤 → 走 fallback
+            $catIds = array();
         }
         if (empty($catIds)) {
             // fallback: 搜全部

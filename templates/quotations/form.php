@@ -246,7 +246,10 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                             foreach ($items as $iIdx => $item):
                             ?>
                             <tr>
-                                <td class="row-num"><?= $iIdx + 1 ?></td>
+                                <td class="row-num">
+                                    <span class="drag-handle" draggable="true" title="拖曳排序">☰</span>
+                                    <span class="row-seq-num"><?= $iIdx + 1 ?></span>
+                                </td>
                                 <td>
                                     <input type="text" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][item_name]" class="form-control item-name" value="<?= e($item['item_name'] ?? '') ?>" placeholder="品名（可手動輸入）" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)">
                                     <input type="hidden" name="sections[<?= $sIdx ?>][items][<?= $iIdx ?>][product_id]" value="<?= e($item['product_id'] ?? '') ?>">
@@ -501,7 +504,13 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
 .quote-items-table input { font-size: .85rem; padding: 4px 6px; }
 .quote-items-table th { font-size: .75rem; padding: 6px 4px; white-space: nowrap; }
 .quote-items-table td { padding: 4px; vertical-align: middle; }
-.row-num { text-align: center; color: var(--gray-500); font-size: .8rem; }
+.row-num { text-align: center; color: var(--gray-500); font-size: .8rem; white-space:nowrap; }
+.drag-handle { cursor: grab; color: #c0c0c0; font-size: 1rem; user-select: none; padding: 0 2px; }
+.drag-handle:hover { color: #666; }
+.drag-handle:active { cursor: grabbing; }
+.row-seq-num { margin-left: 2px; }
+tr.quote-drop-target > td { border-top: 2px solid #1565c0 !important; }
+tr.quote-drag-source > td { opacity: .4; }
 /* 確保單價/成本欄位無 +/- 按鈕 */
 .quote-items-table .item-price,
 .quote-items-table .item-cost { -webkit-appearance: none; -moz-appearance: textfield; }
@@ -724,7 +733,7 @@ function buildItemRow(sidx, iidx) {
     var costTh = canManage ? '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][unit_cost]" class="form-control item-cost" value="0" readonly style="background:#f5f5f5;color:#666;min-width:100px;width:100%"></td>' : '';
     var colSpan = canManage ? 8 : 7;
     return '<tr>' +
-        '<td class="row-num">' + (iidx + 1) + '</td>' +
+        '<td class="row-num"><span class="drag-handle" draggable="true" title="\u62d6\u66f3\u6392\u5e8f">\u2630</span><span class="row-seq-num">' + (iidx + 1) + '</span></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][item_name]" class="form-control item-name" value="" placeholder="\u54c1\u540d\uff08\u53ef\u624b\u52d5\u8f38\u5165\uff09" style="font-weight:600;font-size:.85rem" oninput="checkManualInput(this)"><input type="hidden" name="sections[' + sidx + '][items][' + iidx + '][product_id]" value=""><div class="manual-warn" style="display:none;color:#c62828;font-size:.7rem;margin-top:2px">\u26a0 \u8acb\u7528\u5206\u985e\u6311\u9078\u6216\u95dc\u9375\u5b57\u641c\u5c0b\uff0c\u5426\u5247\u7121\u6cd5\u7522\u751f\u51fa\u5eab\u55ae</div><textarea name="sections[' + sidx + '][items][' + iidx + '][remark]" class="form-control" rows="1" placeholder="\u5099\u8a3b" style="font-size:.78rem;color:#666;margin-top:3px;padding:3px 6px;background:#fffbe6"></textarea></td>' +
         '<td><input type="text" name="sections[' + sidx + '][items][' + iidx + '][model_number]" class="form-control item-model" value="" placeholder="\u578b\u865f" style="font-size:.8rem;color:#1565c0"></td>' +
         '<td><input type="number" name="sections[' + sidx + '][items][' + iidx + '][quantity]" class="form-control item-qty" value="1" step="1" min="0" oninput="calcRow(this)"></td>' +
@@ -766,8 +775,14 @@ function reindexSection(section) {
     var sidx = section.getAttribute('data-sidx');
     var rows = section.querySelectorAll('tbody tr:not(.psel-row)');
     for (var i = 0; i < rows.length; i++) {
-        var numEl = rows[i].querySelector('.row-num');
-        if (numEl) numEl.textContent = i + 1;
+        // 優先更新 row-seq-num span（若有 drag handle 的新版結構），否則 fallback 到 row-num td
+        var seqEl = rows[i].querySelector('.row-seq-num');
+        if (seqEl) {
+            seqEl.textContent = i + 1;
+        } else {
+            var numEl = rows[i].querySelector('.row-num');
+            if (numEl) numEl.textContent = i + 1;
+        }
         var inputs = rows[i].querySelectorAll('input, textarea');
         for (var j = 0; j < inputs.length; j++) {
             var name = inputs[j].name;
@@ -777,6 +792,73 @@ function reindexSection(section) {
         }
     }
 }
+
+// ========== 拖曳排序（data row + psel row 整對一起搬）==========
+var quoteDragSource = null;
+
+document.addEventListener('dragstart', function(e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('drag-handle')) return;
+    var tr = el.closest('tr');
+    if (!tr || tr.classList.contains('psel-row')) return;
+    // 只處理報價表格內的拖曳
+    if (!tr.closest('.quote-items-table')) return;
+    quoteDragSource = tr;
+    tr.classList.add('quote-drag-source');
+    var psel = tr.nextElementSibling;
+    if (psel && psel.classList.contains('psel-row')) psel.classList.add('quote-drag-source');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', 'quote-row'); } catch(ex) {}
+});
+
+document.addEventListener('dragover', function(e) {
+    if (!quoteDragSource) return;
+    var tr = e.target.closest ? e.target.closest('tr') : null;
+    if (!tr) return;
+    // 必須在同一個 tbody（同一個 section）
+    if (tr.closest('tbody') !== quoteDragSource.closest('tbody')) return;
+    // 若 hover 在 psel row 上，目標視為上面的 data row
+    if (tr.classList.contains('psel-row')) tr = tr.previousElementSibling;
+    if (!tr || tr === quoteDragSource) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // 清除其他高亮，設目前
+    var tbody = quoteDragSource.closest('tbody');
+    var marked = tbody.querySelectorAll('tr.quote-drop-target');
+    for (var i = 0; i < marked.length; i++) marked[i].classList.remove('quote-drop-target');
+    tr.classList.add('quote-drop-target');
+});
+
+document.addEventListener('drop', function(e) {
+    if (!quoteDragSource) return;
+    var tr = e.target.closest ? e.target.closest('tr') : null;
+    if (!tr) return;
+    if (tr.closest('tbody') !== quoteDragSource.closest('tbody')) return;
+    if (tr.classList.contains('psel-row')) tr = tr.previousElementSibling;
+    if (!tr || tr === quoteDragSource) return;
+    e.preventDefault();
+    var sourcePsel = quoteDragSource.nextElementSibling;
+    var hasPsel = sourcePsel && sourcePsel.classList.contains('psel-row');
+    var tbody = tr.parentNode;
+    // 把來源 data row 插到目標 data row 前
+    tbody.insertBefore(quoteDragSource, tr);
+    // psel row 跟著搬
+    if (hasPsel) tbody.insertBefore(sourcePsel, tr);
+    // reindex
+    var section = tbody.closest('.quote-section');
+    if (section && typeof reindexSection === 'function') reindexSection(section);
+});
+
+document.addEventListener('dragend', function(e) {
+    if (quoteDragSource) {
+        quoteDragSource.classList.remove('quote-drag-source');
+        var psel = quoteDragSource.nextElementSibling;
+        if (psel && psel.classList.contains('psel-row')) psel.classList.remove('quote-drag-source');
+    }
+    var marked = document.querySelectorAll('tr.quote-drop-target');
+    for (var i = 0; i < marked.length; i++) marked[i].classList.remove('quote-drop-target');
+    quoteDragSource = null;
+});
 
 function checkManualInput(inp) {
     var td = inp.closest('td');
@@ -1049,6 +1131,7 @@ function keywordSearch(input) {
             for (var i = 0; i < data.length; i++) {
                 var stockColor = data[i].stock_qty > 0 ? '#2e7d32' : '#999';
                 var stockText = '庫存: ' + data[i].stock_qty;
+                var disc = data[i].discontinue_when_empty ? 1 : 0;
                 html += '<div class="product-dropdown-item" onclick="selectProduct(this)" ' +
                     'data-id="' + data[i].id + '" ' +
                     'data-name="' + escHtml(data[i].name) + '" ' +
@@ -1056,8 +1139,9 @@ function keywordSearch(input) {
                     'data-unit="' + escHtml(data[i].unit || '式') + '" ' +
                     'data-price="' + (data[i].price || 0) + '" ' +
                     'data-cost="' + (data[i].cost_per_unit || (data[i].pack_qty > 0 ? Math.round(data[i].cost / data[i].pack_qty * 100) / 100 : data[i].cost) || 0) + '" ' +
-                    'data-stock="' + (data[i].stock_qty || 0) + '">' +
-                    '<div style="font-weight:600">' + escHtml(data[i].name) + '</div>' +
+                    'data-stock="' + (data[i].stock_qty || 0) + '" ' +
+                    'data-discontinue="' + disc + '">' +
+                    '<div style="font-weight:600">' + escHtml(data[i].name) + (disc ? ' <span style="color:#c5221f;font-size:.75rem;font-weight:600">⚠ 庫存用完不再進貨</span>' : '') + '</div>' +
                     '<div class="product-meta">' +
                         (data[i].model ? '<span style="color:#1565c0">' + escHtml(data[i].model) + '</span> | ' : '') +
                         '<span style="color:' + stockColor + '">' + stockText + '</span> | ' +
@@ -1079,6 +1163,7 @@ function selectProduct(el) {
     var name = el.getAttribute('data-name');
     var model = el.getAttribute('data-model') || '';
     var stock = el.getAttribute('data-stock') || '0';
+    var disc = el.getAttribute('data-discontinue') === '1';
 
     dataRow.querySelector('input[name*="product_id"]').value = el.getAttribute('data-id');
     dataRow.querySelector('.item-name').value = name;
@@ -1099,7 +1184,8 @@ function selectProduct(el) {
     var stockDisp = pselRow.querySelector('.psel-stock-display');
     if (stockDisp) {
         var stockColor = parseInt(stock) > 0 ? '#2e7d32' : '#c62828';
-        stockDisp.innerHTML = '<span style="color:' + stockColor + '">庫存: ' + stock + '</span>';
+        var discMsg = disc ? ' <span style="color:#c5221f;font-weight:600">⚠ 庫存用完不再進貨</span>' : '';
+        stockDisp.innerHTML = '<span style="color:' + stockColor + '">庫存: ' + stock + '</span>' + discMsg;
     }
 }
 

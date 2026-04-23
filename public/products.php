@@ -128,7 +128,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, cost_per_unit, category_id, stock, is_active, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO products (name, model, vendor_model, brand, supplier, description, specifications, warranty_text, unit, price, cost, retail_price, labor_cost, pack_qty, pack_unit, cost_per_unit, category_id, stock, is_active, discontinue_when_empty, image, datasheet) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
@@ -144,10 +144,12 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
+                !empty($_POST['pack_unit']) ? trim($_POST['pack_unit']) : null,
                 null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 (int)($_POST['stock'] ?? 0),
                 1,
+                !empty($_POST['discontinue_when_empty']) ? 1 : 0,
                 $imageUrl,
                 $datasheetUrl,
             ));
@@ -201,7 +203,7 @@ switch ($action) {
                 $datasheetUrl = trim($_POST['datasheet_url']);
             }
 
-            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, cost_per_unit=?, category_id=?, is_active=?, image=?, datasheet=? WHERE id=?")->execute(array(
+            $db->prepare("UPDATE products SET name=?, model=?, vendor_model=?, brand=?, supplier=?, description=?, specifications=?, warranty_text=?, unit=?, price=?, cost=?, retail_price=?, labor_cost=?, pack_qty=?, pack_unit=?, cost_per_unit=?, category_id=?, is_active=?, discontinue_when_empty=?, image=?, datasheet=? WHERE id=?")->execute(array(
                 trim($_POST['name'] ?? ''),
                 trim($_POST['model'] ?? ''),
                 trim($_POST['vendor_model'] ?? ''),
@@ -216,9 +218,11 @@ switch ($action) {
                 (int)($_POST['retail_price'] ?? 0),
                 (int)($_POST['labor_cost'] ?? 0),
                 !empty($_POST['pack_qty']) ? (float)$_POST['pack_qty'] : null,
+                !empty($_POST['pack_unit']) ? trim($_POST['pack_unit']) : null,
                 null, // cost_per_unit 下面後端計算
                 !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null,
                 isset($_POST['is_active']) ? 1 : 0,
+                !empty($_POST['discontinue_when_empty']) ? 1 : 0,
                 $imageUrl,
                 $datasheetUrl,
                 $id,
@@ -276,6 +280,32 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- AJAX: 切換星標（需管理權限）----
+    case 'ajax_toggle_star':
+        header('Content-Type: application/json');
+        $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['role'], array('boss','manager'));
+        if (!$canManage) {
+            echo json_encode(array('success' => false, 'error' => '權限不足'));
+            exit;
+        }
+        if (!verify_csrf()) {
+            echo json_encode(array('success' => false, 'error' => 'CSRF'));
+            exit;
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(array('success' => false, 'error' => '無效的產品 ID'));
+            exit;
+        }
+        $newVal = $model->toggleStar($id);
+        if ($newVal === null) {
+            echo json_encode(array('success' => false, 'error' => '產品不存在'));
+            exit;
+        }
+        AuditLog::log('products', 'toggle_star', $id, 'is_starred=' . $newVal);
+        echo json_encode(array('success' => true, 'is_starred' => $newVal));
+        exit;
+
     // ---- AJAX: 產品搜尋（施工回報材料用）----
     case 'ajax_search':
         $keyword = trim($_GET['keyword'] ?? '');
@@ -291,6 +321,9 @@ switch ($action) {
                 'model_number' => $p['model_number'] ?? '',
                 'price' => $p['price'] ?? 0,
                 'unit' => $p['unit'] ?? '',
+                'pack_qty' => $p['pack_qty'] ?? null,
+                'pack_unit' => $p['pack_unit'] ?? null,
+                'cost_per_unit' => $p['cost_per_unit'] ?? null,
             );
         }
         json_response(array('data' => $items));
@@ -322,16 +355,17 @@ switch ($action) {
         $catName = trim($_POST['name'] ?? '');
         $catParent = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
         $excludeStockout = !empty($_POST['exclude_from_stockout']) ? 1 : 0;
+        $showInMaterial = !empty($_POST['show_in_material_estimate']) ? 1 : 0;
 
         if (!$catName) {
             Session::flash('error', '請輸入分類名稱');
             redirect('/products.php?action=categories');
         }
         if ($catId) {
-            $model->updateCategory($catId, $catName, $catParent, $excludeStockout);
+            $model->updateCategory($catId, $catName, $catParent, $excludeStockout, $showInMaterial);
             Session::flash('success', '分類已更新');
         } else {
-            $model->createCategory($catName, $catParent, $excludeStockout);
+            $model->createCategory($catName, $catParent, $excludeStockout, $showInMaterial);
             Session::flash('success', '分類已新增');
         }
         redirect('/products.php?action=categories');

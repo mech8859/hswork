@@ -79,6 +79,16 @@ switch ($action) {
                 }
                 $id = $model->create($data);
                 AuditLog::log('overtimes', 'create', $id, '新增加班單');
+
+                // 觸發簽核流程（與請假單一致）
+                try {
+                    require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+                    $approvalModel = new ApprovalModel();
+                    $approvalModel->submitForApproval('overtime', $id, 0, null, (int)$data['user_id']);
+                } catch (Exception $e) {
+                    error_log('Overtime approval dispatch failed: ' . $e->getMessage());
+                }
+
                 Session::flash('success', '加班單已送出，等待核准');
                 redirect('/overtimes.php');
             } catch (Exception $e) {

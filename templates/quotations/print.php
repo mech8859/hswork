@@ -204,7 +204,7 @@ if (!empty($quote['case_id'])) {
             <td>
                 <?= e($item['item_name']) ?><?php if (empty($quote['hide_model_on_print']) && !empty($item['model_number'])): ?> / <?= e($item['model_number']) ?><?php endif; ?>
                 <?php if (!empty($item['remark'])): ?>
-                <div style="color:#555;font-size:.8em;margin-top:1px;white-space:pre-line"><?= e($item['remark']) ?></div>
+                <div style="color:#555;font-size:.9em;margin-top:2px;white-space:pre-line"><?= e($item['remark']) ?></div>
                 <?php endif; ?>
             </td>
             <td class="text-right"><?= rtrim(rtrim(number_format((float)$item['quantity'], 2), '0'), '.') ?></td>
@@ -214,9 +214,17 @@ if (!empty($quote['case_id'])) {
         </tr>
         <?php endforeach; ?>
         <?php if ($quote['format'] === 'project'): ?>
+        <?php $secHasDisc = isset($sec['discount_amount']) && $sec['discount_amount'] !== null && $sec['discount_amount'] !== ''; ?>
         <tr class="subtotal-row">
             <td colspan="4" class="text-right"><strong>小計</strong></td>
-            <td class="text-right"><strong><?= number_format((int)$sec['subtotal']) ?></strong></td>
+            <td class="text-right">
+                <?php if ($secHasDisc): ?>
+                    <span style="text-decoration:line-through;color:#999;font-weight:400;font-size:.85em"><?= number_format((int)$sec['subtotal']) ?></span>
+                    <strong style="color:#c62828;margin-left:4px"><?= number_format((int)$sec['discount_amount']) ?></strong>
+                <?php else: ?>
+                    <strong><?= number_format((int)$sec['subtotal']) ?></strong>
+                <?php endif; ?>
+            </td>
         </tr>
         <?php endif; ?>
     <?php endforeach; ?>

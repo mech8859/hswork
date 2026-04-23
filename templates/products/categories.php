@@ -53,7 +53,8 @@
                     <td>
                         <div class="d-flex gap-1">
                             <?php if (!empty($cat['exclude_from_stockout'])): ?><span class="badge" style="background:#ffebee;color:#c62828;font-size:.7rem;padding:2px 6px;margin-right:4px">不進出庫單</span><?php endif; ?>
-                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"], "exclude_from_stockout" => (int)($cat["exclude_from_stockout"] ?? 0))) ?>)'>編輯</button>
+                            <?php if (!empty($cat['show_in_material_estimate'])): ?><span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:.7rem;padding:2px 6px;margin-right:4px">預計線材</span><?php endif; ?>
+                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"], "exclude_from_stockout" => (int)($cat["exclude_from_stockout"] ?? 0), "show_in_material_estimate" => (int)($cat["show_in_material_estimate"] ?? 0))) ?>)'>編輯</button>
                             <?php if ((int)$cat['child_count'] === 0 && (int)$cat['product_count'] === 0): ?>
                             <form method="POST" action="/products.php?action=category_delete" style="display:inline" onsubmit="return confirm('確認刪除分類「<?= e($cat['name']) ?>」？')">
                                 <?= csrf_field() ?>
@@ -147,6 +148,14 @@
                     <span style="color:#c62828;font-weight:600">不進出庫單</span>
                 </label>
                 <small style="color:#888;display:block;margin-top:2px">勾選後，此分類下的產品從報價單建立出庫單時會自動排除</small>
+            </div>
+
+            <div class="form-group" style="margin-top:8px">
+                <label class="checkbox-label" style="cursor:pointer">
+                    <input type="checkbox" name="show_in_material_estimate" id="catShowMaterial" value="1">
+                    <span style="color:#2e7d32;font-weight:600">預計線材</span>
+                </label>
+                <small style="color:#888;display:block;margin-top:2px">勾選後，此分類（含子分類）下的產品會出現在報價單「預計使用線材」搜尋結果</small>
             </div>
 
             <div class="d-flex gap-1">
@@ -399,6 +408,7 @@ function openCatModal(data) {
     document.getElementById('catName').value = '';
     document.getElementById('catParent').value = '';
     document.getElementById('catExcludeStockout').checked = false;
+    document.getElementById('catShowMaterial').checked = false;
     document.getElementById('catLevel0').value = '';
     document.getElementById('catLevel0New').value = '';
     document.getElementById('catLevel0New').style.display = 'none';
@@ -415,6 +425,7 @@ function openCatModal(data) {
         document.getElementById('catName').value = data.name;
         document.getElementById('catParent').value = data.parent_id || '';
         document.getElementById('catExcludeStockout').checked = !!data.exclude_from_stockout;
+        document.getElementById('catShowMaterial').checked = !!data.show_in_material_estimate;
 
         // 根據深度設定對應欄位
         var depth = getCatDepth(data.id);

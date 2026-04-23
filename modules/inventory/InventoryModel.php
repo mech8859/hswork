@@ -320,6 +320,10 @@ class InventoryModel
             ));
 
             if ($ownTransaction) $this->db->commit();
+            // 庫存歸 0 自動停用（只在減少庫存時觸發）
+            if ($quantity < 0) {
+                $this->autoDisableIfEmpty($productId);
+            }
             return $inventoryId;
         } catch (Exception $e) {
             if ($ownTransaction) $this->db->rollBack();
@@ -382,6 +386,8 @@ class InventoryModel
             INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
             VALUES (?, ?, 'case_out', ?, ?, ?, ?, ?, ?, NOW())
         ")->execute(array($productId, $warehouseId, -$qty, $qtyAfter, $refType, $refId, $note, $userId));
+
+        $this->autoDisableIfEmpty($productId);
     }
 
     /**
@@ -440,6 +446,39 @@ class InventoryModel
             INSERT INTO inventory_transactions (product_id, warehouse_id, type, quantity, qty_after, reference_type, reference_id, note, created_by, created_at)
             VALUES (?, ?, 'case_out', ?, ?, ?, ?, ?, ?, NOW())
         ")->execute(array($productId, $warehouseId, -$qty, $qtyAfter, $refType, $refId, $note, $userId));
+
+        $this->autoDisableIfEmpty($productId);
+    }
+
+    /**
+     * 庫存歸 0 自動停用：若產品設了 discontinue_when_empty=1
+     * 且所有倉庫總 stock_qty <= 0，則 is_active = 0
+     * 在每次降庫存後呼叫
+     */
+    public function autoDisableIfEmpty($productId)
+    {
+        $productId = (int)$productId;
+        if ($productId <= 0) return;
+        try {
+            $stmt = $this->db->prepare("SELECT discontinue_when_empty, is_active FROM products WHERE id = ?");
+            $stmt->execute(array($productId));
+            $p = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$p) return;
+            if (empty($p['discontinue_when_empty'])) return;
+            if (empty($p['is_active'])) return; // 已停用就不動
+
+            $totalStmt = $this->db->prepare("SELECT COALESCE(SUM(stock_qty), 0) FROM inventory WHERE product_id = ?");
+            $totalStmt->execute(array($productId));
+            $totalStock = (float)$totalStmt->fetchColumn();
+            if ($totalStock <= 0) {
+                $this->db->prepare("UPDATE products SET is_active = 0 WHERE id = ?")->execute(array($productId));
+                if (class_exists('AuditLog')) {
+                    AuditLog::log('products', 'auto_disable', $productId, '庫存歸 0 自動停用');
+                }
+            }
+        } catch (Exception $e) {
+            // 欄位未 migrate 等情況，安靜失敗
+        }
     }
 
     /**
@@ -912,6 +951,7 @@ class InventoryModel
     {
         $stmt = $this->db->prepare("
             SELECT p.id, p.name, p.model, p.unit, p.cost, p.price,
+                   p.pack_qty, p.pack_unit, p.cost_per_unit,
                    pc.name AS category_name,
                    COALESCE(inv.stock, 0) AS stock
             FROM products p

@@ -72,9 +72,19 @@ function pv($product, $field, $default = '') {
             </div>
         </div>
 
-        <div class="form-grid-2">
+        <div class="form-grid-3">
             <div class="form-group">
-                <label>每箱/每捲數量 <span style="color:var(--gray-400);font-size:.8rem">(如 305米/箱，非箱裝留空)</span></label>
+                <label>包裝單位 <span style="color:var(--gray-400);font-size:.8rem">(非箱裝留空)</span></label>
+                <?php $curPackUnit = pv($product, 'pack_unit', ''); ?>
+                <select name="pack_unit" id="prodPackUnit" class="form-control">
+                    <option value="">— 無包裝單位 —</option>
+                    <?php foreach (array('箱','卷','包','盒') as $pu): ?>
+                    <option value="<?= $pu ?>" <?= $curPackUnit === $pu ? 'selected' : '' ?>><?= $pu ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>箱／卷／包／盒數量 <span style="color:var(--gray-400);font-size:.8rem">(如 305/箱，非箱裝留空)</span></label>
                 <input type="number" name="pack_qty" id="prodPackQty" class="form-control" value="<?= pv($product, 'pack_qty') ? (float)pv($product, 'pack_qty') : '' ?>" min="0" step="0.01" placeholder="非箱裝留空" oninput="calcCostPerUnit()">
             </div>
             <div class="form-group">
@@ -170,14 +180,19 @@ function pv($product, $field, $default = '') {
         </div>
         <?php endif; ?>
 
-        <?php if ($product): ?>
-        <div class="form-group">
-            <label class="checkbox-label">
+        <div class="form-group" style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+            <?php if ($product): ?>
+            <label class="checkbox-label" style="cursor:pointer">
                 <input type="checkbox" name="is_active" value="1" <?= (!empty($product['is_active'])) ? 'checked' : '' ?>>
                 啟用
             </label>
+            <?php endif; ?>
+            <label class="checkbox-label" style="cursor:pointer">
+                <input type="checkbox" name="discontinue_when_empty" value="1" <?= (!empty($product['discontinue_when_empty'])) ? 'checked' : '' ?>>
+                <span style="color:#c5221f;font-weight:600">庫存用完不再進貨</span>
+                <small style="color:#888;margin-left:4px">（庫存歸 0 時自動停用，報價單禁止選用）</small>
+            </label>
         </div>
-        <?php endif; ?>
 
         <div class="d-flex gap-1 mt-2">
             <button type="submit" class="btn btn-primary"><?= $product ? '更新' : '新增' ?></button>
@@ -188,7 +203,8 @@ function pv($product, $field, $default = '') {
 
 <style>
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 480px) { .form-grid-2 { grid-template-columns: 1fr; } }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 480px) { .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; } }
 .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .price-history-table { width: 100%; border-collapse: collapse; }
 .price-history-table th { font-size: .75rem; color: var(--gray-500); font-weight: 500; padding: 4px 4px 8px; text-align: left; }
