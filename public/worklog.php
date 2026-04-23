@@ -668,6 +668,34 @@ switch ($action) {
             }
         }
 
+        // 若本工程師自己尚未填過 materials，但同排工其他工程師已填過 → 帶入當預設（繼承編輯）
+        $siblingMaterials = array();
+        $siblingFromName = '';
+        if ($worklog && empty($worklog['materials']) && !empty($worklog['schedule_id'])) {
+            try {
+                $sibDb = Database::getInstance();
+                $sibStmt = $sibDb->prepare("
+                    SELECT wl.id AS wl_id, u.real_name
+                    FROM work_logs wl
+                    LEFT JOIN users u ON wl.user_id = u.id
+                    WHERE wl.schedule_id = ? AND wl.id <> ?
+                      AND EXISTS (SELECT 1 FROM material_usage mu WHERE mu.work_log_id = wl.id)
+                    ORDER BY wl.updated_at DESC, wl.id DESC
+                    LIMIT 1
+                ");
+                $sibStmt->execute(array((int)$worklog['schedule_id'], (int)$worklog['id']));
+                $sibRow = $sibStmt->fetch(PDO::FETCH_ASSOC);
+                if ($sibRow) {
+                    $mStmt = $sibDb->prepare("SELECT mu.*, p.name AS product_name FROM material_usage mu LEFT JOIN products p ON mu.product_id = p.id WHERE mu.work_log_id = ? ORDER BY mu.id");
+                    $mStmt->execute(array((int)$sibRow['wl_id']));
+                    $siblingMaterials = $mStmt->fetchAll(PDO::FETCH_ASSOC);
+                    $siblingFromName = $sibRow['real_name'] ?: '';
+                }
+            } catch (Exception $e) {
+                $siblingMaterials = array();
+            }
+        }
+
         // 若無出庫單材料，從案件預估材料預填
         $estimateMaterials = array();
         if (empty($stockOutMaterials) && !empty($soCaseId) && $soCaseId > 0) {
