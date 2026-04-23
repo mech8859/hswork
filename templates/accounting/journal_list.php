@@ -3,6 +3,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="/accounting.php?action=ledger" class="btn btn-secondary">總帳查詢</a>
         <a href="/accounting.php?action=trial_balance" class="btn btn-secondary">試算表</a>
+        <a href="/accounting.php?action=voucher_reconciliation" class="btn btn-secondary">傳票核對</a>
         <?php if ($canManage): ?>
         <a href="/accounting.php?action=journal_create" class="btn btn-primary">+ 新增傳票</a>
         <?php endif; ?>
