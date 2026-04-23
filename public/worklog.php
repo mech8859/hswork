@@ -707,6 +707,43 @@ switch ($action) {
         json_response(array('success' => true));
         break;
 
+    // ---- 刪除整筆施工回報 ----
+    case 'delete':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗');
+            redirect('/worklog.php');
+            break;
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        $fromCase = (int)($_POST['from_case'] ?? 0);
+        $fromSchedule = (int)($_POST['from_schedule'] ?? 0);
+        $worklog = $model->getWorklog($id);
+        if (!$worklog) {
+            Session::flash('error', '找不到此施工回報紀錄');
+            redirect('/worklog.php');
+            break;
+        }
+        // 權限：本人或有 schedule.manage / all 權限
+        $canDelete = ($worklog['user_id'] == $userId)
+            || Auth::hasPermission('schedule.manage')
+            || Auth::hasPermission('all');
+        if (!$canDelete) {
+            Session::flash('error', '無權限刪除此施工回報');
+            redirect('/worklog.php?action=report&id=' . $id);
+            break;
+        }
+        $caseId = $model->deleteWorklog($id);
+        AuditLog::log('worklog', 'delete', $id, '刪除施工回報');
+        Session::flash('success', '施工回報已刪除');
+        if ($fromCase) {
+            redirect('/cases.php?action=edit&id=' . $fromCase . '#sec-worklog');
+        } elseif ($fromSchedule) {
+            redirect('/schedule.php?action=view&id=' . $fromSchedule);
+        } else {
+            redirect('/worklog.php');
+        }
+        break;
+
     // ---- 歷史記錄（時間軸式）----
     case 'history':
         $history = $model->getHistory($userId);

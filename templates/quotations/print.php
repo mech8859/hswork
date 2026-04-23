@@ -222,7 +222,7 @@ if (!empty($quote['case_id'])) {
     <tr><td class="label">營業稅 (<?= rtrim(rtrim(number_format($quote['tax_rate'], 2), '0'), '.') ?>%)：</td><td class="amount">$<?= number_format((int)$quote['tax_amount']) ?></td></tr>
     <tr><td class="label"><strong>合計新台幣：</strong></td><td class="amount"><strong>$<?= number_format((int)$quote['total_amount']) ?></strong></td></tr>
     <?php else: ?>
-    <tr><td class="label"><strong>合計新台幣(未稅)：</strong></td><td class="amount"><strong>$<?= number_format((int)$quote['subtotal']) ?></strong></td></tr>
+    <tr><td class="label"><strong>合計新台幣：</strong></td><td class="amount"><strong>$<?= number_format((int)$quote['subtotal']) ?></strong></td></tr>
     <?php endif; ?>
     <?php if (!empty($quote['has_discount']) && !empty($quote['discount_amount'])): ?>
     <tr><td class="label" style="color:red"><strong>優惠價：</strong></td><td class="amount" style="color:red"><strong>$<?= number_format((int)$quote['discount_amount']) ?></strong></td></tr>

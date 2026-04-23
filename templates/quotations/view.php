@@ -242,7 +242,7 @@ foreach ($approvalStatus['flows'] as $af) {
         <div style="margin-bottom:4px">營業稅 (<?= rtrim(rtrim(number_format($quote['tax_rate'], 2), '0'), '.') ?>%)：<strong>$<?= number_format($quote['tax_amount']) ?></strong></div>
         <div style="font-size:1.2rem;color:var(--primary)">合計新台幣：<strong>$<?= number_format($quote['total_amount']) ?></strong></div>
         <?php else: ?>
-        <div style="font-size:1.2rem;color:var(--primary)">合計新台幣(未稅)：<strong>$<?= number_format($quote['subtotal']) ?></strong></div>
+        <div style="font-size:1.2rem;color:var(--primary)">合計新台幣：<strong>$<?= number_format($quote['subtotal']) ?></strong></div>
         <?php endif; ?>
         <?php if (!empty($quote['has_discount']) && !empty($quote['discount_amount'])): ?>
         <div style="font-size:1.2rem;color:var(--danger);margin-top:4px">優惠價：<strong>$<?= number_format($quote['discount_amount']) ?></strong></div>

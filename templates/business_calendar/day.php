@@ -46,12 +46,13 @@ $calMonth = (int)date('m', strtotime($date));
 <div class="bc-day-list">
     <?php foreach ($items as $item):
         $evColor = BusinessCalendarModel::activityColor($item['activity_type']);
+        $staffColor = BusinessCalendarModel::staffColor($item['staff_name']);
         $atLabel = isset($activityTypes[$item['activity_type']]) ? $activityTypes[$item['activity_type']] : $item['activity_type'];
         $stLabel = isset($statusLabels[$item['status']]) ? $statusLabels[$item['status']] : $item['status'];
         $stBadge = isset($statusBadges[$item['status']]) ? $statusBadges[$item['status']] : 'secondary';
         $regionLabel = isset($regionOptions[$item['region']]) ? $regionOptions[$item['region']] : ($item['region'] ?: '');
     ?>
-    <div class="card bc-day-card" style="border-left:4px solid <?= e($evColor) ?>">
+    <div class="card bc-day-card" style="border-left:4px solid <?= e($staffColor) ?>">
         <div class="d-flex justify-between align-center flex-wrap gap-1 mb-1">
             <div class="d-flex align-center gap-1">
                 <span class="bc-badge-type" style="background:<?= e($evColor) ?>"><?= e($atLabel) ?></span>

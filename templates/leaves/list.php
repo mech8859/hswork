@@ -6,6 +6,7 @@
 <!-- 篩選 -->
 <div class="card">
     <form method="GET" action="/leaves.php" class="filter-form">
+        <input type="hidden" name="action" value="list">
         <div class="filter-row">
             <div class="form-group">
                 <label>月份</label>
@@ -33,7 +34,7 @@
             </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
-                <a href="/leaves.php" class="btn btn-outline btn-sm">清除</a>
+                <a href="/leaves.php?action=list" class="btn btn-outline btn-sm">清除</a>
             </div>
         </div>
     </form>

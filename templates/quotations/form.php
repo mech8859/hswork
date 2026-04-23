@@ -930,9 +930,9 @@ function calcGrandTotal() {
     // 未稅時隱藏稅額行
     document.getElementById('rowSubtotal').style.display = taxFree ? 'none' : 'flex';
     document.getElementById('rowTax').style.display = taxFree ? 'none' : 'flex';
-    // 未稅時合計標籤改
+    // 合計標籤統一顯示「合計新台幣：」（昨天修過、因未合回 main 被還原，2026-04-23 再修一次）
     var totalLabel = document.querySelector('#grandTotal').parentElement.querySelector('span');
-    if (totalLabel) totalLabel.textContent = taxFree ? '合計新台幣(未稅)：' : '合計新台幣：';
+    if (totalLabel) totalLabel.textContent = '合計新台幣：';
     // hidden field
     var hf = document.getElementById('taxFreeHidden');
     if (hf) hf.value = taxFree ? '1' : '0';

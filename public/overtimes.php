@@ -10,6 +10,10 @@ $canManage = Auth::hasPermission('overtime.manage');
 $canView   = Auth::hasPermission('overtime.view') || $canManage;
 $canOwn    = Auth::hasPermission('overtime.own') || $canView;
 
+// 僅允許指定人員手動覆寫加班時數（其他人一律以起迄時間重算）
+$_ot_meName = isset(Auth::user()['real_name']) ? Auth::user()['real_name'] : '';
+$canOverrideHours = ($_ot_meName === '張孟歆');
+
 if (!$canOwn) {
     Session::flash('error', '無權限使用加班單管理');
     redirect('/index.php');
@@ -61,7 +65,7 @@ switch ($action) {
                     'overtime_date' => !empty($_POST['overtime_date']) ? $_POST['overtime_date'] : date('Y-m-d'),
                     'start_time'    => !empty($_POST['start_time']) ? $_POST['start_time'] : null,
                     'end_time'      => !empty($_POST['end_time']) ? $_POST['end_time'] : null,
-                    'hours'         => isset($_POST['hours']) ? $_POST['hours'] : 0,
+                    'hours'         => ($canOverrideHours && isset($_POST['hours'])) ? $_POST['hours'] : 0,
                     'overtime_type' => !empty($_POST['overtime_type']) ? $_POST['overtime_type'] : 'weekday',
                     'reason'        => !empty($_POST['reason']) ? trim($_POST['reason']) : '',
                     'note'          => !empty($_POST['note']) ? trim($_POST['note']) : null,
@@ -132,7 +136,7 @@ switch ($action) {
                     'overtime_date' => !empty($_POST['overtime_date']) ? $_POST['overtime_date'] : date('Y-m-d'),
                     'start_time'    => $_POST['start_time'],
                     'end_time'      => $_POST['end_time'],
-                    'hours'         => isset($_POST['hours']) ? $_POST['hours'] : 0,
+                    'hours'         => ($canOverrideHours && isset($_POST['hours'])) ? $_POST['hours'] : 0,
                     'overtime_type' => !empty($_POST['overtime_type']) ? $_POST['overtime_type'] : 'weekday',
                     'reason'        => trim($_POST['reason']),
                     'note'          => !empty($_POST['note']) ? trim($_POST['note']) : null,

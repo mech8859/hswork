@@ -421,6 +421,38 @@ class WorklogModel
     }
 
     /**
+     * 刪除整筆施工回報（含照片、材料、案件同步紀錄）
+     * 回傳 case_id 以便導向，失敗回 null。
+     */
+    public function deleteWorklog($worklogId)
+    {
+        $worklogId = (int)$worklogId;
+        if (!$worklogId) return null;
+
+        // 取得關聯 case_id（供導向用）
+        $stmt = $this->db->prepare('SELECT s.case_id FROM work_logs wl JOIN schedules s ON wl.schedule_id = s.id WHERE wl.id = ?');
+        $stmt->execute(array($worklogId));
+        $caseId = $stmt->fetchColumn();
+
+        // 刪除照片檔案
+        $pStmt = $this->db->prepare('SELECT file_path FROM worklog_photos WHERE work_log_id = ?');
+        $pStmt->execute(array($worklogId));
+        foreach ($pStmt->fetchAll(PDO::FETCH_COLUMN) as $path) {
+            if (!$path) continue;
+            $full = __DIR__ . '/../../public' . $path;
+            if (file_exists($full)) @unlink($full);
+        }
+
+        // 刪除關聯資料
+        $this->db->prepare('DELETE FROM worklog_photos WHERE work_log_id = ?')->execute(array($worklogId));
+        $this->db->prepare('DELETE FROM material_usage WHERE work_log_id = ?')->execute(array($worklogId));
+        $this->db->prepare('DELETE FROM case_work_logs WHERE source_worklog_id = ?')->execute(array($worklogId));
+        $this->db->prepare('DELETE FROM work_logs WHERE id = ?')->execute(array($worklogId));
+
+        return $caseId ? (int)$caseId : null;
+    }
+
+    /**
      * 取得未填回報提醒（主管用）
      */
     public function getIncompleteReports(array $branchIds, $date = null)
