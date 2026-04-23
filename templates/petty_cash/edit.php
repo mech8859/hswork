@@ -18,7 +18,19 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0) {
         </small>
         <?php endif; ?>
     </div>
-    <?= back_button('/petty_cash.php') ?>
+    <div class="d-flex gap-1 align-center flex-wrap">
+        <?php if (!empty($prevId)): ?>
+        <a href="/petty_cash.php?action=edit&id=<?= (int)$prevId ?>" class="btn btn-outline btn-sm" title="上一筆">&laquo; 上一筆</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+        <?php endif; ?>
+        <?php if (!empty($nextId)): ?>
+        <a href="/petty_cash.php?action=edit&id=<?= (int)$nextId ?>" class="btn btn-outline btn-sm" title="下一筆">下一筆 &raquo;</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+        <?php endif; ?>
+        <?= back_button('/petty_cash.php') ?>
+    </div>
 </div>
 
 <div class="card">

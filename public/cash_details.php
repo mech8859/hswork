@@ -90,13 +90,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update' && !empty($_GE
 
 // ========== 編輯/檢視頁面 ==========
 if ($action === 'edit' && !empty($_GET['id'])) {
-    $record = $model->getCashDetailById((int)$_GET['id']);
+    $_cdId = (int)$_GET['id'];
+    $record = $model->getCashDetailById($_cdId);
     if (!$record) {
         Session::flash('error', '找不到此筆記錄');
         redirect('/cash_details.php');
     }
     $branchIds = Auth::getAccessibleBranchIds();
     $branches = $model->getBranches($branchIds);
+
+    // 上一筆/下一筆
+    $_cdDb = Database::getInstance();
+    $_cdBr = !empty($branchIds) ? implode(',', array_map('intval', $branchIds)) : '0';
+    $prevId = $_cdDb->query("SELECT id FROM cash_details WHERE id < $_cdId AND branch_id IN ($_cdBr) ORDER BY id DESC LIMIT 1")->fetchColumn();
+    $nextId = $_cdDb->query("SELECT id FROM cash_details WHERE id > $_cdId AND branch_id IN ($_cdBr) ORDER BY id ASC LIMIT 1")->fetchColumn();
+
     $pageTitle = '現金明細 - ' . (!empty($record['entry_number']) ? $record['entry_number'] : '檢視');
     $currentPage = 'cash_details';
     require __DIR__ . '/../templates/layouts/header.php';
