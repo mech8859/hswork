@@ -1870,8 +1870,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <?php foreach ($groupedAtt[$typeKey] as $att):
                         $ext = strtolower(pathinfo($att['file_name'], PATHINFO_EXTENSION));
                         $isImg = in_array($ext, array('jpg','jpeg','png','gif','webp','bmp'));
+                        // 報價單附件且 is_current=0 → 標為過期
+                        $isOutdated = ($typeKey === 'quotation') && isset($att['is_current']) && (int)$att['is_current'] === 0;
                     ?>
-                    <div class="atc-file <?= $isImg ? 'atc-file-img' : '' ?>" id="att-<?= $att['id'] ?>">
+                    <div class="atc-file <?= $isImg ? 'atc-file-img' : '' ?><?= $isOutdated ? ' atc-file-outdated' : '' ?>" id="att-<?= $att['id'] ?>">
+                        <?php if ($isOutdated): ?>
+                        <span class="atc-outdated-badge" title="已被新版報價單取代">過期</span>
+                        <?php endif; ?>
                         <?php if ($isImg): ?>
                         <img src="<?= e($att['file_path']) ?>" class="atc-thumb hs-photo" onclick="hsOpenImage('<?= e($att['file_path']) ?>')" alt="<?= e($att['file_name']) ?>">
                         <?php else: ?>

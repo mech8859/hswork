@@ -62,6 +62,10 @@
 .atc-filename:hover { text-decoration:underline; }
 .atc-file:not(.atc-file-img) .atc-del { background:none; border:none; color:var(--gray-400); cursor:pointer; font-size:.8rem; padding:2px 4px; }
 .atc-file:not(.atc-file-img) .atc-del:hover { color:#e53935; }
+.atc-file-outdated { opacity:.55; }
+.atc-file-outdated .atc-thumb { filter: grayscale(60%); }
+.atc-file-outdated .atc-filename { color:var(--gray-500); text-decoration: line-through; }
+.atc-outdated-badge { position:absolute; top:-4px; left:-4px; background:#9e9e9e; color:#fff; font-size:.65rem; padding:1px 6px; border-radius:8px; z-index:2; box-shadow:0 1px 3px rgba(0,0,0,.15); }
 .atc-add-btn { display:flex; align-items:center; justify-content:center; padding:8px; border:2px dashed var(--gray-300); border-radius:6px; cursor:pointer; color:var(--gray-500); font-size:.85rem; transition:all .15s; }
 .atc-add-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(33,150,243,.04); }
 .attach-type-card.atc-drag-over { border-color:var(--primary); background:rgba(33,150,243,.08); box-shadow:0 0 0 3px rgba(33,150,243,.15); }
