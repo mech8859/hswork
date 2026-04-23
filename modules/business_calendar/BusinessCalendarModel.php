@@ -119,7 +119,14 @@ class BusinessCalendarModel
      */
     public function getById($id)
     {
-        $stmt = $this->db->prepare("SELECT bc.*, u.real_name as staff_name FROM business_calendar bc LEFT JOIN users u ON bc.staff_id = u.id WHERE bc.id = ?");
+        $stmt = $this->db->prepare("
+            SELECT bc.*, u.real_name as staff_name,
+                   c.description as case_customer_demand
+            FROM business_calendar bc
+            LEFT JOIN users u ON bc.staff_id = u.id
+            LEFT JOIN cases c ON bc.case_id = c.id
+            WHERE bc.id = ?
+        ");
         $stmt->execute(array($id));
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }

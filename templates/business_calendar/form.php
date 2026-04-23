@@ -78,6 +78,12 @@ require __DIR__ . '/../_readonly_form_helper.php';
                 <input type="time" name="end_time" class="form-control" value="<?= e($event['end_time'] ?? '') ?>">
             </div>
         </div>
+        <?php if ($isEdit && !empty($event['case_id'])): ?>
+        <div class="form-group">
+            <label>客戶需求 <small style="color:#888">(同步案件，不能於此修改)</small></label>
+            <textarea class="form-control" rows="2" readonly style="background:#f5f5f5;color:#555"><?= e($event['case_customer_demand'] ?? '') ?></textarea>
+        </div>
+        <?php endif; ?>
         <div class="form-group">
             <label>備註</label>
             <textarea name="note" class="form-control" rows="3"><?= e($event['note'] ?? '') ?></textarea>

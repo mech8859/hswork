@@ -334,15 +334,7 @@ require __DIR__ . '/../_readonly_form_helper.php';
         <div class="form-row">
             <div class="form-group">
                 <label>客戶需求</label>
-                <select name="description" class="form-control">
-                    <option value="">請選擇</option>
-                    <?php if (isset($customerDemandOptions)): foreach ($customerDemandOptions as $opt): ?>
-                    <option value="<?= e($opt['label']) ?>" <?= ($case['description'] ?? '') === $opt['label'] ? 'selected' : '' ?>><?= e($opt['label']) ?></option>
-                    <?php endforeach; endif; ?>
-                    <?php if (!empty($case['description']) && !in_array($case['description'], array_column($customerDemandOptions ?? array(), 'label'))): ?>
-                    <option value="<?= e($case['description']) ?>" selected><?= e($case['description']) ?></option>
-                    <?php endif; ?>
-                </select>
+                <textarea name="description" class="form-control" rows="2" placeholder="例：監視器, 網路, 電話"><?= e($case['description'] ?? '') ?></textarea>
             </div>
             <div class="form-group">
                 <label>系統別</label>
