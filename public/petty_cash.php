@@ -128,7 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update' && !empty($_GE
 
 // ========== 編輯/檢視頁面 ==========
 if ($action === 'edit' && !empty($_GET['id'])) {
-    $record = $model->getPettyCashById((int)$_GET['id']);
+    $_pcId = (int)$_GET['id'];
+    $record = $model->getPettyCashById($_pcId);
     if (!$record) {
         Session::flash('error', '找不到此筆記錄');
         redirect('/petty_cash.php');
@@ -138,6 +139,13 @@ if ($action === 'edit' && !empty($_GET['id'])) {
         redirect('/petty_cash.php');
     }
     $branches = $model->getBranches($accessibleBranchIds);
+
+    // 上一筆/下一筆（依 id，限可存取分公司）
+    $_pcDb = Database::getInstance();
+    $_pcBr = !empty($accessibleBranchIds) ? implode(',', array_map('intval', $accessibleBranchIds)) : '0';
+    $prevId = $_pcDb->query("SELECT id FROM petty_cash WHERE id < $_pcId AND branch_id IN ($_pcBr) ORDER BY id DESC LIMIT 1")->fetchColumn();
+    $nextId = $_pcDb->query("SELECT id FROM petty_cash WHERE id > $_pcId AND branch_id IN ($_pcBr) ORDER BY id ASC LIMIT 1")->fetchColumn();
+
     $pageTitle = '零用金 - ' . (!empty($record['entry_number']) ? $record['entry_number'] : '檢視');
     $currentPage = 'petty_cash';
     require __DIR__ . '/../templates/layouts/header.php';

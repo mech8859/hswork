@@ -148,11 +148,29 @@ foreach ($approvalStatus['flows'] as $af) {
 </div>
 <?php endif; ?>
 
+<?php
+// 若有關聯案件，查 accepted_quotation_id 判斷此報價是否為案件的「現行版本」
+$_acceptedQid = null;
+if (!empty($quote['case_id'])) {
+    $_aStmt = Database::getInstance()->prepare('SELECT accepted_quotation_id FROM cases WHERE id = ?');
+    $_aStmt->execute(array((int)$quote['case_id']));
+    $_acceptedQid = (int)$_aStmt->fetchColumn();
+}
+$_isCurrentAccepted = ($_acceptedQid > 0 && (int)$quote['id'] === $_acceptedQid);
+$_isSuperseded = ($_acceptedQid > 0 && $quote['status'] === 'customer_accepted' && (int)$quote['id'] !== $_acceptedQid);
+?>
 <!-- 基本資訊 -->
 <div class="card">
     <div class="card-header d-flex justify-between align-center">
         <span>基本資訊</span>
-        <span class="badge badge-<?= QuotationModel::statusBadge($quote['status']) ?>"><?= e(QuotationModel::statusLabel($quote['status'])) ?></span>
+        <div class="d-flex gap-1 align-center">
+            <?php if ($_isCurrentAccepted): ?>
+            <span class="badge" style="background:#2e7d32;color:#fff" title="此報價單為案件的現行成交版本">✓ 現行成交</span>
+            <?php elseif ($_isSuperseded): ?>
+            <span class="badge" style="background:#9e9e9e;color:#fff" title="已被更新版本取代">已被新版取代</span>
+            <?php endif; ?>
+            <span class="badge badge-<?= QuotationModel::statusBadge($quote['status']) ?>"><?= e(QuotationModel::statusLabel($quote['status'])) ?></span>
+        </div>
     </div>
     <div class="info-grid">
         <div><span class="info-label">客戶名稱</span><span><?= e($quote['customer_name']) ?></span></div>

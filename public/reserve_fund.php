@@ -79,13 +79,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update' && !empty($_GE
 
 // ========== 編輯/檢視頁面 ==========
 if ($action === 'edit' && !empty($_GET['id'])) {
-    $record = $model->getReserveFundById((int)$_GET['id']);
+    $_rfId = (int)$_GET['id'];
+    $record = $model->getReserveFundById($_rfId);
     if (!$record) {
         Session::flash('error', '找不到此筆記錄');
         redirect('/reserve_fund.php');
     }
     $branchIds = Auth::getAccessibleBranchIds();
     $branches = $model->getBranches($branchIds);
+
+    // 上一筆/下一筆（依 id）
+    $_rfDb = Database::getInstance();
+    $_rfPrev = $_rfDb->prepare("SELECT id FROM reserve_fund WHERE id < ? ORDER BY id DESC LIMIT 1");
+    $_rfPrev->execute(array($_rfId));
+    $prevId = $_rfPrev->fetchColumn();
+    $_rfNext = $_rfDb->prepare("SELECT id FROM reserve_fund WHERE id > ? ORDER BY id ASC LIMIT 1");
+    $_rfNext->execute(array($_rfId));
+    $nextId = $_rfNext->fetchColumn();
+
     $pageTitle = '備用金 - ' . (!empty($record['entry_number']) ? $record['entry_number'] : '檢視');
     $currentPage = 'reserve_fund';
     require __DIR__ . '/../templates/layouts/header.php';

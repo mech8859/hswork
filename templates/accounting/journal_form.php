@@ -18,6 +18,8 @@ $isCopy = isset($prefillEntry) && !$entry;
 
 <form method="post" id="journalForm" enctype="multipart/form-data" action="/accounting.php?action=<?= $entry ? 'journal_edit&id=' . $entry['id'] : 'journal_create' ?>"
     <?= csrf_field() ?>
+    <?php $_returnTo = isset($_GET['return_to']) ? $_GET['return_to'] : ''; ?>
+    <?php if ($_returnTo): ?><input type="hidden" name="return_to" value="<?= e($_returnTo) ?>"><?php endif; ?>
 
     <div class="card" style="padding:16px;margin-bottom:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">

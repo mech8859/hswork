@@ -590,12 +590,21 @@ class QuotationModel
             return false;
         }
 
+        $caseId = (int)$q['case_id'];
         $isTaxFree = (int)$q['tax_free'];
-        $isTaxIncluded = $isTaxFree ? '未稅(不開發票)' : '含稅(需開發票)';
+        $quoteTaxStr = $isTaxFree ? '未稅(不開發票)' : '含稅(需開發票)';
+
+        // 取目前案件是否含稅（決定是否覆寫）
+        $curStmt = $this->db->prepare('SELECT is_tax_included FROM cases WHERE id = ?');
+        $curStmt->execute(array($caseId));
+        $curTax = (string)$curStmt->fetchColumn();
+
+        // 是否含稅：原本為空才帶入（尊重手動設定，避免覆寫「含稅(免開發票)」這類選擇）
+        $isTaxIncluded = ($curTax === '') ? $quoteTaxStr : $curTax;
 
         // 計算總收款金額（從 case_payments）
         $payStmt = $this->db->prepare('SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ?');
-        $payStmt->execute(array($q['case_id']));
+        $payStmt->execute(array($caseId));
         $totalCollected = (int)$payStmt->fetchColumn();
 
         $totalAmount = (int)$q['total_amount'];
@@ -604,6 +613,7 @@ class QuotationModel
         $this->db->prepare('
             UPDATE cases SET
                 deal_amount = ?,
+                accepted_quotation_id = ?,
                 is_tax_included = ?,
                 tax_amount = ?,
                 total_amount = ?,
@@ -612,13 +622,18 @@ class QuotationModel
             WHERE id = ?
         ')->execute(array(
             (int)$q['subtotal'],
+            (int)$quotationId,
             $isTaxIncluded,
             (int)$q['tax_amount'],
             $totalAmount,
             $totalCollected,
             $balanceAmount,
-            $q['case_id']
+            $caseId,
         ));
+
+        // 將同案件其他 quotation 附件標為過期（新附件由外層 saveAttachment 建立時預設 is_current=1）
+        $this->db->prepare("UPDATE case_attachments SET is_current = 0 WHERE case_id = ? AND file_type = 'quotation'")
+                 ->execute(array($caseId));
 
         return true;
     }

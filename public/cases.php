@@ -380,22 +380,31 @@ switch ($action) {
                 }
             }
             // 2) 實際材料成本（by type）
-            $_muStmt = $_paDb->prepare("
-                SELECT mu.material_type, SUM(mu.used_qty * mu.unit_cost) AS actual_cost
+            // 同排工同品項取最新 worklog（避免多位工程師重複填造成成本灌水），跨排工合計
+            $_muRawStmt = $_paDb->prepare("
+                SELECT mu.material_type, mu.product_id, mu.material_name,
+                       mu.used_qty, mu.unit_cost, wl.updated_at, s.id AS schedule_id
                 FROM material_usage mu
                 JOIN work_logs wl ON mu.work_log_id = wl.id
                 JOIN schedules s ON wl.schedule_id = s.id
                 WHERE s.case_id = ?
-                GROUP BY mu.material_type
+                ORDER BY s.id, wl.updated_at DESC, wl.id DESC
             ");
-            $_muStmt->execute(array($id));
-            foreach ($_muStmt->fetchAll(PDO::FETCH_ASSOC) as $_mu) {
+            $_muRawStmt->execute(array($id));
+            $_costByType = array('equipment' => 0.0, 'cable' => 0.0, 'consumable' => 0.0);
+            $_seenKey = array();
+            foreach ($_muRawStmt->fetchAll(PDO::FETCH_ASSOC) as $_mu) {
+                $k = $_mu['schedule_id'] . '|' . (!empty($_mu['product_id']) ? 'p_'.$_mu['product_id'] : 'n_'.$_mu['material_name']);
+                if (isset($_seenKey[$k])) continue;
+                $_seenKey[$k] = true;
                 $t = $_mu['material_type'];
-                $c = (int)$_mu['actual_cost'];
-                if ($t === 'equipment') $caseProfitAnalysis['actual_equipment'] = $c;
-                elseif ($t === 'cable') $caseProfitAnalysis['actual_cable'] = $c;
-                elseif ($t === 'consumable') $caseProfitAnalysis['actual_consumable'] = $c;
+                if (isset($_costByType[$t])) {
+                    $_costByType[$t] += (float)$_mu['used_qty'] * (float)$_mu['unit_cost'];
+                }
             }
+            $caseProfitAnalysis['actual_equipment']  = (int)$_costByType['equipment'];
+            $caseProfitAnalysis['actual_cable']      = (int)$_costByType['cable'];
+            $caseProfitAnalysis['actual_consumable'] = (int)$_costByType['consumable'];
             // 3) 實際工時
             $_whStmt = $_paDb->prepare("
                 SELECT SUM(TIMESTAMPDIFF(MINUTE, wl.arrival_time, wl.departure_time)) AS total_minutes

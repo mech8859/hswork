@@ -56,6 +56,13 @@ class ProductModel
             $where .= " AND p.category_id IN ($placeholders)";
             $params = array_merge($params, $catIds);
         }
+        // category_ids_in：明確指定允許的分類 id 集合（已含子孫，不再展開）
+        if (!empty($filters['category_ids_in']) && is_array($filters['category_ids_in'])) {
+            $ids = array_map('intval', $filters['category_ids_in']);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $where .= " AND p.category_id IN ($placeholders)";
+            $params = array_merge($params, $ids);
+        }
         if (!empty($filters['supplier'])) {
             $where .= ' AND p.supplier = ?';
             $params[] = $filters['supplier'];
@@ -329,6 +336,42 @@ class ProductModel
             ORDER BY pc.name
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 取得某分類 flag 為 true 的所有分類 ID（含子孫分類）
+     * @param string $flag 'exclude_from_stockout' 或 'show_in_material_estimate'
+     * @return array 分類 id 陣列（可能為空）
+     */
+    public static function getCategoryIdsByFlag($flag)
+    {
+        if (!in_array($flag, array('exclude_from_stockout', 'show_in_material_estimate'), true)) {
+            return array();
+        }
+        $db = Database::getInstance();
+        // 取全部分類做 parent_id map
+        $rows = $db->query("SELECT id, parent_id, `$flag` AS flag FROM product_categories")->fetchAll(PDO::FETCH_ASSOC);
+        $childrenOf = array();      // parent_id => [child_id, ...]
+        $rootIds = array();          // flag=1 的根節點
+        foreach ($rows as $r) {
+            $pid = $r['parent_id'] !== null ? (int)$r['parent_id'] : 0;
+            $childrenOf[$pid][] = (int)$r['id'];
+            if ((int)$r['flag'] === 1) $rootIds[] = (int)$r['id'];
+        }
+        // BFS 展開全部子孫
+        $result = array();
+        $queue = $rootIds;
+        while (!empty($queue)) {
+            $cid = array_shift($queue);
+            if (isset($result[$cid])) continue;
+            $result[$cid] = true;
+            if (isset($childrenOf[$cid])) {
+                foreach ($childrenOf[$cid] as $child) {
+                    if (!isset($result[$child])) $queue[] = $child;
+                }
+            }
+        }
+        return array_keys($result);
     }
 
     /**

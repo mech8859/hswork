@@ -72,6 +72,15 @@ switch ($action) {
             }
         }
 
+        // 上一筆/下一筆
+        $_btDb = Database::getInstance();
+        $_btPrev = $_btDb->prepare("SELECT id FROM bank_transactions WHERE id < ? ORDER BY id DESC LIMIT 1");
+        $_btPrev->execute(array($id));
+        $prevId = $_btPrev->fetchColumn();
+        $_btNext = $_btDb->prepare("SELECT id FROM bank_transactions WHERE id > ? ORDER BY id ASC LIMIT 1");
+        $_btNext->execute(array($id));
+        $nextId = $_btNext->fetchColumn();
+
         $pageTitle = '編輯銀行交易';
         $currentPage = 'bank_transactions';
         require __DIR__ . '/../templates/layouts/header.php';

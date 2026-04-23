@@ -191,6 +191,26 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
     <!-- 材料使用 -->
     <?php
     $materials = $worklog['materials'] ?? array();
+    // 繼承同排工其他工程師已填的 materials（X 方案：誰先填誰當基準）
+    $_inheritedFrom = '';
+    if (empty($materials) && !empty($siblingMaterials)) {
+        $materials = array();
+        foreach ($siblingMaterials as $sm) {
+            $materials[] = array(
+                'material_type' => $sm['material_type'] ?? 'equipment',
+                'product_id'    => $sm['product_id'] ?? '',
+                'material_name' => $sm['material_name'] ?? ($sm['product_name'] ?? ''),
+                'unit'          => $sm['unit'] ?? '',
+                'shipped_qty'   => $sm['shipped_qty'] ?? '',
+                'used_qty'      => $sm['used_qty'] ?? '',
+                'returned_qty'  => $sm['returned_qty'] ?? '',
+                'unit_cost'     => $sm['unit_cost'] ?? '',
+                'material_note' => $sm['note'] ?? '',
+                '_from_sibling' => true,
+            );
+        }
+        $_inheritedFrom = isset($siblingFromName) ? $siblingFromName : '';
+    }
     if (empty($materials) && !empty($stockOutMaterials)) {
         $materials = array();
         foreach ($stockOutMaterials as $soi) {
@@ -242,6 +262,12 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
     }
     $globalIdx = 0;
     ?>
+
+    <?php if (!empty($_inheritedFrom)): ?>
+    <div style="background:#e8f5e9;padding:10px 14px;margin:8px 0;border-left:3px solid #2e7d32;border-radius:4px;font-size:.88rem;color:#1b5e20">
+        📋 已帶入 <strong><?= e($_inheritedFrom) ?></strong> 填的器材/耗材資料，你可以直接儲存確認，或修改數量/新增品項。
+    </div>
+    <?php endif; ?>
 
     <!-- 器材 -->
     <div class="card">

@@ -14,7 +14,19 @@ if (!empty($record['income_amount']) && $record['income_amount'] > 0 && (empty($
 ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>現金明細 - <?= e(!empty($record['entry_number']) ? $record['entry_number'] : '檢視') ?></h2>
-    <?= back_button('/cash_details.php') ?>
+    <div class="d-flex gap-1 align-center flex-wrap">
+        <?php if (!empty($prevId)): ?>
+        <a href="/cash_details.php?action=edit&id=<?= (int)$prevId ?>" class="btn btn-outline btn-sm" title="上一筆">&laquo; 上一筆</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+        <?php endif; ?>
+        <?php if (!empty($nextId)): ?>
+        <a href="/cash_details.php?action=edit&id=<?= (int)$nextId ?>" class="btn btn-outline btn-sm" title="下一筆">下一筆 &raquo;</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+        <?php endif; ?>
+        <?= back_button('/cash_details.php') ?>
+    </div>
 </div>
 
 <div class="card">

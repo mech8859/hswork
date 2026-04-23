@@ -16,11 +16,52 @@ $statusLabels = array(
     'matched_fuzzy'           => array('模糊匹配', '#3b82f6'),
     'matched_amount_mismatch' => array('金額不符', '#f59e0b'),
     'unmatched'               => array('未建傳票', '#ef4444'),
+    'merged_into_prev'        => array('已合併', '#9ca3af'),
 );
 ?>
+<?php
+// 當前網址（含查詢參數），供編輯傳票後帶回使用
+$_reconReturnUrl = '/accounting.php?action=voucher_reconciliation&source=' . e($source)
+    . '&start_date=' . e($startDate) . '&end_date=' . e($endDate);
+if ($branchFilter && $source !== 'bank') $_reconReturnUrl .= '&branch_id=' . (int)$branchFilter;
+if (!empty($statusFilter)) $_reconReturnUrl .= '&status_filter=' . e($statusFilter);
+if (!empty($sortOrder) && $sortOrder === 'asc') $_reconReturnUrl .= '&sort=asc';
+$_reconReturnEncoded = urlencode($_reconReturnUrl);
+?>
+<?php
+// 分頁切換（上一 / 下一）
+$_sourceOrder = array_keys($sourceLabels);
+$_curIdx = array_search($source, $_sourceOrder, true);
+$_prevSource = $_curIdx !== false && $_curIdx > 0 ? $_sourceOrder[$_curIdx - 1] : null;
+$_nextSource = $_curIdx !== false && $_curIdx < count($_sourceOrder) - 1 ? $_sourceOrder[$_curIdx + 1] : null;
+$_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFilter, $sortOrder) {
+    $u = '/accounting.php?action=voucher_reconciliation&source=' . $s
+        . '&start_date=' . e($startDate) . '&end_date=' . e($endDate);
+    if ($branchFilter && $s !== 'bank') $u .= '&branch_id=' . (int)$branchFilter;
+    if (!empty($statusFilter)) $u .= '&status_filter=' . e($statusFilter);
+    if (!empty($sortOrder) && $sortOrder === 'asc') $u .= '&sort=asc';
+    return $u;
+};
+?>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-    <h1>傳票核對報表</h1>
-    <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
+    <div>
+        <h1 style="margin:0 0 4px">傳票核對報表</h1>
+        <div style="font-size:.75rem;color:#888">資料時間：<?= date('H:i:s') ?>（每次開啟即時比對）</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <?php if ($_prevSource): ?>
+        <a href="<?= e($_buildTabUrl($_prevSource)) ?>" class="btn btn-outline btn-sm" title="上一個：<?= e($sourceLabels[$_prevSource]) ?>">&laquo; 上一筆</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+        <?php endif; ?>
+        <?php if ($_nextSource): ?>
+        <a href="<?= e($_buildTabUrl($_nextSource)) ?>" class="btn btn-outline btn-sm" title="下一個：<?= e($sourceLabels[$_nextSource]) ?>">下一筆 &raquo;</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+        <?php endif; ?>
+        <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
+        <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
+    </div>
 </div>
 
 <!-- 源頭切換 tabs -->
@@ -62,9 +103,19 @@ $statusLabels = array(
             <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">狀態</label>
             <select name="status_filter" class="form-control" style="min-width:140px">
                 <option value="">全部</option>
-                <?php foreach ($statusLabels as $sk => $sv): ?>
+                <?php foreach ($statusLabels as $sk => $sv):
+                    if ($sk === 'merged_into_prev') continue;
+                ?>
                 <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($sv[0]) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">排序</label>
+            <?php $sortOrder = isset($sortOrder) ? $sortOrder : 'desc'; ?>
+            <select name="sort" class="form-control" style="min-width:110px">
+                <option value="desc" <?= $sortOrder === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
+                <option value="asc"  <?= $sortOrder === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">查詢</button>
@@ -78,10 +129,12 @@ $statusLabels = array(
         <div style="font-size:.8rem;color:#666">總筆數</div>
         <div style="font-size:1.3rem;font-weight:700"><?= number_format($stats['total']) ?></div>
     </div>
-    <?php foreach ($statusLabels as $sk => $sv): ?>
+    <?php foreach ($statusLabels as $sk => $sv):
+        if ($sk === 'merged_into_prev') continue;
+    ?>
     <a href="/accounting.php?action=voucher_reconciliation&source=<?= e($source) ?>&start_date=<?= e($startDate) ?>&end_date=<?= e($endDate) ?><?= $branchFilter && $source !== 'bank' ? '&branch_id=' . $branchFilter : '' ?>&status_filter=<?= e($sk) ?>" class="card" style="padding:12px;text-align:center;text-decoration:none;color:inherit;border-left:3px solid <?= $sv[1] ?>">
         <div style="font-size:.8rem;color:<?= $sv[1] ?>;font-weight:600"><?= e($sv[0]) ?></div>
-        <div style="font-size:1.3rem;font-weight:700;color:<?= $sv[1] ?>"><?= number_format($stats[$sk]) ?></div>
+        <div style="font-size:1.3rem;font-weight:700;color:<?= $sv[1] ?>"><?= number_format(isset($stats[$sk]) ? $stats[$sk] : 0) ?></div>
     </a>
     <?php endforeach; ?>
 </div>
@@ -110,7 +163,8 @@ $statusLabels = array(
             <?php foreach ($records as $r):
                 $st = isset($statusLabels[$r['match_status']]) ? $statusLabels[$r['match_status']] : array($r['match_status'], '#666');
                 $bgColor = $r['match_status'] === 'unmatched' ? '#fef2f2'
-                         : ($r['match_status'] === 'matched_amount_mismatch' ? '#fffbeb' : '#fff');
+                         : ($r['match_status'] === 'matched_amount_mismatch' ? '#fffbeb'
+                         : ($r['match_status'] === 'merged_into_prev' ? '#f5f5f5' : '#fff'));
             ?>
             <tr style="border-top:1px solid #eee;background:<?= $bgColor ?>">
                 <td style="padding:8px"><?= e($r['date']) ?></td>
@@ -128,12 +182,22 @@ $statusLabels = array(
                 </td>
                 <td style="padding:8px;font-size:.82rem">
                     <?php if ($r['voucher_id']): ?>
-                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
+                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>&return_to=<?= $_reconReturnEncoded ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
                     <?php if ($r['match_status'] === 'matched_amount_mismatch' && $r['voucher_amount'] !== null): ?>
                     <div style="color:#f59e0b;font-size:.75rem">傳票: <?= number_format($r['voucher_amount']) ?></div>
                     <?php endif; ?>
+                    <?php if (in_array($r['match_status'], array('matched_fuzzy', 'matched_amount_mismatch')) && $canManage): ?>
+                    <form method="POST" action="/accounting.php?action=confirm_voucher_match" style="display:inline;margin-top:4px" onsubmit="return confirm('確認此傳票與此來源對應無誤？確認後下次開啟會直接精準匹配。');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="source_module" value="<?= e($source) ?>">
+                        <input type="hidden" name="source_id" value="<?= (int)$r['source_id'] ?>">
+                        <input type="hidden" name="voucher_id" value="<?= (int)$r['voucher_id'] ?>">
+                        <input type="hidden" name="return_to" value="<?= e($_reconReturnUrl) ?>">
+                        <button type="submit" class="btn btn-sm" style="margin-top:3px;padding:2px 8px;font-size:.72rem;background:#16a34a;color:#fff">✓ 確認匹配</button>
+                    </form>
+                    <?php endif; ?>
                     <?php else: ?>
-                    <span style="color:#999">—</span>
+                    <a href="/accounting.php?action=journal_create&return_to=<?= $_reconReturnEncoded ?>" style="color:#999;text-decoration:none">+ 建立</a>
                     <?php endif; ?>
                 </td>
             </tr>

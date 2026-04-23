@@ -3,9 +3,23 @@ $isEdit = !empty($record);
 $bankOptions = FinanceModel::bankAccountOptions();
 ?>
 
-<div class="d-flex justify-between align-center mb-2">
+<div class="d-flex justify-between align-center mb-2 flex-wrap gap-1">
     <h2><?= $isEdit ? '編輯銀行交易' : '新增銀行交易' ?></h2>
-    <?= back_button('/bank_transactions.php') ?>
+    <div class="d-flex gap-1 align-center flex-wrap">
+        <?php if ($isEdit): ?>
+            <?php if (!empty($prevId)): ?>
+            <a href="/bank_transactions.php?action=edit&id=<?= (int)$prevId ?>" class="btn btn-outline btn-sm" title="上一筆">&laquo; 上一筆</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+            <?php endif; ?>
+            <?php if (!empty($nextId)): ?>
+            <a href="/bank_transactions.php?action=edit&id=<?= (int)$nextId ?>" class="btn btn-outline btn-sm" title="下一筆">下一筆 &raquo;</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+            <?php endif; ?>
+        <?php endif; ?>
+        <?= back_button('/bank_transactions.php') ?>
+    </div>
 </div>
 
 <form method="POST" action="/bank_transactions.php?action=store" id="bankTxForm">

@@ -314,8 +314,19 @@ switch ($action) {
         if (strlen($q) < 1) { echo json_encode(array()); break; }
         $db = Database::getInstance();
         $like = '%' . $q . '%';
-        $stmt = $db->prepare("SELECT id, name, model, CAST(COALESCE(NULLIF(cost,0), price, 0) AS SIGNED) as price, unit, pack_qty, pack_unit, cost_per_unit FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ?) ORDER BY name LIMIT 15");
-        $stmt->execute(array($like, $like));
+        // 排除「不進出庫單」分類（及其子孫）下的產品（工程單價/工資單價等非實體品項不應出現在採購/庫存搜尋）
+        require_once __DIR__ . '/../modules/products/ProductModel.php';
+        $excludedCatIds = ProductModel::getCategoryIdsByFlag('exclude_from_stockout');
+        $sql = "SELECT id, name, model, CAST(COALESCE(NULLIF(cost,0), price, 0) AS SIGNED) as price, unit, pack_qty, pack_unit, cost_per_unit FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ?)";
+        $params = array($like, $like);
+        if (!empty($excludedCatIds)) {
+            $ph = implode(',', array_fill(0, count($excludedCatIds), '?'));
+            $sql .= " AND (category_id IS NULL OR category_id NOT IN ($ph))";
+            $params = array_merge($params, $excludedCatIds);
+        }
+        $sql .= " ORDER BY name LIMIT 15";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // 查庫存
         if (!empty($products)) {

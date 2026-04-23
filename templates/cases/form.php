@@ -1797,12 +1797,30 @@ require __DIR__ . '/../_readonly_form_helper.php';
 
         <?php
         // 比對：預估 vs 實際用量
+        // 同一排工（schedule_id）同品項只取最新編輯的 worklog（避免同排工多位工程師重複加總）
+        // 跨排工的相同品項則合計（不同次施工需累計）
         $actualUsage = array();
         if (!empty($worklogTimeline)) {
+            // 依 schedule_id 分組
+            $_wlBySched = array();
             foreach ($worklogTimeline as $wl) {
-                if (!empty($wl['materials'])) {
+                $_sid = isset($wl['schedule_id']) ? (int)$wl['schedule_id'] : 0;
+                $_wlBySched[$_sid][] = $wl;
+            }
+            foreach ($_wlBySched as $_sid => $_wls) {
+                // 同排工內依 updated_at DESC 排序（最新編輯優先）
+                usort($_wls, function($a, $b) {
+                    $aT = isset($a['updated_at']) ? $a['updated_at'] : (isset($a['created_at']) ? $a['created_at'] : '');
+                    $bT = isset($b['updated_at']) ? $b['updated_at'] : (isset($b['created_at']) ? $b['created_at'] : '');
+                    return strcmp($bT, $aT);
+                });
+                $_seenInSched = array();
+                foreach ($_wls as $wl) {
+                    if (empty($wl['materials'])) continue;
                     foreach ($wl['materials'] as $m) {
                         $key = !empty($m['product_id']) ? 'p_' . $m['product_id'] : 'n_' . $m['material_name'];
+                        if (isset($_seenInSched[$key])) continue; // 本排工此品項已取最新一筆
+                        $_seenInSched[$key] = true;
                         if (!isset($actualUsage[$key])) {
                             $actualUsage[$key] = array('name' => $m['material_name'], 'product_id' => isset($m['product_id']) ? $m['product_id'] : null, 'unit' => isset($m['unit']) ? $m['unit'] : '', 'total_used' => 0);
                         }
@@ -1870,8 +1888,13 @@ require __DIR__ . '/../_readonly_form_helper.php';
                     <?php foreach ($groupedAtt[$typeKey] as $att):
                         $ext = strtolower(pathinfo($att['file_name'], PATHINFO_EXTENSION));
                         $isImg = in_array($ext, array('jpg','jpeg','png','gif','webp','bmp'));
+                        // 報價單附件且 is_current=0 → 標為過期
+                        $isOutdated = ($typeKey === 'quotation') && isset($att['is_current']) && (int)$att['is_current'] === 0;
                     ?>
-                    <div class="atc-file <?= $isImg ? 'atc-file-img' : '' ?>" id="att-<?= $att['id'] ?>">
+                    <div class="atc-file <?= $isImg ? 'atc-file-img' : '' ?><?= $isOutdated ? ' atc-file-outdated' : '' ?>" id="att-<?= $att['id'] ?>">
+                        <?php if ($isOutdated): ?>
+                        <span class="atc-outdated-badge" title="已被新版報價單取代">過期</span>
+                        <?php endif; ?>
                         <?php if ($isImg): ?>
                         <img src="<?= e($att['file_path']) ?>" class="atc-thumb hs-photo" onclick="hsOpenImage('<?= e($att['file_path']) ?>')" alt="<?= e($att['file_name']) ?>">
                         <?php else: ?>

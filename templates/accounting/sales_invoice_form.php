@@ -173,22 +173,27 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
     <!-- 金額 -->
     <div class="card">
         <div class="card-header">金額</div>
+        <style>
+        .amt-no-spin::-webkit-inner-spin-button,
+        .amt-no-spin::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .amt-no-spin { -moz-appearance: textfield; }
+        </style>
         <div class="form-row">
             <div class="form-group">
                 <label>未稅金額 *</label>
-                <input type="number" name="amount_untaxed" id="fldUntaxed" class="form-control" step="1" min="0"
+                <input type="number" name="amount_untaxed" id="fldUntaxed" class="form-control amt-no-spin" step="1" min="0"
                        value="<?= $isEdit && !empty($record['amount_untaxed']) ? (int)$record['amount_untaxed'] : '' ?>"
                        oninput="calcTax()" required>
             </div>
             <div class="form-group">
                 <label>稅額</label>
-                <input type="number" name="tax_amount" id="fldTaxAmt" class="form-control" step="1" min="0"
+                <input type="number" name="tax_amount" id="fldTaxAmt" class="form-control amt-no-spin" step="1" min="0"
                        value="<?= $isEdit && !empty($record['tax_amount']) ? (int)$record['tax_amount'] : '' ?>"
                        oninput="calcTotal()">
             </div>
             <div class="form-group">
                 <label>含稅金額</label>
-                <input type="number" name="total_amount" id="fldTotal" class="form-control" step="1" min="0"
+                <input type="number" name="total_amount" id="fldTotal" class="form-control amt-no-spin" step="1" min="0"
                        value="<?= $isEdit && !empty($record['total_amount']) ? (int)$record['total_amount'] : '' ?>" readonly>
             </div>
             <input type="hidden" name="tax_rate" id="fldTaxRate" value="<?= $isEdit && isset($record['tax_rate']) ? $record['tax_rate'] : 5 ?>">
