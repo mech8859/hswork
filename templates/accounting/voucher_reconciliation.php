@@ -27,12 +27,37 @@ if (!empty($statusFilter)) $_reconReturnUrl .= '&status_filter=' . e($statusFilt
 if (!empty($sortOrder) && $sortOrder === 'asc') $_reconReturnUrl .= '&sort=asc';
 $_reconReturnEncoded = urlencode($_reconReturnUrl);
 ?>
+<?php
+// 分頁切換（上一 / 下一）
+$_sourceOrder = array_keys($sourceLabels);
+$_curIdx = array_search($source, $_sourceOrder, true);
+$_prevSource = $_curIdx !== false && $_curIdx > 0 ? $_sourceOrder[$_curIdx - 1] : null;
+$_nextSource = $_curIdx !== false && $_curIdx < count($_sourceOrder) - 1 ? $_sourceOrder[$_curIdx + 1] : null;
+$_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFilter, $sortOrder) {
+    $u = '/accounting.php?action=voucher_reconciliation&source=' . $s
+        . '&start_date=' . e($startDate) . '&end_date=' . e($endDate);
+    if ($branchFilter && $s !== 'bank') $u .= '&branch_id=' . (int)$branchFilter;
+    if (!empty($statusFilter)) $u .= '&status_filter=' . e($statusFilter);
+    if (!empty($sortOrder) && $sortOrder === 'asc') $u .= '&sort=asc';
+    return $u;
+};
+?>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
     <div>
         <h1 style="margin:0 0 4px">傳票核對報表</h1>
         <div style="font-size:.75rem;color:#888">資料時間：<?= date('H:i:s') ?>（每次開啟即時比對）</div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <?php if ($_prevSource): ?>
+        <a href="<?= e($_buildTabUrl($_prevSource)) ?>" class="btn btn-outline btn-sm" title="上一個：<?= e($sourceLabels[$_prevSource]) ?>">&laquo; 上一筆</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+        <?php endif; ?>
+        <?php if ($_nextSource): ?>
+        <a href="<?= e($_buildTabUrl($_nextSource)) ?>" class="btn btn-outline btn-sm" title="下一個：<?= e($sourceLabels[$_nextSource]) ?>">下一筆 &raquo;</a>
+        <?php else: ?>
+        <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+        <?php endif; ?>
         <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
         <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
     </div>
