@@ -1004,7 +1004,7 @@ class AccountingModel
             $amount = max((float)$r['debit_amount'], (float)$r['credit_amount']);
             $match = $this->_fuzzyMatchVoucher(
                 $r['transaction_date'], $amount,
-                array($r['sys_number'], $r['upload_number'])
+                array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description'])
             );
             $out[] = array(
                 'source_id' => (int)$r['id'],
@@ -1047,7 +1047,7 @@ class AccountingModel
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
                     $r['expense_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'])
+                    array($r['entry_number'], $r['upload_number'], $r['description'])
                 );
             }
             $out[] = array(
@@ -1114,7 +1114,7 @@ class AccountingModel
             $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
             $match = $this->_fuzzyMatchVoucher(
                 $r['transaction_date'], $amount,
-                array($r['entry_number'], $r['upload_number'])
+                array($r['entry_number'], $r['upload_number'], $r['description'])
             );
             $out[] = array(
                 'source_id' => (int)$r['id'],
@@ -1141,31 +1141,41 @@ class AccountingModel
     }
 
     /**
-     * 模糊匹配：日期+金額+單號關鍵字
-     * 在 journal_entries.description 或 journal_entry_lines.description 搜尋關鍵字
+     * 模糊匹配：日期+金額+關鍵字（單號/摘要）
+     * 搜 journal_entries.description 或 journal_entry_lines.description 含關鍵字，
+     * 若都不中再 fallback 同日期+同金額（可能多筆，取最新）
      */
     private function _fuzzyMatchVoucher($date, $amount, $keywords)
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
-        $keys = array_filter(array_map('trim', $keywords));
-        if (empty($keys) || !$date) return $unmatched;
+        if (!$date) return $unmatched;
 
-        // 在 description 搜尋任一關鍵字（LIKE），同日期、未作廢
-        $likes = array();
-        $params = array($date);
-        foreach ($keys as $k) {
-            $likes[] = "(je.description LIKE ? OR EXISTS(SELECT 1 FROM journal_entry_lines jl WHERE jl.journal_entry_id = je.id AND jl.description LIKE ?))";
-            $params[] = '%' . $k . '%';
-            $params[] = '%' . $k . '%';
+        // 過濾太短/太通用的關鍵字（避免誤配）
+        $keys = array();
+        foreach ($keywords as $k) {
+            $k = trim((string)$k);
+            if ($k !== '' && mb_strlen($k) >= 2) $keys[] = $k;
         }
-        $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
-                FROM journal_entries je
-                WHERE je.voucher_date = ? AND je.status != 'voided'
-                  AND (" . implode(' OR ', $likes) . ")
-                ORDER BY je.id DESC LIMIT 5";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $matches = array();
+        // Pass 1：以關鍵字搜 description
+        if (!empty($keys)) {
+            $likes = array();
+            $params = array($date);
+            foreach ($keys as $k) {
+                $likes[] = "(je.description LIKE ? OR EXISTS(SELECT 1 FROM journal_entry_lines jl WHERE jl.journal_entry_id = je.id AND jl.description LIKE ?))";
+                $params[] = '%' . $k . '%';
+                $params[] = '%' . $k . '%';
+            }
+            $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
+                    FROM journal_entries je
+                    WHERE je.voucher_date = ? AND je.status != 'voided'
+                      AND (" . implode(' OR ', $likes) . ")
+                    ORDER BY je.id DESC LIMIT 10";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         // 金額對比（容許 1 元誤差）
         foreach ($matches as $m) {
@@ -1178,6 +1188,25 @@ class AccountingModel
             $m = $matches[0];
             return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
         }
+
+        // Pass 2：關鍵字搜不到 → fallback 同日期+同金額（允許誤差 1 元），唯一匹配才回傳
+        if ((float)$amount > 0) {
+            $stmt = $this->db->prepare("
+                SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
+                FROM journal_entries je
+                WHERE je.voucher_date = ? AND je.status != 'voided'
+                  AND ABS(je.total_debit - ?) <= 1
+                ORDER BY je.id DESC LIMIT 2
+            ");
+            $stmt->execute(array($date, (float)$amount));
+            $amtMatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // 唯一匹配 → fuzzy；多筆 → 不配（避免誤配）
+            if (count($amtMatches) === 1) {
+                $m = $amtMatches[0];
+                return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+            }
+        }
+
         return $unmatched;
     }
 
