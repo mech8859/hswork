@@ -1,3 +1,10 @@
+<?php
+$_wlCanDelete = ($worklog['user_id'] == Auth::id())
+    || Auth::hasPermission('schedule.manage')
+    || Auth::hasPermission('all');
+$_fromCaseId = isset($_GET['from_case']) ? (int)$_GET['from_case'] : 0;
+$_fromScheduleId = isset($_GET['from_schedule']) ? (int)$_GET['from_schedule'] : 0;
+?>
 <div class="d-flex justify-between align-center mb-2">
     <h2>施工回報</h2>
     <div class="d-flex gap-1">
@@ -6,6 +13,15 @@
         <?php endif; ?>
         <a href="/worklog.php?action=history" class="btn btn-outline btn-sm">歷史記錄</a>
         <a href="/worklog.php" class="btn btn-outline btn-sm">今日施工</a>
+        <?php if ($_wlCanDelete): ?>
+        <form method="POST" action="/worklog.php?action=delete" style="display:inline" onsubmit="return confirm('確定刪除此筆施工回報？照片、材料使用、案件紀錄將一併移除，且無法復原。');">
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= (int)$worklog['id'] ?>">
+            <?php if ($_fromCaseId): ?><input type="hidden" name="from_case" value="<?= $_fromCaseId ?>"><?php endif; ?>
+            <?php if ($_fromScheduleId): ?><input type="hidden" name="from_schedule" value="<?= $_fromScheduleId ?>"><?php endif; ?>
+            <button type="submit" class="btn btn-danger btn-sm">刪除</button>
+        </form>
+        <?php endif; ?>
     </div>
 </div>
 
