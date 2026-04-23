@@ -473,17 +473,25 @@ switch ($action) {
                             // 無 product_id → 跳過（手動輸入的工程項）
                             if (!$pid) { $skippedCount++; continue; }
 
-                            // 查該產品的分類是否被排除
-                            $catId = $db->prepare("SELECT category_id FROM products WHERE id = ?");
-                            $catId->execute(array($pid));
-                            $pCatId = (int)$catId->fetchColumn();
+                            // 查該產品的分類 + 名稱/型號（若報價 item 沒存名稱就從 products 回補）
+                            $prodStmt = $db->prepare("SELECT category_id, name AS p_name, model AS p_model, unit AS p_unit FROM products WHERE id = ?");
+                            $prodStmt->execute(array($pid));
+                            $prodRow = $prodStmt->fetch(PDO::FETCH_ASSOC);
+                            $pCatId = $prodRow ? (int)$prodRow['category_id'] : 0;
                             if ($pCatId && isset($excludedCatIds[$pCatId])) { $skippedCount++; continue; }
+
+                            $itemName = isset($item['item_name']) && $item['item_name'] !== '' ? $item['item_name'] : ($prodRow['p_name'] ?? '');
+                            $itemModel = isset($item['model_number']) && $item['model_number'] !== '' ? $item['model_number'] : ($prodRow['p_model'] ?? '');
+                            $itemUnit = isset($item['unit']) && $item['unit'] !== '' ? $item['unit'] : ($prodRow['p_unit'] ?? '式');
+
+                            // 名稱與型號都空 → 出庫明細無法識別，跳過
+                            if ($itemName === '' && $itemModel === '') { $skippedCount++; continue; }
 
                             $items[] = array(
                                 'product_id' => $pid,
-                                'product_name' => $item['item_name'] ?? '',
-                                'model' => $item['model_number'] ?? '',
-                                'unit' => $item['unit'] ?? '式',
+                                'product_name' => $itemName,
+                                'model' => $itemModel,
+                                'unit' => $itemUnit,
                                 'quantity' => $qty,
                                 'unit_price' => (float)($item['unit_price'] ?? 0),
                                 'note' => $item['remark'] ?? '',
@@ -593,20 +601,26 @@ switch ($action) {
                         $pid = !empty($item['product_id']) ? (int)$item['product_id'] : null;
                         if (!$pid) { $skippedCount++; continue; }
 
-                        $catId = $db->prepare("SELECT category_id FROM products WHERE id = ?");
-                        $catId->execute(array($pid));
-                        $pCatId = (int)$catId->fetchColumn();
+                        $prodStmt = $db->prepare("SELECT category_id, name AS p_name, model AS p_model, unit AS p_unit FROM products WHERE id = ?");
+                        $prodStmt->execute(array($pid));
+                        $prodRow = $prodStmt->fetch(PDO::FETCH_ASSOC);
+                        $pCatId = $prodRow ? (int)$prodRow['category_id'] : 0;
                         if ($pCatId && isset($excludedCatIds[$pCatId])) { $skippedCount++; continue; }
 
                         $prevQty = isset($prevQtyMap[$pid]) ? $prevQtyMap[$pid] : 0;
                         $diff = $qty - $prevQty;
                         if ($diff <= 0) continue; // 減少或相等 → 忽略（餘料由退庫處理）
 
+                        $itemName = isset($item['item_name']) && $item['item_name'] !== '' ? $item['item_name'] : ($prodRow['p_name'] ?? '');
+                        $itemModel = isset($item['model_number']) && $item['model_number'] !== '' ? $item['model_number'] : ($prodRow['p_model'] ?? '');
+                        $itemUnit = isset($item['unit']) && $item['unit'] !== '' ? $item['unit'] : ($prodRow['p_unit'] ?? '式');
+                        if ($itemName === '' && $itemModel === '') { $skippedCount++; continue; }
+
                         $items[] = array(
                             'product_id' => $pid,
-                            'product_name' => $item['item_name'] ?? '',
-                            'model' => $item['model_number'] ?? '',
-                            'unit' => $item['unit'] ?? '式',
+                            'product_name' => $itemName,
+                            'model' => $itemModel,
+                            'unit' => $itemUnit,
                             'quantity' => $diff,
                             'unit_price' => (float)($item['unit_price'] ?? 0),
                             'note' => $item['remark'] ?? '',
