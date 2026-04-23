@@ -373,52 +373,69 @@ switch ($action) {
         // 公司前綴：理創用 lc_，禾順用空字串
         $prefix = isset($_POST['quote_company_prefix']) ? $_POST['quote_company_prefix'] : '';
         $company = ($prefix === 'lc_') ? 'lichuang' : 'hershun';
+        $branchId = isset($_POST['quote_branch_id']) ? (int)$_POST['quote_branch_id'] : 0;
 
-        $textKeys = array(
-            'quote_company_title', 'quote_company_subtitle',
-            'quote_bank_name', 'quote_bank_branch', 'quote_bank_account',
-            'quote_contact_address', 'quote_contact_phone', 'quote_contact_fax',
-            'quote_service_phone', 'quote_line_id',
-            'quote_bank_reminder', 'quote_deposit_notice',
-            'quote_warranty_months',
-            'quote_warranty_text_1', 'quote_warranty_text_2', 'quote_warranty_text_3',
-        );
         $saveData = array();
-        foreach ($textKeys as $k) {
-            if (isset($_POST[$k])) {
-                $saveData[$prefix . $k] = $_POST[$k];
+
+        if ($branchId > 0) {
+            // 分公司模式：只存 4 個分公司專屬欄位，key 加 _b{id} 後綴
+            $branchKeys = array(
+                'quote_company_title',
+                'quote_contact_address',
+                'quote_contact_phone',
+                'quote_contact_fax',
+            );
+            foreach ($branchKeys as $k) {
+                if (isset($_POST[$k])) {
+                    $saveData[$prefix . $k . '_b' . $branchId] = $_POST[$k];
+                }
             }
-        }
+        } else {
+            // 共用模式：存所有非分公司專屬欄位（排除 4 個分公司專屬欄位）
+            $sharedKeys = array(
+                'quote_company_subtitle',
+                'quote_bank_name', 'quote_bank_branch', 'quote_bank_account',
+                'quote_service_phone', 'quote_line_id',
+                'quote_bank_reminder', 'quote_deposit_notice',
+                'quote_warranty_months',
+                'quote_warranty_text_1', 'quote_warranty_text_2', 'quote_warranty_text_3',
+            );
+            foreach ($sharedKeys as $k) {
+                if (isset($_POST[$k])) {
+                    $saveData[$prefix . $k] = $_POST[$k];
+                }
+            }
 
-        // 處理報價章圖片
-        $uploadDir = __DIR__ . '/uploads/settings/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        if (!empty($_POST['remove_stamp'])) {
-            $saveData[$prefix . 'quote_stamp_image'] = '';
-        }
-        if (!empty($_FILES['stamp_image']['tmp_name'])) {
-            $ext = pathinfo($_FILES['stamp_image']['name'], PATHINFO_EXTENSION);
-            $fname = $prefix . 'stamp_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['stamp_image']['tmp_name'], $uploadDir . $fname);
-            $saveData[$prefix . 'quote_stamp_image'] = 'uploads/settings/' . $fname;
-        }
-
-        // 處理 QR Code 圖片
-        if (!empty($_POST['remove_qrcode'])) {
-            $saveData[$prefix . 'quote_qrcode_image'] = '';
-        }
-        if (!empty($_FILES['qrcode_image']['tmp_name'])) {
-            $ext = pathinfo($_FILES['qrcode_image']['name'], PATHINFO_EXTENSION);
-            $fname = $prefix . 'qrcode_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['qrcode_image']['tmp_name'], $uploadDir . $fname);
-            $saveData[$prefix . 'quote_qrcode_image'] = 'uploads/settings/' . $fname;
+            // 圖章/QR 只在共用模式處理
+            $uploadDir = __DIR__ . '/uploads/settings/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            if (!empty($_POST['remove_stamp'])) {
+                $saveData[$prefix . 'quote_stamp_image'] = '';
+            }
+            if (!empty($_FILES['stamp_image']['tmp_name'])) {
+                $ext = pathinfo($_FILES['stamp_image']['name'], PATHINFO_EXTENSION);
+                $fname = $prefix . 'stamp_' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['stamp_image']['tmp_name'], $uploadDir . $fname);
+                $saveData[$prefix . 'quote_stamp_image'] = 'uploads/settings/' . $fname;
+            }
+            if (!empty($_POST['remove_qrcode'])) {
+                $saveData[$prefix . 'quote_qrcode_image'] = '';
+            }
+            if (!empty($_FILES['qrcode_image']['tmp_name'])) {
+                $ext = pathinfo($_FILES['qrcode_image']['name'], PATHINFO_EXTENSION);
+                $fname = $prefix . 'qrcode_' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['qrcode_image']['tmp_name'], $uploadDir . $fname);
+                $saveData[$prefix . 'quote_qrcode_image'] = 'uploads/settings/' . $fname;
+            }
         }
 
         $model->saveSettings($saveData, 'quotation');
         Session::flash('success', '報價單設定已儲存');
-        redirect('/dropdown_options.php?tab=quotation&company=' . $company);
+        $redirUrl = '/dropdown_options.php?tab=quotation&company=' . $company;
+        if ($branchId > 0) $redirUrl .= '&branch=' . $branchId;
+        redirect($redirUrl);
         break;
 
     case 'save_numbering':
