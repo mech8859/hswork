@@ -312,7 +312,13 @@ switch ($action) {
         if (mb_strlen($keyword) < 2) {
             json_response(array('data' => array()));
         }
-        $result = $model->getList(array('keyword' => $keyword), 1, 10);
+        // 施工回報用：只顯示「預計線材」分類（含子孫）下的產品——工程師只填線材+耗材
+        $filters = array('keyword' => $keyword);
+        $materialCatIds = ProductModel::getCategoryIdsByFlag('show_in_material_estimate');
+        if (!empty($materialCatIds)) {
+            $filters['category_ids_in'] = $materialCatIds;
+        }
+        $result = $model->getList($filters, 1, 10);
         $items = array();
         foreach ($result['data'] as $p) {
             $items[] = array(

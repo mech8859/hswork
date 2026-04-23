@@ -949,7 +949,10 @@ class InventoryModel
      */
     public function searchProducts($keyword, $limit = 20)
     {
-        $stmt = $this->db->prepare("
+        // 排除「不進出庫單」分類（及其子孫）下的產品
+        require_once __DIR__ . '/../products/ProductModel.php';
+        $excludedCatIds = ProductModel::getCategoryIdsByFlag('exclude_from_stockout');
+        $sql = "
             SELECT p.id, p.name, p.model, p.unit, p.cost, p.price,
                    p.pack_qty, p.pack_unit, p.cost_per_unit,
                    pc.name AS category_name,
@@ -958,11 +961,18 @@ class InventoryModel
             LEFT JOIN product_categories pc ON p.category_id = pc.id
             LEFT JOIN (SELECT product_id, CAST(SUM(stock_qty) AS SIGNED) AS stock FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
             WHERE (p.name LIKE ? OR p.model LIKE ?) AND p.is_active = 1
-            ORDER BY p.name
-            LIMIT ?
-        ");
+        ";
         $kw = '%' . $keyword . '%';
-        $stmt->execute(array($kw, $kw, (int)$limit));
+        $params = array($kw, $kw);
+        if (!empty($excludedCatIds)) {
+            $ph = implode(',', array_fill(0, count($excludedCatIds), '?'));
+            $sql .= " AND (p.category_id IS NULL OR p.category_id NOT IN ($ph))";
+            $params = array_merge($params, $excludedCatIds);
+        }
+        $sql .= " ORDER BY p.name LIMIT ?";
+        $params[] = (int)$limit;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
