@@ -375,13 +375,18 @@ switch ($action) {
                     $data['updated_by'] = Auth::id();
                     $model->updateJournalEntry($entry['id'], $data);
                     Session::flash('success', '傳票已更新');
-                    redirect('/accounting.php?action=journal_view&id=' . $entry['id']);
                 } else {
                     $data['created_by'] = Auth::id();
                     $newId = $model->createJournalEntry($data);
                     Session::flash('success', '傳票已建立');
-                    redirect('/accounting.php?action=journal_view&id=' . $newId);
+                    $entry = array('id' => $newId);
                 }
+                // 若有 return_to（來自核對報表等），存完回該處
+                $rtn = isset($_POST['return_to']) ? $_POST['return_to'] : (isset($_GET['return_to']) ? $_GET['return_to'] : '');
+                if ($rtn && strpos($rtn, '/') === 0 && strpos($rtn, '/accounting.php') === 0) {
+                    redirect($rtn);
+                }
+                redirect('/accounting.php?action=journal_view&id=' . $entry['id']);
             } catch (Exception $e) {
                 Session::flash('error', $e->getMessage());
                 // Stay on form

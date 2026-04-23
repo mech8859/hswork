@@ -13,7 +13,13 @@
         $backLabel = '返回列表';
         $ref = isset($_GET['ref']) ? $_GET['ref'] : '';
         $refParams = isset($_GET['ref_params']) ? $_GET['ref_params'] : '';
-        if ($ref === 'ledger') {
+        $returnTo = isset($_GET['return_to']) ? $_GET['return_to'] : '';
+        // return_to 參數（核對報表帶入）優先於 ref
+        if ($returnTo && strpos($returnTo, '/accounting.php') === 0) {
+            $backUrl = $returnTo;
+            if (strpos($returnTo, 'voucher_reconciliation') !== false) $backLabel = '返回傳票核對';
+            else $backLabel = '返回';
+        } elseif ($ref === 'ledger') {
             $backUrl = '/accounting.php?action=ledger' . ($refParams ? '&' . $refParams : '');
             $backLabel = '返回總帳查詢';
         } elseif ($ref === 'offset_ledger') {
@@ -41,7 +47,7 @@
         ?>
         <a href="<?= e($backUrl) ?>" class="btn btn-secondary"><?= $backLabel ?></a>
         <?php if ($canManage && $entry['status'] === 'draft'): ?>
-        <a href="/accounting.php?action=journal_edit&id=<?= $entry['id'] ?>" class="btn btn-secondary">編輯</a>
+        <a href="/accounting.php?action=journal_edit&id=<?= $entry['id'] ?><?= $returnTo ? '&return_to=' . urlencode($returnTo) : '' ?>" class="btn btn-secondary">編輯</a>
         <?php endif; ?>
         <?php if ($canManage): ?>
         <a href="/accounting.php?action=journal_copy&id=<?= $entry['id'] ?>" class="btn btn-outline">複製</a>

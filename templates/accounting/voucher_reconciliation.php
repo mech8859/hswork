@@ -18,9 +18,23 @@ $statusLabels = array(
     'unmatched'               => array('未建傳票', '#ef4444'),
 );
 ?>
+<?php
+// 當前網址（含查詢參數），供編輯傳票後帶回使用
+$_reconReturnUrl = '/accounting.php?action=voucher_reconciliation&source=' . e($source)
+    . '&start_date=' . e($startDate) . '&end_date=' . e($endDate);
+if ($branchFilter && $source !== 'bank') $_reconReturnUrl .= '&branch_id=' . (int)$branchFilter;
+if (!empty($statusFilter)) $_reconReturnUrl .= '&status_filter=' . e($statusFilter);
+$_reconReturnEncoded = urlencode($_reconReturnUrl);
+?>
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-    <h1>傳票核對報表</h1>
-    <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
+    <div>
+        <h1 style="margin:0 0 4px">傳票核對報表</h1>
+        <div style="font-size:.75rem;color:#888">資料時間：<?= date('H:i:s') ?>（每次開啟即時比對）</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
+        <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
+    </div>
 </div>
 
 <!-- 源頭切換 tabs -->
@@ -128,12 +142,12 @@ $statusLabels = array(
                 </td>
                 <td style="padding:8px;font-size:.82rem">
                     <?php if ($r['voucher_id']): ?>
-                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
+                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>&return_to=<?= $_reconReturnEncoded ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
                     <?php if ($r['match_status'] === 'matched_amount_mismatch' && $r['voucher_amount'] !== null): ?>
                     <div style="color:#f59e0b;font-size:.75rem">傳票: <?= number_format($r['voucher_amount']) ?></div>
                     <?php endif; ?>
                     <?php else: ?>
-                    <span style="color:#999">—</span>
+                    <a href="/accounting.php?action=journal_create&return_to=<?= $_reconReturnEncoded ?>" style="color:#999;text-decoration:none">+ 建立</a>
                     <?php endif; ?>
                 </td>
             </tr>
