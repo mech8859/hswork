@@ -372,28 +372,69 @@ function calcTotal() {
 }
 calcTotal();
 
-// ---- 進件編號變動時即時抓案件系統別 ----
+// ---- 進件編號變動時即時從案件帶入訂單資訊/客戶資訊 ----
 (function() {
     var caseInp = document.querySelector('input[name="case_number"]');
-    var sysInp = document.querySelector('input[name="system_type"]');
-    if (!caseInp || !sysInp) return;
+    if (!caseInp) return;
+
+    function setVal(selector, value) {
+        var el = document.querySelector(selector);
+        if (!el || value === undefined || value === null) return;
+        // 已有值不覆蓋（保護使用者手動輸入）
+        if (el.value && el.value !== '' && el.tagName !== 'SELECT') return;
+        if (el.tagName === 'SELECT') {
+            // select 只在目前空白時才設（避免覆蓋使用者已選）
+            if (el.value && el.value !== '') return;
+            el.value = String(value);
+        } else {
+            el.value = value;
+        }
+    }
+    function forceSet(selector, value) {
+        // 強制覆蓋（系統別這種 readonly 欄位）
+        var el = document.querySelector(selector);
+        if (!el) return;
+        el.value = value == null ? '' : value;
+    }
+
     var lastQ = '';
-    function fetchSysType() {
+    function fetchCase() {
         var q = (caseInp.value || '').trim();
         if (q === lastQ) return;
         lastQ = q;
-        if (q === '') { sysInp.value = ''; return; }
+        if (q === '') {
+            forceSet('input[name="system_type"]', '');
+            return;
+        }
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/cases.php?action=ajax_get_case_by_number&case_number=' + encodeURIComponent(q));
         xhr.onload = function() {
             try {
                 var res = JSON.parse(xhr.responseText);
-                sysInp.value = (res.found && res.data && res.data.system_type) ? res.data.system_type : '';
+                if (!res.found || !res.data) {
+                    forceSet('input[name="system_type"]', '');
+                    return;
+                }
+                var d = res.data;
+                // 系統別（readonly，強制更新）
+                forceSet('input[name="system_type"]', d.system_type || '');
+                // 訂單資訊
+                setVal('input[name="customer_no"]', d.customer_no || '');
+                setVal('input[name="customer_name"]', d.customer_name || '');
+                setVal('select[name="branch_id"]', d.branch_id || '');
+                setVal('select[name="sales_id"]', d.sales_id || '');
+                // 客戶資訊（請款用的發票資料，優先 billing_*，否則用 customer_*）
+                setVal('input[name="invoice_title"]', d.billing_title || d.customer_name || '');
+                setVal('input[name="tax_id"]', d.billing_tax_id || '');
+                setVal('input[name="phone"]', d.billing_phone || d.customer_phone || '');
+                setVal('input[name="mobile"]', d.billing_mobile || d.customer_mobile || '');
+                setVal('input[name="invoice_email"]', d.billing_email || '');
+                setVal('input[name="invoice_address"]', d.billing_address || d.contact_address || '');
             } catch (e) {}
         };
         xhr.send();
     }
-    caseInp.addEventListener('change', fetchSysType);
-    caseInp.addEventListener('blur', fetchSysType);
+    caseInp.addEventListener('change', fetchCase);
+    caseInp.addEventListener('blur', fetchCase);
 })();
 </script>

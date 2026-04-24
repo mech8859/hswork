@@ -1151,4 +1151,41 @@ class ReportModel
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
+
+    /**
+     * 完工未收款 / 未完工案件清單
+     * - 來源：cases.status IN ('unpaid', 'incomplete')
+     * - 尾款金額：cases.balance_amount
+     * - 排序：completion_date ASC，NULL 放最上方
+     */
+    public function getUnpaidCases(array $branchIds): array
+    {
+        if (empty($branchIds)) return array('total' => 0, 'total_balance' => 0, 'rows' => array());
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $sql = "
+            SELECT c.id, c.case_number, c.title, c.customer_name,
+                   c.created_at, c.completion_date, c.status,
+                   c.balance_amount, c.total_amount, c.deal_amount,
+                   b.name AS branch_name,
+                   u.real_name AS sales_name
+            FROM cases c
+            LEFT JOIN branches b ON c.branch_id = b.id
+            LEFT JOIN users u ON c.sales_id = u.id
+            WHERE c.branch_id IN ($ph)
+              AND c.status IN ('unpaid', 'incomplete')
+            ORDER BY (c.completion_date IS NULL) DESC, c.completion_date ASC, c.id ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($branchIds);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalBalance = 0;
+        foreach ($rows as $r) $totalBalance += (int)$r['balance_amount'];
+
+        return array(
+            'total' => count($rows),
+            'total_balance' => $totalBalance,
+            'rows' => $rows,
+        );
+    }
 }

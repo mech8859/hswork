@@ -222,11 +222,21 @@ $fmYear = $analysis['year'];
 $fmBaseDate = ($fmYear - 1) . '-12-31'; // 114年12月31日 = 2025-12-31
 $fmMonths = array($fmBaseDate);
 $fmHeaders = array('12/31');
+$fmToday = date('Y-m-d');
+$fmTodayYm = (int)date('Y') * 100 + (int)date('n');
 for ($mi = 1; $mi <= 12; $mi++) {
-    $fmEndDate = date('Y-m-t', mktime(0, 0, 0, $mi, 1, $fmYear));
-    if ($fmEndDate > date('Y-m-d')) break; // 未來不顯示
-    $fmMonths[] = $fmEndDate;
-    $fmHeaders[] = $mi . '月底';
+    $targetYm = $fmYear * 100 + $mi;
+    if ($targetYm > $fmTodayYm) break; // 未來月份跳過
+    $fmMonthEnd = date('Y-m-t', mktime(0, 0, 0, $mi, 1, $fmYear));
+    if ($fmMonthEnd <= $fmToday) {
+        // 月份已結束 → 用月底
+        $fmMonths[] = $fmMonthEnd;
+        $fmHeaders[] = $mi . '月底';
+    } else {
+        // 當前月份 → 即時到今天
+        $fmMonths[] = $fmToday;
+        $fmHeaders[] = $mi . '月 (到 ' . date('m/d', strtotime($fmToday)) . ')';
+    }
 }
 
 // 12/31 基準值（114年底帳）

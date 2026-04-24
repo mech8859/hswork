@@ -132,6 +132,7 @@ var accounts = <?= json_encode($accounts, JSON_UNESCAPED_UNICODE) ?>;
 var costCenters = <?= json_encode($costCenters, JSON_UNESCAPED_UNICODE) ?>;
 var customers = <?= json_encode(isset($customers) ? $customers : array(), JSON_UNESCAPED_UNICODE) ?>;
 var vendors = <?= json_encode(isset($vendors) ? $vendors : array(), JSON_UNESCAPED_UNICODE) ?>;
+var otherRelations = <?= json_encode(isset($otherRelations) ? $otherRelations : array(), JSON_UNESCAPED_UNICODE) ?>;
 var lineIndex = 0;
 
 // === 會計科目選擇彈窗 ===
@@ -665,7 +666,7 @@ function addLine(data) {
     var offsetAmt = data && parseFloat(data.offset_amount) > 0 ? parseInt(data.offset_amount) : '';
     var offsetLedgerId = data && data.offset_ledger_id ? data.offset_ledger_id : '';
 
-    var relTypeSelect = '<select name="lines[' + idx + '][relation_type]" class="form-control rel-type-sel" data-idx="' + idx + '" onchange="onRelTypeChange(' + idx + ')" style="font-size:.85rem;padding:4px">' +
+    var relTypeSelect = '<select name="lines[' + idx + '][relation_type]" class="form-control rel-type-sel" data-idx="' + idx + '" onchange="onRelTypeChange(' + idx + ')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();var v=this.value;if(v===\'customer\'||v===\'vendor\')openRelModal(' + idx + ')}" style="font-size:.85rem;padding:4px">' +
         '<option value="">--</option>' +
         '<option value="customer"' + (relType === 'customer' ? ' selected' : '') + '>客戶</option>' +
         '<option value="vendor"' + (relType === 'vendor' ? ' selected' : '') + '>廠商</option>' +
@@ -712,6 +713,17 @@ function addLine(data) {
         showOtherInput(idx, relName, nameDisplayEl, relId);
     }
     calcTotals();
+
+    // 新增空白行（非載入既有資料）時，自動捲動到新行並聚焦會計科目下拉
+    if (!data) {
+        setTimeout(function() {
+            try {
+                tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                var firstSel = tr.querySelector('select[name^="lines["][name$="[account_id]"]');
+                if (firstSel) firstSel.focus();
+            } catch (e) {}
+        }, 50);
+    }
 }
 
 // 往來類型切換
@@ -743,11 +755,25 @@ function onRelTypeChange(idx) {
     }
 }
 
+// 聚焦該列的借方或貸方金額欄（空的優先，否則借方）
+function _jfFocusAmount(tr) {
+    if (!tr) return;
+    setTimeout(function() {
+        var d = tr.querySelector('.debit-input');
+        var c = tr.querySelector('.credit-input');
+        var target = (d && !d.value) ? d : (c && !c.value ? c : d);
+        if (target) {
+            target.focus();
+            if (target.select) target.select();
+        }
+    }, 30);
+}
+
 function showOtherInput(idx, val, nameDisplayEl, existingRelId) {
     var cell = document.getElementById('rel_cell_' + idx);
     var existInput = cell.querySelector('.rel-other-input');
     if (existInput) existInput.remove();
-    // 往來編號欄放文字輸入（編號）
+    // 往來編號欄放文字輸入（編號）+ datalist 提供已存在「其他」往來對象快選
     var idDisplay = document.getElementById('rel_id_display_' + idx);
     idDisplay.style.display = 'none';
     var initId = existingRelId || document.getElementById('rel_id_' + idx).value || '';
@@ -757,12 +783,45 @@ function showOtherInput(idx, val, nameDisplayEl, existingRelId) {
     idInput.style.fontSize = '.85rem';
     idInput.placeholder = '編號';
     idInput.value = initId;
+    idInput.setAttribute('list', 'otherRelList');
+    idInput.autocomplete = 'off';
     idInput.oninput = function() {
         document.getElementById('rel_id_' + idx).value = this.value;
+        // 若輸入值精準對應 datalist 的選項（code），自動帶入名稱
+        if (typeof otherRelations !== 'undefined') {
+            var v = this.value;
+            var match = null;
+            for (var i = 0; i < otherRelations.length; i++) {
+                if (String(otherRelations[i].id) === v) { match = otherRelations[i]; break; }
+            }
+            if (match) {
+                document.getElementById('rel_name_' + idx).value = match.name;
+                var nameDisp = document.getElementById('rel_name_display_' + idx);
+                var nameInp = nameDisp ? nameDisp.querySelector('.rel-other-name-input') : null;
+                if (nameInp) nameInp.value = match.name;
+            }
+        }
     };
-    // 離開編號欄時自動查詢是否已有對應名稱
+    // 離開編號欄時再查一次 DB（含歷史紀錄）
     idInput.addEventListener('blur', function() {
         checkOtherRelation(idx, this.value);
+    });
+    // Enter → 跳到名稱欄位（若名稱已帶入則直接跳金額）
+    idInput.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        var tr = document.getElementById('line_' + idx);
+        if (!tr) return;
+        var nameInp = tr.querySelector('.rel-other-name-input');
+        // 若名稱已經帶入且 readOnly 就直接跳金額
+        if (nameInp && nameInp.value && nameInp.readOnly) {
+            _jfFocusAmount(tr);
+        } else if (nameInp) {
+            nameInp.focus();
+            if (nameInp.select) nameInp.select();
+        } else {
+            _jfFocusAmount(tr);
+        }
     });
     cell.appendChild(idInput);
 
@@ -778,6 +837,13 @@ function showOtherInput(idx, val, nameDisplayEl, existingRelId) {
         nameInput.oninput = function() {
             document.getElementById('rel_name_' + idx).value = this.value;
         };
+        // Enter → 跳金額欄位
+        nameInput.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            var tr = document.getElementById('line_' + idx);
+            if (tr) _jfFocusAmount(tr);
+        });
         nameDisplayEl.appendChild(nameInput);
     }
 
@@ -889,16 +955,30 @@ function getRelDisplayCode(type, id) {
 
 function pickRel(id, name) {
     if (_relPickerIdx === null) return;
-    var sel = document.querySelector('select[data-idx="' + _relPickerIdx + '"]');
+    var idx = _relPickerIdx;
+    var sel = document.querySelector('select[data-idx="' + idx + '"]');
     var type = sel ? sel.value : '';
     var displayCode = getRelDisplayCode(type, id);
-    document.getElementById('rel_id_' + _relPickerIdx).value = id;
-    document.getElementById('rel_name_' + _relPickerIdx).value = name;
-    document.getElementById('rel_id_display_' + _relPickerIdx).innerHTML = displayCode;
+    document.getElementById('rel_id_' + idx).value = id;
+    document.getElementById('rel_name_' + idx).value = name;
+    document.getElementById('rel_id_display_' + idx).innerHTML = displayCode;
     var short = name.length > 6 ? name.substring(0, 6) : name;
-    document.getElementById('rel_name_display_' + _relPickerIdx).innerHTML = short;
-    document.getElementById('rel_name_display_' + _relPickerIdx).title = name;
+    document.getElementById('rel_name_display_' + idx).innerHTML = short;
+    document.getElementById('rel_name_display_' + idx).title = name;
     closeRelModal();
+
+    // 帶回後自動把游標移到借方金額（空的就進借方，已有借方金額就跳貸方）
+    setTimeout(function() {
+        var tr = document.getElementById('line_' + idx);
+        if (!tr) return;
+        var debit = tr.querySelector('.debit-input');
+        var credit = tr.querySelector('.credit-input');
+        var target = (debit && !debit.value) ? debit : (credit && !credit.value ? credit : debit);
+        if (target) {
+            target.focus();
+            if (target.select) target.select();
+        }
+    }, 50);
 }
 
 function onRelSearch() {
@@ -932,10 +1012,69 @@ function onRelSearch() {
         var relSearch = document.getElementById('relModalSearch');
         if (relSearch) {
             relSearch.addEventListener('compositionstart', function() { relComposing = true; });
-            relSearch.addEventListener('compositionend', function() { relComposing = false; onRelSearch(); });
-            relSearch.addEventListener('input', function() { if (!relComposing) onRelSearch(); });
+            relSearch.addEventListener('compositionend', function() {
+                relComposing = false;
+                onRelSearch();
+                _relHighlightFirst();
+            });
+            // input 事件：即使中文輸入中也即時過濾，過濾完自動標記第一筆
+            relSearch.addEventListener('input', function() {
+                onRelSearch();
+                _relHighlightFirst();
+            });
+            // 方向鍵上下移動 highlight + Enter 選取
+            // IME 組字中的 Enter 讓 IME 處理；組字結束後（即使候選字視窗還開著）Enter 選取清單
+            relSearch.addEventListener('keydown', function(e) {
+                // 只在我方自己的 composition flag 為 true 時讓出（相容性最高）
+                if (relComposing) return;
+                var rows = document.querySelectorAll('#relModalBody tr.acct-row[onclick]');
+                if (!rows.length) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    _relMoveHighlight(rows, 1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    _relMoveHighlight(rows, -1);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var hi = _relGetHighlight(rows);
+                    if (hi) hi.click();
+                    else rows[0].click(); // 無 highlight 時選第一筆
+                }
+            });
         }
     }
+    function _relMoveHighlight(rows, dir) {
+        var cur = _relGetHighlight(rows);
+        var idx = cur ? Array.prototype.indexOf.call(rows, cur) : -1;
+        if (cur) cur.classList.remove('rel-hi');
+        idx = idx + dir;
+        if (idx < 0) idx = rows.length - 1;
+        if (idx >= rows.length) idx = 0;
+        rows[idx].classList.add('rel-hi');
+        rows[idx].scrollIntoView({ block: 'nearest' });
+    }
+    function _relGetHighlight(rows) {
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].classList.contains('rel-hi')) return rows[i];
+        }
+        return null;
+    }
+    function _relResetHighlight() {
+        document.querySelectorAll('#relModalBody tr.acct-row.rel-hi').forEach(function(r) { r.classList.remove('rel-hi'); });
+    }
+    // 過濾後自動標記第一筆 (方便直接按 Enter 選取)
+    function _relHighlightFirst() {
+        _relResetHighlight();
+        var rows = document.querySelectorAll('#relModalBody tr.acct-row[onclick]');
+        if (rows.length > 0) {
+            rows[0].classList.add('rel-hi');
+            rows[0].scrollIntoView({ block: 'nearest' });
+        }
+    }
+    window._relResetHighlight = _relResetHighlight;
+    window._relHighlightFirst = _relHighlightFirst;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initSearchIME);
@@ -1040,8 +1179,16 @@ function autoSetOffsetFlag(el, direction) {
         offsetFlagSel.disabled = true;
 
         if (flag === 2) {
-            // 沖帳：自動彈出選擇立帳單
-            onOffsetFlagChange(parseInt(idx));
+            // 沖帳：若已有關聯的立帳單（編輯既有傳票）→ 不重開 modal，沿用原沖帳設定
+            var hiddenLedger = document.querySelector('input[name="lines[' + idx + '][offset_ledger_id]"]');
+            if (hiddenLedger && hiddenLedger.value) {
+                // 已綁定立帳單，保留原沖帳設定
+                var amtInput = document.getElementById('offset_amt_' + idx);
+                if (amtInput) amtInput.disabled = false;
+            } else {
+                // 全新沖帳 → 彈出選擇立帳單
+                onOffsetFlagChange(parseInt(idx));
+            }
         } else {
             // 立帳：沖額清空
             var amtInput = document.getElementById('offset_amt_' + idx);
@@ -1850,6 +1997,14 @@ function closeOffsetModal() {
 .acct-display { padding:6px 10px; border:1px solid #ddd; border-radius:4px; background:#fff; cursor:pointer; min-height:34px; display:flex; align-items:center; font-size:.9rem; }
 .acct-display:hover { border-color:#2196F3; background:#f8fbff; }
 .acct-row:not([style*="italic"]):hover { background:#e3f2fd !important; }
+.acct-row.rel-hi { background:#bbdefb !important; }
 .acct-row td { padding:8px 12px; border-bottom:1px solid #f0f0f0; }
 #acctModal table { font-size:.9rem; }
 </style>
+
+<!-- 「其他」往來類型的快選 datalist（過往用過的編號+名稱） -->
+<datalist id="otherRelList">
+<?php if (!empty($otherRelations)): foreach ($otherRelations as $or): ?>
+    <option value="<?= e($or['id']) ?>"><?= e($or['name']) ?></option>
+<?php endforeach; endif; ?>
+</datalist>

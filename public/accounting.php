@@ -246,6 +246,7 @@ switch ($action) {
             'keyword'      => isset($_GET['keyword']) ? $_GET['keyword'] : '',
             'created_by'   => isset($_GET['created_by']) ? $_GET['created_by'] : '',
             'amount'       => isset($_GET['amount']) ? $_GET['amount'] : '',
+            'account_id'   => isset($_GET['account_id']) ? $_GET['account_id'] : '',
             'sort'         => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
         );
         $perPage = 100;
@@ -259,6 +260,7 @@ switch ($action) {
         $voucherTypeOptions = AccountingModel::voucherTypeOptions();
         $statusOptions = AccountingModel::statusOptions();
         $creators = $model->getJournalCreators();
+        $accounts = $model->getAccountsFlat(false);
 
         $pageTitle = '傳票管理';
         $currentPage = 'accounting';
@@ -410,6 +412,20 @@ switch ($action) {
         try {
             $vendors = $db2->query("SELECT id, vendor_code, name, tax_id FROM vendors ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { $vendors = array(); }
+
+        // 「其他」往來過往紀錄（供 datalist 自動補完）
+        try {
+            $otherRelations = $db2->query("
+                SELECT relation_id AS id, relation_name AS name, COUNT(*) AS cnt
+                FROM journal_entry_lines
+                WHERE relation_type = 'other'
+                  AND relation_id IS NOT NULL AND relation_id <> ''
+                  AND relation_name IS NOT NULL AND relation_name <> ''
+                GROUP BY relation_id, relation_name
+                ORDER BY cnt DESC, relation_id
+                LIMIT 500
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) { $otherRelations = array(); }
 
         $pageTitle = $entry ? '編輯傳票 - ' . $entry['voucher_number'] : '新增傳票';
         $currentPage = 'accounting';

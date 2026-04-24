@@ -37,19 +37,19 @@
             <option value="<?= e($k) ?>" <?= $filters['status'] === $k ? 'selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
         </select>
-        <select name="voucher_type" class="form-control" style="width:130px">
-            <option value="">全部類型</option>
-            <?php foreach ($voucherTypeOptions as $k => $v): ?>
-            <option value="<?= e($k) ?>" <?= $filters['voucher_type'] === $k ? 'selected' : '' ?>><?= e($v) ?></option>
-            <?php endforeach; ?>
-        </select>
         <select name="created_by" class="form-control" style="width:140px">
             <option value="">全部建立者</option>
             <?php foreach ($creators as $c): ?>
             <option value="<?= (int)$c['id'] ?>" <?= (string)$filters['created_by'] === (string)$c['id'] ? 'selected' : '' ?>><?= e($c['real_name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <input type="number" name="amount" value="<?= e($filters['amount'] ?? '') ?>" placeholder="$ 金額" class="form-control" style="width:110px" step="1" min="0" title="依金額搜尋（借/貸方合計或單行金額）">
+        <input type="text" inputmode="numeric" name="amount" value="<?= e($filters['amount'] ?? '') ?>" placeholder="$ 金額" class="form-control" style="width:110px" title="依金額搜尋（借/貸方合計或單行金額，可輸入 $ 或逗號）">
+        <select name="account_id" class="form-control" style="width:180px" title="依會計科目搜尋">
+            <option value="">全部會計科目</option>
+            <?php foreach ($accounts as $acct): ?>
+            <option value="<?= (int)$acct['id'] ?>" <?= (string)($filters['account_id'] ?? '') === (string)$acct['id'] ? 'selected' : '' ?>><?= e($acct['code']) ?> <?= e($acct['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
         <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:140px">
         <span>~</span>
         <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:140px">

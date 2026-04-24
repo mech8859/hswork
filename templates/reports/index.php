@@ -64,6 +64,7 @@
         array('key' => 'inter_branch_monthly', 'action' => 'inter_branch', 'icon' => '&#128176;', 'title' => '跨點點工費月結', 'desc' => '各據點互相支援費用明細'),
         array('key' => 'sales_personal', 'action' => 'sales_personal', 'icon' => '&#128100;', 'title' => '業務個人分析', 'desc' => '個人進件/成交/金額/案別統計與團隊比較'),
         array('key' => 'branch_monthly', 'action' => 'branch_monthly', 'icon' => '&#127970;', 'title' => '分公司月報', 'desc' => '各分公司每月收款/付款統計與明細'),
+        array('key' => 'unpaid_cases', 'action' => 'unpaid_cases', 'icon' => '&#128722;', 'title' => '完工未收款/未完工', 'desc' => '待收尾款案件清單與合計金額'),
     );
     ?>
     <div class="report-links">

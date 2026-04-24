@@ -369,6 +369,14 @@ class AccountingModel
                 $params[] = $amt;
             }
         }
+        if (!empty($filters['account_id'])) {
+            // 有任一分錄行使用該會計科目
+            $where .= ' AND EXISTS(
+                SELECT 1 FROM journal_entry_lines jl
+                WHERE jl.journal_entry_id = je.id AND jl.account_id = ?
+            )';
+            $params[] = (int)$filters['account_id'];
+        }
         return array($where, $params);
     }
 

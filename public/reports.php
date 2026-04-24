@@ -92,6 +92,21 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 完工未收款 / 未完工 ----
+    case 'unpaid_cases':
+        if (!Auth::canAccessReport('unpaid_cases') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $data = $model->getUnpaidCases($branchIds);
+
+        $pageTitle = '完工未收款/未完工';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/unpaid_cases.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 點工費月結 ----
     case 'inter_branch':
         $month = $_GET['month'] ?? date('Y-m');

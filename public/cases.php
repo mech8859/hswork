@@ -1085,7 +1085,15 @@ switch ($action) {
         header('Content-Type: application/json');
         $cn = trim($_GET['case_number'] ?? '');
         if ($cn === '') { echo json_encode(array('found' => false)); break; }
-        $stmt = Database::getInstance()->prepare("SELECT id, case_number, system_type, customer_id, customer_no, customer_name FROM cases WHERE case_number = ? LIMIT 1");
+        $stmt = Database::getInstance()->prepare("
+            SELECT id, case_number, title, system_type,
+                   customer_id, customer_no, customer_name, customer_phone, customer_mobile,
+                   branch_id, sales_id,
+                   billing_title, billing_tax_id,
+                   billing_phone, billing_mobile, billing_address, billing_email,
+                   contact_address
+            FROM cases WHERE case_number = ? LIMIT 1
+        ");
         $stmt->execute(array($cn));
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) { echo json_encode(array('found' => false)); break; }
