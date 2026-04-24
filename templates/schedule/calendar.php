@@ -93,6 +93,38 @@ if ($currentKeyword !== '')  $keepQs .= '&keyword=' . urlencode($currentKeyword)
     <a href="/schedule.php?year=<?= $nextYear ?>&month=<?= $nextMonth ?><?= $keepQs ?>" class="btn btn-outline btn-sm">下月 &raquo;</a>
 </div>
 
+<!-- 案別篩選 tabs (hide-mobile 桌面版) -->
+<div class="case-type-tabs hide-mobile" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">
+    <button type="button" class="ct-tab active" data-ct="">全部</button>
+    <button type="button" class="ct-tab" data-ct="new_install">新案</button>
+    <button type="button" class="ct-tab" data-ct="addition">老客戶追加</button>
+    <button type="button" class="ct-tab" data-ct="old_repair">舊客戶維修案</button>
+    <button type="button" class="ct-tab" data-ct="new_repair">新客戶維修案</button>
+    <button type="button" class="ct-tab" data-ct="maintenance">維護保養</button>
+</div>
+<style>
+.ct-tab { padding:5px 14px; border:1px solid var(--gray-300); background:#fff; border-radius:16px; font-size:.82rem; cursor:pointer; color:#555; transition:all .15s; }
+.ct-tab:hover { background:#f5f5f5; }
+.ct-tab.active { background:#1565c0; color:#fff; border-color:#1565c0; }
+.cal-event.ct-hidden { display:none !important; }
+</style>
+<script>
+(function(){
+    var tabs = document.querySelectorAll('.case-type-tabs .ct-tab');
+    tabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+            tabs.forEach(function(x){ x.classList.remove('active'); });
+            t.classList.add('active');
+            var sel = t.getAttribute('data-ct');
+            document.querySelectorAll('.cal-event').forEach(function(el) {
+                if (!sel) { el.classList.remove('ct-hidden'); }
+                else { el.classList.toggle('ct-hidden', el.getAttribute('data-case-type') !== sel); }
+            });
+        });
+    });
+})();
+</script>
+
 <?php
 // 預先計算每日狀態供重複使用
 $dayStatusData = array();
@@ -247,7 +279,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                 $shown++;
                 $isMine = in_array($currentUserId, array_column($ds['engineers'], 'user_id'));
             ?>
-            <a href="/schedule.php?action=view&id=<?= $ds['id'] ?>" class="cal-event cal-event-<?= isset($ds['display_status']) ? $ds['display_status'] : $ds['status'] ?> <?= $isMine ? 'cal-event-mine' : '' ?>">
+            <a href="/schedule.php?action=view&id=<?= $ds['id'] ?>" class="cal-event cal-event-<?= isset($ds['display_status']) ? $ds['display_status'] : $ds['status'] ?> <?= $isMine ? 'cal-event-mine' : '' ?>" data-case-type="<?= e($ds['case_type'] ?? '') ?>">
                 <?php
                 $schedTime = '';
                 if (!empty($ds['designated_time'])) {
@@ -273,7 +305,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
                     $engNames = array();
                     foreach ($ds['engineers'] as $eng) $engNames[] = $eng['real_name'];
                 ?>
-                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= isset($ds['display_status']) ? e($ds['display_status']) : e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>" data-case-number="<?= e($ds['case_number'] ?: '') ?>" data-designated-time="<?= e(!empty($ds['designated_time']) ? substr($ds['designated_time'], 0, 5) : '') ?>"></div>
+                <div data-id="<?= $ds['id'] ?>" data-title="<?= e($ds['case_title']) ?>" data-status="<?= isset($ds['display_status']) ? e($ds['display_status']) : e($ds['status']) ?>" data-plate="<?= e($ds['plate_number'] ?: '') ?>" data-engineers="<?= e(implode('、', $engNames)) ?>" data-count="<?= count($ds['engineers']) ?>" data-case-number="<?= e($ds['case_number'] ?: '') ?>" data-designated-time="<?= e(!empty($ds['designated_time']) ? substr($ds['designated_time'], 0, 5) : '') ?>" data-case-type="<?= e($ds['case_type'] ?? '') ?>"></div>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
@@ -302,6 +334,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
         $items[] = array(
             'id' => $ds['id'], 'title' => $ds['case_title'],
             'case_number' => isset($ds['case_number']) ? $ds['case_number'] : '',
+            'case_type' => isset($ds['case_type']) ? $ds['case_type'] : '',
             'status' => isset($ds['display_status']) ? $ds['display_status'] : $ds['status'], 'address' => $ds['address'] ?: '',
             'plate' => $ds['plate_number'] ?: '',
             'engineers' => implode(', ', array_column($ds['engineers'], 'real_name')),
@@ -421,7 +454,12 @@ function openMobileDay(dateStr) {
         html += '<div class="mday-item" style="border-left-color:' + borderColor + '" onclick="location.href=\'/schedule.php?action=view&id=' + s.id + '\'">';
         html += '<div class="mday-item-title">' + mEsc(s.title) + (s.time ? ' <span style="color:#e65100;font-size:.8rem;font-weight:600">' + s.time + '</span>' : '') + '</div>';
         var mStatusLabels = {planned:'已排',confirmed:'已確認',in_progress:'施工中',checked_out:'已下工',needs_revisit:'需再施工',no_report:'未回報',completed:'已完工',cancelled:'取消'};
+        var mCaseTypeMap = {new_install:['新案','#e3f2fd','#1976d2'],addition:['老客追加','#f3e5f5','#6a1b9a'],old_repair:['舊客維修','#fff3e0','#e65100'],new_repair:['新客維修','#ffebee','#c62828'],maintenance:['維護保養','#e8f5e9','#2e7d32']};
         html += '<div class="mday-item-meta">';
+        if (s.case_type && mCaseTypeMap[s.case_type]) {
+            var ct = mCaseTypeMap[s.case_type];
+            html += '<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:' + ct[1] + ';color:' + ct[2] + ';font-size:.7rem;font-weight:600">' + ct[0] + '</span>';
+        }
         html += '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + borderColor + ';color:#fff;font-size:.7rem">' + (mStatusLabels[s.status] || s.status) + '</span>';
         if (s.engineers) html += '<span>&#x1F477; ' + mEsc(s.engineers) + '</span>';
         if (s.plate) html += '<span>&#x1F697; ' + mEsc(s.plate) + '</span>';
@@ -703,6 +741,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
 .cal-event-completed { background: var(--success); }
 .cal-event-cancelled { background: var(--gray-500); }
 .cal-event-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-ct-tag { display:inline-block; padding:0 4px; margin-right:3px; border-radius:6px; font-size:.65rem; font-weight:600; line-height:1.4; vertical-align:middle; }
 .cal-event-info { display: flex; gap: 4px; opacity: .9; font-size: .7rem; }
 
 /* 登入者的排工（醒目邊框） */
@@ -847,6 +886,7 @@ function showSchedulePopup(dateStr) {
     document.getElementById('schPopupTitle').textContent = (d.getMonth()+1) + '/' + d.getDate() + ' (' + weekdays[d.getDay()] + ') ' + items.length + ' 筆排工';
     var statusColors = {planned:'#3b82f6',confirmed:'#2563eb',in_progress:'#f59e0b',checked_out:'#8b5cf6',needs_revisit:'#f97316',no_report:'#ef4444',completed:'#22c55e',cancelled:'#6b7280'};
     var statusLabels = {planned:'已排',confirmed:'已確認',in_progress:'施工中',checked_out:'已下工',needs_revisit:'需再施工',no_report:'未回報',completed:'已完工',cancelled:'取消'};
+    var caseTypeMap = {new_install:['新案','#e3f2fd','#1976d2'],addition:['老客追加','#f3e5f5','#6a1b9a'],old_repair:['舊客維修','#fff3e0','#e65100'],new_repair:['新客維修','#ffebee','#c62828'],maintenance:['維護保養','#e8f5e9','#2e7d32']};
     var html = '';
     for (var i = 0; i < items.length; i++) {
         var it = items[i];
@@ -858,12 +898,15 @@ function showSchedulePopup(dateStr) {
         var count = it.getAttribute('data-count');
         var caseNo = it.getAttribute('data-case-number') || '';
         var designated = it.getAttribute('data-designated-time') || '';
+        var caseType = it.getAttribute('data-case-type') || '';
         var color = statusColors[status] || '#3b82f6';
         var label = statusLabels[status] || status;
+        var ct = caseTypeMap[caseType];
         html += '<a href="/schedule.php?action=view&id=' + id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
             ' onmouseover="this.style.background=\'#eef1f5\'" onmouseout="this.style.background=\'#f8f9fa\'">' +
             '<div style="font-weight:600;font-size:.95rem">' + title + '</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem;color:#888;margin-top:2px">' +
+            (ct ? '<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:' + ct[1] + ';color:' + ct[2] + ';font-size:.7rem;font-weight:600">' + ct[0] + '</span>' : '') +
             '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + color + ';color:#fff;font-size:.7rem">' + label + '</span>' +
             (caseNo ? '<span>' + caseNo + '</span>' : '') +
             '<span>' + count + '人</span>' +

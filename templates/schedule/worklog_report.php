@@ -39,6 +39,64 @@ $_fromScheduleId = isset($_GET['from_schedule']) ? (int)$_GET['from_schedule'] :
 </div>
 
 <?php
+// 同案件前次施工紀錄（排除當前這筆、排除空白內容）
+$prevWorklogs = array();
+if (!empty($worklog['case_id'])) {
+    try {
+        $_pwStmt = Database::getInstance()->prepare("
+            SELECT wl.id, wl.work_description, wl.issues, wl.next_visit_note,
+                   wl.is_completed, wl.payment_amount, wl.payment_method,
+                   s.schedule_date, u.real_name
+            FROM work_logs wl
+            JOIN schedules s ON wl.schedule_id = s.id
+            LEFT JOIN users u ON wl.user_id = u.id
+            WHERE s.case_id = ?
+              AND wl.id <> ?
+              AND wl.work_description IS NOT NULL AND wl.work_description <> ''
+            ORDER BY s.schedule_date DESC, wl.id DESC
+            LIMIT 20
+        ");
+        $_pwStmt->execute(array((int)$worklog['case_id'], (int)$worklog['id']));
+        $prevWorklogs = $_pwStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { $prevWorklogs = array(); }
+}
+?>
+<?php if (!empty($prevWorklogs)): ?>
+<div class="card" style="border-left:4px solid #1565c0;background:#f5f9ff">
+    <div class="card-header d-flex justify-between align-center" style="padding:8px 12px">
+        <span>📋 前次施工紀錄（同案件，共 <?= count($prevWorklogs) ?> 筆）</span>
+        <button type="button" class="btn btn-outline btn-xs" onclick="togglePrevLogs(this)" style="font-size:.75rem">收合</button>
+    </div>
+    <div id="prevLogsBody" style="padding:4px 12px 8px">
+        <?php foreach ($prevWorklogs as $pw): ?>
+        <div style="border-top:1px dashed #cbd5e1;padding:8px 0">
+            <div style="font-size:.82rem;color:#555;margin-bottom:4px">
+                <strong><?= e($pw['schedule_date']) ?></strong>
+                <?php if (!empty($pw['real_name'])): ?><span class="text-muted" style="margin-left:6px"><?= e($pw['real_name']) ?></span><?php endif; ?>
+                <?php if (!empty($pw['is_completed'])): ?><span class="badge badge-success" style="font-size:.7rem;margin-left:6px">已完工</span><?php endif; ?>
+                <?php if (!empty($pw['payment_amount'])): ?><span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:.7rem;margin-left:6px">收款 $<?= number_format($pw['payment_amount']) ?></span><?php endif; ?>
+            </div>
+            <div style="white-space:pre-line;font-size:.88rem;line-height:1.5"><?= e($pw['work_description']) ?></div>
+            <?php if (!empty($pw['issues'])): ?>
+            <div style="margin-top:4px;padding:4px 8px;background:#fff3e0;border-radius:4px;font-size:.82rem;color:#e65100"><strong>問題：</strong><?= e($pw['issues']) ?></div>
+            <?php endif; ?>
+            <?php if (!empty($pw['next_visit_note'])): ?>
+            <div style="margin-top:4px;padding:4px 8px;background:#fff8e1;border-radius:4px;font-size:.82rem;color:#bf360c"><strong>下次備註：</strong><?= e($pw['next_visit_note']) ?></div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<script>
+function togglePrevLogs(btn) {
+    var body = document.getElementById('prevLogsBody');
+    if (body.style.display === 'none') { body.style.display = ''; btn.textContent = '收合'; }
+    else { body.style.display = 'none'; btn.textContent = '展開'; }
+}
+</script>
+<?php endif; ?>
+
+<?php
 $arrivalHM = $worklog['arrival_time'] ? date('H:i', strtotime($worklog['arrival_time'])) : '';
 $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['departure_time'])) : '';
 ?>

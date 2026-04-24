@@ -98,6 +98,12 @@ function _scMobileUrl($extra = array()) {
 .scm-status-completed { background:#22c55e; }
 .scm-status-cancelled { background:#6b7280; }
 .scm-note { margin-top:4px; padding:6px 8px; background:#fffbea; border-left:3px solid #f9a825; font-size:.8rem; color:#6a4800; border-radius:0 4px 4px 0; white-space:pre-wrap; word-break:break-word; }
+.scm-sales-note { margin-top:4px; padding:6px 8px; background:#e3f2fd; border-left:3px solid #1565c0; font-size:.8rem; color:#0d47a1; border-radius:0 4px 4px 0; white-space:pre-wrap; word-break:break-word; }
+.scm-case-type-tabs { display:flex; flex-wrap:wrap; gap:4px; padding:6px 0; overflow-x:auto; }
+.scm-ct-tab { flex-shrink:0; padding:4px 10px; border:1px solid #cbd5e1; background:#fff; border-radius:14px; font-size:.78rem; color:#555; cursor:pointer; }
+.scm-ct-tab.active { background:#1565c0; color:#fff; border-color:#1565c0; }
+.scm-card.ct-hidden { display:none !important; }
+.scm-ct-badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.7rem; font-weight:600; margin-right:4px; vertical-align:middle; }
 .scm-no-data { text-align:center; color:#999; padding:40px 20px; font-size:.9rem; background:#fff; border-radius:8px; }
 
 /* 月曆格模式 */
@@ -176,6 +182,16 @@ function _scMobileUrl($extra = array()) {
         <a href="<?= _scMobileUrl(array('year' => $prevYear, 'month' => $prevMonth, 'date' => null)) ?>">‹ <?= $prevMonth ?>月</a>
         <a href="<?= _scMobileUrl(array('year' => (int)date('Y'), 'month' => (int)date('n'), 'date' => null)) ?>#today" class="current" onclick="scmGoToday(event)">今天</a>
         <a href="<?= _scMobileUrl(array('year' => $nextYear, 'month' => $nextMonth, 'date' => null)) ?>"><?= $nextMonth ?>月 ›</a>
+    </div>
+
+    <!-- 案別篩選 -->
+    <div class="scm-case-type-tabs">
+        <button type="button" class="scm-ct-tab active" data-ct="">全部</button>
+        <button type="button" class="scm-ct-tab" data-ct="new_install">新案</button>
+        <button type="button" class="scm-ct-tab" data-ct="addition">老客戶追加</button>
+        <button type="button" class="scm-ct-tab" data-ct="old_repair">舊客維修</button>
+        <button type="button" class="scm-ct-tab" data-ct="new_repair">新客維修</button>
+        <button type="button" class="scm-ct-tab" data-ct="maintenance">維護保養</button>
     </div>
     </div>
 
@@ -280,17 +296,33 @@ function _scMobileUrl($extra = array()) {
                 $cardClass = 'scm-card';
                 if ($dstat === 'no_report' || $dstat === 'needs_revisit') $cardClass .= ' status-full';
                 elseif ($dstat === 'in_progress') $cardClass .= ' status-partial';
+                // 案別顯示
+                $caseTypeMap = array(
+                    'new_install'  => array('新案',    '#1976d2', '#e3f2fd'),
+                    'addition'     => array('老客追加', '#6a1b9a', '#f3e5f5'),
+                    'old_repair'   => array('舊客維修', '#e65100', '#fff3e0'),
+                    'new_repair'   => array('新客維修', '#c62828', '#ffebee'),
+                    'maintenance'  => array('維護保養', '#2e7d32', '#e8f5e9'),
+                );
+                $ctKey = isset($s['case_type']) ? $s['case_type'] : '';
+                $ctInfo = isset($caseTypeMap[$ctKey]) ? $caseTypeMap[$ctKey] : null;
             ?>
-            <div class="<?= $cardClass ?>" onclick="location.href='<?= e($cardUrl) ?>'">
+            <div class="<?= $cardClass ?>" data-case-type="<?= e($s['case_type'] ?? '') ?>" onclick="location.href='<?= e($cardUrl) ?>'">
                 <div class="scm-card-row">
                     <div style="flex:1;min-width:0">
                         <div class="scm-case-no"><?= e($s['case_number'] ?? '-') ?></div>
                         <div class="scm-case-title">
+                            <?php if ($ctInfo): ?>
+                            <span class="scm-ct-badge" style="background:<?= $ctInfo[2] ?>;color:<?= $ctInfo[1] ?>"><?= e($ctInfo[0]) ?></span>
+                            <?php endif; ?>
                             <span class="scm-status scm-status-<?= e($dstat) ?>"><?= e($statusText) ?></span>
                             <?= e($s['case_title'] ?? '-') ?>
                         </div>
                         <?php if (!empty($s['note'])): ?>
                         <div class="scm-note"><?= e($s['note']) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($s['case_sales_note'])): ?>
+                        <div class="scm-sales-note"><strong>業務備註：</strong><?= e($s['case_sales_note']) ?></div>
                         <?php endif; ?>
                     </div>
                     <?php if ($timeStr): ?>
@@ -409,5 +441,24 @@ document.addEventListener('DOMContentLoaded', function() {
         // 延遲一點等 layout
         setTimeout(scmScrollToToday, 50);
     }
+
+    // 案別篩選 tabs
+    var ctTabs = document.querySelectorAll('.scm-ct-tab');
+    ctTabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+            ctTabs.forEach(function(x){ x.classList.remove('active'); });
+            t.classList.add('active');
+            var sel = t.getAttribute('data-ct');
+            document.querySelectorAll('.scm-card').forEach(function(el) {
+                if (!sel) { el.classList.remove('ct-hidden'); }
+                else { el.classList.toggle('ct-hidden', el.getAttribute('data-case-type') !== sel); }
+            });
+            // 如果整個日期沒有符合的卡，也隱藏該日期 group
+            document.querySelectorAll('.scm-date-group').forEach(function(g) {
+                var visible = g.querySelectorAll('.scm-card:not(.ct-hidden)').length;
+                g.style.display = visible ? '' : 'none';
+            });
+        });
+    });
 });
 </script>

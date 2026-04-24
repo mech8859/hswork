@@ -13,7 +13,7 @@ $caseQuote = null;
 if ($schedule['case_id']) {
     $db = Database::getInstance();
     $nStmt = $db->prepare("
-        SELECT c.notes, c.description, c.customer_name, c.construction_note,
+        SELECT c.notes, c.sales_note, c.description, c.customer_name, c.construction_note,
                c.planned_start_date, c.planned_end_date, c.urgency,
                c.work_time_start, c.work_time_end, c.customer_break_time,
                c.has_time_restriction, c.allow_night_work, c.is_flexible, c.is_large_project,
@@ -32,6 +32,7 @@ if ($schedule['case_id']) {
     $firstCaseContact = !empty($caseContacts) ? $caseContacts[0] : null;
     if ($caseInfo) {
         $caseNote = $caseInfo['notes'] ?: $caseInfo['description'] ?: '';
+        $caseSalesNote = $caseInfo['sales_note'] ?: '';
         // 優先使用案件聯絡人（第一筆），若無才 fallback 到客戶資料
         $customerContact = $firstCaseContact ? $firstCaseContact['contact_name'] : ($caseInfo['cu_contact'] ?: '');
         $customerPhone = $firstCaseContact ? ($firstCaseContact['contact_phone'] ?: '') : ($caseInfo['cu_phone'] ?: '');
@@ -171,10 +172,16 @@ $canJoin = $isEngineerUser && !$isInSchedule && !in_array($schedule['status'], a
         </div>
         <?php endif; ?>
     </div>
-    <?php if ($caseNote): ?>
+    <?php if (!empty($caseNote)): ?>
     <div style="padding:8px 12px;border-top:1px solid var(--gray-100)">
-        <span class="detail-label">業務備註</span>
+        <span class="detail-label">備註</span>
         <p style="margin:4px 0;white-space:pre-line"><?= nl2br(e($caseNote)) ?></p>
+    </div>
+    <?php endif; ?>
+    <?php if (!empty($caseSalesNote)): ?>
+    <div style="padding:8px 12px;border-top:1px solid var(--gray-100);background:#f5f9ff">
+        <span class="detail-label">業務備註</span>
+        <p style="margin:4px 0;white-space:pre-line;color:#1565c0"><?= nl2br(e($caseSalesNote)) ?></p>
     </div>
     <?php endif; ?>
     <?php if ($caseQuote): ?>
@@ -398,6 +405,47 @@ if (!is_array($conduits)) $conduits = array();
             <div style="margin-top:4px;font-size:.9rem;min-height:40px;padding:8px;background:var(--gray-50);border-radius:var(--radius);color:var(--gray-700)"><?= !empty($siteCond['special_requirements']) ? nl2br(e($siteCond['special_requirements'])) : '-' ?></div>
         </div>
     </div>
+</div>
+<?php endif; ?>
+
+<!-- 前次施工回報（其他日期的排工） -->
+<?php if (!empty($previousVisitWorklogs)): ?>
+<div class="card" style="border-left:4px solid #1565c0">
+    <div class="card-header">
+        <span>📚 同案件其他日期施工回報</span>
+        <span class="text-muted" style="font-size:.8rem;margin-left:8px">(<?= count($previousVisitWorklogs) ?> 筆)</span>
+    </div>
+    <?php foreach ($previousVisitWorklogs as $pvw): ?>
+    <div style="padding:12px;border-bottom:1px solid var(--gray-100);background:#f8fbff">
+        <div class="d-flex justify-between align-center mb-1" style="flex-wrap:wrap;gap:6px">
+            <div>
+                <strong style="color:#1565c0"><?= e(date('Y-m-d', strtotime($pvw['schedule_date']))) ?></strong>
+                <?php if (!empty($pvw['visit_number'])): ?>
+                <span class="badge" style="background:#e3f2fd;color:#1565c0;margin-left:4px">第 <?= (int)$pvw['visit_number'] ?> 次</span>
+                <?php endif; ?>
+                <span style="margin-left:8px"><?= e($pvw['real_name']) ?></span>
+                <?php if (!empty($pvw['is_completed'])): ?>
+                <span class="badge badge-success" style="margin-left:4px">已完工</span>
+                <?php endif; ?>
+                <?php if (!empty($pvw['next_visit_needed'])): ?>
+                <span class="badge badge-warning" style="margin-left:4px">需再施工</span>
+                <?php endif; ?>
+            </div>
+            <a href="/schedule.php?action=view&id=<?= (int)$pvw['schedule_id'] ?>" class="btn btn-outline btn-sm" style="font-size:.75rem">前往該排工</a>
+        </div>
+        <div style="margin-bottom:4px"><p style="margin:2px 0;white-space:pre-line;font-size:.9rem"><?= e($pvw['work_description']) ?></p></div>
+        <?php if (!empty($pvw['issues'])): ?>
+        <div style="margin-bottom:4px"><span style="font-size:.8rem;color:var(--danger)">問題：</span><span style="font-size:.85rem"><?= e($pvw['issues']) ?></span></div>
+        <?php endif; ?>
+        <?php if (!empty($pvw['photos'])): ?>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0">
+            <?php foreach ($pvw['photos'] as $p): ?>
+            <img src="<?= e($p['file_path']) ?>" class="sch-photo" onclick="openSchLightbox('<?= e($p['file_path']) ?>')" style="width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);cursor:pointer">
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
 </div>
 <?php endif; ?>
 

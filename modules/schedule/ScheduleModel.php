@@ -37,6 +37,7 @@ class ScheduleModel
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
                    c.case_type, c.total_visits, c.max_engineers, c.customer_name,
                    c.planned_start_time AS case_designated_time,
+                   c.notes AS case_note, c.sales_note AS case_sales_note,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name, b.code AS branch_code
             FROM schedules s

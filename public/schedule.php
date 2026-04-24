@@ -251,6 +251,18 @@ switch ($action) {
             }
         }
 
+        // 載入同案件其他日期的施工回報（前次 / 後次）
+        $previousVisitWorklogs = array();
+        if (!empty($schedule['case_id'])) {
+            $allCaseLogs = $worklogModel->getCaseTimeline((int)$schedule['case_id'], 50);
+            foreach ($allCaseLogs as $wl) {
+                // 排除當前排工的，只保留其他日期的
+                if ((int)$wl['schedule_id'] !== (int)$id) {
+                    $previousVisitWorklogs[] = $wl;
+                }
+            }
+        }
+
         $pageTitle = '排工詳情';
         $currentPage = 'schedule';
         require __DIR__ . '/../templates/layouts/header.php';
