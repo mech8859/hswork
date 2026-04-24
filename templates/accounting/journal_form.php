@@ -11,15 +11,16 @@ $isCopy = isset($prefillEntry) && !$entry;
 .credit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .debit-input, .credit-input { -moz-appearance: textfield; appearance: textfield; }
 </style>
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <h1><?= $entry ? '編輯傳票 - ' . e($entry['voucher_number']) : ($isCopy ? '複製傳票' : '新增傳票') ?></h1>
-    <?= back_button('/accounting.php') ?>
-</div>
-
 <form method="post" id="journalForm" enctype="multipart/form-data" action="/accounting.php?action=<?= $entry ? 'journal_edit&id=' . $entry['id'] : 'journal_create' ?>"
     <?= csrf_field() ?>
     <?php $_returnTo = isset($_GET['return_to']) ? $_GET['return_to'] : ''; ?>
     <?php if ($_returnTo): ?><input type="hidden" name="return_to" value="<?= e($_returnTo) ?>"><?php endif; ?>
+
+<div class="page-sticky-head">
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <h1><?= $entry ? '編輯傳票 - ' . e($entry['voucher_number']) : ($isCopy ? '複製傳票' : '新增傳票') ?></h1>
+    <?= back_button('/accounting.php') ?>
+</div>
 
     <div class="card" style="padding:16px;margin-bottom:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
@@ -62,15 +63,17 @@ $isCopy = isset($prefillEntry) && !$entry;
         </div>
     </div>
 
+    </div><!-- /.page-sticky-head -->
+
     <!-- Journal Lines -->
     <div class="card" style="padding:16px;margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <h3 style="margin:0">分錄明細</h3>
             <button type="button" class="btn btn-primary btn-sm" onclick="addLine()">+ 新增行</button>
         </div>
-        <div style="overflow-x:auto">
+        <div style="overflow:visible">
             <table class="data-table" style="width:100%" id="linesTable">
-                <thead>
+                <thead class="sticky-thead">
                     <tr>
                         <th style="width:24px"></th>
                         <th style="width:36px">#</th>

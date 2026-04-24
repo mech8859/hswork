@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>進項發票管理 <span style="font-size:.7em;color:var(--gray-500);font-weight:normal">(共 <?= number_format($result['total']) ?> 筆)</span></h2>
     <?php if ($canManage): ?>
@@ -72,6 +73,7 @@
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <?php if (!empty($result['summary'])): ?>
 <div class="card" style="padding:10px 14px;margin-bottom:10px;background:#e3f2fd;border-left:4px solid #1565c0">
@@ -127,7 +129,7 @@
     <!-- 桌面版表格 -->
     <div class="table-responsive hide-mobile">
         <table class="table">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th style="width:32px"></th>
                     <th>發票號碼</th>

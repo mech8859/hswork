@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>資產負債表</h1>
     <div style="display:flex;gap:8px">
@@ -39,6 +40,7 @@
         <span style="color:#d32f2f;margin-left:16px">不平衡 (差異: <?= number_format($report['total_assets'] - $report['total_le']) ?>)</span>
     <?php endif; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <!-- Left: Assets -->

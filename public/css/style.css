@@ -116,6 +116,37 @@ a:hover { text-decoration: underline; }
 }
 .content-full { margin-top: 0; padding: 0; }
 
+/* 清單頁固定標題區（標題 + 摘要 + 篩選器），滾動時保持可見 */
+.page-sticky-head {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 56px;
+    z-index: 50;
+    background: var(--gray-50);
+    display: block;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 6px -2px rgba(0,0,0,0.08);
+}
+
+/* 資料表欄位標題固定（配合 .page-sticky-head 使用） */
+/* 注意：table-responsive 有 overflow-x:auto 會破壞 sticky，必須移除或改 visible */
+.table-responsive:has(.sticky-thead) {
+    overflow: visible;
+}
+@media (max-width: 767px) {
+    .table-responsive:has(.sticky-thead) { overflow-x: auto; }
+}
+.sticky-thead th {
+    position: -webkit-sticky;
+    position: sticky;
+    top: var(--table-sticky-top, 56px);
+    z-index: 10;
+    background: var(--gray-100);
+    box-shadow: 0 1px 0 var(--gray-300);
+}
+
 /* --- Cards --- */
 .card {
     background: #fff;

@@ -43,6 +43,7 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
     return $u;
 };
 ?>
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
     <div>
         <h1 style="margin:0 0 4px">傳票核對報表</h1>
@@ -60,6 +61,16 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
         <?php endif; ?>
         <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
+        <?php if (Auth::hasPermission('accounting.manage') || Auth::hasPermission('all')): ?>
+        <form method="POST" action="/accounting.php?action=voucher_reconciliation_batch" style="display:inline" onsubmit="return confirm('批次把所有「模糊匹配」的來源單綁定到對應傳票？\n\n• 只會綁定尚未綁定的傳票\n• 已綁定其他來源的傳票會被略過\n\n執行後才能精準匹配。');">
+            <?= csrf_field() ?>
+            <input type="hidden" name="source" value="<?= e($source) ?>">
+            <input type="hidden" name="start_date" value="<?= e($startDate) ?>">
+            <input type="hidden" name="end_date" value="<?= e($endDate) ?>">
+            <input type="hidden" name="branch_id" value="<?= (int)$branchFilter ?>">
+            <button type="submit" class="btn btn-success" title="把所有模糊匹配自動變成精準匹配">⚡ 批次自動核對</button>
+        </form>
+        <?php endif; ?>
         <a href="/accounting.php?action=journals" class="btn btn-secondary">傳票管理</a>
     </div>
 </div>
@@ -82,11 +93,11 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <input type="hidden" name="source" value="<?= e($source) ?>">
         <div>
             <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">起始日期</label>
-            <input type="date" name="start_date" value="<?= e($startDate) ?>" class="form-control" max="2099-12-31">
+            <input type="date" name="start_date" value="<?= e($startDate) ?>" class="form-control" min="2026-01-01" max="2099-12-31" title="2026/01/01 之前資料不核對">
         </div>
         <div>
             <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">結束日期</label>
-            <input type="date" name="end_date" value="<?= e($endDate) ?>" class="form-control" max="2099-12-31">
+            <input type="date" name="end_date" value="<?= e($endDate) ?>" class="form-control" min="2026-01-01" max="2099-12-31">
         </div>
         <?php if ($source !== 'bank'): ?>
         <div>
@@ -138,6 +149,7 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
     </a>
     <?php endforeach; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- 結果表格 -->
 <div class="card" style="padding:0">
@@ -160,13 +172,28 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($records as $r):
+            <?php
+            // 追蹤上一筆主列是否已成功比對；已合併的手續費列在主列匹配成功時隱藏
+            $_prevMainMatched = false;
+            foreach ($records as $r):
                 $st = isset($statusLabels[$r['match_status']]) ? $statusLabels[$r['match_status']] : array($r['match_status'], '#666');
+                // 已合併手續費：若上一筆主列已比對成功 → 跳過不顯示
+                if ($r['match_status'] === 'merged_into_prev' && $_prevMainMatched) {
+                    continue;
+                }
+                // 更新主列狀態（非 merged 都算主列）
+                if ($r['match_status'] !== 'merged_into_prev') {
+                    $_prevMainMatched = in_array($r['match_status'], array('matched_precise','matched_fuzzy'), true);
+                }
                 $bgColor = $r['match_status'] === 'unmatched' ? '#fef2f2'
                          : ($r['match_status'] === 'matched_amount_mismatch' ? '#fffbeb'
                          : ($r['match_status'] === 'merged_into_prev' ? '#f5f5f5' : '#fff'));
+                // 每筆的返回 URL 附加錨點，讓從傳票檢視返回時自動捲到原位
+                $_rowAnchor = '#src-' . $source . '-' . (int)$r['source_id'];
+                $_rowReturnUrl = $_reconReturnUrl . $_rowAnchor;
+                $_rowReturnEncoded = urlencode($_rowReturnUrl);
             ?>
-            <tr style="border-top:1px solid #eee;background:<?= $bgColor ?>">
+            <tr id="src-<?= e($source) ?>-<?= (int)$r['source_id'] ?>" style="border-top:1px solid #eee;background:<?= $bgColor ?>;scroll-margin-top:260px">
                 <td style="padding:8px"><?= e($r['date']) ?></td>
                 <td style="padding:8px;font-family:monospace;font-size:.82rem">
                     <a href="<?= e($sourceViewUrls[$source]) . (int)$r['source_id'] ?>" style="color:#1565c0;text-decoration:none" title="查看原單"><?= e($r['number']) ?: '(無單號)' ?></a>
@@ -182,7 +209,7 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                 </td>
                 <td style="padding:8px;font-size:.82rem">
                     <?php if ($r['voucher_id']): ?>
-                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>&return_to=<?= $_reconReturnEncoded ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
+                    <a href="/accounting.php?action=journal_view&id=<?= (int)$r['voucher_id'] ?>&return_to=<?= $_rowReturnEncoded ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($r['voucher_number']) ?></a>
                     <?php if ($r['match_status'] === 'matched_amount_mismatch' && $r['voucher_amount'] !== null): ?>
                     <div style="color:#f59e0b;font-size:.75rem">傳票: <?= number_format($r['voucher_amount']) ?></div>
                     <?php endif; ?>
@@ -192,12 +219,12 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                         <input type="hidden" name="source_module" value="<?= e($source) ?>">
                         <input type="hidden" name="source_id" value="<?= (int)$r['source_id'] ?>">
                         <input type="hidden" name="voucher_id" value="<?= (int)$r['voucher_id'] ?>">
-                        <input type="hidden" name="return_to" value="<?= e($_reconReturnUrl) ?>">
+                        <input type="hidden" name="return_to" value="<?= e($_rowReturnUrl) ?>">
                         <button type="submit" class="btn btn-sm" style="margin-top:3px;padding:2px 8px;font-size:.72rem;background:#16a34a;color:#fff">✓ 確認匹配</button>
                     </form>
                     <?php endif; ?>
-                    <?php else: ?>
-                    <a href="/accounting.php?action=journal_create&return_to=<?= $_reconReturnEncoded ?>" style="color:#999;text-decoration:none">+ 建立</a>
+                    <?php elseif ($r['match_status'] !== 'merged_into_prev'): ?>
+                    <a href="/accounting.php?action=journal_create&return_to=<?= $_rowReturnEncoded ?>" style="color:#999;text-decoration:none">+ 建立</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -206,3 +233,47 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
     </table>
     <?php endif; ?>
 </div>
+
+<script>
+// 核對後返回：依 URL 的 focus_src 或 hash 捲到原列；若該列已被過濾掉則回到送出前的捲動位置
+(function() {
+    var STORAGE_KEY = 'vrScrollY';
+
+    // 送出確認匹配表單前，先記住目前 scrollY
+    document.querySelectorAll('form[action*="confirm_voucher_match"]').forEach(function(f) {
+        f.addEventListener('submit', function() {
+            try { sessionStorage.setItem(STORAGE_KEY, String(window.scrollY)); } catch (e) {}
+        });
+    });
+
+    // 頁面載入：優先捲到該筆；找不到就恢復送出前的位置
+    var qs = new URLSearchParams(window.location.search);
+    var focus = qs.get('focus_src');
+    var target = null;
+    if (focus) {
+        target = document.getElementById('src-' + focus);
+    } else if (window.location.hash && window.location.hash.indexOf('#src-') === 0) {
+        target = document.querySelector(window.location.hash);
+    }
+    function restorePrevScroll() {
+        try {
+            var y = sessionStorage.getItem(STORAGE_KEY);
+            if (y !== null) {
+                window.scrollTo({ top: parseInt(y, 10), behavior: 'auto' });
+                sessionStorage.removeItem(STORAGE_KEY);
+            }
+        } catch (e) {}
+    }
+    setTimeout(function() {
+        if (target) {
+            target.scrollIntoView({ block: 'center', behavior: 'auto' });
+            target.style.boxShadow = '0 0 0 3px rgba(22,163,74,.45)';
+            setTimeout(function() { target.style.boxShadow = ''; }, 1500);
+            try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        } else if (focus) {
+            // 有 focus_src 但該列已被過濾隱藏 → 恢復到送出前位置
+            restorePrevScroll();
+        }
+    }, 50);
+})();
+</script>

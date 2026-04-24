@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>損益表</h1>
     <div style="display:flex;gap:8px">
@@ -38,6 +39,7 @@
     期間: <?= e(format_date($report['start_date'])) ?> ~ <?= e(format_date($report['end_date'])) ?>
     <?php if ($costCenterId): ?> | 成本中心篩選<?php endif; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- Income Statement -->
 <div class="card" style="overflow-x:auto">

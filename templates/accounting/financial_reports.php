@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>財務報表</h1>
     <div style="display:flex;gap:8px">
@@ -67,6 +68,7 @@ foreach ($tabs as $key => $label): ?>
             style="border-radius:4px 4px 0 0;margin-bottom:-2px;<?= $frTab === $key ? 'border-bottom:2px solid var(--primary)' : '' ?>"><?= $label ?></button>
 <?php endforeach; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- ============================== -->
 <!-- Tab 1: 損益表 -->

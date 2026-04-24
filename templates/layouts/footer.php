@@ -1,5 +1,32 @@
 </main>
 
+<script>
+// 動態計算 .page-sticky-head 高度，寫入 CSS 變數 --table-sticky-top，讓資料表 thead 能 sticky 在下方
+(function() {
+    function updateStickyOffset() {
+        var head = document.querySelector('.page-sticky-head');
+        if (!head) {
+            document.documentElement.style.setProperty('--table-sticky-top', '56px');
+            return;
+        }
+        var h = head.offsetHeight + 56;
+        document.documentElement.style.setProperty('--table-sticky-top', h + 'px');
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateStickyOffset);
+    } else {
+        updateStickyOffset();
+    }
+    window.addEventListener('resize', updateStickyOffset);
+    // 監測 sticky head 高度變化（例如切換展開/收合）
+    if (window.ResizeObserver) {
+        document.addEventListener('DOMContentLoaded', function() {
+            var head = document.querySelector('.page-sticky-head');
+            if (head) new ResizeObserver(updateStickyOffset).observe(head);
+        });
+    }
+})();
+</script>
 <script src="/js/app.js"></script>
 <script>
 // PWA Service Worker 註冊

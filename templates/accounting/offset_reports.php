@@ -3,6 +3,7 @@ $relTypeLabels = array('customer' => '客戶', 'vendor' => '廠商', 'other' => 
 $grandOriginal = 0; $grandOffset = 0; $grandRemaining = 0;
 foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset += $g['sum_offset']; $grandRemaining += $g['sum_remaining']; }
 ?>
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>立沖帳報表</h1>
     <div style="display:flex;gap:8px">
@@ -113,15 +114,16 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
     <button type="button" class="or-tab <?= $orTab === 'balance' ? 'active' : '' ?>" onclick="switchTab('balance')">科目餘額表</button>
     <button type="button" class="or-tab <?= $orTab === 'subledger' ? 'active' : '' ?>" onclick="switchTab('subledger')">立沖分類帳</button>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- ========== 1. 立沖明細表 ========== -->
 <div id="tab-detail" class="or-panel" style="<?= $orTab !== 'detail' ? 'display:none' : '' ?>">
 <?php if (empty($orRecords)): ?>
 <div class="card" style="padding:20px;text-align:center;color:#999">無資料</div>
 <?php else: ?>
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.82rem;white-space:nowrap">
-        <thead><tr style="background:#f5f5f5">
+        <thead class="sticky-thead"><tr style="background:#f5f5f5">
             <th>日期</th><th>傳票號碼</th><th>科目</th><th>成本中心</th><th>往來類型</th><th>往來編號</th><th>往來對象</th><th>摘要</th><th style="text-align:right">立帳金額</th><th style="text-align:right">沖帳金額</th><th style="text-align:right">未沖餘額</th>
         </tr></thead>
         <tbody>
@@ -207,9 +209,9 @@ foreach ($orBalance as $g) {
 <?php if (empty($orBalance)): ?>
 <div class="card" style="padding:20px;text-align:center;color:#999">無未沖餘額資料</div>
 <?php else: ?>
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
-        <thead><tr style="background:#f5f5f5">
+        <thead class="sticky-thead"><tr style="background:#f5f5f5">
             <th>科目編號</th><th>科目名稱</th><th>往來類型</th><th>往來編號</th><th>往來對象</th><th>成本中心</th><th>筆數</th>
             <th style="text-align:right">原始金額</th><th style="text-align:right">已沖金額</th><th style="text-align:right">未沖餘額</th>
         </tr></thead>
@@ -272,7 +274,7 @@ foreach ($orBalance as $g) {
 <div class="card" style="padding:20px;text-align:center;color:#999">無資料</div>
 <?php else: ?>
 <?php foreach ($orGrouped as $key => $g): ?>
-<div class="card" style="margin-bottom:16px;overflow-x:auto">
+<div class="card" style="margin-bottom:16px;overflow:visible">
     <div style="padding:10px 16px;background:#f8f9fa;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
             <strong style="font-family:monospace"><?= e($g['account_code']) ?></strong> <?= e($g['account_name']) ?>
@@ -287,7 +289,7 @@ foreach ($orBalance as $g) {
         </div>
     </div>
     <table class="data-table" style="width:100%;font-size:.82rem">
-        <thead><tr style="background:#fafafa">
+        <thead class="sticky-thead"><tr style="background:#fafafa">
             <th style="width:90px">日期</th><th style="width:130px">傳票號碼</th><th>摘要</th><th>成本中心</th>
             <th style="width:100px;text-align:right">立帳金額</th><th style="width:100px;text-align:right">沖帳金額</th><th style="width:110px;text-align:right">餘額</th>
         </tr></thead>

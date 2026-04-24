@@ -1331,6 +1331,9 @@ switch ($action) {
         if (!in_array($source, $validSources)) $source = 'bank';
         $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
         $endDate   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-d');
+        // 2026/01/01 之前資料不核對
+        $_vrMinDate = '2026-01-01';
+        if ($startDate < $_vrMinDate) $startDate = $_vrMinDate;
         $statusFilter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
         $branchFilter = isset($_GET['branch_id']) ? (int)$_GET['branch_id'] : 0;
         $sortOrder = isset($_GET['sort']) && $_GET['sort'] === 'asc' ? 'asc' : 'desc'; // 預設：新→舊
@@ -1404,7 +1407,59 @@ switch ($action) {
         }
         $_cvRtn = isset($_POST['return_to']) ? $_POST['return_to'] : '/accounting.php?action=voucher_reconciliation';
         if (strpos($_cvRtn, '/accounting.php') !== 0) $_cvRtn = '/accounting.php?action=voucher_reconciliation';
+        // 拆解原 return_to 的 hash，改用 query param focus_src（避免部分瀏覽器 POST 重導後遺失 hash）
+        $_cvHashPos = strpos($_cvRtn, '#src-');
+        if ($_cvHashPos !== false) {
+            $_cvFocus = substr($_cvRtn, $_cvHashPos + 5); // 去掉 #src-
+            $_cvRtn = substr($_cvRtn, 0, $_cvHashPos);
+            $_cvRtn .= (strpos($_cvRtn, '?') === false ? '?' : '&') . 'focus_src=' . urlencode($_cvFocus);
+        }
         redirect($_cvRtn);
+        break;
+
+    // ---- 批次自動核對：為所有「模糊匹配」自動綁定到對應傳票 ----
+    case 'voucher_reconciliation_batch':
+        if (!$canManage || $_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗或無權限');
+            redirect('/accounting.php?action=voucher_reconciliation');
+        }
+        $_brSource   = isset($_POST['source']) ? $_POST['source'] : '';
+        $_brStart    = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-d', strtotime('-30 days'));
+        $_brEnd      = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-d');
+        $_brBranch   = isset($_POST['branch_id']) ? (int)$_POST['branch_id'] : 0;
+        // 2026/01/01 之前不核對
+        if ($_brStart < '2026-01-01') $_brStart = '2026-01-01';
+        $_brValid    = array('bank','petty_cash','reserve_fund','cash_details');
+        if (!in_array($_brSource, $_brValid)) {
+            Session::flash('error', '來源錯誤');
+            redirect('/accounting.php?action=voucher_reconciliation');
+        }
+        try {
+            $_brRows = $model->getVoucherReconciliation($_brSource, $_brStart, $_brEnd, $_brBranch ?: null);
+            $_brBound = 0; $_brSkip = 0;
+            $_brDb = Database::getInstance();
+            $_brUpd = $_brDb->prepare("UPDATE journal_entries SET source_module = ?, source_id = ? WHERE id = ? AND (source_module IS NULL OR source_id IS NULL OR source_id = 0)");
+            foreach ($_brRows as $_brR) {
+                // 只處理 fuzzy 匹配，且有 voucher_id 的
+                if ($_brR['match_status'] !== 'matched_fuzzy') continue;
+                if (empty($_brR['voucher_id']) || empty($_brR['source_id'])) continue;
+                // 執行 UPDATE，WHERE 條件排除已綁定者，避免覆蓋
+                $_brUpd->execute(array($_brSource, (int)$_brR['source_id'], (int)$_brR['voucher_id']));
+                if ($_brUpd->rowCount() > 0) {
+                    AuditLog::log('journal_entries', 'batch_match', (int)$_brR['voucher_id'], "批次綁定 {$_brSource}#{$_brR['source_id']}");
+                    $_brBound++;
+                } else {
+                    $_brSkip++;
+                }
+            }
+            Session::flash('success', "批次核對完成：新綁定 {$_brBound} 筆，略過已綁定 {$_brSkip} 筆");
+        } catch (Exception $e) {
+            Session::flash('error', '批次核對失敗：' . $e->getMessage());
+        }
+        $_brRtn = '/accounting.php?action=voucher_reconciliation&source=' . urlencode($_brSource)
+                . '&start_date=' . urlencode($_brStart) . '&end_date=' . urlencode($_brEnd);
+        if ($_brBranch && $_brSource !== 'bank') $_brRtn .= '&branch_id=' . $_brBranch;
+        redirect($_brRtn);
         break;
 
     case 'reconciliation':

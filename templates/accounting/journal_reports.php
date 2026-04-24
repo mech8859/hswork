@@ -6,6 +6,7 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
     return '<a href="/accounting.php?action=journal_view&id=' . (int)$id . '&ref=journal_reports&ref_tab=' . $tab . '&ref_params=' . urlencode($refBase) . '">' . e($number) . '</a>';
 }
 ?>
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>傳票報表</h1>
     <div style="display:flex;gap:8px">
@@ -71,12 +72,13 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
     <button type="button" class="jr-tab <?= $jrTab === $tk ? 'active' : '' ?>" onclick="jrSwitch('<?= $tk ?>')"><?= $tl ?></button>
     <?php endforeach; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- ========== 1. 傳票日報表 ========== -->
 <div id="jr-daily_voucher" class="jr-panel" style="<?= $jrTab !== 'daily_voucher' ? 'display:none' : '' ?>">
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
-        <thead><tr style="background:#f5f5f5">
+        <thead class="sticky-thead"><tr style="background:#f5f5f5">
             <th>日期</th><th>傳票號碼</th><th>成本中心</th><th style="width:80px">科目編號</th><th>科目名稱</th><th>摘要</th>
             <th style="text-align:right">借方金額</th><th style="text-align:right">貸方金額</th><th>建立者</th>
         </tr></thead>
@@ -130,9 +132,9 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
 
 <!-- ========== 2. 日記帳 ========== -->
 <div id="jr-journal" class="jr-panel" style="<?= $jrTab !== 'journal' ? 'display:none' : '' ?>">
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
-        <thead><tr style="background:#f5f5f5">
+        <thead class="sticky-thead"><tr style="background:#f5f5f5">
             <th>日期</th><th>傳票號碼</th><th>成本中心</th><th style="width:80px">科目編號</th><th>科目名稱</th><th>摘要</th>
             <th style="text-align:right">借方金額</th><th style="text-align:right">貸方金額</th><th>建立者</th>
         </tr></thead>
@@ -171,12 +173,12 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
 
 <!-- ========== 3. 日計表 ========== -->
 <div id="jr-daily_summary" class="jr-panel" style="<?= $jrTab !== 'daily_summary' ? 'display:none' : '' ?>">
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <div style="padding:10px 16px;background:#f8f9fa;border-bottom:1px solid #eee;font-size:.85rem">
         <strong>期間：<?= e($jrDateFrom) ?> ~ <?= e($jrDateTo) ?></strong>
     </div>
     <table class="data-table" style="width:100%;font-size:.82rem">
-        <thead>
+        <thead class="sticky-thead">
             <tr style="background:#f5f5f5">
                 <th rowspan="2">成本中心</th>
                 <th rowspan="2" style="width:80px">科目編號</th>
@@ -243,9 +245,9 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
 
 <!-- ========== 4. 現金簿 ========== -->
 <div id="jr-cash_book" class="jr-panel" style="<?= $jrTab !== 'cash_book' ? 'display:none' : '' ?>">
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
-        <thead><tr style="background:#f5f5f5">
+        <thead class="sticky-thead"><tr style="background:#f5f5f5">
             <th>日期</th><th>傳票號碼</th><th>成本中心</th><th style="width:80px">科目編號</th><th>科目名稱</th><th>摘要</th>
             <th style="text-align:right">收入(借方)</th><th style="text-align:right">支出(貸方)</th><th style="text-align:right">餘額</th><th>建立者</th>
         </tr></thead>
@@ -292,13 +294,13 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
 <?php foreach ($jrGeneralLedger as $acctCode => $acctData):
     $isDebitNormal = ($acctData['normal_balance'] === 'debit');
 ?>
-<div class="card" style="margin-bottom:16px;overflow-x:auto">
+<div class="card" style="margin-bottom:16px;overflow:visible">
     <div style="padding:10px 16px;background:#f8f9fa;border-bottom:1px solid #eee">
         <strong style="font-family:monospace"><?= e($acctData['code']) ?></strong> <?= e($acctData['name']) ?>
         <span style="margin-left:12px;color:#666;font-size:.85rem">正常餘額: <?= $isDebitNormal ? '借方' : '貸方' ?></span>
     </div>
     <table class="data-table" style="width:100%;font-size:.82rem">
-        <thead><tr style="background:#fafafa">
+        <thead class="sticky-thead"><tr style="background:#fafafa">
             <th style="width:90px">日期</th><th style="width:130px">傳票號碼</th><th>成本中心</th><th>摘要</th>
             <th style="width:100px;text-align:right">借方</th><th style="width:100px;text-align:right">貸方</th>
             <th style="width:50px;text-align:center">借貸</th><th style="width:100px;text-align:right">餘額</th>
@@ -368,13 +370,13 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
 <?php foreach ($jrByAccount as $acctCode => $acctData):
     $isDebitNormal = ($acctData['normal_balance'] === 'debit');
 ?>
-<div class="card" style="margin-bottom:16px;overflow-x:auto">
+<div class="card" style="margin-bottom:16px;overflow:visible">
     <div style="padding:10px 16px;background:#f8f9fa;border-bottom:1px solid #eee">
         <strong style="font-family:monospace"><?= e($acctData['code']) ?></strong> <?= e($acctData['name']) ?>
         <span style="margin-left:12px;color:#666;font-size:.85rem">正常餘額: <?= $isDebitNormal ? '借方' : '貸方' ?></span>
     </div>
     <table class="data-table" style="width:100%;font-size:.82rem">
-        <thead><tr style="background:#fafafa">
+        <thead class="sticky-thead"><tr style="background:#fafafa">
             <th style="width:90px">日期</th><th style="width:130px">傳票號碼</th><th>成本中心</th>
             <th style="width:80px">科目編號</th><th>科目名稱</th><th>摘要</th>
             <th style="width:90px;text-align:right">借方金額</th><th style="width:90px;text-align:right">貸方金額</th>

@@ -1,4 +1,5 @@
 <?php $bankOptions = FinanceModel::bankAccountOptions(); ?>
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>銀行帳戶明細</h2>
     <div class="d-flex align-center gap-1">
@@ -9,8 +10,14 @@
 </div>
 
 <!-- 銀行帳戶彙總 -->
+<?php $hideDetail = isset($_COOKIE['bank_hide_detail']) && $_COOKIE['bank_hide_detail'] === '1'; ?>
 <div class="card mb-2">
-    <div class="card-header">帳戶彙總</div>
+    <div class="card-header d-flex justify-between align-center">
+        <span>帳戶彙總</span>
+        <button type="button" id="btnToggleBankDetail" class="btn btn-outline btn-sm" onclick="toggleBankDetail()" style="font-size:.8rem">
+            <?= $hideDetail ? '▼ 展開明細' : '▲ 收合明細' ?>
+        </button>
+    </div>
     <div class="bank-summary-cards">
         <div class="bank-sum-card" style="background:linear-gradient(135deg,#1a237e,#283593);color:#fff">
             <div class="bank-sum-label">銀行總餘額</div>
@@ -31,7 +38,7 @@
     </div>
 
     <?php if (!empty($bankSummary['accounts'])): ?>
-    <div class="table-responsive mt-1">
+    <div class="table-responsive mt-1" id="bankDetailTable" style="<?= $hideDetail ? 'display:none' : '' ?>">
         <table class="table" style="font-size:.9rem">
             <thead>
                 <tr>
@@ -64,7 +71,7 @@
     <?php endif; ?>
 </div>
 
-<div class="card">
+<div class="card" style="margin-bottom:0">
     <form method="GET" action="/bank_transactions.php" class="filter-form">
         <div class="filter-row">
             <div class="form-group">
@@ -95,6 +102,7 @@
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <div class="card">
     <?php if (empty($records)): ?>
@@ -134,7 +142,7 @@
     <!-- 桌面表格 -->
     <div class="table-responsive hide-mobile">
         <table class="table">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th style="width:32px"></th>
                     <th>交易日期</th>
@@ -233,5 +241,22 @@ function toggleStar(el) {
         alert('網路錯誤');
     };
     xhr.send(form);
+}
+
+// 展開/收合帳戶彙總明細
+function toggleBankDetail() {
+    var tbl = document.getElementById('bankDetailTable');
+    var btn = document.getElementById('btnToggleBankDetail');
+    if (!tbl || !btn) return;
+    var hidden = tbl.style.display === 'none';
+    if (hidden) {
+        tbl.style.display = '';
+        btn.innerHTML = '▲ 收合明細';
+        document.cookie = 'bank_hide_detail=0; path=/; max-age=' + (60*60*24*365);
+    } else {
+        tbl.style.display = 'none';
+        btn.innerHTML = '▼ 展開明細';
+        document.cookie = 'bank_hide_detail=1; path=/; max-age=' + (60*60*24*365);
+    }
 }
 </script>

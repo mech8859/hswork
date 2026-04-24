@@ -1,4 +1,5 @@
 <?php $typeOptions = FinanceModel::incomeExpenseOptions(); ?>
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <div class="d-flex align-center gap-1">
         <h2>零用金管理</h2>
@@ -120,6 +121,7 @@
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <div class="card">
     <?php if (empty($records)): ?>
@@ -160,7 +162,7 @@
     <!-- 桌面表格 -->
     <div class="table-responsive hide-mobile">
         <table class="table">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th style="width:32px"></th>
                     <th>編號</th>

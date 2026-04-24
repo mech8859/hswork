@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>總帳查詢</h1>
     <div style="display:flex;gap:8px">
@@ -76,11 +77,22 @@
         期間: <?= e(format_date($startDate)) ?> ~ <?= e(format_date($endDate)) ?>
     </span>
 </div>
+<?php endif; ?>
+<?php if (!empty($rangeAccounts)): ?>
+<!-- Range Query Stats -->
+<div class="card" style="padding:12px;margin-bottom:16px;background:#f8f9fa">
+    <strong>科目區間: <?= e($codeFrom) ?> ~ <?= e($codeTo) ?></strong>
+    <span style="margin-left:12px;color:#666">共 <?= count($rangeAccounts) ?> 個科目，<?= count($ledgerEntries) ?> 筆分錄</span>
+    <span style="margin-left:12px;color:#666">期間: <?= e(format_date($startDate)) ?> ~ <?= e(format_date($endDate)) ?></span>
+</div>
+<?php endif; ?>
+</div><!-- /.page-sticky-head -->
 
+<?php if ($accountId && $selectedAccount): ?>
 <!-- Ledger Table -->
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%">
-        <thead>
+        <thead class="sticky-thead">
             <tr>
                 <th style="width:100px">日期</th>
                 <th style="width:120px">傳票號碼</th>
@@ -139,15 +151,10 @@
     </table>
 </div>
 <?php elseif (!empty($rangeAccounts)): ?>
-<!-- Range Query -->
-<div class="card" style="padding:12px;margin-bottom:16px;background:#f8f9fa">
-    <strong>科目區間: <?= e($codeFrom) ?> ~ <?= e($codeTo) ?></strong>
-    <span style="margin-left:12px;color:#666">共 <?= count($rangeAccounts) ?> 個科目，<?= count($ledgerEntries) ?> 筆分錄</span>
-    <span style="margin-left:12px;color:#666">期間: <?= e(format_date($startDate)) ?> ~ <?= e(format_date($endDate)) ?></span>
-</div>
-<div class="card" style="overflow-x:auto">
+<!-- Range Query Table -->
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%">
-        <thead>
+        <thead class="sticky-thead">
             <tr>
                 <th style="width:100px">日期</th>
                 <th style="width:120px">傳票號碼</th>

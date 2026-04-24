@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>立沖帳查詢</h1>
     <div style="display:flex;gap:8px">
@@ -125,11 +126,12 @@ foreach ($offsetRecords as $r) {
         <div style="font-size:1.1rem;font-weight:bold"><?= $countOpen ?> / <?= $countPartial ?> / <?= $countClosed ?></div>
     </div>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- Table -->
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
-        <thead>
+        <thead class="sticky-thead">
             <tr>
                 <th style="width:32px"></th>
                 <th style="width:100px">傳票日期</th>

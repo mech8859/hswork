@@ -1077,7 +1077,8 @@ class AccountingModel
                 $amount = max($debit, $credit);
                 $match = $this->_fuzzyMatchVoucher(
                     $r['transaction_date'], $amount,
-                    array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description'])
+                    array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
+                    '1113' // 銀行存款科目前綴
                 );
             }
             $out[] = array(
@@ -1121,7 +1122,8 @@ class AccountingModel
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
                     $r['expense_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description'])
+                    array($r['entry_number'], $r['upload_number'], $r['description']),
+                    '11122' // 零用金科目前綴
                 );
             }
             $out[] = array(
@@ -1165,7 +1167,8 @@ class AccountingModel
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
                     $r['expense_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description'])
+                    array($r['entry_number'], $r['upload_number'], $r['description']),
+                    '11121' // 備用金科目前綴
                 );
             }
             $out[] = array(
@@ -1209,7 +1212,8 @@ class AccountingModel
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
                     $r['transaction_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description'])
+                    array($r['entry_number'], $r['upload_number'], $r['description']),
+                    '1111' // 現金科目前綴
                 );
             }
             $out[] = array(
@@ -1241,7 +1245,7 @@ class AccountingModel
      * 搜 journal_entries.description 或 journal_entry_lines.description 含關鍵字，
      * 若都不中再 fallback 同日期+同金額（可能多筆，取最新）
      */
-    private function _fuzzyMatchVoucher($date, $amount, $keywords)
+    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '')
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
         if (!$date) return $unmatched;
@@ -1254,6 +1258,8 @@ class AccountingModel
         }
 
         $matches = array();
+        // 排除已被其他來源精準綁定的傳票（避免一張傳票同時被多筆來源誤配）
+        $excludeBoundSql = " AND NOT (je.source_module IN ('bank','petty_cash','reserve_fund','cash_details') AND je.source_id IS NOT NULL AND je.source_id > 0)";
         // Pass 1：以關鍵字搜 description
         if (!empty($keys)) {
             $likes = array();
@@ -1266,6 +1272,7 @@ class AccountingModel
             $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
                     FROM journal_entries je
                     WHERE je.voucher_date = ? AND je.status != 'voided'
+                      {$excludeBoundSql}
                       AND (" . implode(' OR ', $likes) . ")
                     ORDER BY je.id DESC LIMIT 10";
             $stmt = $this->db->prepare($sql);
@@ -1291,6 +1298,7 @@ class AccountingModel
                 SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
                 FROM journal_entries je
                 WHERE je.voucher_date = ? AND je.status != 'voided'
+                  {$excludeBoundSql}
                   AND ABS(je.total_debit - ?) <= 1
                 ORDER BY je.id DESC LIMIT 2
             ");
@@ -1300,6 +1308,33 @@ class AccountingModel
             if (count($amtMatches) === 1) {
                 $m = $amtMatches[0];
                 return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+            }
+
+            // Pass 3：合併匯款傳票 — 查同日有單行借/貸金額匹配的傳票（例如一張 JV 包含多筆廠商付款）
+            // 只查未綁定的 je；若有指定 accountPrefix，只限定該科目（例如銀行存款 1113*、零用金 11122*）
+            $acctSql = '';
+            $acctParams = array();
+            if ($accountPrefix !== '') {
+                $acctSql = " AND coa.account_code LIKE ?";
+                $acctParams[] = $accountPrefix . '%';
+            }
+            $stmt2 = $this->db->prepare("
+                SELECT DISTINCT je.id, je.voucher_number, je.voucher_date, je.total_debit
+                FROM journal_entries je
+                JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
+                JOIN chart_of_accounts coa ON jl.account_id = coa.id
+                WHERE je.voucher_date = ? AND je.status != 'voided'
+                  {$excludeBoundSql}
+                  AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)
+                  {$acctSql}
+                ORDER BY je.id DESC LIMIT 3
+            ");
+            $p2 = array_merge(array($date, (float)$amount, (float)$amount), $acctParams);
+            $stmt2->execute($p2);
+            $lineMatches = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            if (count($lineMatches) === 1) {
+                $m = $lineMatches[0];
+                return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$amount);
             }
         }
 

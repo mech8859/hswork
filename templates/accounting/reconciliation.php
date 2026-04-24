@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>銀行對帳</h1>
     <div style="display:flex;gap:8px">
@@ -61,6 +62,7 @@
         <?php endif; ?>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- Split View -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">

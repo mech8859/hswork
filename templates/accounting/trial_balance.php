@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>試算表</h1>
     <div style="display:flex;gap:8px">
@@ -33,11 +34,12 @@
     | 成本中心篩選
     <?php endif; ?>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- Trial Balance Table -->
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%">
-        <thead>
+        <thead class="sticky-thead">
             <tr>
                 <th style="width:100px">科目編號</th>
                 <th>科目名稱</th>

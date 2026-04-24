@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h1>傳票管理 <small style="font-size:.55em;color:#666;font-weight:normal">共 <?= number_format($totalCount) ?> 筆</small></h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -60,9 +61,10 @@
         <button type="submit" class="btn btn-secondary">篩選</button>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <!-- Journal Entries Table -->
-<div class="card" style="overflow-x:auto">
+<div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%; table-layout:fixed;">
         <colgroup>
             <col style="width:32px">
@@ -74,7 +76,7 @@
             <col style="width:80px">
             <col style="width:80px">
         </colgroup>
-        <thead>
+        <thead class="sticky-thead">
             <tr>
                 <th></th>
                 <th>日期</th>
