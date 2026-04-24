@@ -26,15 +26,20 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
-    // ---- 簽核歷史紀錄（所有模組） ----
+    // ---- 簽核歷史紀錄（預設只顯示自己簽的，可切換全部） ----
     case 'history':
         if (!$canViewApprovals) { Session::flash('error', '無權限'); redirect('/index.php'); }
+        // scope: mine=只看自己(預設) / all=全部(需 manage 權限)
+        $scope = isset($_GET['scope']) ? $_GET['scope'] : 'mine';
+        $canViewAll = Auth::hasPermission('approvals.manage') || Auth::hasPermission('all');
+        if ($scope === 'all' && !$canViewAll) $scope = 'mine';
         $filters = array(
-            'module'    => isset($_GET['module']) ? $_GET['module'] : '',
-            'status'    => isset($_GET['status']) ? $_GET['status'] : '',
-            'date_from' => isset($_GET['date_from']) ? $_GET['date_from'] : '',
-            'date_to'   => isset($_GET['date_to']) ? $_GET['date_to'] : '',
-            'keyword'   => isset($_GET['keyword']) ? $_GET['keyword'] : '',
+            'module'      => isset($_GET['module']) ? $_GET['module'] : '',
+            'status'      => isset($_GET['status']) ? $_GET['status'] : '',
+            'date_from'   => isset($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'     => isset($_GET['date_to']) ? $_GET['date_to'] : '',
+            'keyword'     => isset($_GET['keyword']) ? $_GET['keyword'] : '',
+            'approver_id' => $scope === 'mine' ? Auth::id() : 0,
         );
         $history = $model->getApprovalHistory($filters);
         $pageTitle = '簽核紀錄';
@@ -224,8 +229,11 @@ switch ($action) {
                         if ($module === 'leaves') {
                             $db->prepare("UPDATE leaves SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ?")
                                ->execute(array(Auth::id(), $targetId));
+                        } elseif ($module === 'overtime') {
+                            $db->prepare("UPDATE overtimes SET status = 'approved', approved_by = ?, approved_at = NOW(), reject_reason = NULL WHERE id = ?")
+                               ->execute(array(Auth::id(), $targetId));
                         }
-                        Session::flash('success', '已核准（最終關），請假單已核准');
+                        Session::flash('success', '已核准（最終關），已核准');
                     } elseif ($advance['status'] === 'pending_next') {
                         // 送下一關：通知
                         require_once __DIR__ . '/../modules/notifications/NotificationModel.php';
@@ -378,6 +386,9 @@ switch ($action) {
                     }
                     if ($module === 'leaves') {
                         $db->prepare("UPDATE leaves SET status = 'rejected', approved_by = ?, approved_at = NOW(), reject_reason = ? WHERE id = ?")
+                           ->execute(array(Auth::id(), $comment, $targetId));
+                    } elseif ($module === 'overtime') {
+                        $db->prepare("UPDATE overtimes SET status = 'rejected', approved_by = ?, approved_at = NOW(), reject_reason = ? WHERE id = ?")
                            ->execute(array(Auth::id(), $comment, $targetId));
                     }
                     AuditLog::log('approvals', 'reject', $flowId, $module . ' 簽核退回 #' . $targetId . ' - ' . $comment);

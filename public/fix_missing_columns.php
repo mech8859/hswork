@@ -90,4 +90,22 @@ if (!in_array('attachment_path', $biCols)) {
     echo "attachment_path 已存在 ✓<br>";
 }
 
+// 檢查 cases 表：no_equipment
+echo "<h3>cases 表</h3>";
+$cCols = array();
+$cStmt = $db->query("SHOW COLUMNS FROM cases");
+while ($row = $cStmt->fetch(PDO::FETCH_ASSOC)) {
+    $cCols[] = $row['Field'];
+}
+if (!in_array('no_equipment', $cCols)) {
+    try {
+        $db->exec("ALTER TABLE cases ADD COLUMN `no_equipment` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '此案件無使用設備(不需出庫)'");
+        echo "新增 no_equipment ✓<br>";
+    } catch (Exception $ex) {
+        echo "失敗: " . $ex->getMessage() . "<br>";
+    }
+} else {
+    echo "no_equipment 已存在 ✓<br>";
+}
+
 echo "<br><a href='/cases.php'>回案件管理</a> | <a href='/products.php?action=categories'>產品分類</a>";

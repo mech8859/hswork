@@ -502,7 +502,8 @@ class CaseModel
                 repair_original_case = ?, repair_original_complete_date = ?, repair_original_warranty_date = ?,
                 repair_is_charged = ?, repair_no_charge_reason = ?,
                 sales_note = ?,
-                est_labor_days = ?, est_labor_people = ?, est_labor_hours = ?
+                est_labor_days = ?, est_labor_people = ?, est_labor_hours = ?,
+                no_equipment = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -590,6 +591,7 @@ class CaseModel
             !empty($data['est_labor_days']) ? $data['est_labor_days'] : null,
             !empty($data['est_labor_people']) ? (int)$data['est_labor_people'] : null,
             !empty($data['est_labor_hours']) ? $data['est_labor_hours'] : null,
+            isset($data['no_equipment']) ? (int)!!$data['no_equipment'] : 0,
             $id,
         ]);
 

@@ -674,7 +674,7 @@ class ApprovalModel
                     $typeLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','official'=>'公假','day_off'=>'補休','menstrual'=>'生理假','bereavement'=>'喪假','marriage'=>'婚假','maternity'=>'產假','paternity'=>'陪產假','funeral'=>'喪假','other'=>'其他');
                     $typeLabel = isset($typeLabels[$row['leave_type']]) ? $typeLabels[$row['leave_type']] : $row['leave_type'];
                     $row['label'] = '#' . $targetId . ' ' . $row['real_name'] . ' ' . $typeLabel . ' ' . $row['start_date'] . ($row['start_date'] !== $row['end_date'] ? '~' . $row['end_date'] : '');
-                    $row['url'] = '/leaves.php#leave-' . $targetId;
+                    $row['url'] = '/leaves.php?action=view&id=' . $targetId;
                     $row['amount'] = 0;
                 }
                 return $row ?: array();
@@ -690,7 +690,7 @@ class ApprovalModel
                     $hoursStr = !empty($row['hours']) ? ' ' . rtrim(rtrim(number_format((float)$row['hours'], 2), '0'), '.') . 'h' : '';
                     $row['label'] = '#' . $targetId . ' ' . $row['real_name'] . ' ' . $typeLabel . ' ' . $row['overtime_date']
                         . ($st ? ' ' . $st . '~' . $et : '') . $hoursStr;
-                    $row['url'] = '/overtimes.php#overtime-' . $targetId;
+                    $row['url'] = '/overtimes.php?action=view&id=' . $targetId;
                     $row['amount'] = 0;
                 }
                 return $row ?: array();
@@ -1088,6 +1088,10 @@ class ApprovalModel
         if (!empty($filters['status'])) {
             $where[] = 'af.status = ?';
             $params[] = $filters['status'];
+        }
+        if (!empty($filters['approver_id'])) {
+            $where[] = 'af.approver_id = ?';
+            $params[] = (int)$filters['approver_id'];
         }
         if (!empty($filters['date_from'])) {
             $where[] = 'DATE(af.created_at) >= ?';

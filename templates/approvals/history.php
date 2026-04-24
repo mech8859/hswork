@@ -59,6 +59,17 @@ $moduleOptions = array(
             <label style="font-size:.8rem">關鍵字</label>
             <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword']) ?>" placeholder="案件編號 / 客戶名">
         </div>
+        <?php if (!empty($canViewAll)): ?>
+        <div class="form-group" style="margin:0">
+            <label style="font-size:.8rem">範圍</label>
+            <select name="scope" class="form-control">
+                <option value="mine" <?= ($scope === 'mine') ? 'selected' : '' ?>>只看我簽的</option>
+                <option value="all" <?= ($scope === 'all') ? 'selected' : '' ?>>全部</option>
+            </select>
+        </div>
+        <?php else: ?>
+        <input type="hidden" name="scope" value="mine">
+        <?php endif; ?>
         <div class="form-group" style="margin:0">
             <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
             <a href="/approvals.php?action=history" class="btn btn-outline btn-sm">清除</a>

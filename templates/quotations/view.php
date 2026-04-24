@@ -12,6 +12,15 @@ $isApprover = false;
 foreach ($approvalStatus['flows'] as $af) {
     if ($af['approver_id'] == Auth::id() && $af['status'] === 'pending') $isApprover = true;
 }
+// 檢查關聯案件是否標記「無使用設備」
+$caseNoEquipment = false;
+if (!empty($quote['case_id'])) {
+    try {
+        $_ceStmt = Database::getInstance()->prepare('SELECT no_equipment FROM cases WHERE id = ?');
+        $_ceStmt->execute(array($quote['case_id']));
+        $caseNoEquipment = (int)$_ceStmt->fetchColumn() === 1;
+    } catch (Exception $e) {}
+}
 ?>
 <?php if (!empty($quote['loss_reason'])): ?>
 <div class="alert" style="background:#fff3e0;border-left:4px solid #c5221f;padding:10px 14px;margin-bottom:12px;border-radius:4px">
@@ -54,7 +63,7 @@ foreach ($approvalStatus['flows'] as $af) {
             <a href="/quotations.php?action=status&id=<?= $quote['id'] ?>&status=revision_needed&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('客戶要求修改？')">待修改</a>
             <?php endif; ?>
 
-            <?php if ($quote['status'] === 'customer_accepted'): ?>
+            <?php if ($quote['status'] === 'customer_accepted' && !$caseNoEquipment): ?>
             <?php if (!empty($relatedStockOuts)): ?>
                 <?php $_latestSo = $relatedStockOuts[0]; ?>
                 <a href="/stock_outs.php?action=view&id=<?= $_latestSo['id'] ?>" class="btn btn-sm" style="background:var(--success);color:#fff" title="點選前往出庫單 <?= e($_latestSo['so_number']) ?>">✓ 出庫單已建立</a>
@@ -65,6 +74,8 @@ foreach ($approvalStatus['flows'] as $af) {
             <?php else: ?>
                 <a href="/quotations.php?action=create_stock_out&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-sm" style="background:#FF9800;color:#fff" onclick="return confirm('從此報價單建立出庫單？')">建立出庫單</a>
             <?php endif; ?>
+            <?php elseif ($quote['status'] === 'customer_accepted' && $caseNoEquipment): ?>
+            <span class="badge" style="background:#e3f2fd;color:#1565c0;padding:4px 10px;font-size:.8rem">此案件無使用設備</span>
             <?php endif; ?>
 
             <a href="/quotations.php?action=duplicate&id=<?= $quote['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>" class="btn btn-outline btn-sm" onclick="return confirm('確定複製？')">複製</a>
@@ -105,8 +116,8 @@ foreach ($approvalStatus['flows'] as $af) {
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
-<!-- 已建立的出庫單 -->
-<?php if (!empty($relatedStockOuts)): ?>
+<!-- 已建立的出庫單（此案件無使用設備時隱藏） -->
+<?php if (!empty($relatedStockOuts) && !$caseNoEquipment): ?>
 <div class="card mb-2" style="border-left:4px solid var(--success)">
     <div class="card-header" style="padding:8px 12px;font-size:.85rem;display:flex;align-items:center;gap:8px">
         <span>📦 已建立出庫單</span>

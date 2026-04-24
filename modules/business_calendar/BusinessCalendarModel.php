@@ -240,7 +240,9 @@ class BusinessCalendarModel
             return array('ok'=>false, 'message'=>'檔案超過 20MB');
         }
 
-        $dir = __DIR__ . '/../../public/uploads/cases/' . (int)$caseId;
+        // 用 DOCUMENT_ROOT 確保兩端路徑一致（local=public/ server=www/）
+        $webRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? rtrim($_SERVER['DOCUMENT_ROOT'], '/') : (__DIR__ . '/../../public');
+        $dir = $webRoot . '/uploads/cases/' . (int)$caseId;
         if (!is_dir($dir)) @mkdir($dir, 0755, true);
 
         $ext = strtolower(pathinfo($fileField['name'], PATHINFO_EXTENSION));
@@ -266,7 +268,8 @@ class BusinessCalendarModel
         $stmt->execute(array((int)$attachmentId, (int)$caseId));
         $path = $stmt->fetchColumn();
         if (!$path) return array('ok'=>false, 'message'=>'找不到附件');
-        $full = __DIR__ . '/../../public' . $path;
+        $webRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? rtrim($_SERVER['DOCUMENT_ROOT'], '/') : (__DIR__ . '/../../public');
+        $full = $webRoot . $path;
         if (file_exists($full)) @unlink($full);
         $this->db->prepare("DELETE FROM case_attachments WHERE id = ?")->execute(array((int)$attachmentId));
         return array('ok'=>true);

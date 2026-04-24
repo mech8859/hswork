@@ -427,6 +427,16 @@ switch ($action) {
                 redirect('/quotations.php');
             }
 
+            // 「此案件無使用設備」→ 擋建立出庫單
+            if (!empty($quote['case_id'])) {
+                $_neStmt = Database::getInstance()->prepare('SELECT no_equipment FROM cases WHERE id = ?');
+                $_neStmt->execute(array($quote['case_id']));
+                if ((int)$_neStmt->fetchColumn() === 1) {
+                    Session::flash('error', '此案件標記為「無使用設備」，不需建立出庫單');
+                    redirect('/quotations.php?action=view&id=' . $qId);
+                }
+            }
+
             // 檢查是否已有此報價單的出庫單
             $db = Database::getInstance();
             $existSo = $db->prepare("SELECT id, so_number, status FROM stock_outs WHERE source_type = 'quotation' AND source_id = ?");

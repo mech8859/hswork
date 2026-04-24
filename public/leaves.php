@@ -31,6 +31,27 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 檢視單筆 ----
+    case 'view':
+        $id = (int)($_GET['id'] ?? 0);
+        $leave = $model->getById($id);
+        if (!$leave) {
+            Session::flash('error', '請假單不存在');
+            redirect('/leaves.php');
+        }
+        // 權限：本人 or view+ or manage
+        if ($leave['user_id'] != Auth::id() && !$canManage && !Auth::hasPermission('leaves.view')) {
+            Session::flash('error', '權限不足');
+            redirect('/leaves.php');
+        }
+
+        $pageTitle = '請假單檢視';
+        $currentPage = 'leaves';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/leaves/view.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 申請請假 ----
     case 'create':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {

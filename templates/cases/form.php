@@ -50,8 +50,8 @@
         <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">排工條件尚未備齊：<?= implode('、', array_map('e', $warnings)) ?></span>
         <?php endif; } ?>
         <?php
-        // 出庫單狀態（純顯示）
-        if (!empty($caseStockOutStatus) && $caseStockOutStatus['quote_count'] > 0):
+        // 出庫單狀態（純顯示）— 若案件勾選「無使用設備」則隱藏
+        if (empty($case['no_equipment']) && !empty($caseStockOutStatus) && $caseStockOutStatus['quote_count'] > 0):
             if ($caseStockOutStatus['stockout_count'] > 0):
                 foreach ($caseStockOutStatus['stockouts'] as $_so):
         ?>
@@ -59,6 +59,9 @@
         <?php endforeach; else: ?>
         <span style="color:#e65100;font-size:.85rem;font-weight:600;margin-left:12px">📦 出庫單尚未建立</span>
         <?php endif; endif; ?>
+        <?php if (!empty($case['no_equipment'])): ?>
+        <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:.75rem;font-weight:600;margin-left:12px;padding:2px 8px">此案件無使用設備</span>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
@@ -625,18 +628,24 @@ require __DIR__ . '/../_readonly_form_helper.php';
     <div class="card" id="sec-quote-drawing">
         <div class="card-header d-flex justify-between align-center">
             <span>報價單 / 圖面</span>
-            <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
-                <?php if (!$latestQuote): ?>
-                <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_person'] ?? '') ?>&phone=<?= urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? '')) ?>"
-                   class="btn btn-primary btn-sm">+ 建立報價單</a>
-                <?php elseif ($latestQuote['status'] === 'customer_accepted'): ?>
-                <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>"
-                   class="btn btn-outline btn-sm">檢視報價單</a>
-                <?php else: ?>
-                <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>"
-                   class="btn btn-primary btn-sm">編輯報價單</a>
+            <div class="d-flex align-center gap-1">
+                <label class="checkbox-label" style="cursor:pointer;font-size:.85rem;color:#555;margin:0;display:inline-flex;align-items:center;gap:4px" title="勾選後隱藏出庫單，排工不必等出庫">
+                    <input type="checkbox" name="no_equipment" value="1" <?= !empty($case['no_equipment']) ? 'checked' : '' ?> style="margin:0">
+                    此案件無使用設備
+                </label>
+                <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
+                    <?php if (!$latestQuote): ?>
+                    <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_person'] ?? '') ?>&phone=<?= urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? '')) ?>"
+                       class="btn btn-primary btn-sm">+ 建立報價單</a>
+                    <?php elseif ($latestQuote['status'] === 'customer_accepted'): ?>
+                    <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>"
+                       class="btn btn-outline btn-sm">檢視報價單</a>
+                    <?php else: ?>
+                    <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>"
+                       class="btn btn-primary btn-sm">編輯報價單</a>
+                    <?php endif; ?>
                 <?php endif; ?>
-            <?php endif; ?>
+            </div>
         </div>
 
         <!-- 已關聯的報價單 -->
