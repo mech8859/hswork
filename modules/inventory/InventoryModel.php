@@ -949,9 +949,9 @@ class InventoryModel
      */
     public function searchProducts($keyword, $limit = 20)
     {
-        // 排除「不進出庫單」分類（及其子孫）下的產品
+        // 排除「非庫存」分類（及其子孫）下的產品（工程項次/費用類不進庫存系統）
         require_once __DIR__ . '/../products/ProductModel.php';
-        $excludedCatIds = ProductModel::getCategoryIdsByFlag('exclude_from_stockout');
+        $excludedCatIds = ProductModel::getCategoryIdsByFlag('is_non_inventory');
         $sql = "
             SELECT p.id, p.name, p.model, p.unit, p.cost, p.price,
                    p.pack_qty, p.pack_unit, p.cost_per_unit,

@@ -314,9 +314,9 @@ switch ($action) {
         if (strlen($q) < 1) { echo json_encode(array()); break; }
         $db = Database::getInstance();
         $like = '%' . $q . '%';
-        // 排除「不進出庫單」分類（及其子孫）下的產品（工程單價/工資單價等非實體品項不應出現在採購/庫存搜尋）
+        // 排除「非庫存」分類（及其子孫）下的產品（工程項次/工資/費用類非實體品項不進庫存系統）
         require_once __DIR__ . '/../modules/products/ProductModel.php';
-        $excludedCatIds = ProductModel::getCategoryIdsByFlag('exclude_from_stockout');
+        $excludedCatIds = ProductModel::getCategoryIdsByFlag('is_non_inventory');
         $sql = "SELECT id, name, model, CAST(COALESCE(NULLIF(cost,0), price, 0) AS SIGNED) as price, unit, pack_qty, pack_unit, cost_per_unit FROM products WHERE is_active = 1 AND (name LIKE ? OR model LIKE ?)";
         $params = array($like, $like);
         if (!empty($excludedCatIds)) {

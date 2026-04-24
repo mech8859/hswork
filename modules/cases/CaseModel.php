@@ -609,6 +609,27 @@ class CaseModel
         if (!empty($data['survey_date'])) {
             $this->syncSurveyToCalendar($id, $data);
         }
+
+        // 案件名稱 / 發票抬頭 / 統編 同步到該案件下所有報價單
+        $syncFields = array();
+        $syncParams = array();
+        if (array_key_exists('title', $data)) {
+            $syncFields[] = 'site_name = ?';
+            $syncParams[] = $data['title'];
+        }
+        if (array_key_exists('billing_title', $data)) {
+            $syncFields[] = 'invoice_title = ?';
+            $syncParams[] = $data['billing_title'];
+        }
+        if (array_key_exists('billing_tax_id', $data)) {
+            $syncFields[] = 'invoice_tax_id = ?';
+            $syncParams[] = $data['billing_tax_id'];
+        }
+        if (!empty($syncFields)) {
+            $syncParams[] = $id;
+            $this->db->prepare("UPDATE quotations SET " . implode(', ', $syncFields) . " WHERE case_id = ?")
+                ->execute($syncParams);
+        }
     }
 
     /**

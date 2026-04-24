@@ -25,15 +25,17 @@ if ($schedule['case_id']) {
     $nStmt->execute(array($schedule['case_id']));
     $caseInfo = $nStmt->fetch(PDO::FETCH_ASSOC);
     $constructionNote = '';
-    // 從 case_contacts 取聯絡人（第一筆）
-    $ccStmt = $db->prepare("SELECT contact_name, contact_phone FROM case_contacts WHERE case_id = ? LIMIT 1");
+    // 從 case_contacts 取全部聯絡人（案件管理填的優先，其次才是客戶資料）
+    $ccStmt = $db->prepare("SELECT contact_name, contact_phone, contact_role FROM case_contacts WHERE case_id = ? ORDER BY id");
     $ccStmt->execute(array($schedule['case_id']));
-    $caseContact = $ccStmt->fetch(PDO::FETCH_ASSOC);
+    $caseContacts = $ccStmt->fetchAll(PDO::FETCH_ASSOC);
+    $firstCaseContact = !empty($caseContacts) ? $caseContacts[0] : null;
     if ($caseInfo) {
         $caseNote = $caseInfo['notes'] ?: $caseInfo['description'] ?: '';
-        $customerPhone = $caseInfo['cu_phone'] ?: ($caseContact ? $caseContact['contact_phone'] : '') ?: '';
+        // 優先使用案件聯絡人（第一筆），若無才 fallback 到客戶資料
+        $customerContact = $firstCaseContact ? $firstCaseContact['contact_name'] : ($caseInfo['cu_contact'] ?: '');
+        $customerPhone = $firstCaseContact ? ($firstCaseContact['contact_phone'] ?: '') : ($caseInfo['cu_phone'] ?: '');
         $customerMobile = $caseInfo['cu_mobile'] ?: '';
-        $customerContact = $caseInfo['cu_contact'] ?: ($caseContact ? $caseContact['contact_name'] : '') ?: '';
         $constructionNote = $caseInfo['construction_note'] ?: '';
     }
     // 現場環境
@@ -140,6 +142,19 @@ $canJoin = $isEngineerUser && !$isInSchedule && !in_array($schedule['status'], a
             <span class="detail-label">客戶名稱</span>
             <span class="detail-value"><?= e($schedule['case_title'] ?: '-') ?></span>
         </div>
+        <?php if (!empty($caseContacts)): ?>
+        <?php foreach ($caseContacts as $i => $cc): ?>
+        <div class="detail-item">
+            <span class="detail-label">聯絡人<?= count($caseContacts) > 1 ? ' ' . ($i + 1) : '' ?><?= !empty($cc['contact_role']) ? ' (' . e($cc['contact_role']) . ')' : '' ?></span>
+            <span class="detail-value">
+                <?= e($cc['contact_name']) ?>
+                <?php if (!empty($cc['contact_phone'])): ?>
+                <a href="tel:<?= e($cc['contact_phone']) ?>" style="margin-left:8px"><?= e($cc['contact_phone']) ?></a>
+                <?php endif; ?>
+            </span>
+        </div>
+        <?php endforeach; ?>
+        <?php else: ?>
         <div class="detail-item">
             <span class="detail-label">聯絡人</span>
             <span class="detail-value"><?= e($customerContact ?: '-') ?></span>
@@ -148,10 +163,13 @@ $canJoin = $isEngineerUser && !$isInSchedule && !in_array($schedule['status'], a
             <span class="detail-label">電話</span>
             <span class="detail-value"><?php if ($customerPhone): ?><a href="tel:<?= e($customerPhone) ?>"><?= e($customerPhone) ?></a><?php else: ?>-<?php endif; ?></span>
         </div>
+        <?php endif; ?>
+        <?php if ($customerMobile): ?>
         <div class="detail-item">
-            <span class="detail-label">手機</span>
-            <span class="detail-value"><?php if ($customerMobile): ?><a href="tel:<?= e($customerMobile) ?>"><?= e($customerMobile) ?></a><?php else: ?>-<?php endif; ?></span>
+            <span class="detail-label">客戶手機</span>
+            <span class="detail-value"><a href="tel:<?= e($customerMobile) ?>"><?= e($customerMobile) ?></a></span>
         </div>
+        <?php endif; ?>
     </div>
     <?php if ($caseNote): ?>
     <div style="padding:8px 12px;border-top:1px solid var(--gray-100)">

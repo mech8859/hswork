@@ -28,7 +28,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword']) ?>" placeholder="客戶名/單號/案場">
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword']) ?>" placeholder="案件名稱/單號/客戶名">
             </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
@@ -59,7 +59,7 @@
         <div class="staff-card" onclick="location.href='/quotations.php?action=view&id=<?= $q['id'] ?>'">
             <div class="d-flex justify-between align-center">
                 <span>
-                    <strong><?= e($q['customer_name']) ?></strong>
+                    <strong><?= e($q['site_name'] ?: $q['customer_name']) ?></strong>
                     <?php if ($pb): ?>
                     <span class="badge" style="background:<?= $pb['bg'] ?>;color:<?= $pb['color'] ?>;font-size:.65em;margin-left:4px;padding:2px 6px" title="利潤率 <?= number_format((float)$q['profit_rate'], 1) ?>%"><?= $pb['label'] ?></span>
                     <?php endif; ?>
@@ -79,7 +79,7 @@
     <div class="table-responsive hide-mobile">
         <table class="table">
             <thead><tr>
-                <th>單號</th><th>日期</th><th>客戶</th><th>案場</th><th>格式</th><th>業務</th><th>金額</th><th>狀態</th><th>操作</th>
+                <th>單號</th><th>日期</th><th>案件名稱</th><th>格式</th><th>業務</th><th>金額</th><th>狀態</th><th>操作</th>
             </tr></thead>
             <tbody>
                 <?php foreach ($quotations as $q): $pb = _quoteProfitBadge(isset($q['profit_rate']) ? $q['profit_rate'] : null); ?>
@@ -87,12 +87,11 @@
                     <td><a href="/quotations.php?action=view&id=<?= $q['id'] ?>"><?= e($q['quotation_number']) ?></a></td>
                     <td><?= e($q['quote_date']) ?></td>
                     <td>
-                        <?= e($q['customer_name']) ?>
+                        <?= e($q['site_name'] ?: $q['customer_name']) ?>
                         <?php if ($pb): ?>
                         <span class="badge" style="background:<?= $pb['bg'] ?>;color:<?= $pb['color'] ?>;font-size:.7em;margin-left:4px;padding:2px 6px" title="利潤率 <?= number_format((float)$q['profit_rate'], 1) ?>%"><?= $pb['label'] ?></span>
                         <?php endif; ?>
                     </td>
-                    <td><?= e(mb_substr($q['site_name'] ?: '-', 0, 15)) ?></td>
                     <td><?= QuotationModel::formatLabel($q['format']) ?></td>
                     <td><?= e($q['sales_name'] ?: '-') ?></td>
                     <td class="text-right">$<?= number_format($q['total_amount']) ?></td>

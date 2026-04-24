@@ -176,7 +176,7 @@ $_isSuperseded = ($_acceptedQid > 0 && $quote['status'] === 'customer_accepted' 
         <div><span class="info-label">客戶名稱</span><span><?= e($quote['customer_name']) ?></span></div>
         <div><span class="info-label">連絡對象</span><span><?= e($quote['contact_person'] ?: '-') ?></span></div>
         <div><span class="info-label">連絡電話</span><span><?= e($quote['contact_phone'] ?: '-') ?></span></div>
-        <div><span class="info-label">案場名稱</span><span><?= e($quote['site_name'] ?: '-') ?></span></div>
+        <div><span class="info-label">案件名稱</span><span><?= e($quote['site_name'] ?: '-') ?></span></div>
         <div><span class="info-label">施工地址</span><span><?= e($quote['site_address'] ?: '-') ?></span></div>
         <div><span class="info-label">報價格式</span><span><?= QuotationModel::formatLabel($quote['format']) ?></span></div>
         <div><span class="info-label">報價日期</span><span><?= e($quote['quote_date']) ?></span></div>

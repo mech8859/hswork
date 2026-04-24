@@ -155,6 +155,7 @@ class Auth
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
                     'reviews' => array('reviews.manage', 'reviews.view'),
+                    'tech_manuals' => array('tech_manuals.manage', 'tech_manuals.view'),
                     'petty_cash' => array('petty_cash.manage', 'petty_cash.view'),
                     'system' => array('system.manage'),
                 );
@@ -449,6 +450,7 @@ class Auth
                     'accounting' => array('accounting.manage', 'accounting.view'),
                     'approvals' => array('approvals.manage', 'approvals.view'),
                     'reviews' => array('reviews.manage', 'reviews.view'),
+                    'tech_manuals' => array('tech_manuals.manage', 'tech_manuals.view'),
                     'petty_cash' => array('petty_cash.manage', 'petty_cash.view'),
                     'system' => array('system.manage'),
                 );

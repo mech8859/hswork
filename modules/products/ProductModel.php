@@ -340,12 +340,12 @@ class ProductModel
 
     /**
      * 取得某分類 flag 為 true 的所有分類 ID（含子孫分類）
-     * @param string $flag 'exclude_from_stockout' 或 'show_in_material_estimate'
+     * @param string $flag 'exclude_from_stockout' / 'show_in_material_estimate' / 'is_non_inventory'
      * @return array 分類 id 陣列（可能為空）
      */
     public static function getCategoryIdsByFlag($flag)
     {
-        if (!in_array($flag, array('exclude_from_stockout', 'show_in_material_estimate'), true)) {
+        if (!in_array($flag, array('exclude_from_stockout', 'show_in_material_estimate', 'is_non_inventory'), true)) {
             return array();
         }
         $db = Database::getInstance();
@@ -377,20 +377,20 @@ class ProductModel
     /**
      * 建立分類
      */
-    public function createCategory($name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0)
+    public function createCategory($name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0, $isNonInventory = 0)
     {
-        $stmt = $this->db->prepare("INSERT INTO product_categories (name, parent_id, exclude_from_stockout, show_in_material_estimate) VALUES (?, ?, ?, ?)");
-        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate));
+        $stmt = $this->db->prepare("INSERT INTO product_categories (name, parent_id, exclude_from_stockout, show_in_material_estimate, is_non_inventory) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate, (int)$isNonInventory));
         return $this->db->lastInsertId();
     }
 
     /**
      * 更新分類
      */
-    public function updateCategory($id, $name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0)
+    public function updateCategory($id, $name, $parentId, $excludeStockout = 0, $showInMaterialEstimate = 0, $isNonInventory = 0)
     {
-        $stmt = $this->db->prepare("UPDATE product_categories SET name = ?, parent_id = ?, exclude_from_stockout = ?, show_in_material_estimate = ? WHERE id = ?");
-        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate, (int)$id));
+        $stmt = $this->db->prepare("UPDATE product_categories SET name = ?, parent_id = ?, exclude_from_stockout = ?, show_in_material_estimate = ?, is_non_inventory = ? WHERE id = ?");
+        $stmt->execute(array(trim($name), $parentId ? (int)$parentId : null, (int)$excludeStockout, (int)$showInMaterialEstimate, (int)$isNonInventory, (int)$id));
     }
 
     /**

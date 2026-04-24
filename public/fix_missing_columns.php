@@ -61,6 +61,16 @@ if (!in_array('exclude_from_stockout', $pcCols)) {
 } else {
     echo "exclude_from_stockout 已存在 ✓<br>";
 }
+if (!in_array('is_non_inventory', $pcCols)) {
+    try {
+        $db->exec("ALTER TABLE product_categories ADD COLUMN `is_non_inventory` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '非庫存(不出現在入庫/出庫/採購搜尋)' AFTER `exclude_from_stockout`");
+        echo "新增 is_non_inventory ✓<br>";
+    } catch (Exception $ex) {
+        echo "失敗: " . $ex->getMessage() . "<br>";
+    }
+} else {
+    echo "is_non_inventory 已存在 ✓<br>";
+}
 
 // 檢查 case_billing_items 表
 echo "<h3>case_billing_items 表</h3>";

@@ -53,8 +53,9 @@
                     <td>
                         <div class="d-flex gap-1">
                             <?php if (!empty($cat['exclude_from_stockout'])): ?><span class="badge" style="background:#ffebee;color:#c62828;font-size:.7rem;padding:2px 6px;margin-right:4px">不進出庫單</span><?php endif; ?>
+                            <?php if (!empty($cat['is_non_inventory'])): ?><span class="badge" style="background:#fce4ec;color:#ad1457;font-size:.7rem;padding:2px 6px;margin-right:4px">非庫存</span><?php endif; ?>
                             <?php if (!empty($cat['show_in_material_estimate'])): ?><span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:.7rem;padding:2px 6px;margin-right:4px">預計線材</span><?php endif; ?>
-                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"], "exclude_from_stockout" => (int)($cat["exclude_from_stockout"] ?? 0), "show_in_material_estimate" => (int)($cat["show_in_material_estimate"] ?? 0))) ?>)'>編輯</button>
+                            <button type="button" class="btn btn-outline btn-sm" onclick='openCatModal(<?= json_encode(array("id" => $cat["id"], "name" => $cat["name"], "parent_id" => $cat["parent_id"], "exclude_from_stockout" => (int)($cat["exclude_from_stockout"] ?? 0), "show_in_material_estimate" => (int)($cat["show_in_material_estimate"] ?? 0), "is_non_inventory" => (int)($cat["is_non_inventory"] ?? 0))) ?>)'>編輯</button>
                             <?php if ((int)$cat['child_count'] === 0 && (int)$cat['product_count'] === 0): ?>
                             <form method="POST" action="/products.php?action=category_delete" style="display:inline" onsubmit="return confirm('確認刪除分類「<?= e($cat['name']) ?>」？')">
                                 <?= csrf_field() ?>
@@ -147,7 +148,15 @@
                     <input type="checkbox" name="exclude_from_stockout" id="catExcludeStockout" value="1">
                     <span style="color:#c62828;font-weight:600">不進出庫單</span>
                 </label>
-                <small style="color:#888;display:block;margin-top:2px">勾選後，此分類下的產品從報價單建立出庫單時會自動排除</small>
+                <small style="color:#888;display:block;margin-top:2px">勾選後，此分類下的產品從報價單建立出庫單時會自動排除（仍可入庫/手動出庫）</small>
+            </div>
+
+            <div class="form-group" style="margin-top:8px">
+                <label class="checkbox-label" style="cursor:pointer">
+                    <input type="checkbox" name="is_non_inventory" id="catNonInventory" value="1">
+                    <span style="color:#ad1457;font-weight:600">非庫存</span>
+                </label>
+                <small style="color:#888;display:block;margin-top:2px">勾選後，此分類下的產品完全不出現在入庫/出庫/採購搜尋（適用工程項次、工資、費用類）</small>
             </div>
 
             <div class="form-group" style="margin-top:8px">
@@ -409,6 +418,7 @@ function openCatModal(data) {
     document.getElementById('catParent').value = '';
     document.getElementById('catExcludeStockout').checked = false;
     document.getElementById('catShowMaterial').checked = false;
+    document.getElementById('catNonInventory').checked = false;
     document.getElementById('catLevel0').value = '';
     document.getElementById('catLevel0New').value = '';
     document.getElementById('catLevel0New').style.display = 'none';
@@ -426,6 +436,7 @@ function openCatModal(data) {
         document.getElementById('catParent').value = data.parent_id || '';
         document.getElementById('catExcludeStockout').checked = !!data.exclude_from_stockout;
         document.getElementById('catShowMaterial').checked = !!data.show_in_material_estimate;
+        document.getElementById('catNonInventory').checked = !!data.is_non_inventory;
 
         // 根據深度設定對應欄位
         var depth = getCatDepth(data.id);

@@ -16,6 +16,10 @@ require __DIR__ . '/../_readonly_form_helper.php';
 
 <form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" id="bcForm">
     <?= csrf_field() ?>
+    <?php if ($isEdit): ?>
+    <input type="hidden" name="case_id" value="<?= (int)($event['case_id'] ?? 0) ?>">
+    <input type="hidden" name="customer_id" value="<?= (int)($event['customer_id'] ?? 0) ?>">
+    <?php endif; ?>
 
     <div class="card">
         <div class="card-header">行程資料</div>
@@ -127,10 +131,16 @@ require __DIR__ . '/../_readonly_form_helper.php';
     <div class="card-header d-flex justify-between align-center">
         <span>📷 現場照片 <span class="text-muted" style="font-size:.8rem">（同步顯示在案件管理）</span></span>
         <?php if ($canEdit): ?>
-        <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
-            <input type="file" id="bcPhotoInput" accept="image/*" multiple capture="environment" style="display:none" onchange="bcUploadPhotos(this)">
-            ＋ 上傳照片
-        </label>
+        <div class="d-flex gap-1">
+            <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0">
+                <input type="file" id="bcPhotoInputCamera" accept="image/*" capture="environment" style="display:none" onchange="bcUploadPhotos(this)">
+                📷 拍照
+            </label>
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0">
+                <input type="file" id="bcPhotoInputGallery" accept="image/*" multiple style="display:none" onchange="bcUploadPhotos(this)">
+                🖼️ 相簿
+            </label>
+        </div>
         <?php endif; ?>
     </div>
     <div id="bcPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px">

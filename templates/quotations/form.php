@@ -90,15 +90,18 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                 $initCaseId = $quote ? ($quote['case_id'] ?? '') : ($_GET['case_id'] ?? '');
                 // 如果指定的案件不在選項中，額外查詢加入
                 $extraCase = null;
+                // 新建時連帶取案件的 billing_title/billing_tax_id 做預填
+                $linkedCase = null;
                 if ($initCaseId) {
+                    try {
+                        $lcStmt = Database::getInstance()->prepare('SELECT id, case_number, title, billing_title, billing_tax_id FROM cases WHERE id = ?');
+                        $lcStmt->execute(array($initCaseId));
+                        $linkedCase = $lcStmt->fetch(PDO::FETCH_ASSOC);
+                    } catch (Exception $e) {}
                     $found = false;
                     foreach ($cases as $c) { if ($c['id'] == $initCaseId) { $found = true; break; } }
-                    if (!$found) {
-                        try {
-                            $ecStmt = Database::getInstance()->prepare('SELECT id, case_number, title FROM cases WHERE id = ?');
-                            $ecStmt->execute(array($initCaseId));
-                            $extraCase = $ecStmt->fetch(PDO::FETCH_ASSOC);
-                        } catch (Exception $e) {}
+                    if (!$found && $linkedCase) {
+                        $extraCase = $linkedCase;
                     }
                 }
                 ?>
@@ -126,8 +129,8 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                 </datalist>
             </div>
             <div class="form-group">
-                <label>案場名稱</label>
-                <input type="text" name="site_name" class="form-control" value="<?= e($quote['site_name'] ?? '') ?>">
+                <label>案件名稱</label>
+                <input type="text" name="site_name" class="form-control" value="<?= e($quote['site_name'] ?? ($linkedCase['title'] ?? '')) ?>">
             </div>
             <div class="form-group" style="flex:2">
                 <label>施工地址</label>
@@ -138,11 +141,11 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
         <div class="form-row">
             <div class="form-group">
                 <label>發票抬頭</label>
-                <input type="text" name="invoice_title" class="form-control" value="<?= e($quote['invoice_title'] ?? ($custData['invoice_title'] ?? '')) ?>">
+                <input type="text" name="invoice_title" class="form-control" value="<?= e($quote['invoice_title'] ?? ($linkedCase['billing_title'] ?? ($custData['invoice_title'] ?? ''))) ?>">
             </div>
             <div class="form-group">
                 <label>統編</label>
-                <input type="text" name="invoice_tax_id" class="form-control" value="<?= e($quote['invoice_tax_id'] ?? ($custData['tax_id'] ?? '')) ?>">
+                <input type="text" name="invoice_tax_id" class="form-control" value="<?= e($quote['invoice_tax_id'] ?? ($linkedCase['billing_tax_id'] ?? ($custData['tax_id'] ?? ''))) ?>">
             </div>
         </div>
     </div>
@@ -1513,6 +1516,8 @@ function loadEstMaterials(caseId) {
             fillIfEmpty('contact_phone', d.case.contact_phone);
             fillIfEmpty('site_name', d.case.site_name);
             fillIfEmpty('site_address', d.case.site_address);
+            fillIfEmpty('invoice_title', d.case.invoice_title);
+            fillIfEmpty('invoice_tax_id', d.case.invoice_tax_id);
         }
         if (estCard) { estCard.style.display = ''; loadEstMaterials(caseId); }
         updateCableCaseUI();

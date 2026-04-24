@@ -208,7 +208,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
                 <span class="badge <?= CaseModel::statusBadge($row['status'] ?: '') ?>"><?= e(CaseModel::statusLabel($row['status'] ?: '')) ?></span>
             </div>
             <div class="case-card-title">
-                <?= e($row['customer_name'] ?: $row['title'] ?: '') ?>
+                <?= e($row['title'] ?: $row['customer_name'] ?: '') ?>
                 <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.6em">黑名單</span><?php endif; ?>
                 <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.6em">未成交</span><?php endif; ?>
                 <?php
@@ -244,7 +244,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
                 <tr>
                     <th style="white-space:nowrap">進件編號</th>
                     <th style="white-space:nowrap;min-width:80px">進件日期</th>
-                    <th style="max-width:250px;min-width:120px">客戶名稱</th>
+                    <th style="max-width:250px;min-width:120px">案件名稱</th>
                     <th>據點</th>
                     <th>案別</th>
                     <th>進度</th>
@@ -259,7 +259,7 @@ $subStatusOptions = CaseModel::subStatusOptions();
                     <td><a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['case_number'] ?: '') ?></a></td>
                     <td style="white-space:nowrap"><?= !empty($row['created_at']) ? date('Y/m/d', strtotime($row['created_at'])) : '-' ?><?php if (!empty($row['updated_at']) && $row['updated_at'] !== $row['created_at']): ?><br><span style="font-size:.7rem;color:#aaa"><?= date('m/d H:i', strtotime($row['updated_at'])) ?></span><?php endif; ?></td>
                     <td>
-                        <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['customer_name'] ?: $row['title'] ?: '') ?></a>
+                        <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['title'] ?: $row['customer_name'] ?: '') ?></a>
                         <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.65em">黑名單</span><?php endif; ?>
                         <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.65em">未成交</span><?php endif; ?>
                         <?php

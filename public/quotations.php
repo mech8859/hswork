@@ -790,7 +790,8 @@ switch ($action) {
         $db = Database::getInstance();
         $cStmt = $db->prepare("
             SELECT c.case_number, c.title, c.customer_name, c.customer_phone, c.customer_mobile,
-                   c.contact_person, c.contact_address, c.construction_area
+                   c.contact_person, c.contact_address, c.construction_area,
+                   c.billing_title, c.billing_tax_id
             FROM cases c WHERE c.id = ?
         ");
         $cStmt->execute(array($qCaseId));
@@ -810,8 +811,10 @@ switch ($action) {
                 'customer_name'   => $c['customer_name'],
                 'contact_person'  => $c['contact_person'],
                 'contact_phone'   => $c['customer_phone'] ?: $c['customer_mobile'],
-                'site_name'       => $c['construction_area'],
+                'site_name'       => $c['title'],
                 'site_address'    => $c['contact_address'],
+                'invoice_title'   => $c['billing_title'],
+                'invoice_tax_id'  => $c['billing_tax_id'],
             ),
             'existing_quotation' => $existing,
         ));

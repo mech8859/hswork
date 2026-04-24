@@ -84,6 +84,9 @@
         <?php if (Auth::hasPermission('reviews.manage') || Auth::hasPermission('reviews.view') || Auth::hasPermission('all')): ?>
         <li><a href="/reviews.php" class="<?= ($currentPage ?? '') === 'reviews' ? 'active' : '' ?>">⭐ 五星評價統計</a></li>
         <?php endif; ?>
+        <?php if (Auth::hasPermission('tech_manuals.manage') || Auth::hasPermission('tech_manuals.view') || Auth::hasPermission('all')): ?>
+        <li><a href="/tech_manuals.php" class="<?= ($currentPage ?? '') === 'tech_manuals' ? 'active' : '' ?>">📖 技術手冊</a></li>
+        <?php endif; ?>
 
         <!-- 業務管理 -->
         <li class="nav-section">業務管理</li>

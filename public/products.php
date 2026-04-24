@@ -362,16 +362,17 @@ switch ($action) {
         $catParent = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
         $excludeStockout = !empty($_POST['exclude_from_stockout']) ? 1 : 0;
         $showInMaterial = !empty($_POST['show_in_material_estimate']) ? 1 : 0;
+        $isNonInventory = !empty($_POST['is_non_inventory']) ? 1 : 0;
 
         if (!$catName) {
             Session::flash('error', '請輸入分類名稱');
             redirect('/products.php?action=categories');
         }
         if ($catId) {
-            $model->updateCategory($catId, $catName, $catParent, $excludeStockout, $showInMaterial);
+            $model->updateCategory($catId, $catName, $catParent, $excludeStockout, $showInMaterial, $isNonInventory);
             Session::flash('success', '分類已更新');
         } else {
-            $model->createCategory($catName, $catParent, $excludeStockout, $showInMaterial);
+            $model->createCategory($catName, $catParent, $excludeStockout, $showInMaterial, $isNonInventory);
             Session::flash('success', '分類已新增');
         }
         redirect('/products.php?action=categories');

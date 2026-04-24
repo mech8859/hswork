@@ -145,8 +145,8 @@ if (!empty($quote['case_id'])) {
         <td><?= e($quote['quote_date']) ?></td>
     </tr>
     <tr>
-        <td class="label">客戶編號：</td>
-        <td><?= e($printCustNo) ?></td>
+        <td class="label">案件名稱：</td>
+        <td><?= e($quote['site_name'] ?: '') ?></td>
         <td class="label">抬　頭：</td>
         <td><?= e($quote['invoice_title'] ?: '') ?></td>
         <td class="label">有效日期：</td>
@@ -167,10 +167,6 @@ if (!empty($quote['case_id'])) {
         <td><?= e($printCaseNo) ?></td>
         <td class="label">服務專線：</td>
         <td><?= e(isset($qs['quote_service_phone']) && $qs['quote_service_phone'] ? $qs['quote_service_phone'] : '0800-008-859') ?></td>
-    </tr>
-    <tr>
-        <td class="label">案場名稱：</td>
-        <td colspan="5"><?= e($quote['site_name'] ?: '') ?></td>
     </tr>
     <tr>
         <td class="label">施工地址：</td>
