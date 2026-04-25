@@ -706,7 +706,7 @@ function addLine(data) {
         '<td><span id="unoffset_amt_' + idx + '" style="display:block;text-align:right;font-size:.85rem;color:#999;padding:6px 0">--</span></td>' +
         '<td><input type="number" name="lines[' + idx + '][offset_amount]" class="form-control offset-amt-input" id="offset_amt_' + idx + '" style="text-align:right;font-size:.85rem" step="1" min="0" value="' + offsetAmt + '" disabled>' +
             (offsetLedgerId ? '<input type="hidden" name="lines[' + idx + '][offset_ledger_id]" value="' + offsetLedgerId + '">' : '') + '</td>' +
-        '<td><input type="text" name="lines[' + idx + '][description]" class="form-control" value="' + desc.replace(/"/g, '&quot;') + '" style="font-size:.85rem"></td>' +
+        '<td class="desc-cell" style="cursor:text"><input type="text" name="lines[' + idx + '][description]" class="form-control" value="' + desc.replace(/"/g, '&quot;') + '" style="font-size:.85rem" draggable="false"></td>' +
         '<td style="white-space:nowrap"><button type="button" class="btn btn-sm btn-outline" onclick="insertLineBefore(' + idx + ')" title="插入行" style="padding:2px 6px;font-size:.75rem;margin-right:2px">+</button><button type="button" class="btn btn-sm btn-danger" onclick="removeLine(' + idx + ')" title="刪除">&times;</button></td>';
     document.getElementById('linesBody').appendChild(tr);
 
@@ -1275,7 +1275,23 @@ function renumberLines() {
         tbody = document.getElementById('linesBody');
         if (!tbody) return;
 
+        // 點摘要欄前先把整列 draggable 關掉；點別處再打開（避免拖曳搶走文字選取）
+        tbody.addEventListener('mousedown', function(e) {
+            var tr = e.target.closest('tr');
+            if (!tr) return;
+            if (e.target.closest('.desc-cell')) {
+                tr.draggable = false;
+            } else {
+                tr.draggable = true;
+            }
+        }, true);
+
         tbody.addEventListener('dragstart', function(e) {
+            // 雙保險：dragstart 還是檢查一次
+            if (e.target.closest('.desc-cell') || e.target.matches('input[name*="[description]"]')) {
+                e.preventDefault();
+                return;
+            }
             var tr = e.target.closest('tr');
             if (!tr || !tbody.contains(tr)) return;
             dragRow = tr;

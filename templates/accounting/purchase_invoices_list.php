@@ -66,6 +66,14 @@
                 <label>關鍵字</label>
                 <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報年月/金額（$1500 精準比對）">
             </div>
+            <div class="form-group">
+                <label>排序</label>
+                <?php $_sortVal = !empty($filters['sort']) && $filters['sort'] === 'asc' ? 'asc' : 'desc'; ?>
+                <select name="sort" class="form-control">
+                    <option value="desc" <?= $_sortVal === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
+                    <option value="asc"  <?= $_sortVal === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
+                </select>
+            </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
                 <a href="/purchase_invoices.php" class="btn btn-outline btn-sm">清除</a>

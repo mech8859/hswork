@@ -15,6 +15,18 @@
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
+        <?php if ($isEdit): ?>
+            <?php if (!empty($prevId)): ?>
+            <a href="/payments_out.php?action=edit&id=<?= (int)$prevId ?>" class="btn btn-outline btn-sm" title="上一筆">&laquo; 上一筆</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+            <?php endif; ?>
+            <?php if (!empty($nextId)): ?>
+            <a href="/payments_out.php?action=edit&id=<?= (int)$nextId ?>" class="btn btn-outline btn-sm" title="下一筆">下一筆 &raquo;</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+            <?php endif; ?>
+        <?php endif; ?>
         <?php if ($isEdit && (Auth::hasPermission('finance.delete') || Auth::hasPermission('all') || (Auth::user()['role'] ?? '') === 'accounting_supervisor')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeletePayment(<?= $record['id'] ?>, '<?= e($record['payment_number']) ?>')">刪除</button>
         <?php endif; ?>

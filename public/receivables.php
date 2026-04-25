@@ -176,6 +176,15 @@ switch ($action) {
         $editingLockModule = 'receivables';
         $editingLockRecordId = $id;
 
+        // 上一筆/下一筆
+        $_navDb = Database::getInstance();
+        $prevStmt = $_navDb->prepare("SELECT id FROM receivables WHERE id < ? ORDER BY id DESC LIMIT 1");
+        $prevStmt->execute(array($id));
+        $prevId = $prevStmt->fetchColumn();
+        $nextStmt = $_navDb->prepare("SELECT id FROM receivables WHERE id > ? ORDER BY id ASC LIMIT 1");
+        $nextStmt->execute(array($id));
+        $nextId = $nextStmt->fetchColumn();
+
         $pageTitle = '編輯請款單 - ' . $record['invoice_number'];
         $currentPage = 'receivables';
         require __DIR__ . '/../templates/layouts/header.php';

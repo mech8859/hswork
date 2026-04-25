@@ -66,7 +66,7 @@
             <tr><td colspan="17" style="text-align:center;padding:20px;color:#999">尚無科目資料</td></tr>
             <?php endif; ?>
             <?php foreach ($allAccounts as $acc): ?>
-            <tr style="<?= !$acc['is_active'] ? 'opacity:0.5' : '' ?>">
+            <tr id="acc-<?= (int)$acc['id'] ?>" style="scroll-margin-top:120px;<?= !$acc['is_active'] ? 'opacity:0.5' : '' ?>">
                 <td><strong><a href="javascript:void(0)" onclick='openAccountModal(<?= json_encode($acc, JSON_UNESCAPED_UNICODE) ?>)' style="color:var(--primary);text-decoration:none"><?= e($acc['code']) ?></a></strong></td>
                 <td><?= e($acc['name']) ?></td>
                 <td><?= e($acc['offset_type'] ?? '') ?></td>
@@ -216,6 +216,7 @@ if (_initTypeFilter) {
         <form method="post" action="/accounting.php?action=account_save">
             <?= csrf_field() ?>
             <input type="hidden" name="id" id="acc_id" value="">
+            <input type="hidden" name="return_to" id="acc_return_to" value="">
             <div class="modal-body" style="display:grid;gap:10px;font-size:.9rem">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div><label>科目編號 <span style="color:red">*</span></label><input type="text" name="code" id="acc_code" class="form-control" required></div>
@@ -360,6 +361,10 @@ if (_initTypeFilter) {
 var accFields = ['id','code','name','offset_type','tx_type','parent_code','type_num','type_name_full','type','cat_code','cat_name','attr','project_calc','normal','dept_calc','relate_type','internal_flag','level','sort','detail','desc'];
 function openAccountModal(acc) {
     document.getElementById('accountModal').style.display = 'flex';
+    // 記住目前篩選與要回去的列位置
+    var rt = window.location.pathname + window.location.search;
+    if (acc && acc.id) rt += '#acc-' + acc.id;
+    document.getElementById('acc_return_to').value = rt;
     if (acc) {
         document.getElementById('accountModalTitle').textContent = '編輯科目';
         document.getElementById('acc_id').value = acc.id || '';

@@ -25,6 +25,7 @@ switch ($action) {
             'invoice_no_to'   => !empty($_GET['invoice_no_to']) ? $_GET['invoice_no_to'] : '',
             // seller_tax_id 預設禾順 94081455；使用者若主動切到「全部賣方」會送空字串
             'seller_tax_id'   => isset($_GET['seller_tax_id']) ? $_GET['seller_tax_id'] : '94081455',
+            'sort'         => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getSalesInvoices($filters, $page);

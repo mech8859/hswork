@@ -83,6 +83,13 @@ foreach ($orGrouped as $g) { $grandOriginal += $g['sum_original']; $grandOffset 
                 <?php endforeach; ?>
             </select>
         </div>
+        <div>
+            <label style="font-size:.85em">排序</label>
+            <select name="sort" class="form-control">
+                <option value="desc" <?= (!isset($orSort) || $orSort !== 'asc') ? 'selected' : '' ?>>新 → 舊</option>
+                <option value="asc"  <?= (isset($orSort) && $orSort === 'asc') ? 'selected' : '' ?>>舊 → 新</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">查詢</button>
         <a href="/accounting.php?action=offset_reports" class="btn btn-outline">清除</a>
     </form>
@@ -212,7 +219,7 @@ foreach ($orBalance as $g) {
 <div class="card" style="overflow:visible">
     <table class="data-table" style="width:100%;font-size:.85rem">
         <thead class="sticky-thead"><tr style="background:#f5f5f5">
-            <th>科目編號</th><th>科目名稱</th><th>往來類型</th><th>往來編號</th><th>往來對象</th><th>成本中心</th><th>筆數</th>
+            <th>科目編號</th><th>科目名稱</th><th>成本中心</th><th>往來類型</th><th>往來編號</th><th>往來對象</th><th>筆數</th>
             <th style="text-align:right">原始金額</th><th style="text-align:right">已沖金額</th><th style="text-align:right">未沖餘額</th>
         </tr></thead>
         <tbody>
@@ -236,10 +243,10 @@ foreach ($orBalance as $g) {
         <tr>
             <td style="font-family:monospace"><?= e($g['account_code']) ?></td>
             <td><?= e($g['account_name']) ?></td>
+            <td><?= e($g['cost_center_name'] ?? '') ?></td>
             <td><?= $relTypeLabels[$g['relation_type']] ?? $g['relation_type'] ?></td>
             <td><?= e(!empty($g['relation_display_code']) ? $g['relation_display_code'] : $g['relation_id']) ?></td>
             <td><?= e($g['relation_name'] ?? '') ?></td>
-            <td><?= e($g['cost_center_name'] ?? '') ?></td>
             <td><?= count($g['records']) ?></td>
             <td style="text-align:right"><?= number_format($g['sum_original']) ?></td>
             <td style="text-align:right"><?= number_format($g['sum_offset']) ?></td>
@@ -290,7 +297,7 @@ foreach ($orBalance as $g) {
     </div>
     <table class="data-table" style="width:100%;font-size:.82rem">
         <thead class="sticky-thead"><tr style="background:#fafafa">
-            <th style="width:90px">日期</th><th style="width:130px">傳票號碼</th><th>摘要</th><th>成本中心</th>
+            <th style="width:90px">日期</th><th style="width:130px">傳票號碼</th><th style="width:110px">成本中心</th><th>摘要</th>
             <th style="width:100px;text-align:right">立帳金額</th><th style="width:100px;text-align:right">沖帳金額</th><th style="width:110px;text-align:right">餘額</th>
         </tr></thead>
         <tbody>
@@ -298,24 +305,26 @@ foreach ($orBalance as $g) {
         $runBal = 0;
         foreach ($g['records'] as $r):
             $runBal += (float)$r['original_amount'];
+            $_rDesc = !empty($r['line_description']) ? $r['line_description'] : (!empty($r['description']) ? $r['description'] : '立帳');
         ?>
         <tr>
             <td><?= e($r['voucher_date']) ?></td>
             <td><a href="/accounting.php?action=journal_view&id=<?= $r['journal_entry_id'] ?>&ref=reconciliation"><?= e($r['voucher_number']) ?></a></td>
-            <td style="color:#666"><?= e($r['description'] ?? '立帳') ?></td>
             <td><?= e($r['cost_center_name'] ?? '') ?></td>
+            <td style="color:#666"><?= e($_rDesc) ?></td>
             <td style="text-align:right;font-weight:600"><?= number_format((float)$r['original_amount']) ?></td>
             <td style="text-align:right"></td>
             <td style="text-align:right;font-weight:bold"><?= number_format($runBal) ?></td>
         </tr>
         <?php if (!empty($orDetails[$r['id']])): foreach ($orDetails[$r['id']] as $d):
             $runBal -= (float)$d['offset_amount'];
+            $_dDesc = !empty($d['line_description']) ? $d['line_description'] : '↳ 沖帳';
         ?>
         <tr style="background:#fafafa">
             <td><?= e($d['offset_date'] ?? $d['voucher_date']) ?></td>
             <td><a href="/accounting.php?action=journal_view&id=<?= $d['journal_entry_id'] ?>&ref=reconciliation"><?= e($d['offset_voucher_number'] ?? $d['voucher_number']) ?></a></td>
-            <td style="color:#888">↳ 沖帳</td>
             <td></td>
+            <td style="color:#888"><?= e($_dDesc) ?></td>
             <td style="text-align:right"></td>
             <td style="text-align:right;color:#4CAF50"><?= number_format((float)$d['offset_amount']) ?></td>
             <td style="text-align:right;font-weight:bold;<?= $runBal < 0 ? 'color:red' : '' ?>"><?= number_format($runBal) ?></td>

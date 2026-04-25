@@ -50,6 +50,11 @@
         <input type="text" name="invoice_no_from" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_from']) ? $filters['invoice_no_from'] : '') ?>" placeholder="號碼起">
         <span style="color:#888">~</span>
         <input type="text" name="invoice_no_to" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_to']) ? $filters['invoice_no_to'] : '') ?>" placeholder="號碼迄">
+        <?php $_sortVal = !empty($filters['sort']) && $filters['sort'] === 'asc' ? 'asc' : 'desc'; ?>
+        <select name="sort" class="form-control" style="width:auto;min-width:90px" title="排序">
+            <option value="desc" <?= $_sortVal === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
+            <option value="asc"  <?= $_sortVal === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
+        </select>
         <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
         <a href="/sales_invoices.php" class="btn btn-outline btn-sm">清除</a>
     </form>

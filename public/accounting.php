@@ -119,18 +119,33 @@ switch ($action) {
             redirect('/accounting.php?action=accounts');
         }
 
+        $newId = $id;
         try {
             if ($id) {
                 $model->updateAccount($id, $data);
                 Session::flash('success', '科目已更新');
             } else {
-                $model->createAccount($data);
+                $newId = $model->createAccount($data);
                 Session::flash('success', '科目已新增');
             }
         } catch (Exception $e) {
             Session::flash('error', '操作失敗: ' . $e->getMessage());
         }
-        redirect('/accounting.php?action=accounts');
+        // 回到原篩選位置 + 該列錨點
+        $_acRet = isset($_POST['return_to']) ? $_POST['return_to'] : '';
+        if ($_acRet === '' || strpos($_acRet, '/accounting.php') !== 0) {
+            $_acRet = '/accounting.php?action=accounts';
+        }
+        // 新增時把 hash 換成新 id；編輯但無 hash 時補上
+        if ($newId) {
+            $hashPos = strpos($_acRet, '#acc-');
+            if ($hashPos !== false) {
+                $_acRet = substr($_acRet, 0, $hashPos) . '#acc-' . (int)$newId;
+            } else {
+                $_acRet .= '#acc-' . (int)$newId;
+            }
+        }
+        redirect($_acRet);
         break;
 
     case 'account_toggle':
@@ -670,6 +685,7 @@ switch ($action) {
         $olDateTo = isset($_GET['date_to']) ? $_GET['date_to'] : '';
         $olCostCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : 0;
         $olKeyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
+        $olSort = (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc';
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
@@ -739,7 +755,7 @@ switch ($action) {
             LEFT JOIN cost_centers cc ON ol.cost_center_id = cc.id
             LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
             WHERE {$where}
-            ORDER BY ol.voucher_date DESC, ol.id DESC
+            ORDER BY ol.voucher_date " . ($olSort === 'asc' ? 'ASC' : 'DESC') . ", ol.id " . ($olSort === 'asc' ? 'ASC' : 'DESC') . "
         ");
         $stmt->execute($params);
         $offsetRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -816,43 +832,198 @@ switch ($action) {
         $frMonthTo = isset($_GET['month_to']) ? (int)$_GET['month_to'] : (int)date('n');
         $frCcId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : null;
         $frTab = isset($_GET['tab']) ? $_GET['tab'] : 'income_statement';
+        // 科目層級：all = 全部明細科目；summary = 僅統馭科目（聚合到 is_detail=0 的最近祖先）
+        $frAccountView = (isset($_GET['account_view']) && $_GET['account_view'] === 'summary') ? 'summary' : 'all';
         $costCenters = $model->getCostCenters();
 
         $dateFrom = sprintf('%04d-%02d-01', $frYear, $frMonthFrom);
         $dateTo = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $frYear, $frMonthTo)));
+        $dateYTDFrom = sprintf('%04d-01-01', $frYear);
 
-        // 損益表資料
+        // 損益表資料 - 期間
         $plData = $model->getIncomeStatement($dateFrom, $dateTo, $frCcId);
+        // 損益表資料 - 年累計（年初到 month_to）
+        $plDataYTD = $model->getIncomeStatement($dateYTDFrom, $dateTo, $frCcId);
+
+        // 預先去重：同一 code 合併金額（避免 chart_of_accounts 有重複碼造成多列）
+        $_dedupe = function($rows) {
+            $merged = array();
+            foreach ($rows as $r) {
+                $k = $r['code'];
+                if (!isset($merged[$k])) $merged[$k] = $r;
+                else {
+                    $merged[$k]['total_debit']  += (float)$r['total_debit'];
+                    $merged[$k]['total_credit'] += (float)$r['total_credit'];
+                }
+            }
+            return array_values($merged);
+        };
+        $plData    = $_dedupe($plData);
+        $plDataYTD = $_dedupe($plDataYTD);
+
+        // 統馭科目聚合（is_detail=0 OR 編號後3位=000 OR tx_type=統馭科目）
+        if ($frAccountView === 'summary') {
+            $_dbFr = Database::getInstance();
+            $_acStmt = $_dbFr->query("SELECT id, account_code, account_name, account_type, normal_balance, parent_id, is_detail, tx_type FROM chart_of_accounts");
+            $_am = array();
+            $_codeToId = array();
+            foreach ($_acStmt->fetchAll(PDO::FETCH_ASSOC) as $_a) {
+                $_am[(int)$_a['id']] = $_a;
+                $_codeToId[$_a['account_code']] = (int)$_a['id'];
+            }
+            $_isControl = function($a) {
+                if ((int)$a['is_detail'] === 0) return true;
+                $code = (string)$a['account_code'];
+                if (strlen($code) >= 3 && substr($code, -3) === '000') return true;
+                if (!empty($a['tx_type']) && $a['tx_type'] === '統馭科目') return true;
+                return false;
+            };
+            $_resolveCtrl = function($id) use (&$_am, &$_resolveCtrl, $_isControl) {
+                if (!isset($_am[$id])) return null;
+                $a = $_am[$id];
+                if ($_isControl($a)) return $a;
+                if (!empty($a['parent_id']) && isset($_am[(int)$a['parent_id']])) {
+                    return $_resolveCtrl((int)$a['parent_id']);
+                }
+                return $a;
+            };
+            $_aggregate = function($rows) use ($_codeToId, $_resolveCtrl) {
+                $merged = array();
+                foreach ($rows as $r) {
+                    $ctl = isset($_codeToId[$r['code']]) ? $_resolveCtrl($_codeToId[$r['code']]) : null;
+                    if (!$ctl) {
+                        $key = $r['code'];
+                        if (!isset($merged[$key])) $merged[$key] = $r;
+                        else {
+                            $merged[$key]['total_debit'] += (float)$r['total_debit'];
+                            $merged[$key]['total_credit'] += (float)$r['total_credit'];
+                        }
+                        continue;
+                    }
+                    $key = $ctl['account_code'];
+                    if (!isset($merged[$key])) {
+                        $merged[$key] = array(
+                            'code' => $ctl['account_code'],
+                            'name' => $ctl['account_name'],
+                            'account_type' => $ctl['account_type'],
+                            'normal_balance' => $ctl['normal_balance'],
+                            'code_prefix' => substr($ctl['account_code'], 0, 1),
+                            'total_debit' => 0,
+                            'total_credit' => 0,
+                        );
+                    }
+                    $merged[$key]['total_debit'] += (float)$r['total_debit'];
+                    $merged[$key]['total_credit'] += (float)$r['total_credit'];
+                }
+                return array_values($merged);
+            };
+            $plData    = $_aggregate($plData);
+            $plDataYTD = $_aggregate($plDataYTD);
+        }
 
         // 月別損益
         $monthlyPL = $model->getMonthlyIncomeStatement($frYear, $frCcId);
+
+        // 月別損益去重 + 統馭聚合（沿用相同邏輯）
+        $_dedupeMonthly = function($rows) {
+            $merged = array();
+            foreach ($rows as $r) {
+                $k = $r['code'] . '|' . (int)$r['month'];
+                if (!isset($merged[$k])) $merged[$k] = $r;
+                else {
+                    $merged[$k]['total_debit']  += (float)$r['total_debit'];
+                    $merged[$k]['total_credit'] += (float)$r['total_credit'];
+                }
+            }
+            return array_values($merged);
+        };
+        $monthlyPL = $_dedupeMonthly($monthlyPL);
+        if ($frAccountView === 'summary' && isset($_codeToId, $_resolveCtrl)) {
+            $merged = array();
+            foreach ($monthlyPL as $r) {
+                $ctl = isset($_codeToId[$r['code']]) ? $_resolveCtrl($_codeToId[$r['code']]) : null;
+                if (!$ctl) {
+                    $k = $r['code'] . '|' . (int)$r['month'];
+                    if (!isset($merged[$k])) $merged[$k] = $r;
+                    else {
+                        $merged[$k]['total_debit']  += (float)$r['total_debit'];
+                        $merged[$k]['total_credit'] += (float)$r['total_credit'];
+                    }
+                    continue;
+                }
+                $k = $ctl['account_code'] . '|' . (int)$r['month'];
+                if (!isset($merged[$k])) {
+                    $merged[$k] = array(
+                        'code' => $ctl['account_code'],
+                        'name' => $ctl['account_name'],
+                        'account_type' => $ctl['account_type'],
+                        'normal_balance' => $ctl['normal_balance'],
+                        'code_prefix' => substr($ctl['account_code'], 0, 1),
+                        'month' => (int)$r['month'],
+                        'total_debit' => 0,
+                        'total_credit' => 0,
+                    );
+                }
+                $merged[$k]['total_debit']  += (float)$r['total_debit'];
+                $merged[$k]['total_credit'] += (float)$r['total_credit'];
+            }
+            $monthlyPL = array_values($merged);
+        }
 
         // 預算資料
         $budgetData = $model->getBudgetSummary($frYear, $frMonthFrom, $frMonthTo, $frCcId);
 
         // 資產負債表
         $bsData = $model->getBalanceSheetData($dateTo, $frCcId);
+        // BS 損益結轉：用「期初到截止日」的全期間 4-8 損益（含開帳前未結帳）
+        // 這樣 BS 永遠平衡（A = L + E + NI），不會因為 IS 期間設定不同而失衡
+        $_bsNiData = $model->getIncomeStatement('1900-01-01', $dateTo, $frCcId);
+        $bsNetIncome = 0;
+        foreach ($_bsNiData as $_r) {
+            $p = $_r['code_prefix'];
+            $cr = (float)$_r['total_credit'];
+            $db = (float)$_r['total_debit'];
+            if ($p === '4' || ($p === '7' && $_r['normal_balance'] === 'credit')) {
+                $bsNetIncome += $cr - $db; // 收入正貢獻
+            } else {
+                $bsNetIncome -= ($db - $cr); // 成本/費用/稅 負貢獻
+            }
+        }
 
         // 試算表資料（for 閱報式）
         $trialData = $model->getTrialBalance($dateTo, $frCcId ? $frCcId : 0);
 
-        // 彙總損益
-        $plSummary = array('revenue' => 0, 'cost' => 0, 'expense' => 0, 'other_income' => 0, 'other_expense' => 0, 'tax' => 0);
-        foreach ($plData as $row) {
-            $net = (float)$row['total_credit'] - (float)$row['total_debit'];
-            $prefix = $row['code_prefix'];
-            if ($prefix === '4') $plSummary['revenue'] += $net;
-            elseif ($prefix === '5') $plSummary['cost'] += ((float)$row['total_debit'] - (float)$row['total_credit']);
-            elseif ($prefix === '6') $plSummary['expense'] += ((float)$row['total_debit'] - (float)$row['total_credit']);
-            elseif ($prefix === '7') {
-                if ($row['normal_balance'] === 'credit') $plSummary['other_income'] += $net;
-                else $plSummary['other_expense'] += ((float)$row['total_debit'] - (float)$row['total_credit']);
+        // 彙總損益（共用 closure）
+        $sumPL = function($rows) {
+            $s = array('revenue'=>0,'cost'=>0,'expense'=>0,'other_income'=>0,'other_expense'=>0,'tax'=>0);
+            foreach ($rows as $row) {
+                $credit = (float)$row['total_credit'];
+                $debit  = (float)$row['total_debit'];
+                $net = $credit - $debit;
+                $prefix = $row['code_prefix'];
+                if ($prefix === '4') $s['revenue'] += $net;
+                elseif ($prefix === '5') $s['cost'] += $debit - $credit;
+                elseif ($prefix === '6') $s['expense'] += $debit - $credit;
+                elseif ($prefix === '7') {
+                    if ($row['normal_balance'] === 'credit') $s['other_income'] += $net;
+                    else $s['other_expense'] += $debit - $credit;
+                }
+                elseif ($prefix === '8') $s['tax'] += $debit - $credit;
             }
-            elseif ($prefix === '8') $plSummary['tax'] += ((float)$row['total_debit'] - (float)$row['total_credit']);
+            $s['gross_profit'] = $s['revenue'] - $s['cost'];
+            $s['operating_profit'] = $s['gross_profit'] - $s['expense'];
+            $s['pre_tax_income'] = $s['operating_profit'] + $s['other_income'] - $s['other_expense'];
+            $s['net_income'] = $s['pre_tax_income'] - $s['tax'];
+            return $s;
+        };
+        $plSummary    = $sumPL($plData);
+        $plSummaryYTD = $sumPL($plDataYTD);
+
+        // YTD by code (供累計欄使用)
+        $plYTDByCode = array();
+        foreach ($plDataYTD as $row) {
+            $plYTDByCode[$row['code']] = $row;
         }
-        $plSummary['gross_profit'] = $plSummary['revenue'] - $plSummary['cost'];
-        $plSummary['operating_profit'] = $plSummary['gross_profit'] - $plSummary['expense'];
-        $plSummary['net_income'] = $plSummary['operating_profit'] + $plSummary['other_income'] - $plSummary['other_expense'] - $plSummary['tax'];
 
         // 預算彙總
         $budgetSummary = array('revenue' => 0, 'cost' => 0, 'expense' => 0, 'other' => 0, 'tax' => 0);
@@ -1094,6 +1265,7 @@ switch ($action) {
         $orCostCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : 0;
         $orTab = isset($_GET['tab']) ? $_GET['tab'] : 'detail';
         $orKeyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
+        $orSort = (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc';
 
         $accounts = $model->getAccountsFlat(false);
         $costCenters = $model->getCostCenters();
@@ -1154,13 +1326,15 @@ switch ($action) {
 
         $stmt = $db->prepare("
             SELECT ol.*, coa.code AS account_code, coa.name AS account_name, cc.name AS cost_center_name,
+                   jl.description AS line_description,
                    CASE WHEN ol.relation_type = 'vendor' THEN v.vendor_code ELSE NULL END AS relation_display_code
             FROM offset_ledger ol
             LEFT JOIN chart_of_accounts coa ON ol.account_id = coa.id
             LEFT JOIN cost_centers cc ON ol.cost_center_id = cc.id
             LEFT JOIN vendors v ON ol.relation_type = 'vendor' AND v.id = ol.relation_id
+            LEFT JOIN journal_entry_lines jl ON jl.id = ol.journal_line_id
             WHERE {$where}
-            ORDER BY coa.code, CAST(ol.relation_id AS UNSIGNED), ol.voucher_date, ol.id
+            ORDER BY coa.code, CAST(ol.relation_id AS UNSIGNED), ol.voucher_date " . ($orSort === 'asc' ? 'ASC' : 'DESC') . ", ol.id " . ($orSort === 'asc' ? 'ASC' : 'DESC') . "
         ");
         $stmt->execute($params);
         $orRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1170,9 +1344,11 @@ switch ($action) {
         if (!empty($orRecords)) {
             $ids = array_column($orRecords, 'id');
             $ph = implode(',', array_fill(0, count($ids), '?'));
-            $dStmt = $db->prepare("SELECT od.*, je.voucher_number AS offset_voucher_number, je.voucher_date AS offset_date
+            $dStmt = $db->prepare("SELECT od.*, je.voucher_number AS offset_voucher_number, je.voucher_date AS offset_date,
+                    jl.description AS line_description
                 FROM offset_details od
                 LEFT JOIN journal_entries je ON od.journal_entry_id = je.id
+                LEFT JOIN journal_entry_lines jl ON jl.id = od.journal_line_id
                 WHERE od.ledger_id IN ({$ph}) ORDER BY od.voucher_date, od.id");
             $dStmt->execute($ids);
             foreach ($dStmt->fetchAll(PDO::FETCH_ASSOC) as $d) {
@@ -1327,7 +1503,7 @@ switch ($action) {
     // ============================================================
     case 'voucher_reconciliation':
         $source = isset($_GET['source']) ? $_GET['source'] : 'bank';
-        $validSources = array('bank','petty_cash','reserve_fund','cash_details');
+        $validSources = array('bank','petty_cash','reserve_fund','cash_details','rf_pc_match','cash_pc_match');
         if (!in_array($source, $validSources)) $source = 'bank';
         $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
         $endDate   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-d');
@@ -1339,35 +1515,91 @@ switch ($action) {
         $sortOrder = isset($_GET['sort']) && $_GET['sort'] === 'asc' ? 'asc' : 'desc'; // 預設：新→舊
 
         $branches = $model->getBranches();
-        $records = $model->getVoucherReconciliation($source, $startDate, $endDate, $branchFilter ?: null);
 
-        // 統計 + 狀態篩選（合併列不計入 total/分類）
-        $_realRecCount = 0;
-        $stats = array('matched_precise'=>0, 'matched_fuzzy'=>0, 'matched_amount_mismatch'=>0, 'unmatched'=>0, 'total'=>0);
-        foreach ($records as $r) {
-            if ($r['match_status'] === 'merged_into_prev') continue;
-            $_realRecCount++;
-            if (isset($stats[$r['match_status']])) $stats[$r['match_status']]++;
-        }
-        $stats['total'] = $_realRecCount;
-        if ($statusFilter) {
-            $records = array_values(array_filter($records, function($r) use ($statusFilter) {
-                return $r['match_status'] === $statusFilter;
-            }));
+        if ($source === 'rf_pc_match' || $source === 'cash_pc_match') {
+            // 備用金/現金 → 零用金 配對（不同的資料結構，但 schema 相容）
+            if ($source === 'cash_pc_match') {
+                $records = $model->getCashToPettyCashMatch($startDate, $endDate, $branchFilter ?: null);
+            } else {
+                $records = $model->getReserveFundToPettyCashMatch($startDate, $endDate, $branchFilter ?: null);
+            }
+            $stats = array('matched_precise'=>0, 'manually_confirmed'=>0, 'unmatched_rf'=>0, 'unmatched_pc'=>0, 'total'=>0);
+            foreach ($records as $r) {
+                $stats['total']++;
+                $isConf = !empty($r['is_confirmed']);
+                $isUnmatched = ($r['match_status'] === 'unmatched_rf' || $r['match_status'] === 'unmatched_pc');
+                if ($isConf && $isUnmatched) {
+                    $stats['manually_confirmed']++;
+                } elseif (isset($stats[$r['match_status']])) {
+                    $stats[$r['match_status']]++;
+                }
+            }
+            if ($statusFilter === 'all') {
+                // 顯示全部（含精準匹配），不過濾
+            } elseif ($statusFilter === 'unmatched_all') {
+                // 全部未對應（仍未人工核對）
+                $records = array_values(array_filter($records, function($r) {
+                    if (empty($r['is_confirmed']) && ($r['match_status'] === 'unmatched_rf' || $r['match_status'] === 'unmatched_pc')) return true;
+                    return false;
+                }));
+            } elseif ($statusFilter === 'manually_confirmed') {
+                $records = array_values(array_filter($records, function($r) {
+                    return !empty($r['is_confirmed']) && ($r['match_status'] === 'unmatched_rf' || $r['match_status'] === 'unmatched_pc');
+                }));
+            } elseif ($statusFilter === 'unmatched_rf' || $statusFilter === 'unmatched_pc') {
+                // 未對應分類也只顯示尚未人工核對的
+                $records = array_values(array_filter($records, function($r) use ($statusFilter) {
+                    return $r['match_status'] === $statusFilter && empty($r['is_confirmed']);
+                }));
+            } elseif ($statusFilter) {
+                $records = array_values(array_filter($records, function($r) use ($statusFilter) {
+                    return $r['match_status'] === $statusFilter;
+                }));
+            } else {
+                // 預設隱藏：自動精準匹配 + 已人工核對的列
+                $records = array_values(array_filter($records, function($r) {
+                    if ($r['match_status'] === 'matched_precise') return false;
+                    if (!empty($r['is_confirmed'])) return false;
+                    return true;
+                }));
+            }
+            usort($records, function($a, $b) use ($sortOrder) {
+                $cmp = strcmp($b['date'], $a['date']);
+                return $sortOrder === 'asc' ? -$cmp : $cmp;
+            });
         } else {
-            // 預設隱藏「精準匹配」列（已經確認過的不再顯示，減少視覺干擾）
-            // 若要看，點統計卡「精準匹配」進去即可
-            $records = array_values(array_filter($records, function($r) {
-                return $r['match_status'] !== 'matched_precise';
-            }));
-        }
+            $records = $model->getVoucherReconciliation($source, $startDate, $endDate, $branchFilter ?: null);
 
-        // 排序（預設新→舊）
-        usort($records, function($a, $b) use ($sortOrder) {
-            $cmp = strcmp($b['date'], $a['date']);
-            if ($cmp === 0) $cmp = (int)$b['source_id'] - (int)$a['source_id'];
-            return $sortOrder === 'asc' ? -$cmp : $cmp;
-        });
+            // 統計 + 狀態篩選（合併列不計入 total/分類）
+            $_realRecCount = 0;
+            $stats = array('matched_precise'=>0, 'matched_fuzzy'=>0, 'matched_amount_mismatch'=>0, 'unmatched'=>0, 'total'=>0);
+            foreach ($records as $r) {
+                if ($r['match_status'] === 'merged_into_prev') continue;
+                $_realRecCount++;
+                if (isset($stats[$r['match_status']])) $stats[$r['match_status']]++;
+            }
+            $stats['total'] = $_realRecCount;
+            if ($statusFilter === 'all') {
+                // 顯示全部（含精準匹配 + 已合併），不過濾
+            } elseif ($statusFilter) {
+                $records = array_values(array_filter($records, function($r) use ($statusFilter) {
+                    return $r['match_status'] === $statusFilter;
+                }));
+            } else {
+                // 預設隱藏「精準匹配」列（已經確認過的不再顯示，減少視覺干擾）
+                // 若要看，點統計卡「精準匹配」進去即可
+                $records = array_values(array_filter($records, function($r) {
+                    return $r['match_status'] !== 'matched_precise';
+                }));
+            }
+
+            // 排序（預設新→舊）
+            usort($records, function($a, $b) use ($sortOrder) {
+                $cmp = strcmp($b['date'], $a['date']);
+                if ($cmp === 0) $cmp = (int)$b['source_id'] - (int)$a['source_id'];
+                return $sortOrder === 'asc' ? -$cmp : $cmp;
+            });
+        }
 
         $pageTitle = '傳票核對報表';
         $currentPage = 'accounting';
@@ -1375,6 +1607,58 @@ switch ($action) {
         require __DIR__ . '/../templates/accounting/voucher_reconciliation.php';
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
+
+    case 'cash_pc_match_confirm':
+        if (!$canManage || $_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗或無權限');
+            redirect('/accounting.php?action=voucher_reconciliation&source=cash_pc_match');
+        }
+        $_cId = isset($_POST['cash_id']) ? (int)$_POST['cash_id'] : 0;
+        $_pId = isset($_POST['pc_id']) ? (int)$_POST['pc_id'] : 0;
+        $_act = isset($_POST['act']) ? $_POST['act'] : 'confirm';
+        $_rtn = isset($_POST['return_to']) ? $_POST['return_to'] : '/accounting.php?action=voucher_reconciliation&source=cash_pc_match';
+        if (strpos($_rtn, '/accounting.php') !== 0) $_rtn = '/accounting.php?action=voucher_reconciliation&source=cash_pc_match';
+        try {
+            if ($_act === 'unconfirm') {
+                $model->unconfirmCashPcMatch($_cId, $_pId);
+                AuditLog::log('cash_pc_match', 'unconfirm', 0, "現={$_cId} / 零={$_pId}");
+                Session::flash('success', '已取消核對');
+            } else {
+                $u = Auth::user();
+                $model->confirmCashPcMatch($_cId, $_pId, $u ? (int)$u['id'] : null);
+                AuditLog::log('cash_pc_match', 'confirm', 0, "現={$_cId} / 零={$_pId}");
+                Session::flash('success', '已確認核對');
+            }
+        } catch (Exception $e) {
+            Session::flash('error', '操作失敗：' . $e->getMessage());
+        }
+        redirect($_rtn);
+
+    case 'rf_pc_match_confirm':
+        if (!$canManage || $_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
+            Session::flash('error', '安全驗證失敗或無權限');
+            redirect('/accounting.php?action=voucher_reconciliation&source=rf_pc_match');
+        }
+        $_rfId = isset($_POST['rf_id']) ? (int)$_POST['rf_id'] : 0;
+        $_pcId = isset($_POST['pc_id']) ? (int)$_POST['pc_id'] : 0;
+        $_act  = isset($_POST['act']) ? $_POST['act'] : 'confirm';
+        $_rtn  = isset($_POST['return_to']) ? $_POST['return_to'] : '/accounting.php?action=voucher_reconciliation&source=rf_pc_match';
+        if (strpos($_rtn, '/accounting.php') !== 0) $_rtn = '/accounting.php?action=voucher_reconciliation&source=rf_pc_match';
+        try {
+            if ($_act === 'unconfirm') {
+                $model->unconfirmRfPcMatch($_rfId, $_pcId);
+                AuditLog::log('rf_pc_match', 'unconfirm', 0, "備={$_rfId} / 零={$_pcId}");
+                Session::flash('success', '已取消核對');
+            } else {
+                $u = Auth::user();
+                $model->confirmRfPcMatch($_rfId, $_pcId, $u ? (int)$u['id'] : null);
+                AuditLog::log('rf_pc_match', 'confirm', 0, "備={$_rfId} / 零={$_pcId}");
+                Session::flash('success', '已確認核對');
+            }
+        } catch (Exception $e) {
+            Session::flash('error', '操作失敗：' . $e->getMessage());
+        }
+        redirect($_rtn);
 
     case 'confirm_voucher_match':
         if (!$canManage || $_SERVER['REQUEST_METHOD'] !== 'POST' || !verify_csrf()) {
@@ -1538,39 +1822,26 @@ switch ($action) {
     // 損益表
     // ============================================================
     case 'income_statement':
-        require_once __DIR__ . '/../modules/accounting/ReportModel.php';
-        $reportModel = new ReportModel();
+        // 統一導向「財務報表 → 損益表」分頁，避免兩個損益表計算邏輯不一致
         $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-01-01');
-        $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
-        $costCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : null;
-        $costCenters = $model->getCostCenters();
-
-        $report = $reportModel->getIncomeStatement($startDate, $endDate, $costCenterId);
-
-        $pageTitle = '損益表';
-        $currentPage = 'accounting';
-        require __DIR__ . '/../templates/layouts/header.php';
-        require __DIR__ . '/../templates/accounting/income_statement.php';
-        require __DIR__ . '/../templates/layouts/footer.php';
+        $endDate   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-d');
+        $year  = (int)substr($startDate, 0, 4);
+        $monthFrom = (int)substr($startDate, 5, 2);
+        $monthTo   = (int)substr($endDate,   5, 2);
+        $ccQs = !empty($_GET['cost_center_id']) ? '&cost_center_id=' . (int)$_GET['cost_center_id'] : '';
+        redirect("/accounting.php?action=financial_reports&tab=income_statement&year={$year}&month_from={$monthFrom}&month_to={$monthTo}{$ccQs}");
         break;
 
     // ============================================================
     // 資產負債表
     // ============================================================
     case 'balance_sheet':
-        require_once __DIR__ . '/../modules/accounting/ReportModel.php';
-        $reportModel = new ReportModel();
+        // 統一導向「財務報表 → 資產負債表」分頁
         $asOfDate = isset($_GET['as_of_date']) ? $_GET['as_of_date'] : date('Y-m-d');
-        $costCenterId = !empty($_GET['cost_center_id']) ? (int)$_GET['cost_center_id'] : null;
-        $costCenters = $model->getCostCenters();
-
-        $report = $reportModel->getBalanceSheet($asOfDate, $costCenterId);
-
-        $pageTitle = '資產負債表';
-        $currentPage = 'accounting';
-        require __DIR__ . '/../templates/layouts/header.php';
-        require __DIR__ . '/../templates/accounting/balance_sheet.php';
-        require __DIR__ . '/../templates/layouts/footer.php';
+        $year  = (int)substr($asOfDate, 0, 4);
+        $monthTo = (int)substr($asOfDate, 5, 2);
+        $ccQs = !empty($_GET['cost_center_id']) ? '&cost_center_id=' . (int)$_GET['cost_center_id'] : '';
+        redirect("/accounting.php?action=financial_reports&tab=balance_sheet&year={$year}&month_from=1&month_to={$monthTo}{$ccQs}");
         break;
 
     default:

@@ -90,10 +90,10 @@
                     <th style="width:32px"></th>
                     <th>收款單號</th>
                     <th>登記日期</th>
+                    <th>分公司</th>
                     <th>入帳日期</th>
                     <th>客戶名稱</th>
                     <th>系統別</th>
-                    <th>分公司</th>
                     <th>業務</th>
                     <th class="text-right">收款總計</th>
                     <th>狀態</th>
@@ -108,10 +108,10 @@
                     </td>
                     <td><a href="/receipts.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['receipt_number']) ?></a></td>
                     <td><?= e(!empty($row['register_date']) ? $row['register_date'] : '-') ?></td>
+                    <td><?= e(!empty($row['branch_name']) ? $row['branch_name'] : '-') ?></td>
                     <td><?= e(!empty($row['deposit_date']) ? $row['deposit_date'] : '-') ?></td>
                     <td><?= e(!empty($row['customer_name']) ? $row['customer_name'] : '-') ?></td>
                     <td style="font-size:.85rem;color:#666"><?= e(!empty($row['system_type']) ? $row['system_type'] : '-') ?></td>
-                    <td><?= e(!empty($row['branch_name']) ? $row['branch_name'] : '-') ?></td>
                     <td><?= e(!empty($row['sales_name']) ? $row['sales_name'] : '-') ?></td>
                     <td class="text-right">$<?= number_format(!empty($row['total_amount']) ? $row['total_amount'] : 0) ?></td>
                     <td>

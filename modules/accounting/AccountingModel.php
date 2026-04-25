@@ -779,7 +779,19 @@ class AccountingModel
                     $stmtCheck->execute(array($ledgerId));
                     $ledger = $stmtCheck->fetch(PDO::FETCH_ASSOC);
                     if (!$ledger) {
-                        throw new Exception('沖帳失敗：找不到對應的立帳記錄 (ID: ' . $ledgerId . ')');
+                        // 自動重綁：原立帳可能被取消過帳後重建（id 變了）
+                        $rebindId = $this->_findRebindLedgerId($line, $ledgerId);
+                        if ($rebindId) {
+                            // 更新 line 與 entry 內存值
+                            $this->db->prepare("UPDATE journal_entry_lines SET offset_ledger_id = ? WHERE id = ?")
+                                     ->execute(array($rebindId, $line['id']));
+                            $ledgerId = $rebindId;
+                            $stmtCheck->execute(array($ledgerId));
+                            $ledger = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+                        }
+                    }
+                    if (!$ledger) {
+                        throw new Exception('沖帳失敗：找不到對應的立帳記錄 (ID: ' . $ledgerId . ')。已嘗試自動重綁但失敗，請重新編輯此沖帳行選擇正確的立帳。');
                     }
                     if ((float)$ledger['remaining_amount'] <= 0) {
                         throw new Exception('沖帳失敗：立帳記錄 ' . $ledger['voucher_number'] . ' 已無餘額可沖');
@@ -1231,6 +1243,490 @@ class AccountingModel
             );
         }
         return $out;
+    }
+
+    /**
+     * 備用金支出 ↔ 零用金收入 配對（用途含「入零用金」）
+     *
+     * 配對邏輯：
+     *   - 備用金 type='支出' AND description LIKE '%入零用金%'
+     *   - 零用金 type='收入' AND description LIKE '%入零用金%'
+     *   - 同 branch_id + 同金額 + 日期相同 → matched_precise
+     *   - 同 branch_id + 同金額 + 日期差 ≤ 3 天 → matched_date_diff
+     *   - 同 branch_id + 日期相同 + 金額差 → matched_amount_mismatch
+     *   - 沒對到 → unmatched_rf（備出沒對應零收）/ unmatched_pc（零收沒對應備出）
+     */
+    public function getReserveFundToPettyCashMatch($startDate, $endDate, $branchId = null)
+    {
+        // 抓備用金支出 + 用途含「入零用金」
+        $rfSql = "SELECT id, entry_number, expense_date, expense_amount, branch_id, description, type
+                  FROM reserve_fund
+                  WHERE type = '支出' AND expense_date BETWEEN ? AND ?
+                    AND description LIKE '%入零用金%'";
+        $rfParams = array($startDate, $endDate);
+        if ($branchId) { $rfSql .= " AND branch_id = ?"; $rfParams[] = (int)$branchId; }
+        $rfSql .= " ORDER BY expense_date, id";
+        $st = $this->db->prepare($rfSql);
+        $st->execute($rfParams);
+        $rfRows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // 抓零用金收入 + 用途含「入零用金」
+        // 注意：petty_cash 的「收支日期」實際是 entry_date 欄（不是 expense_date）
+        $pcSql = "SELECT id, entry_number, entry_date AS expense_date, income_amount, branch_id, description, type
+                  FROM petty_cash
+                  WHERE type = '收入' AND entry_date BETWEEN ? AND ?
+                    AND description LIKE '%入零用金%'";
+        $pcParams = array($startDate, $endDate);
+        if ($branchId) { $pcSql .= " AND branch_id = ?"; $pcParams[] = (int)$branchId; }
+        $pcSql .= " ORDER BY entry_date, id";
+        $st = $this->db->prepare($pcSql);
+        $st->execute($pcParams);
+        $pcRows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // 分公司名稱對照
+        $brStmt = $this->db->query("SELECT id, name FROM branches");
+        $brMap = array();
+        foreach ($brStmt->fetchAll(PDO::FETCH_ASSOC) as $b) {
+            $brMap[(int)$b['id']] = $b['name'];
+        }
+
+        // 已人工核對的配對（rf_id → pc_id）+ 單邊已核對
+        $confirmedRfToPc = array();
+        $confirmedPcToRf = array();
+        $confirmedRfAlone = array(); // rf_id => true（單獨核對 rf）
+        $confirmedPcAlone = array(); // pc_id => true（單獨核對 pc）
+        try {
+            $cf = $this->db->query("SELECT rf_id, pc_id FROM rf_pc_match_confirmed");
+            foreach ($cf->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                $rfid = $c['rf_id'] !== null ? (int)$c['rf_id'] : 0;
+                $pcid = $c['pc_id'] !== null ? (int)$c['pc_id'] : 0;
+                if ($rfid > 0 && $pcid > 0) {
+                    $confirmedRfToPc[$rfid] = $pcid;
+                    $confirmedPcToRf[$pcid] = $rfid;
+                } elseif ($rfid > 0) {
+                    $confirmedRfAlone[$rfid] = true;
+                } elseif ($pcid > 0) {
+                    $confirmedPcAlone[$pcid] = true;
+                }
+            }
+        } catch (Exception $e) { /* 表還沒建就跳過 */ }
+
+        // pc 列以 id 索引，方便依 confirmed 找出對應索引
+        $pcIdToIdx = array();
+        foreach ($pcRows as $i => $p) {
+            $pcIdToIdx[(int)$p['id']] = $i;
+        }
+
+        // 兩邊都依「日期 → id」由舊到新排序，依序配對（FIFO）
+        // 備用金 rfRows 已是 expense_date, id 升序
+        // pc 索引：date|amount → list of pc rows（同 key 內依 id 由小到大，最早優先）
+        $pcByKey = array();
+        $pcUsed = array();
+        foreach ($pcRows as $i => $p) {
+            $k = $p['expense_date'] . '|' . (int)$p['income_amount'];
+            if (!isset($pcByKey[$k])) $pcByKey[$k] = array();
+            $pcByKey[$k][] = $i;
+        }
+        foreach ($pcByKey as $k => $idxList) {
+            usort($idxList, function($a, $b) use ($pcRows) {
+                return (int)$pcRows[$a]['id'] - (int)$pcRows[$b]['id'];
+            });
+            $pcByKey[$k] = $idxList;
+        }
+        // 同金額（不限日期）→ 用於日期差異備援，依日期+id 升序
+        $pcByAmount = array();
+        foreach ($pcRows as $i => $p) {
+            $a = (int)$p['income_amount'];
+            if (!isset($pcByAmount[$a])) $pcByAmount[$a] = array();
+            $pcByAmount[$a][] = $i;
+        }
+        foreach ($pcByAmount as $a => $idxList) {
+            usort($idxList, function($x, $y) use ($pcRows) {
+                $cmp = strcmp($pcRows[$x]['expense_date'], $pcRows[$y]['expense_date']);
+                if ($cmp !== 0) return $cmp;
+                return (int)$pcRows[$x]['id'] - (int)$pcRows[$y]['id'];
+            });
+            $pcByAmount[$a] = $idxList;
+        }
+
+        $out = array();
+
+        // 第一輪：備用金支出 → 嘗試找對應零用金收入（不分分公司）
+        foreach ($rfRows as $r) {
+            $rfBranch = (int)$r['branch_id'];
+            $rfAmount = (int)$r['expense_amount'];
+            $rfDate   = $r['expense_date'];
+            $rfId     = (int)$r['id'];
+            $key      = $rfDate . '|' . $rfAmount;
+            $pickedIdx = null;
+            $status = 'unmatched_rf';
+            $pcMatched = null;
+            $isConfirmed = false;
+
+            // 0. 已人工核對 → 強制配到指定 pc_id
+            if (isset($confirmedRfToPc[$rfId]) && isset($pcIdToIdx[$confirmedRfToPc[$rfId]])) {
+                $pickedIdx = $pcIdToIdx[$confirmedRfToPc[$rfId]];
+                $status = 'matched_precise';
+                $isConfirmed = true;
+            }
+
+            // 同日期 + 同金額 → 依序取下一筆零用金 = 精準匹配
+            // 其他情形（金額不符 / 日期不同）一律不配對，留為 unmatched_rf / unmatched_pc 分開顯示
+            if ($pickedIdx === null && !empty($pcByKey[$key])) {
+                foreach ($pcByKey[$key] as $idx) {
+                    if (in_array($idx, $pcUsed, true)) continue;
+                    if (isset($confirmedPcToRf[(int)$pcRows[$idx]['id']])) continue;
+                    $pickedIdx = $idx;
+                    $status = 'matched_precise';
+                    break;
+                }
+            }
+
+            if ($pickedIdx !== null) {
+                $pcUsed[] = $pickedIdx;
+                $pcMatched = $pcRows[$pickedIdx];
+            }
+
+            // 若是 unmatched_rf 但已被單獨核對 → 也標 is_confirmed
+            if ($status === 'unmatched_rf' && isset($confirmedRfAlone[$rfId])) {
+                $isConfirmed = true;
+            }
+
+            $out[] = array(
+                'date'           => $rfDate,
+                'rf_id'          => (int)$r['id'],
+                'rf_number'      => $r['entry_number'],
+                'rf_amount'      => $rfAmount,
+                'rf_description' => $r['description'],
+                'rf_branch_id'   => $rfBranch,
+                'rf_branch_name' => isset($brMap[$rfBranch]) ? $brMap[$rfBranch] : '',
+                'pc_id'          => $pcMatched ? (int)$pcMatched['id'] : null,
+                'pc_number'      => $pcMatched ? $pcMatched['entry_number'] : null,
+                'pc_amount'      => $pcMatched ? (int)$pcMatched['income_amount'] : null,
+                'pc_description' => $pcMatched ? $pcMatched['description'] : null,
+                'pc_branch_id'   => $pcMatched ? (int)$pcMatched['branch_id'] : null,
+                'pc_branch_name' => $pcMatched ? (isset($brMap[(int)$pcMatched['branch_id']]) ? $brMap[(int)$pcMatched['branch_id']] : '') : null,
+                'pc_date'        => $pcMatched ? $pcMatched['expense_date'] : null,
+                'match_status'   => $status,
+                'is_confirmed'   => $isConfirmed,
+            );
+        }
+
+        // 第二輪：剩下沒被匹配的零用金收入 → unmatched_pc
+        foreach ($pcRows as $idx => $p) {
+            if (in_array($idx, $pcUsed, true)) continue;
+            $pcBranch = (int)$p['branch_id'];
+            $out[] = array(
+                'date'           => $p['expense_date'],
+                'rf_id'          => null,
+                'rf_number'      => null,
+                'rf_amount'      => null,
+                'rf_description' => null,
+                'rf_branch_id'   => null,
+                'rf_branch_name' => null,
+                'pc_id'          => (int)$p['id'],
+                'pc_number'      => $p['entry_number'],
+                'pc_amount'      => (int)$p['income_amount'],
+                'pc_description' => $p['description'],
+                'pc_branch_id'   => $pcBranch,
+                'pc_branch_name' => isset($brMap[$pcBranch]) ? $brMap[$pcBranch] : '',
+                'pc_date'        => $p['expense_date'],
+                'match_status'   => 'unmatched_pc',
+                'is_confirmed'   => isset($confirmedPcAlone[(int)$p['id']]),
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * 人工核對：把備用金支出 與 零用金收入 綁成精準匹配
+     * 允許單邊 NULL（單獨核對 unmatched 列）
+     */
+    public function confirmRfPcMatch($rfId, $pcId, $userId = null)
+    {
+        $rfId = (int)$rfId;
+        $pcId = (int)$pcId;
+        if ($rfId <= 0 && $pcId <= 0) {
+            throw new \RuntimeException('參數錯誤');
+        }
+        // 清掉既有綁定（避免唯一鍵衝突）
+        if ($rfId > 0) {
+            $this->db->prepare("DELETE FROM rf_pc_match_confirmed WHERE rf_id = ?")->execute(array($rfId));
+        }
+        if ($pcId > 0) {
+            $this->db->prepare("DELETE FROM rf_pc_match_confirmed WHERE pc_id = ?")->execute(array($pcId));
+        }
+        $stmt = $this->db->prepare("INSERT INTO rf_pc_match_confirmed (rf_id, pc_id, confirmed_by, confirmed_at) VALUES (?, ?, ?, NOW())");
+        $stmt->execute(array(
+            $rfId > 0 ? $rfId : null,
+            $pcId > 0 ? $pcId : null,
+            $userId ?: null
+        ));
+    }
+
+    /**
+     * 取消人工核對
+     */
+    public function unconfirmRfPcMatch($rfId, $pcId)
+    {
+        $rfId = (int)$rfId;
+        $pcId = (int)$pcId;
+        if ($rfId > 0 && $pcId > 0) {
+            $stmt = $this->db->prepare("DELETE FROM rf_pc_match_confirmed WHERE rf_id = ? AND pc_id = ?");
+            $stmt->execute(array($rfId, $pcId));
+        } elseif ($rfId > 0) {
+            $stmt = $this->db->prepare("DELETE FROM rf_pc_match_confirmed WHERE rf_id = ? AND pc_id IS NULL");
+            $stmt->execute(array($rfId));
+        } elseif ($pcId > 0) {
+            $stmt = $this->db->prepare("DELETE FROM rf_pc_match_confirmed WHERE pc_id = ? AND rf_id IS NULL");
+            $stmt->execute(array($pcId));
+        }
+    }
+
+    /**
+     * 現金支出 ↔ 零用金收入 配對（用途含「入零用金」）
+     * 規則同 getReserveFundToPettyCashMatch
+     */
+    public function getCashToPettyCashMatch($startDate, $endDate, $branchId = null)
+    {
+        // 現金支出（排除用途只有「入零用金」三字無其他字句的）
+        $cashSql = "SELECT id, entry_number, transaction_date AS expense_date, expense_amount, branch_id, description
+                    FROM cash_details
+                    WHERE expense_amount > 0 AND transaction_date BETWEEN ? AND ?
+                      AND description LIKE '%入零用金%'
+                      AND TRIM(description) <> '入零用金'";
+        $cashParams = array($startDate, $endDate);
+        if ($branchId) { $cashSql .= " AND branch_id = ?"; $cashParams[] = (int)$branchId; }
+        $cashSql .= " ORDER BY transaction_date, id";
+        $st = $this->db->prepare($cashSql);
+        $st->execute($cashParams);
+        $cashRows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // 零用金收入 + 用途含「入零用金」（同樣排除單純「入零用金」三字）
+        // 注意：petty_cash 的「收支日期」實際是 entry_date 欄（不是 expense_date）
+        $pcSql = "SELECT id, entry_number, entry_date AS expense_date, income_amount, branch_id, description, type
+                  FROM petty_cash
+                  WHERE type = '收入' AND entry_date BETWEEN ? AND ?
+                    AND description LIKE '%入零用金%'
+                    AND TRIM(description) <> '入零用金'";
+        $pcParams = array($startDate, $endDate);
+        if ($branchId) { $pcSql .= " AND branch_id = ?"; $pcParams[] = (int)$branchId; }
+        $pcSql .= " ORDER BY entry_date, id";
+        $st = $this->db->prepare($pcSql);
+        $st->execute($pcParams);
+        $pcRows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // 分公司名稱對照
+        $brStmt = $this->db->query("SELECT id, name FROM branches");
+        $brMap = array();
+        foreach ($brStmt->fetchAll(PDO::FETCH_ASSOC) as $b) {
+            $brMap[(int)$b['id']] = $b['name'];
+        }
+
+        // 已人工核對
+        $confirmedCashToPc = array();
+        $confirmedPcToCash = array();
+        $confirmedCashAlone = array();
+        $confirmedPcAlone = array();
+        try {
+            $cf = $this->db->query("SELECT cash_id, pc_id FROM cash_pc_match_confirmed");
+            foreach ($cf->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                $cid = $c['cash_id'] !== null ? (int)$c['cash_id'] : 0;
+                $pid = $c['pc_id'] !== null ? (int)$c['pc_id'] : 0;
+                if ($cid > 0 && $pid > 0) {
+                    $confirmedCashToPc[$cid] = $pid;
+                    $confirmedPcToCash[$pid] = $cid;
+                } elseif ($cid > 0) {
+                    $confirmedCashAlone[$cid] = true;
+                } elseif ($pid > 0) {
+                    $confirmedPcAlone[$pid] = true;
+                }
+            }
+        } catch (Exception $e) { /* 表還沒建就跳過 */ }
+
+        $pcIdToIdx = array();
+        foreach ($pcRows as $i => $p) $pcIdToIdx[(int)$p['id']] = $i;
+
+        // pc 索引依日期+id 升序
+        $pcByKey = array();
+        $pcUsed = array();
+        foreach ($pcRows as $i => $p) {
+            $k = $p['expense_date'] . '|' . (int)$p['income_amount'];
+            if (!isset($pcByKey[$k])) $pcByKey[$k] = array();
+            $pcByKey[$k][] = $i;
+        }
+        foreach ($pcByKey as $k => $idxList) {
+            usort($idxList, function($a, $b) use ($pcRows) {
+                return (int)$pcRows[$a]['id'] - (int)$pcRows[$b]['id'];
+            });
+            $pcByKey[$k] = $idxList;
+        }
+
+        $out = array();
+
+        foreach ($cashRows as $r) {
+            $cashBranch = (int)$r['branch_id'];
+            $cashAmount = (int)$r['expense_amount'];
+            $cashDate   = $r['expense_date'];
+            $cashId     = (int)$r['id'];
+            $key        = $cashDate . '|' . $cashAmount;
+            $pickedIdx = null;
+            $status = 'unmatched_rf';
+            $pcMatched = null;
+            $isConfirmed = false;
+
+            // 0. 已人工核對 → 強制配
+            if (isset($confirmedCashToPc[$cashId]) && isset($pcIdToIdx[$confirmedCashToPc[$cashId]])) {
+                $pickedIdx = $pcIdToIdx[$confirmedCashToPc[$cashId]];
+                $status = 'matched_precise';
+                $isConfirmed = true;
+            }
+
+            // 同日期 + 同金額才算配對；其他情形分開顯示
+            if ($pickedIdx === null && !empty($pcByKey[$key])) {
+                foreach ($pcByKey[$key] as $idx) {
+                    if (in_array($idx, $pcUsed, true)) continue;
+                    if (isset($confirmedPcToCash[(int)$pcRows[$idx]['id']])) continue;
+                    $pickedIdx = $idx;
+                    $status = 'matched_precise';
+                    break;
+                }
+            }
+
+            if ($pickedIdx !== null) {
+                $pcUsed[] = $pickedIdx;
+                $pcMatched = $pcRows[$pickedIdx];
+            }
+
+            if ($status === 'unmatched_rf' && isset($confirmedCashAlone[$cashId])) {
+                $isConfirmed = true;
+            }
+
+            $out[] = array(
+                'date'           => $cashDate,
+                'rf_id'          => $cashId, // 用 rf_id 通用欄名（template 共用）
+                'rf_number'      => $r['entry_number'],
+                'rf_amount'      => $cashAmount,
+                'rf_description' => $r['description'],
+                'rf_branch_id'   => $cashBranch,
+                'rf_branch_name' => isset($brMap[$cashBranch]) ? $brMap[$cashBranch] : '',
+                'pc_id'          => $pcMatched ? (int)$pcMatched['id'] : null,
+                'pc_number'      => $pcMatched ? $pcMatched['entry_number'] : null,
+                'pc_amount'      => $pcMatched ? (int)$pcMatched['income_amount'] : null,
+                'pc_description' => $pcMatched ? $pcMatched['description'] : null,
+                'pc_branch_id'   => $pcMatched ? (int)$pcMatched['branch_id'] : null,
+                'pc_branch_name' => $pcMatched ? (isset($brMap[(int)$pcMatched['branch_id']]) ? $brMap[(int)$pcMatched['branch_id']] : '') : null,
+                'pc_date'        => $pcMatched ? $pcMatched['expense_date'] : null,
+                'match_status'   => $status,
+                'is_confirmed'   => $isConfirmed,
+            );
+        }
+
+        // 第二輪：剩下零用金
+        foreach ($pcRows as $idx => $p) {
+            if (in_array($idx, $pcUsed, true)) continue;
+            $pcBranch = (int)$p['branch_id'];
+            $out[] = array(
+                'date'           => $p['expense_date'],
+                'rf_id'          => null,
+                'rf_number'      => null,
+                'rf_amount'      => null,
+                'rf_description' => null,
+                'rf_branch_id'   => null,
+                'rf_branch_name' => null,
+                'pc_id'          => (int)$p['id'],
+                'pc_number'      => $p['entry_number'],
+                'pc_amount'      => (int)$p['income_amount'],
+                'pc_description' => $p['description'],
+                'pc_branch_id'   => $pcBranch,
+                'pc_branch_name' => isset($brMap[$pcBranch]) ? $brMap[$pcBranch] : '',
+                'pc_date'        => $p['expense_date'],
+                'match_status'   => 'unmatched_pc',
+                'is_confirmed'   => isset($confirmedPcAlone[(int)$p['id']]),
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * 人工核對：現金支出 ↔ 零用金收入
+     */
+    public function confirmCashPcMatch($cashId, $pcId, $userId = null)
+    {
+        $cashId = (int)$cashId;
+        $pcId   = (int)$pcId;
+        if ($cashId <= 0 && $pcId <= 0) {
+            throw new \RuntimeException('參數錯誤');
+        }
+        if ($cashId > 0) {
+            $this->db->prepare("DELETE FROM cash_pc_match_confirmed WHERE cash_id = ?")->execute(array($cashId));
+        }
+        if ($pcId > 0) {
+            $this->db->prepare("DELETE FROM cash_pc_match_confirmed WHERE pc_id = ?")->execute(array($pcId));
+        }
+        $stmt = $this->db->prepare("INSERT INTO cash_pc_match_confirmed (cash_id, pc_id, confirmed_by, confirmed_at) VALUES (?, ?, ?, NOW())");
+        $stmt->execute(array(
+            $cashId > 0 ? $cashId : null,
+            $pcId > 0 ? $pcId : null,
+            $userId ?: null
+        ));
+    }
+
+    public function unconfirmCashPcMatch($cashId, $pcId)
+    {
+        $cashId = (int)$cashId;
+        $pcId   = (int)$pcId;
+        if ($cashId > 0 && $pcId > 0) {
+            $this->db->prepare("DELETE FROM cash_pc_match_confirmed WHERE cash_id = ? AND pc_id = ?")->execute(array($cashId, $pcId));
+        } elseif ($cashId > 0) {
+            $this->db->prepare("DELETE FROM cash_pc_match_confirmed WHERE cash_id = ? AND pc_id IS NULL")->execute(array($cashId));
+        } elseif ($pcId > 0) {
+            $this->db->prepare("DELETE FROM cash_pc_match_confirmed WHERE pc_id = ? AND cash_id IS NULL")->execute(array($pcId));
+        }
+    }
+
+    /**
+     * 嘗試重新綁定失效的 offset_ledger_id
+     *  1. 用 offset_ref_id 對應的 journal_line_id 在 offset_ledger 找
+     *  2. 從摘要中解析「JV-XXXXXXXX-XXX」+ 科目 + 往來 + 金額 配對
+     * 找到回傳新 ledger.id，否則 0
+     */
+    private function _findRebindLedgerId($line, $oldLedgerId)
+    {
+        $lineId = (int)$line['id'];
+        $refId  = !empty($line['offset_ref_id']) ? (int)$line['offset_ref_id'] : 0;
+        $accId  = (int)$line['account_id'];
+        $relType = isset($line['relation_type']) ? $line['relation_type'] : null;
+        $relId   = isset($line['relation_id']) ? $line['relation_id'] : null;
+        $amount  = (float)$line['offset_amount'];
+        $desc    = isset($line['description']) ? (string)$line['description'] : '';
+
+        // 1) offset_ref_id → journal_line_id 找
+        if ($refId > 0) {
+            $st = $this->db->prepare("SELECT id FROM offset_ledger WHERE journal_line_id = ?");
+            $st->execute(array($refId));
+            $found = $st->fetchColumn();
+            if ($found) return (int)$found;
+        }
+
+        // 2) 從摘要抓 JV-... 傳票號
+        if (preg_match('/(JV-\d{8}-\d{3})/', $desc, $m)) {
+            $vn = $m[1];
+            $st = $this->db->prepare("
+                SELECT id FROM offset_ledger
+                WHERE voucher_number = ? AND account_id = ?
+                  AND (relation_id <=> ?) AND (relation_type <=> ?)
+                ORDER BY ABS(original_amount - ?) ASC, id DESC
+                LIMIT 1
+            ");
+            $st->execute(array($vn, $accId, $relId, $relType, $amount));
+            $found = $st->fetchColumn();
+            if ($found) return (int)$found;
+        }
+
+        return 0;
     }
 
     private function _findPreciseMatch($sourceModule, $sourceId)

@@ -38,6 +38,18 @@ if ($isLocked) {
         <?php endif; ?>
     </div>
     <div class="d-flex gap-1">
+        <?php if ($isEdit): ?>
+            <?php if (!empty($prevId)): ?>
+            <a href="/payables.php?action=edit&id=<?= (int)$prevId ?>" class="btn btn-outline btn-sm" title="上一筆">&laquo; 上一筆</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">&laquo; 上一筆</span>
+            <?php endif; ?>
+            <?php if (!empty($nextId)): ?>
+            <a href="/payables.php?action=edit&id=<?= (int)$nextId ?>" class="btn btn-outline btn-sm" title="下一筆">下一筆 &raquo;</a>
+            <?php else: ?>
+            <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
+            <?php endif; ?>
+        <?php endif; ?>
         <?php if ($isEdit && !$isLocked && (Auth::hasPermission('finance.manage') || Auth::hasPermission('all'))): ?>
         <form method="POST" action="/payables.php?action=generate_payment&id=<?= $record['id'] ?>" style="display:inline" onsubmit="return confirm('確定生成付款單？\n\n金額與廠商會從本應付帳款帶入，生成後本應付帳款將鎖定不可修改，請先確認所有進貨明細正確。')">
             <?= csrf_field() ?>

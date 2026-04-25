@@ -105,7 +105,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="用途說明" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="用途說明/編號/金額" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>排序</label>
@@ -167,13 +167,13 @@
                     <th style="width:32px"></th>
                     <th>編號</th>
                     <th>收支日期</th>
+                    <th>分公司</th>
                     <th>收支別</th>
                     <th>有無發票</th>
                     <th class="text-right">支出金額</th>
                     <th class="text-right">收入金額</th>
                     <th class="text-right">餘額</th>
                     <th>用途說明</th>
-                    <th>分公司</th>
                     <th>登記人</th>
                     <th>簽核狀態</th>
                 </tr>
@@ -184,6 +184,7 @@
                     <td class="text-center" onclick="event.stopPropagation()"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="event.stopPropagation();toggleStarPettyCash(this)" title="標記">&#9733;</span></td>
                     <td style="font-size:.85rem"><?= e(!empty($r['entry_number']) ? $r['entry_number'] : '-') ?></td>
                     <td><?= e(!empty($r['entry_date']) ? $r['entry_date'] : '-') ?></td>
+                    <td><?= e(!empty($r['branch_name']) ? $r['branch_name'] : '-') ?></td>
                     <td>
                         <?php if (!empty($r['type'])): ?>
                         <span class="badge <?= $r['type'] === '支出' ? 'badge-danger' : 'badge-success' ?>"><?= e($r['type']) ?></span>
@@ -194,7 +195,6 @@
                     <td class="text-right"><?= (!empty($r['income_amount']) && $r['income_amount'] > 0) ? '<span style="color:var(--success)">$' . number_format($r['income_amount']) . '</span>' : '-' ?></td>
                     <td class="text-right"><strong style="color:<?= (isset($r['running_balance']) && $r['running_balance'] < 0) ? 'var(--danger)' : '#333' ?>">$<?= number_format(isset($r['running_balance']) ? $r['running_balance'] : 0) ?></strong></td>
                     <td><?= e(!empty($r['description']) ? $r['description'] : '-') ?></td>
-                    <td><?= e(!empty($r['branch_name']) ? $r['branch_name'] : '-') ?></td>
                     <td><?= e(!empty($r['registrar']) ? $r['registrar'] : '-') ?></td>
                     <td><?= e(!empty($r['approval_status']) ? $r['approval_status'] : '-') ?></td>
                 </tr>
