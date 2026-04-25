@@ -1188,4 +1188,67 @@ class ReportModel
             'rows' => $rows,
         );
     }
+
+    /**
+     * 案件更新進度報表
+     * - 顯示每個案件的最後一次狀態變更（上次狀態 vs 本次狀態）
+     * - 沒有歷史變更紀錄者，「上次狀態」顯示「—」、最後更新時間用 cases.updated_at
+     * - 排除：已完工結案 (status = 'closed' 或 sub_status = '已完工結案')
+     * - 隱藏：當前使用者在 case_progress_hidden 標記的案件
+     */
+    public function getCaseProgressReport(array $branchIds, $userId = null)
+    {
+        if (empty($branchIds)) return array();
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = $branchIds;
+
+        // 取每案最後一次變更紀錄（用子查詢取最大 changed_at）
+        $sql = "
+            SELECT c.id, c.case_number, c.created_at, c.title, c.updated_at,
+                   c.status AS current_status, c.sub_status AS current_sub_status,
+                   u.real_name AS sales_name, b.name AS branch_name,
+                   h.old_status, h.new_status, h.old_sub_status, h.new_sub_status,
+                   h.changed_at
+            FROM cases c
+            LEFT JOIN users u ON c.sales_id = u.id
+            LEFT JOIN branches b ON c.branch_id = b.id
+            LEFT JOIN (
+                SELECT csh.*
+                FROM case_status_history csh
+                INNER JOIN (
+                    SELECT case_id, MAX(changed_at) AS max_changed_at
+                    FROM case_status_history
+                    GROUP BY case_id
+                ) m ON m.case_id = csh.case_id AND m.max_changed_at = csh.changed_at
+            ) h ON h.case_id = c.id
+            WHERE c.branch_id IN ($ph)
+              AND (c.status IS NULL OR c.status <> 'closed')
+              AND (c.sub_status IS NULL OR c.sub_status <> '已完工結案')
+        ";
+
+        if ($userId) {
+            $sql .= " AND NOT EXISTS (
+                SELECT 1 FROM case_progress_hidden ph
+                WHERE ph.case_id = c.id AND ph.user_id = ?
+            )";
+            $params[] = (int)$userId;
+        }
+
+        $sql .= " ORDER BY COALESCE(h.changed_at, c.updated_at, c.created_at) DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 隱藏案件（僅在當前使用者的報表內隱藏）
+     */
+    public function hideCaseProgress($userId, $caseId)
+    {
+        $stmt = $this->db->prepare(
+            "INSERT IGNORE INTO case_progress_hidden (user_id, case_id, hidden_at) VALUES (?, ?, NOW())"
+        );
+        $stmt->execute(array((int)$userId, (int)$caseId));
+    }
 }

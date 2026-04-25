@@ -97,21 +97,21 @@ return [
 
     // 報表權限（角色預設）
     'report_defaults' => [
-        'boss'              => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases'],
-        'vice_president'    => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases'],
-        'manager'           => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases'],
-        'assistant_manager' => ['case_summary','case_profit','finance_summary','unpaid_cases'],
-        'sales_manager'   => ['case_summary','case_profit','sales_personal','unpaid_cases'],
-        'eng_manager'     => ['case_summary','staff_value','inter_branch_monthly','unpaid_cases'],
+        'boss'              => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress'],
+        'vice_president'    => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress'],
+        'manager'           => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress'],
+        'assistant_manager' => ['case_summary','case_profit','finance_summary','unpaid_cases','case_progress'],
+        'sales_manager'   => ['case_summary','case_profit','sales_personal','unpaid_cases','case_progress'],
+        'eng_manager'     => ['case_summary','staff_value','inter_branch_monthly','unpaid_cases','case_progress'],
         'eng_deputy'      => ['staff_value'],
         'engineer'        => [],
-        'sales'           => ['case_summary','sales_personal'],
+        'sales'           => ['case_summary','sales_personal','case_progress'],
         'sales_assistant' => [],
-        'admin_staff'       => ['case_summary','finance_summary','inter_branch_monthly','unpaid_cases'],
+        'admin_staff'       => ['case_summary','finance_summary','inter_branch_monthly','unpaid_cases','case_progress'],
         'accountant'        => ['finance_summary','unpaid_cases'],
         'warehouse'         => [],
         'purchaser'         => [],
-        'hq'                => ['case_summary','case_profit','finance_summary','sales_personal','unpaid_cases'],
+        'hq'                => ['case_summary','case_profit','finance_summary','sales_personal','unpaid_cases','case_progress'],
     ],
 
     // 報表標籤（新增報表只要加在這裡，權限管理會自動出現）
@@ -124,6 +124,7 @@ return [
         'sales_personal'        => '業務個人分析',
         'branch_monthly'        => '分公司月報',
         'unpaid_cases'          => '完工未收款/未完工',
+        'case_progress'         => '案件更新進度',
     ],
 
     // 假別

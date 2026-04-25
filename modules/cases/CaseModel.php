@@ -439,6 +439,14 @@ class CaseModel
      */
     public function update(int $id, array $data): void
     {
+        // 紀錄變更前的進度/狀態（供案件更新進度報表使用）
+        $beforeRow = null;
+        try {
+            $st = $this->db->prepare("SELECT status, sub_status FROM cases WHERE id = ?");
+            $st->execute(array($id));
+            $beforeRow = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Exception $e) { $beforeRow = null; }
+
         // 完工狀態保護：closed / completed_pending / unpaid 只能透過簽核流程變更
         $protectedStatuses = array('closed', 'completed_pending', 'unpaid');
         $newStatus = isset($data['status']) ? $data['status'] : '';
@@ -632,6 +640,44 @@ class CaseModel
             $this->db->prepare("UPDATE quotations SET " . implode(', ', $syncFields) . " WHERE case_id = ?")
                 ->execute($syncParams);
         }
+
+        // 紀錄狀態變更（供案件更新進度報表使用）
+        if ($beforeRow) {
+            try {
+                $afterSt = $this->db->prepare("SELECT status, sub_status FROM cases WHERE id = ?");
+                $afterSt->execute(array($id));
+                $afterRow = $afterSt->fetch(PDO::FETCH_ASSOC) ?: null;
+                if ($afterRow) {
+                    $this->recordStatusHistory($id, $beforeRow, $afterRow);
+                }
+            } catch (Exception $e) { /* ignore */ }
+        }
+    }
+
+    /**
+     * 紀錄案件狀態變更到 case_status_history
+     * @param int $caseId
+     * @param array $before  ['status' => ..., 'sub_status' => ...]
+     * @param array $after   ['status' => ..., 'sub_status' => ...]
+     */
+    private function recordStatusHistory($caseId, $before, $after)
+    {
+        $oldStatus = isset($before['status']) ? $before['status'] : null;
+        $oldSub = isset($before['sub_status']) ? $before['sub_status'] : null;
+        $newStatus = isset($after['status']) ? $after['status'] : null;
+        $newSub = isset($after['sub_status']) ? $after['sub_status'] : null;
+        // 沒變就不記
+        if ((string)$oldStatus === (string)$newStatus && (string)$oldSub === (string)$newSub) {
+            return;
+        }
+        try {
+            $user = Session::getUser();
+            $uid = $user ? (int)$user['id'] : null;
+            $stmt = $this->db->prepare("INSERT INTO case_status_history
+                (case_id, old_status, new_status, old_sub_status, new_sub_status, changed_by, changed_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute(array($caseId, $oldStatus, $newStatus, $oldSub, $newSub, $uid));
+        } catch (Exception $e) { /* 表不存在或其他錯誤都靜默 */ }
     }
 
     /**
@@ -1246,6 +1292,14 @@ class CaseModel
      */
     public function updateStage($id, $stage, $data = array())
     {
+        // 紀錄變更前的進度/狀態
+        $_beforeRow = null;
+        try {
+            $st = $this->db->prepare("SELECT status, sub_status FROM cases WHERE id = ?");
+            $st->execute(array($id));
+            $_beforeRow = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Exception $e) { $_beforeRow = null; }
+
         $sets = array('stage = ?');
         $params = array($stage);
 
@@ -1269,6 +1323,18 @@ class CaseModel
         $params[] = $id;
         $sql = "UPDATE cases SET " . implode(', ', $sets) . " WHERE id = ?";
         $this->db->prepare($sql)->execute($params);
+
+        // 紀錄狀態變更（供案件更新進度報表使用）
+        if ($_beforeRow) {
+            try {
+                $afterSt = $this->db->prepare("SELECT status, sub_status FROM cases WHERE id = ?");
+                $afterSt->execute(array($id));
+                $afterRow = $afterSt->fetch(PDO::FETCH_ASSOC) ?: null;
+                if ($afterRow) {
+                    $this->recordStatusHistory($id, $_beforeRow, $afterRow);
+                }
+            } catch (Exception $e) { /* ignore */ }
+        }
     }
 
     /**
