@@ -93,7 +93,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="摘要/對象" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="摘要/編號/金額" autocomplete="off">
             </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>

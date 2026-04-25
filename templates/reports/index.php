@@ -65,6 +65,7 @@
         array('key' => 'sales_personal', 'action' => 'sales_personal', 'icon' => '&#128100;', 'title' => '業務個人分析', 'desc' => '個人進件/成交/金額/案別統計與團隊比較'),
         array('key' => 'branch_monthly', 'action' => 'branch_monthly', 'icon' => '&#127970;', 'title' => '分公司月報', 'desc' => '各分公司每月收款/付款統計與明細'),
         array('key' => 'unpaid_cases', 'action' => 'unpaid_cases', 'icon' => '&#128722;', 'title' => '完工未收款/未完工', 'desc' => '待收尾款案件清單與合計金額'),
+        array('key' => 'case_progress', 'action' => 'case_progress', 'icon' => '&#128221;', 'title' => '案件更新進度', 'desc' => '案件最後狀態變更追蹤（剔除已完工結案）'),
     );
     ?>
     <div class="report-links">

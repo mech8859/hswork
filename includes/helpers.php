@@ -24,6 +24,21 @@ function e($value): string
 }
 
 /**
+ * 數字格式化，負數自動以紅色顯示（報表用）
+ * @param float|int $v
+ * @param int $decimals
+ * @return string HTML 字串
+ */
+function nfmt($v, $decimals = 0): string
+{
+    $formatted = number_format((float)$v, $decimals);
+    if ((float)$v < 0) {
+        return '<span style="color:#dc2626">' . $formatted . '</span>';
+    }
+    return $formatted;
+}
+
+/**
  * 產生 CSRF hidden input
  */
 function csrf_field(): string

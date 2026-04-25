@@ -86,6 +86,13 @@
                 <?php endforeach; ?>
             </select>
         </div>
+        <div>
+            <label style="font-size:0.85em">排序</label>
+            <select name="sort" class="form-control">
+                <option value="desc" <?= (!isset($olSort) || $olSort !== 'asc') ? 'selected' : '' ?>>新 → 舊</option>
+                <option value="asc"  <?= (isset($olSort) && $olSort === 'asc') ? 'selected' : '' ?>>舊 → 新</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">查詢</button>
         <a href="/accounting.php?action=offset_ledger" class="btn btn-outline">清除</a>
     </form>

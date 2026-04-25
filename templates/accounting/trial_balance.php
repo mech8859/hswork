@@ -80,13 +80,29 @@
                 // Section header
                 if ($tb['account_type'] !== $currentType):
                     $currentType = $tb['account_type'];
+                    $_typeBg = array(
+                        'asset' => '#cfe2ff', 'liability' => '#f8d7da', 'equity' => '#e2d4f0',
+                        'revenue' => '#d1ecf1', 'cost' => '#ffd6cc', 'expense' => '#ffe5b4',
+                    );
+                    $_tbg = isset($_typeBg[$currentType]) ? $_typeBg[$currentType] : '#dee2e6';
             ?>
-            <tr style="background:#e9ecef;font-weight:bold">
+            <tr style="background:<?= $_tbg ?>;font-weight:bold">
                 <td colspan="7"><?= isset($typeLabels[$currentType]) ? e($typeLabels[$currentType]) : e($currentType) ?></td>
             </tr>
             <?php endif; ?>
+            <?php
+            $_tbIsControl = (strlen($tb['code']) >= 3 && substr($tb['code'], -3) === '000');
+            $_tbTab = $_tbIsControl ? 'general_ledger' : 'sub_ledger';
+            $_tbDateFrom = (int)substr($asOfDate, 0, 4) . '-01-01';
+            $_tbUrl = '/accounting.php?action=journal_reports&tab=' . $_tbTab
+                    . '&date_from=' . urlencode($_tbDateFrom)
+                    . '&date_to=' . urlencode($asOfDate)
+                    . '&account_from=' . urlencode($tb['code'])
+                    . '&account_to=' . urlencode($tb['code']);
+            if ($costCenterId) $_tbUrl .= '&cost_center_id=' . (int)$costCenterId;
+            ?>
             <tr>
-                <td><?= e($tb['code']) ?></td>
+                <td><a href="<?= e($_tbUrl) ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($tb['code']) ?></a></td>
                 <td><?= e($tb['name']) ?></td>
                 <td style="font-size:0.85em;color:#666"><?= isset($typeLabels[$tb['account_type']]) ? e($typeLabels[$tb['account_type']]) : '' ?></td>
                 <td style="text-align:right"><?= $d > 0 ? number_format($d, 2) : '' ?></td>

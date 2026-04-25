@@ -107,6 +107,43 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 案件更新進度 ----
+    case 'case_progress':
+        if (!Auth::canAccessReport('case_progress') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $userId = Auth::id();
+        $rows = $model->getCaseProgressReport($branchIds, $userId);
+
+        $pageTitle = '案件更新進度';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/case_progress.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    // ---- 案件更新進度 - 隱藏單筆（僅報表內）----
+    case 'case_progress_hide':
+        header('Content-Type: application/json; charset=utf-8');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(array('success' => false, 'msg' => 'method not allowed'));
+            exit;
+        }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        $userId = Auth::id();
+        if (!$caseId || !$userId) {
+            echo json_encode(array('success' => false, 'msg' => '參數錯誤'));
+            exit;
+        }
+        try {
+            $model->hideCaseProgress($userId, $caseId);
+            echo json_encode(array('success' => true));
+        } catch (Exception $e) {
+            echo json_encode(array('success' => false, 'msg' => $e->getMessage()));
+        }
+        exit;
+
     // ---- 點工費月結 ----
     case 'inter_branch':
         $month = $_GET['month'] ?? date('Y-m');

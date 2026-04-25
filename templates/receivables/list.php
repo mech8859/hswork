@@ -83,9 +83,9 @@ $statusBadgeMap = array(
                     <th>請款單號</th>
                     <th>傳票號碼</th>
                     <th>請款日期</th>
+                    <th>分公司</th>
                     <th>客戶名稱</th>
                     <th>系統別</th>
-                    <th>分公司</th>
                     <th>業務</th>
                     <th class="text-right">總計</th>
                     <th>狀態</th>
@@ -105,9 +105,9 @@ $statusBadgeMap = array(
                     <td><a href="/receivables.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['receivable_number'] ?: $row['invoice_number'] ?: '-') ?></a></td>
                     <td><?= e($row['voucher_number'] ?? '-') ?></td>
                     <td><?= !empty($row['invoice_date']) ? $row['invoice_date'] : '-' ?></td>
+                    <td><?= e($row['branch_name'] ?? '-') ?></td>
                     <td><?= e($row['customer_name'] ?: '-') ?></td>
                     <td style="font-size:.85rem;color:#666"><?= e(!empty($row['system_type']) ? $row['system_type'] : '-') ?></td>
-                    <td><?= e($row['branch_name'] ?? '-') ?></td>
                     <td><?= e($row['sales_name'] ?? '-') ?></td>
                     <td class="text-right">$<?= number_format($row['total_amount'] ?: $row['subtotal'] ?: 0) ?></td>
                     <td><span class="badge <?= $badgeCls ?>"><?= e($row['status'] ?: '-') ?></span></td>

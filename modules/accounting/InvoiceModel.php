@@ -191,11 +191,12 @@ class InvoiceModel
         $page = min($page, $lastPage);
         $offset = ($page - 1) * $perPage;
 
+        $sortDir = (isset($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
         $sql = "SELECT pi.*, u.real_name AS created_by_name
                 FROM purchase_invoices pi
                 LEFT JOIN users u ON u.id = pi.created_by
                 WHERE " . $whereStr . "
-                ORDER BY COALESCE(pi.invoice_date, '1900-01-01') DESC, pi.id DESC
+                ORDER BY COALESCE(pi.invoice_date, '1900-01-01') {$sortDir}, pi.id {$sortDir}
                 LIMIT " . (int) $perPage . " OFFSET " . (int) $offset;
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -481,11 +482,12 @@ class InvoiceModel
         $page = min($page, $lastPage);
         $offset = ($page - 1) * $perPage;
 
+        $sortDir = (isset($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
         $sql = "SELECT si.*, u.real_name AS created_by_name
                 FROM sales_invoices si
                 LEFT JOIN users u ON u.id = si.created_by
                 WHERE " . $whereStr . "
-                ORDER BY si.invoice_date DESC, si.id DESC
+                ORDER BY si.invoice_date {$sortDir}, si.id {$sortDir}
                 LIMIT " . (int) $perPage . " OFFSET " . (int) $offset;
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);

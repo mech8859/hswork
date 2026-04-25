@@ -1,9 +1,11 @@
 <?php
 $sourceLabels = array(
-    'bank'         => '銀行帳戶明細',
-    'petty_cash'   => '零用金管理',
-    'reserve_fund' => '備用金管理',
-    'cash_details' => '現金明細',
+    'bank'           => '銀行帳戶明細',
+    'petty_cash'     => '零用金管理',
+    'reserve_fund'   => '備用金管理',
+    'cash_details'   => '現金明細',
+    'rf_pc_match'    => '備用金→零用金',
+    'cash_pc_match'  => '現金→零用金',
 );
 $sourceViewUrls = array(
     'bank'         => '/bank_transactions.php?action=edit&id=',
@@ -17,6 +19,20 @@ $statusLabels = array(
     'matched_amount_mismatch' => array('金額不符', '#f59e0b'),
     'unmatched'               => array('未建傳票', '#ef4444'),
     'merged_into_prev'        => array('已合併', '#9ca3af'),
+);
+// 備用金→零用金 專用狀態
+$rfPcStatusLabels = array(
+    'matched_precise'         => array('精準匹配', '#16a34a'),
+    'unmatched_rf'            => array('零用金未對應', '#ef4444'),
+    'unmatched_pc'            => array('備用金未對應', '#ef4444'),
+    'manually_confirmed'      => array('已人工核對', '#16a34a'),
+);
+// 現金→零用金 專用狀態（unmatched_pc = 現金未對應）
+$cashPcStatusLabels = array(
+    'matched_precise'         => array('精準匹配', '#16a34a'),
+    'unmatched_rf'            => array('零用金未對應', '#ef4444'),
+    'unmatched_pc'            => array('現金未對應', '#ef4444'),
+    'manually_confirmed'      => array('已人工核對', '#16a34a'),
 );
 ?>
 <?php
@@ -61,7 +77,7 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
         <?php endif; ?>
         <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
-        <?php if (Auth::hasPermission('accounting.manage') || Auth::hasPermission('all')): ?>
+        <?php if ($source !== 'rf_pc_match' && (Auth::hasPermission('accounting.manage') || Auth::hasPermission('all'))): ?>
         <form method="POST" action="/accounting.php?action=voucher_reconciliation_batch" style="display:inline" onsubmit="return confirm('批次把所有「模糊匹配」的來源單綁定到對應傳票？\n\n• 只會綁定尚未綁定的傳票\n• 已綁定其他來源的傳票會被略過\n\n執行後才能精準匹配。');">
             <?= csrf_field() ?>
             <input type="hidden" name="source" value="<?= e($source) ?>">
@@ -112,9 +128,17 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <?php endif; ?>
         <div>
             <label style="display:block;font-size:.85rem;color:#666;margin-bottom:2px">狀態</label>
-            <select name="status_filter" class="form-control" style="min-width:140px">
-                <option value="">全部</option>
-                <?php foreach ($statusLabels as $sk => $sv):
+            <select name="status_filter" class="form-control" style="min-width:160px">
+                <option value="">全部（隱藏精準）</option>
+                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>全部（含精準匹配）</option>
+                <?php if ($source === 'rf_pc_match' || $source === 'cash_pc_match'): ?>
+                <option value="unmatched_all" <?= $statusFilter === 'unmatched_all' ? 'selected' : '' ?>>全部未對應</option>
+                <?php endif; ?>
+                <?php
+                if ($source === 'cash_pc_match') $_filterLabels = $cashPcStatusLabels;
+                elseif ($source === 'rf_pc_match') $_filterLabels = $rfPcStatusLabels;
+                else $_filterLabels = $statusLabels;
+                foreach ($_filterLabels as $sk => $sv):
                     if ($sk === 'merged_into_prev') continue;
                 ?>
                 <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($sv[0]) ?></option>
@@ -140,7 +164,11 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <div style="font-size:.8rem;color:#666">總筆數</div>
         <div style="font-size:1.3rem;font-weight:700"><?= number_format($stats['total']) ?></div>
     </div>
-    <?php foreach ($statusLabels as $sk => $sv):
+    <?php
+    if ($source === 'cash_pc_match') $_statCardLabels = $cashPcStatusLabels;
+    elseif ($source === 'rf_pc_match') $_statCardLabels = $rfPcStatusLabels;
+    else $_statCardLabels = $statusLabels;
+    foreach ($_statCardLabels as $sk => $sv):
         if ($sk === 'merged_into_prev') continue;
     ?>
     <a href="/accounting.php?action=voucher_reconciliation&source=<?= e($source) ?>&start_date=<?= e($startDate) ?>&end_date=<?= e($endDate) ?><?= $branchFilter && $source !== 'bank' ? '&branch_id=' . $branchFilter : '' ?>&status_filter=<?= e($sk) ?>" class="card" style="padding:12px;text-align:center;text-decoration:none;color:inherit;border-left:3px solid <?= $sv[1] ?>">
@@ -155,6 +183,134 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
 <div class="card" style="padding:0">
     <?php if (empty($records)): ?>
     <div style="text-align:center;padding:40px;color:#999">此範圍無資料</div>
+    <?php elseif ($source === 'rf_pc_match' || $source === 'cash_pc_match'): ?>
+    <?php
+    $_isCash = $source === 'cash_pc_match';
+    $_leftLabel = $_isCash ? '現金支出' : '備用金支出';
+    $_leftEditUrl = $_isCash ? '/cash_details.php?action=edit&id=' : '/reserve_fund.php?action=edit&id=';
+    $_confirmAction = $_isCash ? 'cash_pc_match_confirm' : 'rf_pc_match_confirm';
+    $_leftIdField = $_isCash ? 'cash_id' : 'rf_id';
+    $_rfPcReturn = '/accounting.php?action=voucher_reconciliation&source=' . $source
+        . '&start_date=' . urlencode($startDate) . '&end_date=' . urlencode($endDate);
+    if ($branchFilter) $_rfPcReturn .= '&branch_id=' . (int)$branchFilter;
+    if (!empty($statusFilter)) $_rfPcReturn .= '&status_filter=' . urlencode($statusFilter);
+    if (!empty($sortOrder) && $sortOrder === 'asc') $_rfPcReturn .= '&sort=asc';
+    ?>
+    <div class="table-responsive" style="--table-sticky-top:240px">
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+        <thead class="sticky-thead">
+            <tr style="background:#f5f5f5">
+                <th style="padding:10px 8px;text-align:left;width:80px">分公司</th>
+                <th colspan="4" style="padding:10px 8px;text-align:center;background:#fef3c7;border-right:2px solid #fff"><?= e($_leftLabel) ?></th>
+                <th colspan="4" style="padding:10px 8px;text-align:center;background:#dcfce7">零用金收入</th>
+                <th style="padding:10px 8px;text-align:center;width:110px">狀態</th>
+                <th style="padding:10px 8px;text-align:center;width:100px">動作</th>
+            </tr>
+            <tr style="background:#f5f5f5">
+                <th></th>
+                <th style="padding:8px;text-align:left;width:90px;background:#fef3c7">日期</th>
+                <th style="padding:8px;text-align:left;width:120px;background:#fef3c7">單號</th>
+                <th style="padding:8px;text-align:right;width:80px;background:#fef3c7">金額</th>
+                <th style="padding:8px;text-align:left;background:#fef3c7;border-right:2px solid #fff">用途說明</th>
+                <th style="padding:8px;text-align:left;width:90px;background:#dcfce7">日期</th>
+                <th style="padding:8px;text-align:left;width:120px;background:#dcfce7">單號</th>
+                <th style="padding:8px;text-align:right;width:80px;background:#dcfce7">金額</th>
+                <th style="padding:8px;text-align:left;background:#dcfce7">用途說明</th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            $_rowLabels = ($source === 'cash_pc_match') ? $cashPcStatusLabels : $rfPcStatusLabels;
+            foreach ($records as $r):
+                $st = isset($_rowLabels[$r['match_status']]) ? $_rowLabels[$r['match_status']] : array($r['match_status'], '#666');
+                // 精準匹配（自動配對成功） + 已人工核對 → 視為已核對
+                $isConfirmed = !empty($r['is_confirmed']) || $r['match_status'] === 'matched_precise';
+                if ($isConfirmed) {
+                    $bg = '#f0fdf4'; // 綠
+                } else {
+                    $bg = '#fef2f2'; // 紅
+                }
+                $branch = $r['rf_branch_name'] ?: $r['pc_branch_name'] ?: '-';
+                $hasPair = $r['rf_id'] && $r['pc_id'];
+            ?>
+            <tr id="rfpc-<?= (int)($r['rf_id'] ?: 0) ?>-<?= (int)($r['pc_id'] ?: 0) ?>" style="border-top:1px solid #eee;background:<?= $bg ?>;scroll-margin-top:260px">
+                <td style="padding:8px;font-size:.82rem;color:#555"><?= e($branch) ?></td>
+                <!-- 備用金 -->
+                <td style="padding:8px;background:rgba(254,243,199,.3)"><?= $r['date'] !== null && $r['rf_id'] ? e($r['date']) : '<span style="color:#999">—</span>' ?></td>
+                <td style="padding:8px;font-family:monospace;font-size:.82rem;background:rgba(254,243,199,.3)">
+                    <?php if ($r['rf_id']): ?>
+                    <a href="<?= e($_leftEditUrl) ?><?= (int)$r['rf_id'] ?>" style="color:#1565c0;text-decoration:none"><?= e($r['rf_number'] ?: '(無單號)') ?></a>
+                    <?php else: ?>
+                    <span style="color:#999">—</span>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:8px;text-align:right;color:#d32f2f;background:rgba(254,243,199,.3)">
+                    <?= $r['rf_amount'] !== null ? number_format($r['rf_amount']) : '<span style="color:#999">—</span>' ?>
+                </td>
+                <td style="padding:8px;font-size:.82rem;border-right:2px solid #eee;background:rgba(254,243,199,.3)" title="<?= e($r['rf_description']) ?>">
+                    <?= $r['rf_description'] !== null ? e(mb_substr($r['rf_description'], 0, 30)) : '<span style="color:#999">—</span>' ?>
+                </td>
+                <!-- 零用金 -->
+                <td style="padding:8px;background:rgba(220,252,231,.3)"><?= $r['pc_date'] ? e($r['pc_date']) : '<span style="color:#999">—</span>' ?></td>
+                <td style="padding:8px;font-family:monospace;font-size:.82rem;background:rgba(220,252,231,.3)">
+                    <?php if ($r['pc_id']): ?>
+                    <a href="/petty_cash.php?action=edit&id=<?= (int)$r['pc_id'] ?>" style="color:#1565c0;text-decoration:none"><?= e($r['pc_number'] ?: '(無單號)') ?></a>
+                    <?php else: ?>
+                    <span style="color:#999">—</span>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:8px;text-align:right;color:#16a34a;background:rgba(220,252,231,.3)">
+                    <?= $r['pc_amount'] !== null ? number_format($r['pc_amount']) : '<span style="color:#999">—</span>' ?>
+                </td>
+                <td style="padding:8px;font-size:.82rem;background:rgba(220,252,231,.3)" title="<?= e($r['pc_description']) ?>">
+                    <?= $r['pc_description'] !== null ? e(mb_substr($r['pc_description'], 0, 30)) : '<span style="color:#999">—</span>' ?>
+                </td>
+                <td style="padding:8px;text-align:center;white-space:nowrap">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:<?= $st[1] ?>;color:#fff;font-size:.72rem;font-weight:600"><?= e($st[0]) ?></span>
+                    <?php if ($isConfirmed): ?>
+                    <div style="color:#16a34a;font-size:.7rem;margin-top:2px;font-weight:600">✓ 已人工核對</div>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:8px;text-align:center">
+                    <?php
+                    $rfIdVal = (int)($r['rf_id'] ?: 0);
+                    $pcIdVal = (int)($r['pc_id'] ?: 0);
+                    $hasAny = $rfIdVal > 0 || $pcIdVal > 0;
+                    $confirmMsg = $hasPair
+                        ? '確認此備用金支出與零用金收入配對無誤？\n確認後此筆會鎖定為精準匹配。'
+                        : '確認此筆人工核對無誤？\n（單邊未對應也標記為已核對，下次預設視圖會隱藏）';
+                    ?>
+                    <?php if ($hasAny && ($canManage ?? false)): ?>
+                        <?php if ($isConfirmed): ?>
+                        <form method="POST" action="/accounting.php?action=<?= e($_confirmAction) ?>" style="display:inline" onsubmit="return confirm('取消此筆人工核對？');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act" value="unconfirm">
+                            <input type="hidden" name="<?= e($_leftIdField) ?>" value="<?= $rfIdVal ?>">
+                            <input type="hidden" name="pc_id" value="<?= $pcIdVal ?>">
+                            <input type="hidden" name="return_to" value="<?= e($_rfPcReturn) ?>#rfpc-<?= $rfIdVal ?>-<?= $pcIdVal ?>">
+                            <button type="submit" class="btn btn-sm" style="padding:3px 10px;font-size:.72rem;background:#16a34a;color:#fff" title="已核對，點擊取消">✓ 標示已核對</button>
+                        </form>
+                        <?php else: ?>
+                        <form method="POST" action="/accounting.php?action=<?= e($_confirmAction) ?>" style="display:inline" onsubmit="return confirm('<?= $confirmMsg ?>');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act" value="confirm">
+                            <input type="hidden" name="<?= e($_leftIdField) ?>" value="<?= $rfIdVal ?>">
+                            <input type="hidden" name="pc_id" value="<?= $pcIdVal ?>">
+                            <input type="hidden" name="return_to" value="<?= e($_rfPcReturn) ?>#rfpc-<?= $rfIdVal ?>-<?= $pcIdVal ?>">
+                            <button type="submit" class="btn btn-sm" style="padding:3px 10px;font-size:.72rem;background:#ef4444;color:#fff" title="標示為待核對，點擊後變為已核對">標示待核對</button>
+                        </form>
+                        <?php endif; ?>
+                    <?php else: ?>
+                    <span style="color:#bbb">—</span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
     <?php else: ?>
     <table style="width:100%;border-collapse:collapse;font-size:.88rem">
         <thead>

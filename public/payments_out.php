@@ -201,6 +201,15 @@ switch ($action) {
         $editingLockModule = 'payments_out';
         $editingLockRecordId = $id;
 
+        // 上一筆/下一筆
+        $_navDb = Database::getInstance();
+        $prevStmt = $_navDb->prepare("SELECT id FROM payments_out WHERE id < ? ORDER BY id DESC LIMIT 1");
+        $prevStmt->execute(array($id));
+        $prevId = $prevStmt->fetchColumn();
+        $nextStmt = $_navDb->prepare("SELECT id FROM payments_out WHERE id > ? ORDER BY id ASC LIMIT 1");
+        $nextStmt->execute(array($id));
+        $nextId = $nextStmt->fetchColumn();
+
         $pageTitle = '編輯付款單 - ' . (!empty($record['payment_number']) ? $record['payment_number'] : $record['id']);
         $currentPage = 'payments_out';
         require __DIR__ . '/../templates/layouts/header.php';

@@ -78,6 +78,7 @@ if (!empty($records)) {
                 <label>分公司</label>
                 <select name="branch_id" class="form-control">
                     <option value="">全部</option>
+                    <option value="__blank__" <?= (!empty($filters['branch_id']) && $filters['branch_id'] === '__blank__') ? 'selected' : '' ?>>空白（未設定）</option>
                     <?php foreach ($branches as $b): ?>
                     <option value="<?= e($b['id']) ?>" <?= (!empty($filters['branch_id']) && $filters['branch_id'] == $b['id']) ? 'selected' : '' ?>><?= e($b['name']) ?></option>
                     <?php endforeach; ?>
@@ -93,7 +94,7 @@ if (!empty($records)) {
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="明細/承辦業務" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="明細/編號/金額" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>排序</label>
@@ -160,10 +161,10 @@ if (!empty($records)) {
                     <th style="width:32px"></th>
                     <th>編號</th>
                     <th>交易日期</th>
+                    <th>分公司</th>
                     <th class="text-right">收入</th>
                     <th class="text-right">支出</th>
                     <th class="text-right">餘額</th>
-                    <th>分公司</th>
                     <th>承辦業務</th>
                     <th>明細</th>
                 </tr>
@@ -180,6 +181,7 @@ if (!empty($records)) {
                     </td>
                     <td style="font-size:.85rem"><?= e(!empty($r['entry_number']) ? $r['entry_number'] : '-') ?></td>
                     <td><?= e(!empty($r['transaction_date']) ? $r['transaction_date'] : '-') ?></td>
+                    <td><?= e(!empty($r['branch_name']) ? $r['branch_name'] : '-') ?></td>
                     <td class="text-right"><?= (!empty($r['income_amount']) && $r['income_amount'] > 0) ? '<span style="color:var(--success)">$' . number_format($r['income_amount']) . '</span>' : '-' ?></td>
                     <td class="text-right"><?= (!empty($r['expense_amount']) && $r['expense_amount'] > 0) ? '<span style="color:var(--danger)">$' . number_format($r['expense_amount']) . '</span>' : '-' ?></td>
                     <?php
@@ -187,7 +189,6 @@ if (!empty($records)) {
                         $balStyle = $bal < 0 ? 'color:var(--danger)' : '';
                     ?>
                     <td class="text-right"><span style="<?= $balStyle ?>">$<?= number_format($bal) ?></span></td>
-                    <td><?= e(!empty($r['branch_name']) ? $r['branch_name'] : '-') ?></td>
                     <td><?= e(!empty($r['sales_name']) ? $r['sales_name'] : '-') ?></td>
                     <td><?= e(!empty($r['description']) ? $r['description'] : '-') ?></td>
                 </tr>

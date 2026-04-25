@@ -1456,11 +1456,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
 
         $countStmt = $this->db->prepare("SELECT COUNT(*) FROM bank_transactions WHERE {$where}");
@@ -1501,11 +1507,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
 
         // 轉入/轉出合計 per bank account
@@ -1609,10 +1621,17 @@ class FinanceModel
             $params[] = $filters['type'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ? OR pc.expense_amount = ? OR pc.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND pc.entry_date >= ?';
@@ -1672,10 +1691,17 @@ class FinanceModel
             $params[] = $filters['type'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ? OR pc.expense_amount = ? OR pc.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND pc.entry_date >= ?';
@@ -1720,10 +1746,17 @@ class FinanceModel
             $params[] = $filters['type'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ? OR pc.expense_amount = ? OR pc.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (pc.description LIKE ? OR pc.entry_number LIKE ? OR pc.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND pc.entry_date >= ?';
@@ -1855,10 +1888,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (rf.description LIKE ? OR rf.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (rf.description LIKE ? OR rf.entry_number LIKE ? OR rf.upload_number LIKE ? OR rf.expense_amount = ? OR rf.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (rf.description LIKE ? OR rf.entry_number LIKE ? OR rf.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
+            }
         }
         return $where;
     }
@@ -2039,8 +2079,12 @@ class FinanceModel
         $params = array();
 
         if (!empty($filters['branch_id'])) {
-            $where .= ' AND cd.branch_id = ?';
-            $params[] = $filters['branch_id'];
+            if ($filters['branch_id'] === '__blank__') {
+                $where .= ' AND (cd.branch_id IS NULL OR cd.branch_id = 0)';
+            } else {
+                $where .= ' AND cd.branch_id = ?';
+                $params[] = $filters['branch_id'];
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND cd.transaction_date >= ?';
@@ -2051,10 +2095,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw;
+            }
         }
 
         $stmt = $this->db->prepare("
@@ -2072,8 +2123,12 @@ class FinanceModel
         $params = array();
 
         if (!empty($filters['branch_id'])) {
-            $where .= ' AND cd.branch_id = ?';
-            $params[] = $filters['branch_id'];
+            if ($filters['branch_id'] === '__blank__') {
+                $where .= ' AND (cd.branch_id IS NULL OR cd.branch_id = 0)';
+            } else {
+                $where .= ' AND cd.branch_id = ?';
+                $params[] = $filters['branch_id'];
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND cd.transaction_date >= ?';
@@ -2084,10 +2139,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw;
+            }
         }
 
         $sortDir = (!empty($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
@@ -2112,8 +2174,12 @@ class FinanceModel
         $params = array();
 
         if (!empty($filters['branch_id'])) {
-            $where .= ' AND cd.branch_id = ?';
-            $params[] = $filters['branch_id'];
+            if ($filters['branch_id'] === '__blank__') {
+                $where .= ' AND (cd.branch_id IS NULL OR cd.branch_id = 0)';
+            } else {
+                $where .= ' AND cd.branch_id = ?';
+                $params[] = $filters['branch_id'];
+            }
         }
         if (!empty($filters['date_from'])) {
             $where .= ' AND cd.transaction_date >= ?';
@@ -2124,10 +2190,17 @@ class FinanceModel
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['keyword'])) {
-            $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
             $kw = '%' . $filters['keyword'] . '%';
-            $params[] = $kw;
-            $params[] = $kw;
+            $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
+            $isNum = ctype_digit($kwNum) && $kwNum !== '';
+            if ($isNum) {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw;
+                $params[] = (int)$kwNum; $params[] = (int)$kwNum;
+            } else {
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw;
+            }
         }
 
         $countStmt = $this->db->prepare("SELECT COUNT(*) FROM cash_details cd WHERE {$where}");
