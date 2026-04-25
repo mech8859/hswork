@@ -973,6 +973,9 @@ switch ($action) {
         // 預算資料
         $budgetData = $model->getBudgetSummary($frYear, $frMonthFrom, $frMonthTo, $frCcId);
 
+        // 現金流量表（直接法）
+        $cfsData = $model->getCashFlowDirect($dateFrom, $dateTo, $frCcId);
+
         // 資產負債表
         $bsData = $model->getBalanceSheetData($dateTo, $frCcId);
         // BS 損益結轉：用「期初到截止日」的全期間 4-8 損益（含開帳前未結帳）
@@ -1054,6 +1057,29 @@ switch ($action) {
         }
         for ($m = 1; $m <= 12; $m++) {
             $monthlySum[$m]['net'] = $monthlySum[$m]['revenue'] - $monthlySum[$m]['cost'] - $monthlySum[$m]['expense'] + $monthlySum[$m]['other'] - $monthlySum[$m]['tax'];
+        }
+
+        // 分公司比較（IS / CFS）— 為每個成本中心預先計算（依目前 期間 篩選）
+        $branchCompare = array();
+        if ($frTab === 'is_by_branch' || $frTab === 'cfs_by_branch') {
+            // 全公司列在最前
+            $totalEntry = array('id' => 0, 'name' => '全公司合計');
+            if ($frTab === 'is_by_branch') {
+                $totalEntry['is'] = $sumPL($model->getIncomeStatement($dateFrom, $dateTo, null));
+            } else {
+                $totalEntry['cfs'] = $model->getCashFlowDirect($dateFrom, $dateTo, null);
+            }
+            $branchCompare[] = $totalEntry;
+            foreach ($costCenters as $cc) {
+                $ccId = (int)$cc['id'];
+                $entry = array('id' => $ccId, 'name' => $cc['name']);
+                if ($frTab === 'is_by_branch') {
+                    $entry['is'] = $sumPL($model->getIncomeStatement($dateFrom, $dateTo, $ccId));
+                } else {
+                    $entry['cfs'] = $model->getCashFlowDirect($dateFrom, $dateTo, $ccId);
+                }
+                $branchCompare[] = $entry;
+            }
         }
 
         $pageTitle = '財務報表';

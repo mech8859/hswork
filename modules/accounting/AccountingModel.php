@@ -2182,6 +2182,192 @@ class AccountingModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * 現金流量表（直接法）
+     * 找出所有涉及現金科目（1111/1112/1113 開頭）的傳票，依對手科目分類為:
+     *   - operating（營運）: 4/5/6/7/8 + 11(非現金) + 21
+     *   - investing（投資）: 12-19（非流動資產）
+     *   - financing（籌資）: 22-29（長期負債）+ 3xxx（權益）
+     *
+     * @param string $dateFrom
+     * @param string $dateTo
+     * @param int|null $costCenterId
+     * @return array {
+     *   sections: { operating, investing, financing }
+     *   start_cash, end_cash, period_change
+     * }
+     */
+    public function getCashFlowDirect($dateFrom, $dateTo, $costCenterId = null)
+    {
+        // 取所有涉及現金科目的傳票 ID
+        // 注意：分公司（成本中心）篩選用「非現金那一行」的 cost_center
+        // 因現金/銀行帳戶通常不設分公司，分公司歸屬反映在對手科目
+        $cashCondition = "(coa.account_code LIKE '1111%' OR coa.account_code LIKE '1112%' OR coa.account_code LIKE '1113%')";
+        $notCashCondition = "NOT (coa.account_code LIKE '1111%' OR coa.account_code LIKE '1112%' OR coa.account_code LIKE '1113%')";
+
+        if ($costCenterId) {
+            // 找：有現金行 + 有非現金行 cost_center=X 的傳票
+            $sql1 = "SELECT DISTINCT je.id
+                     FROM journal_entries je
+                     WHERE je.status = 'posted'
+                       AND je.voucher_date BETWEEN ? AND ?
+                       AND EXISTS (
+                           SELECT 1 FROM journal_entry_lines jl JOIN chart_of_accounts coa ON coa.id = jl.account_id
+                           WHERE jl.journal_entry_id = je.id AND $cashCondition
+                       )
+                       AND EXISTS (
+                           SELECT 1 FROM journal_entry_lines jl JOIN chart_of_accounts coa ON coa.id = jl.account_id
+                           WHERE jl.journal_entry_id = je.id AND $notCashCondition AND jl.cost_center_id = ?
+                       )";
+            $stmt = $this->db->prepare($sql1);
+            $stmt->execute(array($dateFrom, $dateTo, (int)$costCenterId));
+        } else {
+            $sql1 = "SELECT DISTINCT je.id
+                     FROM journal_entries je
+                     JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
+                     JOIN chart_of_accounts coa ON coa.id = jl.account_id
+                     WHERE je.status = 'posted'
+                       AND je.voucher_date BETWEEN ? AND ?
+                       AND $cashCondition";
+            $stmt = $this->db->prepare($sql1);
+            $stmt->execute(array($dateFrom, $dateTo));
+        }
+        $entryIds = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+
+        // 累積分類結果
+        $sections = array(
+            'operating' => array('items' => array(), 'inflow' => 0, 'outflow' => 0),
+            'investing' => array('items' => array(), 'inflow' => 0, 'outflow' => 0),
+            'financing' => array('items' => array(), 'inflow' => 0, 'outflow' => 0),
+        );
+
+        if (!empty($entryIds)) {
+            // 取這些傳票的所有非現金分錄；若有指定成本中心，只取該成本中心的非現金行
+            $ph = implode(',', array_fill(0, count($entryIds), '?'));
+            $extraWhere = '';
+            $extraParams = array();
+            if ($costCenterId) {
+                $extraWhere = ' AND jl.cost_center_id = ?';
+                $extraParams[] = (int)$costCenterId;
+            }
+            $sql2 = "SELECT jl.journal_entry_id, jl.debit_amount, jl.credit_amount,
+                            coa.account_code, coa.account_name
+                     FROM journal_entry_lines jl
+                     JOIN chart_of_accounts coa ON coa.id = jl.account_id
+                     WHERE jl.journal_entry_id IN ($ph)
+                       AND NOT (coa.account_code LIKE '1111%' OR coa.account_code LIKE '1112%' OR coa.account_code LIKE '1113%')
+                       $extraWhere";
+            $stmt = $this->db->prepare($sql2);
+            $stmt->execute(array_merge($entryIds, $extraParams));
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as $r) {
+                $code = $r['account_code'];
+                $cat = $this->_classifyCashFlow($code);
+                $key = $code . '|' . $r['account_name'];
+                if (!isset($sections[$cat]['items'][$key])) {
+                    $sections[$cat]['items'][$key] = array(
+                        'code' => $code,
+                        'name' => $r['account_name'],
+                        'inflow' => 0,
+                        'outflow' => 0,
+                    );
+                }
+                // 非現金 借方（debit）= 該科目支出 → 現金流出
+                // 非現金 貸方（credit）= 該科目收入 → 現金流入
+                $debit = (float)$r['debit_amount'];
+                $credit = (float)$r['credit_amount'];
+                if ($credit > 0) {
+                    $sections[$cat]['items'][$key]['inflow'] += $credit;
+                    $sections[$cat]['inflow'] += $credit;
+                }
+                if ($debit > 0) {
+                    $sections[$cat]['items'][$key]['outflow'] += $debit;
+                    $sections[$cat]['outflow'] += $debit;
+                }
+            }
+        }
+
+        // 排序每個分類內的明細：依 code
+        foreach ($sections as &$sec) {
+            usort($sec['items'], function($a, $b) { return strcmp($a['code'], $b['code']); });
+        }
+        unset($sec);
+
+        // 起期現金 = dateFrom 之前所有現金科目的淨借餘
+        $startCash = $this->_getCashBalance($this->_dateMinusOne($dateFrom), $costCenterId);
+        $endCash   = $this->_getCashBalance($dateTo, $costCenterId);
+        $periodChange = $endCash - $startCash;
+
+        return array(
+            'sections' => $sections,
+            'start_cash' => $startCash,
+            'end_cash' => $endCash,
+            'period_change' => $periodChange,
+        );
+    }
+
+    /**
+     * 依科目代碼前綴分類至 operating/investing/financing
+     */
+    private function _classifyCashFlow($code)
+    {
+        $p1 = substr($code, 0, 1);
+        $p2 = substr($code, 0, 2);
+        // 投資：12-19（非流動資產）
+        if ($p1 === '1' && $p2 !== '11') return 'investing';
+        // 籌資：22-29（長期負債）+ 3xxx（權益）
+        if (in_array($p2, array('22','23','24','25','26','27','28','29'), true)) return 'financing';
+        if ($p1 === '3') return 'financing';
+        // 其他都是營運（4/5/6/7/8 + 11(非現金) + 21）
+        return 'operating';
+    }
+
+    /**
+     * 取截止日的現金科目（1111/1112/1113）淨餘額（借-貸）
+     * 若指定成本中心：依「同筆傳票中非現金行」的成本中心歸屬，計算該分公司的現金累計增減
+     */
+    private function _getCashBalance($asOfDate, $costCenterId = null)
+    {
+        if ($costCenterId) {
+            // 找出這個分公司在該日前的所有現金活動（透過非現金對手行歸屬）
+            // 對該分公司：累計 = sum(該傳票現金行 借-貸) for each entry that has a non-cash line with cost_center=X
+            $stmt = $this->db->prepare("
+                SELECT COALESCE(SUM(cash_jl.debit_amount), 0) - COALESCE(SUM(cash_jl.credit_amount), 0) AS bal
+                FROM journal_entries je
+                JOIN journal_entry_lines cash_jl ON cash_jl.journal_entry_id = je.id
+                JOIN chart_of_accounts cash_coa ON cash_coa.id = cash_jl.account_id
+                WHERE je.status = 'posted' AND je.voucher_date <= ?
+                  AND (cash_coa.account_code LIKE '1111%' OR cash_coa.account_code LIKE '1112%' OR cash_coa.account_code LIKE '1113%')
+                  AND EXISTS (
+                      SELECT 1 FROM journal_entry_lines other_jl
+                      JOIN chart_of_accounts other_coa ON other_coa.id = other_jl.account_id
+                      WHERE other_jl.journal_entry_id = je.id
+                        AND NOT (other_coa.account_code LIKE '1111%' OR other_coa.account_code LIKE '1112%' OR other_coa.account_code LIKE '1113%')
+                        AND other_jl.cost_center_id = ?
+                  )
+            ");
+            $stmt->execute(array($asOfDate, (int)$costCenterId));
+            return (float)$stmt->fetchColumn();
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT COALESCE(SUM(jl.debit_amount), 0) - COALESCE(SUM(jl.credit_amount), 0) AS bal
+            FROM journal_entry_lines jl
+            JOIN journal_entries je ON je.id = jl.journal_entry_id AND je.status = 'posted' AND je.voucher_date <= ?
+            JOIN chart_of_accounts coa ON coa.id = jl.account_id
+            WHERE (coa.account_code LIKE '1111%' OR coa.account_code LIKE '1112%' OR coa.account_code LIKE '1113%')
+        ");
+        $stmt->execute(array($asOfDate));
+        return (float)$stmt->fetchColumn();
+    }
+
+    private function _dateMinusOne($date)
+    {
+        $t = strtotime($date . ' -1 day');
+        return $t ? date('Y-m-d', $t) : $date;
+    }
+
     public function getPLAccounts()
     {
         return $this->db->query("

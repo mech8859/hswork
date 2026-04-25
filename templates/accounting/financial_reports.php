@@ -69,6 +69,9 @@ $tabs = array(
     'trial_newspaper' => '閱報式試算表',
     'balance_sheet' => '資產負債表',
     'balance_sheet_newspaper' => '閱讀式資產負債表',
+    'cash_flow' => '現金流量表',
+    'is_by_branch' => 'IS 分公司比較',
+    'cfs_by_branch' => 'CFS 分公司比較',
 );
 foreach ($tabs as $key => $label): ?>
     <button type="button" class="btn <?= $frTab === $key ? 'btn-primary' : 'btn-secondary' ?>"
@@ -1001,6 +1004,237 @@ $_isBalanced = abs($_assetTotal - $_totalLE) < 1;
     </div>
 </div>
 
+<!-- ============================== -->
+<!-- Tab 10: 現金流量表（直接法）-->
+<!-- ============================== -->
+<?php elseif ($frTab === 'cash_flow'): ?>
+<?php
+$_cfsSecLabels = array(
+    'operating' => array('營運活動現金流量', '#cfe2ff'),
+    'investing' => array('投資活動現金流量', '#e2d4f0'),
+    'financing' => array('籌資活動現金流量', '#fdf0d9'),
+);
+$_cfsNetByCat = array();
+foreach ($cfsData['sections'] as $catKey => $sec) {
+    $_cfsNetByCat[$catKey] = $sec['inflow'] - $sec['outflow'];
+}
+$_cfsTotalNet = array_sum($_cfsNetByCat);
+?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
+<div class="card" style="padding:12px;margin-bottom:8px;background:#f8f9fa">
+    <strong>現金流量表（直接法）</strong>
+    期間: <?= e($dateFrom) ?> ~ <?= e($dateTo) ?>
+    <span style="margin-left:12px;color:#666;font-size:.85rem">現金科目：1111* 現金、1112* 零用金/備用金、1113* 銀行存款</span>
+</div>
+
+<div class="card" style="overflow-x:auto">
+    <table class="data-table" style="width:100%">
+        <thead>
+            <tr style="background:#f5f5f5">
+                <th style="width:90px">代碼</th>
+                <th>科目</th>
+                <th style="width:130px;text-align:right">現金流入</th>
+                <th style="width:130px;text-align:right">現金流出</th>
+                <th style="width:130px;text-align:right">淨額</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($_cfsSecLabels as $catKey => $sl):
+            $sec = $cfsData['sections'][$catKey];
+            $secNet = $sec['inflow'] - $sec['outflow'];
+        ?>
+        <tr style="background:<?= $sl[1] ?>;font-weight:bold">
+            <td colspan="5"><?= e($sl[0]) ?></td>
+        </tr>
+        <?php if (empty($sec['items'])): ?>
+        <tr><td colspan="5" style="text-align:center;color:#999;padding:8px">本期間無資料</td></tr>
+        <?php else: ?>
+        <?php foreach ($sec['items'] as $it):
+            $itNet = $it['inflow'] - $it['outflow'];
+        ?>
+        <tr>
+            <td><a href="<?= e($_lL($it['code'])) ?>" style="color:#1565c0;text-decoration:none;font-family:monospace"><?= e($it['code']) ?></a></td>
+            <td><?= e($it['name']) ?></td>
+            <td style="text-align:right;color:#16a34a"><?= $it['inflow'] > 0 ? nfmt($it['inflow']) : '' ?></td>
+            <td style="text-align:right;color:#dc2626"><?= $it['outflow'] > 0 ? '(' . nfmt($it['outflow']) . ')' : '' ?></td>
+            <td style="text-align:right;font-weight:600"><?= nfmt($itNet) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        <tr style="background:#e9ecef;font-weight:bold">
+            <td colspan="2" style="text-align:right"><?= e($sl[0]) ?> 小計</td>
+            <td style="text-align:right;color:#16a34a"><?= nfmt($sec['inflow']) ?></td>
+            <td style="text-align:right;color:#dc2626"><?= '(' . nfmt($sec['outflow']) . ')' ?></td>
+            <td style="text-align:right;font-weight:bold;color:<?= $secNet >= 0 ? '#16a34a' : '#dc2626' ?>"><?= nfmt($secNet) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        <!-- 本期現金及約當現金增減 -->
+        <tr style="background:#d4edda;font-weight:bold;font-size:1.05em">
+            <td colspan="4" style="text-align:right">本期現金及約當現金淨增（減）</td>
+            <td style="text-align:right;color:<?= $_cfsTotalNet >= 0 ? '#16a34a' : '#dc2626' ?>"><?= nfmt($_cfsTotalNet) ?></td>
+        </tr>
+        <tr>
+            <td colspan="4" style="text-align:right">期初現金及約當現金</td>
+            <td style="text-align:right"><?= nfmt($cfsData['start_cash']) ?></td>
+        </tr>
+        <tr style="background:#c3e6cb;font-weight:bold;font-size:1.1em">
+            <td colspan="4" style="text-align:right">期末現金及約當現金</td>
+            <td style="text-align:right"><?= nfmt($cfsData['end_cash']) ?></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<?php
+$_cfsCheck = $cfsData['start_cash'] + $_cfsTotalNet;
+$_cfsDiff = $_cfsCheck - $cfsData['end_cash'];
+?>
+<?php if (abs($_cfsDiff) > 1): ?>
+<div class="alert alert-error" style="margin-top:8px">
+    現金流量表不平衡（差 <?= nfmt($_cfsDiff) ?>）— 期初+淨增 ≠ 期末。
+    可能因內部現金科目間轉帳（如 銀行 → 零用金）也被計入。
+</div>
+<?php else: ?>
+<div class="alert alert-success" style="margin-top:8px">✓ 期初 + 本期淨增（減）= 期末，現金流量表平衡</div>
+<?php endif; ?>
+
+<!-- ============================== -->
+<!-- Tab 11: IS 分公司比較 -->
+<!-- ============================== -->
+<?php elseif ($frTab === 'is_by_branch'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
+<div class="card" style="padding:12px;margin-bottom:8px;background:#f8f9fa">
+    <strong>損益表 — 分公司（成本中心）比較</strong>
+    期間: <?= e($dateFrom) ?> ~ <?= e($dateTo) ?>
+</div>
+<!-- 分析圖 -->
+<div class="card" style="padding:16px;margin-bottom:16px">
+    <h3 style="margin-bottom:12px">分公司損益分析圖</h3>
+    <div style="width:95%;margin:0 auto">
+        <canvas id="isBranchChart" style="width:100%;max-height:520px"></canvas>
+    </div>
+</div>
+<div class="card" style="overflow-x:auto">
+    <table class="data-table" style="width:100%">
+        <thead>
+            <tr style="background:#f5f5f5">
+                <th style="width:160px">項目</th>
+                <?php foreach ($branchCompare as $b): ?>
+                <th style="text-align:right"><?= e($b['name']) ?></th>
+                <?php endforeach; ?>
+            </tr>
+        </thead>
+        <tbody>
+        <?php
+        $isRows = array(
+            array('label' => '營業收入', 'key' => 'revenue', 'highlight' => false),
+            array('label' => '營業成本', 'key' => 'cost', 'highlight' => false, 'bracket' => true),
+            array('label' => '營業毛利', 'key' => 'gross_profit', 'highlight' => true),
+            array('label' => '營業費用', 'key' => 'expense', 'highlight' => false, 'bracket' => true),
+            array('label' => '營業淨利', 'key' => 'operating_profit', 'highlight' => true),
+            array('label' => '營業外收入', 'key' => 'other_income', 'highlight' => false),
+            array('label' => '營業外費用', 'key' => 'other_expense', 'highlight' => false, 'bracket' => true),
+            array('label' => '稅前淨利', 'key' => 'pre_tax_income', 'highlight' => true),
+            array('label' => '所得稅', 'key' => 'tax', 'highlight' => false, 'bracket' => true),
+            array('label' => '本期淨利', 'key' => 'net_income', 'highlight' => true, 'big' => true),
+        );
+        foreach ($isRows as $row):
+            $bg = '';
+            if (!empty($row['big'])) $bg = 'background:#c3e6cb;font-weight:bold;font-size:1.05em';
+            elseif (!empty($row['highlight'])) $bg = 'background:#d4edda;font-weight:bold';
+        ?>
+        <tr style="<?= $bg ?>">
+            <td><?= e($row['label']) ?></td>
+            <?php foreach ($branchCompare as $b):
+                $v = isset($b['is'][$row['key']]) ? (float)$b['is'][$row['key']] : 0;
+            ?>
+            <td style="text-align:right"><?= !empty($row['bracket']) && $v > 0 ? '(' . nfmt($v) . ')' : nfmt($v) ?></td>
+            <?php endforeach; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+<!-- ============================== -->
+<!-- Tab 12: CFS 分公司比較 -->
+<!-- ============================== -->
+<?php elseif ($frTab === 'cfs_by_branch'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
+<div class="card" style="padding:12px;margin-bottom:8px;background:#f8f9fa">
+    <strong>現金流量表 — 分公司（成本中心）比較</strong>
+    期間: <?= e($dateFrom) ?> ~ <?= e($dateTo) ?>
+</div>
+<!-- 分析圖 -->
+<div class="card" style="padding:16px;margin-bottom:16px">
+    <h3 style="margin-bottom:12px">分公司現金流量分析圖</h3>
+    <div style="width:95%;margin:0 auto">
+        <canvas id="cfsBranchChart" style="width:100%;max-height:520px"></canvas>
+    </div>
+</div>
+<div class="card" style="overflow-x:auto">
+    <table class="data-table" style="width:100%">
+        <thead>
+            <tr style="background:#f5f5f5">
+                <th style="width:200px">項目</th>
+                <?php foreach ($branchCompare as $b): ?>
+                <th style="text-align:right"><?= e($b['name']) ?></th>
+                <?php endforeach; ?>
+            </tr>
+        </thead>
+        <tbody>
+        <?php
+        $cfsRows = array(
+            array('label' => '營運活動 — 流入', 'cat' => 'operating', 'side' => 'inflow', 'color' => '#16a34a'),
+            array('label' => '營運活動 — 流出', 'cat' => 'operating', 'side' => 'outflow', 'color' => '#dc2626', 'bracket' => true),
+            array('label' => '營運活動淨額', 'cat' => 'operating', 'side' => 'net', 'highlight' => '#cfe2ff'),
+            array('label' => '投資活動 — 流入', 'cat' => 'investing', 'side' => 'inflow', 'color' => '#16a34a'),
+            array('label' => '投資活動 — 流出', 'cat' => 'investing', 'side' => 'outflow', 'color' => '#dc2626', 'bracket' => true),
+            array('label' => '投資活動淨額', 'cat' => 'investing', 'side' => 'net', 'highlight' => '#e2d4f0'),
+            array('label' => '籌資活動 — 流入', 'cat' => 'financing', 'side' => 'inflow', 'color' => '#16a34a'),
+            array('label' => '籌資活動 — 流出', 'cat' => 'financing', 'side' => 'outflow', 'color' => '#dc2626', 'bracket' => true),
+            array('label' => '籌資活動淨額', 'cat' => 'financing', 'side' => 'net', 'highlight' => '#fdf0d9'),
+            array('label' => '本期現金淨增（減）', 'cat' => '_total_net', 'side' => '', 'highlight' => '#d4edda', 'bold' => true),
+            array('label' => '期初現金', 'cat' => '_start_cash', 'side' => ''),
+            array('label' => '期末現金', 'cat' => '_end_cash', 'side' => '', 'highlight' => '#c3e6cb', 'bold' => true),
+        );
+        foreach ($cfsRows as $row):
+            $bg = '';
+            if (!empty($row['highlight'])) $bg = 'background:' . $row['highlight'] . ';';
+            if (!empty($row['bold'])) $bg .= 'font-weight:bold;font-size:1.05em';
+        ?>
+        <tr style="<?= $bg ?>">
+            <td><?= e($row['label']) ?></td>
+            <?php foreach ($branchCompare as $b):
+                $cfs = isset($b['cfs']) ? $b['cfs'] : null;
+                $v = 0;
+                if ($cfs) {
+                    if ($row['cat'] === '_total_net') {
+                        $v = ($cfs['sections']['operating']['inflow'] - $cfs['sections']['operating']['outflow'])
+                           + ($cfs['sections']['investing']['inflow'] - $cfs['sections']['investing']['outflow'])
+                           + ($cfs['sections']['financing']['inflow'] - $cfs['sections']['financing']['outflow']);
+                    } elseif ($row['cat'] === '_start_cash') {
+                        $v = $cfs['start_cash'];
+                    } elseif ($row['cat'] === '_end_cash') {
+                        $v = $cfs['end_cash'];
+                    } elseif ($row['side'] === 'net') {
+                        $v = $cfs['sections'][$row['cat']]['inflow'] - $cfs['sections'][$row['cat']]['outflow'];
+                    } else {
+                        $v = $cfs['sections'][$row['cat']][$row['side']];
+                    }
+                }
+                $color = isset($row['color']) ? $row['color'] : '';
+            ?>
+            <td style="text-align:right;<?= $color ? 'color:' . $color : '' ?>">
+                <?= !empty($row['bracket']) && $v > 0 ? '(' . nfmt($v) . ')' : nfmt($v) ?>
+            </td>
+            <?php endforeach; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
 <?php endif; ?>
 
 <!-- ============================== -->
@@ -1378,6 +1612,75 @@ document.querySelectorAll('.chart-toggle').forEach(function(btn) {
             btn.textContent = '切換長條圖';
         }
     });
+});
+<?php endif; ?>
+
+<?php if ($frTab === 'is_by_branch'): ?>
+// IS 分公司比較長條圖
+new Chart(document.getElementById('isBranchChart'), {
+    type: 'bar',
+    data: {
+        labels: [<?php foreach ($branchCompare as $b) echo "'" . addslashes($b['name']) . "',"; ?>],
+        datasets: [
+            { label: '營業收入',  data: [<?php foreach ($branchCompare as $b) echo (float)($b['is']['revenue'] ?? 0) . ','; ?>], backgroundColor: '#00C853' },
+            { label: '營業成本',  data: [<?php foreach ($branchCompare as $b) echo (float)($b['is']['cost'] ?? 0) . ','; ?>], backgroundColor: '#FF4081' },
+            { label: '營業費用',  data: [<?php foreach ($branchCompare as $b) echo (float)($b['is']['expense'] ?? 0) . ','; ?>], backgroundColor: '#FFEA00' },
+            { label: '營業淨利',  data: [<?php foreach ($branchCompare as $b) echo (float)($b['is']['operating_profit'] ?? 0) . ','; ?>], backgroundColor: '#2962FF' },
+            { label: '本期淨利',  data: [<?php foreach ($branchCompare as $b) echo (float)($b['is']['net_income'] ?? 0) . ','; ?>], backgroundColor: '#7E57C2' }
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top', labels: { font: { size: 13, weight: 'bold' } } },
+            datalabels: {
+                anchor: 'end', align: 'top', color: '#333', font: { size: 11, weight: 'bold' },
+                formatter: function(v) { return v ? v.toLocaleString() : ''; }
+            }
+        },
+        scales: {
+            x: { ticks: { font: { size: 12 } } },
+            y: { ticks: { font: { size: 12 }, callback: function(v) { return v.toLocaleString(); } } }
+        }
+    }
+});
+<?php endif; ?>
+
+<?php if ($frTab === 'cfs_by_branch'): ?>
+// CFS 分公司比較長條圖
+new Chart(document.getElementById('cfsBranchChart'), {
+    type: 'bar',
+    data: {
+        labels: [<?php foreach ($branchCompare as $b) echo "'" . addslashes($b['name']) . "',"; ?>],
+        datasets: [
+            { label: '營運活動淨額',  data: [<?php foreach ($branchCompare as $b) {
+                $c = $b['cfs'] ?? null; $v = $c ? ($c['sections']['operating']['inflow'] - $c['sections']['operating']['outflow']) : 0; echo $v . ',';
+            } ?>], backgroundColor: '#2962FF' },
+            { label: '投資活動淨額',  data: [<?php foreach ($branchCompare as $b) {
+                $c = $b['cfs'] ?? null; $v = $c ? ($c['sections']['investing']['inflow'] - $c['sections']['investing']['outflow']) : 0; echo $v . ',';
+            } ?>], backgroundColor: '#7E57C2' },
+            { label: '籌資活動淨額',  data: [<?php foreach ($branchCompare as $b) {
+                $c = $b['cfs'] ?? null; $v = $c ? ($c['sections']['financing']['inflow'] - $c['sections']['financing']['outflow']) : 0; echo $v . ',';
+            } ?>], backgroundColor: '#FF9100' },
+            { label: '期末現金',     data: [<?php foreach ($branchCompare as $b) {
+                $c = $b['cfs'] ?? null; echo ($c ? (float)$c['end_cash'] : 0) . ',';
+            } ?>], backgroundColor: '#00C853' }
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top', labels: { font: { size: 13, weight: 'bold' } } },
+            datalabels: {
+                anchor: 'end', align: 'top', color: '#333', font: { size: 11, weight: 'bold' },
+                formatter: function(v) { return v ? v.toLocaleString() : ''; }
+            }
+        },
+        scales: {
+            x: { ticks: { font: { size: 12 } } },
+            y: { ticks: { font: { size: 12 }, callback: function(v) { return v.toLocaleString(); } } }
+        }
+    }
 });
 <?php endif; ?>
 </script>
