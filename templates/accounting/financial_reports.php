@@ -327,6 +327,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 2: 實際損益圖 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'actual_chart'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:16px">
     <h3 style="margin-bottom:16px">實際損益圖 - <?= $frYear ?>年 <?= $frMonthFrom ?>~<?= $frMonthTo ?>月</h3>
     <div style="max-width:800px;margin:0 auto">
@@ -338,6 +339,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 3: 預算損益圖 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'budget_chart'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:16px">
     <h3 style="margin-bottom:16px">預算損益圖 - <?= $frYear ?>年 <?= $frMonthFrom ?>~<?= $frMonthTo ?>月</h3>
     <div style="max-width:800px;margin:0 auto">
@@ -349,6 +351,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 4: 預實比較圖 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'budget_actual_chart'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:16px">
     <h3 style="margin-bottom:16px">預算 vs 實際比較 - <?= $frYear ?>年 <?= $frMonthFrom ?>~<?= $frMonthTo ?>月</h3>
     <div style="max-width:900px;margin:0 auto">
@@ -397,6 +400,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 5: 多期損益比較 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'multi_period'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:12px;margin-bottom:8px;background:#f8f9fa">
     <strong>多會計期間損益比較表</strong> <?= $frYear ?>年
 </div>
@@ -565,6 +569,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 6: 月份損益圖 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'monthly_chart'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:16px;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
         <h3 style="margin:0">月份損益圖 - <?= $frYear ?>年（<?= $frMonthFrom ?>月 ~ <?= $frMonthTo ?>月）</h3>
@@ -605,6 +610,7 @@ $_lL = function($code) use ($dateFrom, $dateTo, $frCcId) {
 <!-- Tab 7: 閱報式試算表 -->
 <!-- ============================== -->
 <?php elseif ($frTab === 'trial_newspaper'): ?>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;margin:8px 0 4px">禾順監視數位科技有限公司</div>
 <div class="card" style="padding:12px;margin-bottom:8px;background:#f8f9fa">
     <strong>閱報式試算表</strong> 截止日期: <?= e($dateTo) ?>
 </div>
@@ -1111,7 +1117,7 @@ $_cfsDiff = $_cfsCheck - $cfsData['end_cash'];
 <div class="card" style="padding:16px;margin-bottom:16px">
     <h3 style="margin-bottom:12px">分公司損益分析圖</h3>
     <div style="width:95%;margin:0 auto">
-        <canvas id="isBranchChart" style="width:100%;max-height:520px"></canvas>
+        <canvas id="isBranchChart" style="width:100%;height:560px"></canvas>
     </div>
 </div>
 <div class="card" style="overflow-x:auto">
@@ -1169,7 +1175,7 @@ $_cfsDiff = $_cfsCheck - $cfsData['end_cash'];
 <div class="card" style="padding:16px;margin-bottom:16px">
     <h3 style="margin-bottom:12px">分公司現金流量分析圖</h3>
     <div style="width:95%;margin:0 auto">
-        <canvas id="cfsBranchChart" style="width:100%;max-height:520px"></canvas>
+        <canvas id="cfsBranchChart" style="width:100%;height:560px"></canvas>
     </div>
 </div>
 <div class="card" style="overflow-x:auto">
@@ -1344,7 +1350,9 @@ window._monthlyChartConfig = {
                 labels: { font: { size: 14, weight: 'bold' }, boxWidth: 18, padding: 14 }
             },
             datalabels: {
-                anchor: 'end', align: 'top', color: '#333', font: { size: 13, weight: 'bold' },
+                anchor: 'end', align: 'top',
+                color: function(ctx) { return ctx.dataset.data[ctx.dataIndex] < 0 ? '#dc2626' : '#333'; },
+                font: { size: 13, weight: 'bold' },
                 formatter: function(v) { return v ? v.toLocaleString() : ''; }
             }
         },
@@ -1631,16 +1639,31 @@ new Chart(document.getElementById('isBranchChart'), {
     },
     options: {
         responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 60, bottom: 40, left: 8, right: 8 } },
         plugins: {
-            legend: { position: 'top', labels: { font: { size: 13, weight: 'bold' } } },
+            legend: { position: 'top', labels: { font: { size: 15, weight: 'bold' }, boxWidth: 48, boxHeight: 18, padding: 16 } },
             datalabels: {
-                anchor: 'end', align: 'top', color: '#333', font: { size: 11, weight: 'bold' },
-                formatter: function(v) { return v ? v.toLocaleString() : ''; }
+                anchor: 'end',
+                align: function(ctx) { return ctx.dataset.data[ctx.dataIndex] < 0 ? 'bottom' : 'top'; },
+                color: function(ctx) { return ctx.dataset.data[ctx.dataIndex] < 0 ? '#dc2626' : '#333'; },
+                font: { size: 14, weight: 'bold' },
+                clip: false,
+                offset: function(ctx) {
+                    // 不同 dataset 用不同 offset，避免相鄰 dataset 同高的標籤撞在一起
+                    return 4 + (ctx.datasetIndex % 2) * 18;
+                },
+                formatter: function(v, ctx) {
+                    if (!v) return '';
+                    var maxAbs = 0;
+                    ctx.dataset.data.forEach(function(d) { if (Math.abs(d) > maxAbs) maxAbs = Math.abs(d); });
+                    if (maxAbs > 0 && Math.abs(v) / maxAbs < 0.05) return '';
+                    return v.toLocaleString();
+                }
             }
         },
         scales: {
-            x: { ticks: { font: { size: 12 } } },
-            y: { ticks: { font: { size: 12 }, callback: function(v) { return v.toLocaleString(); } } }
+            x: { ticks: { font: { size: 15, weight: 'bold' } } },
+            y: { ticks: { font: { size: 13 }, callback: function(v) { return v.toLocaleString(); } } }
         }
     }
 });
@@ -1669,16 +1692,31 @@ new Chart(document.getElementById('cfsBranchChart'), {
     },
     options: {
         responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 60, bottom: 40, left: 8, right: 8 } },
         plugins: {
-            legend: { position: 'top', labels: { font: { size: 13, weight: 'bold' } } },
+            legend: { position: 'top', labels: { font: { size: 15, weight: 'bold' }, boxWidth: 48, boxHeight: 18, padding: 16 } },
             datalabels: {
-                anchor: 'end', align: 'top', color: '#333', font: { size: 11, weight: 'bold' },
-                formatter: function(v) { return v ? v.toLocaleString() : ''; }
+                anchor: 'end',
+                align: function(ctx) { return ctx.dataset.data[ctx.dataIndex] < 0 ? 'bottom' : 'top'; },
+                color: function(ctx) { return ctx.dataset.data[ctx.dataIndex] < 0 ? '#dc2626' : '#333'; },
+                font: { size: 14, weight: 'bold' },
+                clip: false,
+                offset: function(ctx) {
+                    // 不同 dataset 用不同 offset，避免相鄰 dataset 同高的標籤撞在一起
+                    return 4 + (ctx.datasetIndex % 2) * 18;
+                },
+                formatter: function(v, ctx) {
+                    if (!v) return '';
+                    var maxAbs = 0;
+                    ctx.dataset.data.forEach(function(d) { if (Math.abs(d) > maxAbs) maxAbs = Math.abs(d); });
+                    if (maxAbs > 0 && Math.abs(v) / maxAbs < 0.05) return '';
+                    return v.toLocaleString();
+                }
             }
         },
         scales: {
-            x: { ticks: { font: { size: 12 } } },
-            y: { ticks: { font: { size: 12 }, callback: function(v) { return v.toLocaleString(); } } }
+            x: { ticks: { font: { size: 15, weight: 'bold' } } },
+            y: { ticks: { font: { size: 13 }, callback: function(v) { return v.toLocaleString(); } } }
         }
     }
 });
