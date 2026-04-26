@@ -92,6 +92,51 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 結案資料異常 ----
+    case 'closed_anomalies':
+        if (!Auth::canAccessReport('closed_anomalies') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $db = Database::getInstance();
+        $ph = implode(',', array_map('intval', $branchIds));
+        $bidFilter = !empty($branchIds) ? "AND branch_id IN ({$ph})" : 'AND 0';
+
+        $totalClosed = (int)$db->query("SELECT COUNT(*) FROM cases WHERE status='closed' {$bidFilter}")->fetchColumn();
+        $lockedCount = (int)$db->query("SELECT COUNT(*) FROM cases WHERE status='closed' AND is_locked=1 {$bidFilter}")->fetchColumn();
+
+        $anomBalance = $db->query("
+            SELECT id, case_number, title, customer_name, branch_id, is_locked,
+                   total_amount, deal_amount, balance_amount, total_collected,
+                   settlement_confirmed, settlement_date, completion_date
+            FROM cases
+            WHERE status='closed' AND balance_amount IS NOT NULL AND balance_amount != 0 {$bidFilter}
+            ORDER BY id DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $anomSettle = $db->query("
+            SELECT id, case_number, title, customer_name, branch_id, is_locked,
+                   balance_amount, settlement_confirmed, completion_date
+            FROM cases
+            WHERE status='closed' AND (settlement_confirmed IS NULL OR settlement_confirmed = 0) {$bidFilter}
+            ORDER BY id DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $anomCompletion = $db->query("
+            SELECT id, case_number, title, customer_name, branch_id, is_locked,
+                   completion_date, balance_amount, settlement_confirmed
+            FROM cases
+            WHERE status='closed' AND completion_date IS NULL {$bidFilter}
+            ORDER BY id DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $pageTitle = '結案資料異常';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/closed_anomalies.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 完工未收款 / 未完工 ----
     case 'unpaid_cases':
         if (!Auth::canAccessReport('unpaid_cases') && !Auth::hasPermission('all')) {

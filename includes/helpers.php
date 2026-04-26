@@ -530,6 +530,124 @@ function tryAutoCloseCase($caseId)
     $l2->execute(array($caseId));
     if ((int)$l2->fetchColumn() === 0) return false;
 
-    $db->prepare("UPDATE cases SET status = 'closed' WHERE id = ?")->execute(array($caseId));
+    // 結案時順手上鎖（清掉解鎖時間戳，避免懸空）
+    $db->prepare("UPDATE cases SET status = 'closed', is_locked = 1, locked_by = COALESCE(locked_by, ?), locked_at = COALESCE(locked_at, NOW()), unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")
+       ->execute(array(_lockSystemUserId(), $caseId));
     return true;
+}
+
+/**
+ * 案件結案鎖：取得「系統」操作的 user_id，用於自動結案的 locked_by 欄位
+ * 優先：當前登入者；無登入則 0（代表系統自動）
+ */
+function _lockSystemUserId()
+{
+    $u = Session::getUser();
+    return $u && isset($u['id']) ? (int)$u['id'] : 0;
+}
+
+/**
+ * 案件結案鎖：判斷案件目前是否處於「鎖定狀態」（編輯被禁止）
+ * 邏輯：is_locked=1 → 鎖定；is_locked=0 但 status='closed' 且 unlocked_at 超過 30 分鐘 → 視為已過期，呼叫端應重鎖
+ *
+ * @return array ['locked' => bool, 'expired' => bool, 'unlocked_by' => int, 'unlocked_at' => string]
+ */
+function getCaseLockState($case)
+{
+    $isClosed = isset($case['status']) && $case['status'] === 'closed';
+    $isLocked = !empty($case['is_locked']);
+    $unlockedAt = isset($case['unlocked_at']) ? $case['unlocked_at'] : null;
+    $expired = false;
+    if ($isClosed && !$isLocked && $unlockedAt) {
+        // 解鎖逾時 30 分鐘 → 視為過期，應重鎖
+        $expired = (strtotime($unlockedAt) + 30 * 60) < time();
+    }
+    return array(
+        'locked' => $isLocked || $expired,
+        'expired' => $expired,
+        'unlocked_by' => isset($case['unlocked_by']) ? (int)$case['unlocked_by'] : 0,
+        'unlocked_at' => $unlockedAt,
+    );
+}
+
+/**
+ * 案件結案鎖：懶式 timeout 重鎖
+ * 載入案件時呼叫；若已結案 + 解鎖逾時 30 分鐘 → 自動回到鎖定狀態
+ *
+ * @return bool true=有重鎖，false=不需重鎖
+ */
+function autoRelockCaseIfExpired($caseId)
+{
+    $db = Database::getInstance();
+    $stmt = $db->prepare("SELECT status, is_locked, unlocked_at FROM cases WHERE id = ?");
+    $stmt->execute(array($caseId));
+    $c = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return false;
+    if ($c['status'] !== 'closed') return false;
+    if (!empty($c['is_locked'])) return false;
+    if (empty($c['unlocked_at'])) return false;
+    if ((strtotime($c['unlocked_at']) + 30 * 60) >= time()) return false;
+    // 逾時，重鎖
+    $db->prepare("UPDATE cases SET is_locked = 1, unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")
+       ->execute(array($caseId));
+    return true;
+}
+
+/**
+ * 案件結案鎖：判斷使用者是否可解鎖
+ */
+function canUnlockCase()
+{
+    $u = Session::getUser();
+    if (!$u) return false;
+    return in_array($u['role'], array('boss', 'vice_president'));
+}
+
+/**
+ * 案件結案鎖：自動鎖「乾淨已結案」案件
+ * 條件：status='closed' AND balance=0 AND settlement_confirmed=1 AND completion_date NOT NULL AND is_locked=0
+ * 用於：在邊緣事件後（編輯存檔、收款結清等）順手鎖；不會動異常資料
+ *
+ * @return bool true=有鎖到
+ */
+function lockCaseIfClean($caseId)
+{
+    $db = Database::getInstance();
+    $stmt = $db->prepare("
+        UPDATE cases
+        SET is_locked = 1,
+            locked_by = COALESCE(locked_by, ?),
+            locked_at = COALESCE(locked_at, NOW()),
+            unlocked_at = NULL,
+            unlocked_by = NULL
+        WHERE id = ?
+          AND status = 'closed'
+          AND is_locked = 0
+          AND (balance_amount IS NULL OR balance_amount = 0)
+          AND settlement_confirmed = 1
+          AND completion_date IS NOT NULL
+    ");
+    $stmt->execute(array(_lockSystemUserId(), (int)$caseId));
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * 案件結案鎖：守門 — 在 UPDATE cases 前呼叫，已鎖則丟例外
+ * 對於 boss/vice_president 不擋（解鎖期間或強制接管使用）
+ *
+ * @param int $caseId
+ * @param string $reason 用於錯誤訊息的操作描述（例如「修改案件」、「新增收款單」）
+ * @throws RuntimeException
+ */
+function assertCaseNotLocked($caseId, $reason = '修改案件')
+{
+    $db = Database::getInstance();
+    $stmt = $db->prepare("SELECT status, is_locked, unlocked_at FROM cases WHERE id = ?");
+    $stmt->execute(array($caseId));
+    $c = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return;
+    $state = getCaseLockState($c);
+    if (!$state['locked']) return;
+    // 鎖定狀態下：boss/vice_president 也擋（要他們先到案件編輯頁解鎖再操作，留軌跡）
+    throw new \RuntimeException('此案件已完工結案並上鎖，無法' . $reason . '。請先解鎖再操作。');
 }

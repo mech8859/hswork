@@ -179,9 +179,10 @@ switch ($action) {
                         // 不應該到這裡（前面已擋），保險起見再擋一次
                         Session::flash('error', $advance['error']);
                     } elseif ($advStatus === 'closed') {
-                        // 全部簽完 + 尾款=0 → 案件進度改為已完工結案
-                        $db->prepare("UPDATE cases SET status = 'closed' WHERE id = ?")->execute(array($targetId));
-                        Session::flash('success', '已核准，案件已完工結案');
+                        // 全部簽完 + 尾款=0 → 案件進度改為已完工結案，並自動上鎖
+                        $db->prepare("UPDATE cases SET status = 'closed', is_locked = 1, locked_by = COALESCE(locked_by, ?), locked_at = COALESCE(locked_at, NOW()), unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")
+                           ->execute(array(Auth::id(), $targetId));
+                        Session::flash('success', '已核准，案件已完工結案並自動上鎖');
                     } elseif ($advStatus === 'unpaid') {
                         // Level 2 勾無收款 → 案件進度改為完工未收款
                         $db->prepare("UPDATE cases SET status = 'unpaid' WHERE id = ?")->execute(array($targetId));

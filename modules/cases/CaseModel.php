@@ -439,6 +439,18 @@ class CaseModel
      */
     public function update(int $id, array $data): void
     {
+        // 結案鎖：守門 — 已上鎖案件不能透過 update 修改（boss/vp 也擋；要先解鎖）
+        // 簽核流程通過 _from_approval flag 跳過
+        if (empty($data['_from_approval'])) {
+            try {
+                if (function_exists('assertCaseNotLocked')) {
+                    assertCaseNotLocked($id, '修改案件');
+                }
+            } catch (\RuntimeException $lockEx) {
+                throw $lockEx;
+            }
+        }
+
         // 紀錄變更前的進度/狀態（供案件更新進度報表使用）
         $beforeRow = null;
         try {

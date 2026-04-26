@@ -185,6 +185,8 @@ switch ($action) {
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
         $id = (int)($_GET['id'] ?? 0);
+        // 結案鎖：載入前先做懶式 timeout 重鎖（解鎖逾 30 分鐘自動回鎖）
+        autoRelockCaseIfExpired($id);
         $case = $model->getById($id);
         if (!$case) {
             Session::flash('error', '案件不存在');
@@ -220,10 +222,20 @@ switch ($action) {
             redirect('/cases.php');
         }
 
+        // 結案鎖：判定鎖定狀態，覆蓋 $caseCanEdit
+        $caseLockState = getCaseLockState($case);
+        if ($caseLockState['locked']) {
+            // 鎖定中 → 任何人（含 boss/vp）都不能直接編輯，必須先解鎖
+            $caseCanEdit = false;
+        }
+        // 提供模板使用：是否可看到「解鎖」按鈕
+        $caseCanUnlock = canUnlockCase();
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 後端守門：無編輯權限不能 POST
             if (!$caseCanEdit) {
-                Session::flash('error', '無編輯權限，僅可檢視');
+                $errMsg = $caseLockState['locked'] ? '此案件已完工結案並上鎖，請先解鎖再編輯' : '無編輯權限，僅可檢視';
+                Session::flash('error', $errMsg);
                 redirect('/cases.php?action=edit&id=' . $id);
             }
             if (!verify_csrf()) {
@@ -280,6 +292,10 @@ switch ($action) {
             }
             // 嘗試自動結案（手動編輯後若四項條件都到位）
             tryAutoCloseCase($id);
+            // 結案鎖：若案件已是 closed 且乾淨（balance=0 + 結清 + 完工日齊），自動補鎖
+            if (function_exists('lockCaseIfClean')) {
+                lockCaseIfClean($id);
+            }
             Session::flash('success', '案件已更新');
             redirect('/cases.php?action=view&id=' . $id);
         }
@@ -603,6 +619,15 @@ switch ($action) {
     case 'add_payment':
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
+        // 結案鎖：擋住對已上鎖案件的新增帳款（不影響未結案案件）
+        $_addPayCaseId = (int)($_POST['case_id'] ?? 0);
+        if ($_addPayCaseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($_addPayCaseId, '新增帳款交易'); }
+            catch (\RuntimeException $_lockEx) {
+                echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage()));
+                break;
+            }
+        }
         try {
         $caseId = (int)($_POST['case_id'] ?? 0);
         $payDate = $_POST['payment_date'] ?? '';
@@ -729,6 +754,14 @@ switch ($action) {
         $stmt->execute(array($pid));
         $pay = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$pay) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
+        // 結案鎖：擋住對已上鎖案件的帳款編輯（不影響未結案案件）
+        if (!empty($pay['case_id']) && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked((int)$pay['case_id'], '修改帳款交易'); }
+            catch (\RuntimeException $_lockEx) {
+                echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage()));
+                break;
+            }
+        }
 
         $newDate = $_POST['payment_date'] ?? '';
         $newType = $_POST['payment_type'] ?? '';
@@ -928,6 +961,15 @@ switch ($action) {
         $delCaseId = (int)$delRow['case_id'];
         $delReceiptNo = $delRow['receipt_number'];
 
+        // 結案鎖：擋住對已上鎖案件的帳款刪除（不影響未結案案件）
+        if ($delCaseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($delCaseId, '刪除帳款交易'); }
+            catch (\RuntimeException $_lockEx) {
+                echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage()));
+                break;
+            }
+        }
+
         // ⚠ 連動防呆：如果有對應收款單，擋下並提示
         if (!empty($delReceiptNo)) {
             try {
@@ -966,6 +1008,11 @@ switch ($action) {
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $caseId = (int)($_POST['case_id'] ?? 0);
+        // 結案鎖
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '新增施工回報'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $stmt = Database::getInstance()->prepare('INSERT INTO case_work_logs (case_id, work_date, work_content, equipment_used, cable_used, created_by) VALUES (?, ?, ?, ?, ?, ?)');
         $stmt->execute(array($caseId, $_POST['work_date'] ?? '', $_POST['work_content'] ?? '', $_POST['equipment_used'] ?? '', $_POST['cable_used'] ?? '', Auth::id()));
         $newId = (int)Database::getInstance()->lastInsertId();
@@ -996,6 +1043,11 @@ switch ($action) {
         $stmt->execute(array($wid));
         $wl = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$wl) { echo json_encode(array('success' => false, 'error' => '找不到紀錄')); break; }
+        // 結案鎖
+        if (!empty($wl['case_id']) && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked((int)$wl['case_id'], '修改施工回報'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         Database::getInstance()->prepare('UPDATE case_work_logs SET work_date=?, work_content=?, equipment_used=?, cable_used=? WHERE id=?')
             ->execute(array($_POST['work_date'] ?? '', $_POST['work_content'] ?? '', $_POST['equipment_used'] ?? '', $_POST['cable_used'] ?? '', $wid));
         if (!empty($_FILES['photos']['name'][0])) {
@@ -1023,6 +1075,14 @@ switch ($action) {
             break;
         }
         $wid = (int)($_POST['worklog_id'] ?? 0);
+        // 結案鎖：先查 case_id
+        $_wlCheck = Database::getInstance()->prepare('SELECT case_id FROM case_work_logs WHERE id = ?');
+        $_wlCheck->execute(array($wid));
+        $_wlCaseId = (int)$_wlCheck->fetchColumn();
+        if ($_wlCaseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($_wlCaseId, '刪除施工回報'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         Database::getInstance()->prepare('DELETE FROM case_work_logs WHERE id = ?')->execute(array($wid));
         echo json_encode(array('success' => true));
         break;
@@ -1032,6 +1092,11 @@ switch ($action) {
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $caseId = (int)($_GET['id'] ?? 0);
+        // 結案鎖
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '上傳附件'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $fileType = $_POST['file_type'] ?? 'other';
         if (empty($_FILES['file']['tmp_name'])) { echo json_encode(array('success' => false, 'error' => '無檔案')); break; }
         $dir = __DIR__ . '/uploads/cases/' . $caseId;
@@ -1054,6 +1119,14 @@ switch ($action) {
             break;
         }
         $attId = (int)($_POST['attachment_id'] ?? 0);
+        // 結案鎖：先查附件對應的 case_id
+        $_attCheck = Database::getInstance()->prepare('SELECT case_id FROM case_attachments WHERE id = ?');
+        $_attCheck->execute(array($attId));
+        $_attCaseId = (int)$_attCheck->fetchColumn();
+        if ($_attCaseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($_attCaseId, '刪除附件'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $model->deleteAttachment($attId);
         echo json_encode(array('success' => true));
         break;
@@ -1074,6 +1147,11 @@ switch ($action) {
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $caseId = (int)($_POST['case_id'] ?? 0);
+        // 結案鎖
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '切換不允許拍照'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $noPhoto = (int)($_POST['no_photo'] ?? 0);
         Database::getInstance()->prepare('UPDATE case_readiness SET no_photo_allowed = ? WHERE case_id = ?')->execute(array($noPhoto, $caseId));
         echo json_encode(array('success' => true));
@@ -1227,6 +1305,11 @@ switch ($action) {
         $biId = (int)($_POST['id'] ?? 0);
         $caseId = (int)($_POST['case_id'] ?? 0);
         if (!$caseId) { echo json_encode(array('success' => false, 'error' => '缺少案件ID')); break; }
+        // 結案鎖
+        if (function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '新增/修改請款項目'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $biData = array(
             !empty($_POST['payment_category']) ? $_POST['payment_category'] : '',
             !empty($_POST['amount_untaxed']) ? (int)str_replace(',', '', $_POST['amount_untaxed']) : null,
@@ -1319,6 +1402,11 @@ switch ($action) {
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $biId = (int)($_POST['id'] ?? 0);
         $caseId = (int)($_POST['case_id'] ?? 0);
+        // 結案鎖
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '刪除請款項目'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         if ($biId && $caseId) {
             Database::getInstance()->prepare("DELETE FROM case_billing_items WHERE id=? AND case_id=?")->execute(array($biId, $caseId));
         }
@@ -1349,6 +1437,11 @@ switch ($action) {
             break;
         }
         $caseId = (int)($_POST['case_id'] ?? 0);
+        // 結案鎖
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+            try { assertCaseNotLocked($caseId, '修改支援分公司'); }
+            catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
+        }
         $selectedBranches = $_POST['branch_ids'] ?? array();
         if (!is_array($selectedBranches)) {
             $selectedBranches = array();
@@ -1356,6 +1449,65 @@ switch ($action) {
         $selectedBranches = array_map('intval', $selectedBranches);
         $model->saveSupportBranches($caseId, $selectedBranches, Auth::id());
         echo json_encode(array('success' => true));
+        break;
+
+    // ---- 結案鎖：解鎖案件（boss / vice_president）----
+    case 'unlock_case':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/cases.php'); }
+        if (!verify_csrf()) {
+            Session::flash('error', '安全驗證失敗');
+            redirect('/cases.php');
+        }
+        if (!canUnlockCase()) {
+            Session::flash('error', '無解鎖權限（限 boss / 副總）');
+            redirect('/cases.php');
+        }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        if ($caseId > 0) {
+            $db = Database::getInstance();
+            $u = Auth::user();
+            $stmt = $db->prepare("UPDATE cases SET is_locked = 0, unlocked_at = NOW(), unlocked_by = ? WHERE id = ? AND status = 'closed'");
+            $stmt->execute(array($u['id'], $caseId));
+            if ($stmt->rowCount() > 0) {
+                AuditLog::log('cases', 'unlock', $caseId, '解鎖結案案件（' . $u['real_name'] . '）');
+                // 寫入 case_status_history 留軌跡
+                try {
+                    $db->prepare("INSERT INTO case_status_history (case_id, old_status, new_status, changed_by, change_reason, changed_at) VALUES (?, ?, ?, ?, ?, NOW())")
+                       ->execute(array($caseId, 'closed_locked', 'closed_unlocked', $u['id'], '管理員解鎖編輯'));
+                } catch (Exception $e) { /* 表不存在或欄位不同則跳過 */ }
+                Session::flash('success', '已解鎖，請於 30 分鐘內完成編輯並儲存（存檔後自動重鎖）');
+            } else {
+                Session::flash('error', '解鎖失敗（案件不存在或非已結案狀態）');
+            }
+        }
+        redirect('/cases.php?action=edit&id=' . $caseId);
+        break;
+
+    // ---- 結案鎖：手動上鎖（boss / vice_president）----
+    case 'lock_case':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/cases.php'); }
+        if (!verify_csrf()) {
+            Session::flash('error', '安全驗證失敗');
+            redirect('/cases.php');
+        }
+        if (!canUnlockCase()) {
+            Session::flash('error', '無上鎖權限（限 boss / 副總）');
+            redirect('/cases.php');
+        }
+        $caseId = (int)($_POST['case_id'] ?? 0);
+        if ($caseId > 0) {
+            $db = Database::getInstance();
+            $u = Auth::user();
+            $stmt = $db->prepare("UPDATE cases SET is_locked = 1, locked_by = ?, locked_at = NOW(), unlocked_at = NULL, unlocked_by = NULL WHERE id = ? AND status = 'closed'");
+            $stmt->execute(array($u['id'], $caseId));
+            if ($stmt->rowCount() > 0) {
+                AuditLog::log('cases', 'lock', $caseId, '手動上鎖結案案件（' . $u['real_name'] . '）');
+                Session::flash('success', '案件已上鎖');
+            } else {
+                Session::flash('error', '上鎖失敗（案件不存在或非已結案狀態）');
+            }
+        }
+        redirect('/cases.php?action=edit&id=' . $caseId);
         break;
 
     default:

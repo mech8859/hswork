@@ -194,6 +194,15 @@ switch ($action) {
                     $caseStmt->execute(array($rNum));
                     $affectedCaseIds = array_filter($caseStmt->fetchAll(PDO::FETCH_COLUMN));
                     foreach ($affectedCaseIds as $cid) {
+                        // 結案鎖：已鎖案件拒絕回寫帳款（避免結案後資料被改）
+                        try {
+                            if (function_exists('assertCaseNotLocked')) {
+                                assertCaseNotLocked($cid, '回寫案件帳款');
+                            }
+                        } catch (\RuntimeException $lockEx) {
+                            error_log('Receipt sync blocked by case lock: case_id=' . $cid . ' msg=' . $lockEx->getMessage());
+                            continue; // 跳過該案件，不影響其他案件
+                        }
                         $totalStmt = Database::getInstance()->prepare("SELECT COALESCE(SUM(amount),0), COALESCE(SUM(wire_fee),0) FROM case_payments WHERE case_id = ?");
                         $totalStmt->execute(array($cid));
                         $sumRow = $totalStmt->fetch(PDO::FETCH_NUM);
@@ -251,6 +260,10 @@ switch ($action) {
                         // 嘗試自動結案（只有狀態改為已收款才觸發，避免每次更新都重複跑）
                         if ($data['status'] === '已收款' && $record['status'] !== '已收款') {
                             tryAutoCloseCase($cid);
+                        }
+                        // 結案鎖：若案件已是 closed 且乾淨（balance=0 + 結清 + 完工日齊），自動補鎖
+                        if (function_exists('lockCaseIfClean')) {
+                            lockCaseIfClean($cid);
                         }
                     }
                 } catch (Exception $autoSettleEx) {

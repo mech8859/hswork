@@ -16,13 +16,207 @@ function pivotRowTotal($data, $months) {
     <h2>📊 案件綜合分析</h2>
     <form method="GET" class="d-flex gap-1 align-center">
         <input type="hidden" name="action" value="case_analysis">
-        <select name="year" class="form-control" style="width:auto" onchange="this.form.submit()">
+        <input type="hidden" name="perf_month" value="<?= e(isset($_GET['perf_month']) && preg_match('/^\d{4}-\d{2}$/', $_GET['perf_month']) ? $_GET['perf_month'] : date('Y-m')) ?>" id="topPerfMonth">
+        <select name="year" class="form-control" style="width:auto" onchange="
+            var y = parseInt(this.value);
+            var pm = document.getElementById('topPerfMonth');
+            if (pm && parseInt(pm.value.substring(0,4)) !== y) {
+                var t = new Date();
+                var snap = (y === t.getFullYear()) ? ('0'+(t.getMonth()+1)).slice(-2) : '12';
+                pm.value = y + '-' + snap;
+            }
+            this.form.submit();
+        ">
             <?php for ($y = (int)date('Y'); $y >= 2024; $y--): ?>
             <option value="<?= $y ?>" <?= $analysis['year'] == $y ? 'selected' : '' ?>><?= ($y - 1911) ?>年 (<?= $y ?>)</option>
             <?php endfor; ?>
         </select>
         <?= back_button('/reports.php') ?>
     </form>
+</div>
+
+<!-- ★ 本月業務新案 / 老客戶追加 績效（依分公司、業務人員）-->
+<?php
+$cmLabel = isset($_GET['perf_month']) && preg_match('/^\d{4}-\d{2}$/', $_GET['perf_month']) ? $_GET['perf_month'] : date('Y-m');
+$cmStart = $cmLabel . '-01';
+$cmEnd   = date('Y-m-t', strtotime($cmStart));
+// 產生最近 24 個月的選項
+$cmMonthOptions = array();
+for ($i = 0; $i < 24; $i++) {
+    $cmMonthOptions[] = date('Y-m', strtotime("-{$i} months"));
+}
+$cmBranchPh = !empty($branchIds) ? implode(',', array_map('intval', $branchIds)) : '0';
+$cmDb = Database::getInstance();
+$cmStmt = $cmDb->query("
+    SELECT c.branch_id,
+           b.name AS branch_name,
+           c.sales_id,
+           u.real_name AS sales_name,
+           u.role AS sales_role,
+           c.case_type,
+           c.sub_status
+    FROM cases c
+    JOIN branches b ON c.branch_id = b.id
+    LEFT JOIN users u ON c.sales_id = u.id
+    WHERE c.branch_id IN ({$cmBranchPh})
+      AND c.case_type IN ('new_install','addition')
+      AND c.created_at BETWEEN '{$cmStart} 00:00:00' AND '{$cmEnd} 23:59:59'
+");
+$cmRows = $cmStmt->fetchAll(PDO::FETCH_ASSOC);
+$cmClosed = array('已成交','跨月成交','現簽','電話報價成交');
+
+$cmBranchAgg = array();   // [branch_name => [new_entry,new_closed,add_entry,add_closed]]
+$cmSalesAgg  = array();   // [branch_name => [sales_name => [...,role]]]
+foreach ($cmRows as $r) {
+    $bn = $r['branch_name'] ?: '(未設定)';
+    $sn = $r['sales_name'] ?: '(未指定)';
+    $role = $r['sales_role'] ?: '';
+    $isAdd = ($r['case_type'] === 'addition');
+    $isClosed = in_array($r['sub_status'], $cmClosed);
+
+    if (!isset($cmBranchAgg[$bn])) {
+        $cmBranchAgg[$bn] = array('new_entry'=>0,'new_closed'=>0,'add_entry'=>0,'add_closed'=>0);
+    }
+    if ($isAdd) { $cmBranchAgg[$bn]['add_entry']++; if ($isClosed) $cmBranchAgg[$bn]['add_closed']++; }
+    else        { $cmBranchAgg[$bn]['new_entry']++; if ($isClosed) $cmBranchAgg[$bn]['new_closed']++; }
+
+    if (!in_array($role, array('sales_manager','sales'))) continue;
+    if (!isset($cmSalesAgg[$bn])) $cmSalesAgg[$bn] = array();
+    if (!isset($cmSalesAgg[$bn][$sn])) {
+        $cmSalesAgg[$bn][$sn] = array('role'=>$role,'new_entry'=>0,'new_closed'=>0,'add_entry'=>0,'add_closed'=>0);
+    }
+    if ($isAdd) { $cmSalesAgg[$bn][$sn]['add_entry']++; if ($isClosed) $cmSalesAgg[$bn][$sn]['add_closed']++; }
+    else        { $cmSalesAgg[$bn][$sn]['new_entry']++; if ($isClosed) $cmSalesAgg[$bn][$sn]['new_closed']++; }
+}
+ksort($cmBranchAgg);
+ksort($cmSalesAgg);
+$cmRate = function($num, $den) { return $den > 0 ? round($num / $den * 100, 1) . '%' : '-'; };
+?>
+<div class="card">
+    <div class="card-header analysis-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>★ <?= ($cmLabel === date('Y-m')) ? '本月' : '指定月份' ?>（<?= e($cmLabel) ?>）業務新案 / 老客戶追加 績效</span>
+        <form method="GET" style="margin:0;display:flex;align-items:center;gap:6px">
+            <input type="hidden" name="action" value="case_analysis">
+            <input type="hidden" name="year" value="<?= (int)$analysis['year'] ?>">
+            <label style="color:#fff;font-weight:normal;font-size:13px">月份</label>
+            <select name="perf_month" class="form-control" style="width:auto;height:28px;padding:2px 6px;font-size:13px" onchange="
+                var y = this.value.substring(0,4);
+                var yi = this.form.querySelector('input[name=year]');
+                if (yi) yi.value = y;
+                this.form.submit();
+            ">
+                <?php foreach ($cmMonthOptions as $opt): ?>
+                <option value="<?= e($opt) ?>" <?= $opt === $cmLabel ? 'selected' : '' ?>><?= e($opt) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
+
+    <div style="padding:6px 10px;font-size:13px;color:#666">
+        統計區間：<?= e($cmStart) ?> ~ <?= e($cmEnd) ?>　|
+        資料源：案件管理（case_type = new_install / addition）　|
+        成交定義：sub_status ∈ <?= e(implode('、', $cmClosed)) ?>
+    </div>
+
+    <!-- 分公司彙整 -->
+    <div class="table-responsive" style="margin-bottom:8px">
+        <table class="table table-sm analysis-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="vertical-align:middle">分公司</th>
+                    <th colspan="3" style="text-align:center;background:#e3f2fd">新案</th>
+                    <th colspan="3" style="text-align:center;background:#fff3e0">老客戶追加</th>
+                    <th colspan="3" style="text-align:center;background:#e8f5e9">本月合計</th>
+                </tr>
+                <tr>
+                    <th>進件</th><th>成交</th><th>成交率</th>
+                    <th>進件</th><th>成交</th><th>成交率</th>
+                    <th>進件</th><th>成交</th><th>成交率</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                if (empty($cmBranchAgg)):
+                ?>
+                <tr><td colspan="10" class="text-muted text-center"><?= e($cmLabel) ?> 尚無新案 / 老客戶追加進件</td></tr>
+                <?php
+                else:
+                    $gNE=0;$gNC=0;$gAE=0;$gAC=0;
+                    foreach ($cmBranchAgg as $name => $d):
+                        $tE = $d['new_entry'] + $d['add_entry'];
+                        $tC = $d['new_closed'] + $d['add_closed'];
+                        $gNE += $d['new_entry']; $gNC += $d['new_closed'];
+                        $gAE += $d['add_entry']; $gAC += $d['add_closed'];
+                ?>
+                <tr>
+                    <td><?= e($name) ?></td>
+                    <td><?= $d['new_entry'] ?: '' ?></td>
+                    <td><?= $d['new_closed'] ?: '' ?></td>
+                    <td><?= $cmRate($d['new_closed'], $d['new_entry']) ?></td>
+                    <td><?= $d['add_entry'] ?: '' ?></td>
+                    <td><?= $d['add_closed'] ?: '' ?></td>
+                    <td><?= $cmRate($d['add_closed'], $d['add_entry']) ?></td>
+                    <td class="col-total"><?= $tE ?: '' ?></td>
+                    <td class="col-total"><?= $tC ?: '' ?></td>
+                    <td class="col-total"><?= $cmRate($tC, $tE) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <td><?= $gNE ?: '' ?></td>
+                    <td><?= $gNC ?: '' ?></td>
+                    <td><?= $cmRate($gNC, $gNE) ?></td>
+                    <td><?= $gAE ?: '' ?></td>
+                    <td><?= $gAC ?: '' ?></td>
+                    <td><?= $cmRate($gAC, $gAE) ?></td>
+                    <td class="col-total"><?= ($gNE+$gAE) ?: '' ?></td>
+                    <td class="col-total"><?= ($gNC+$gAC) ?: '' ?></td>
+                    <td class="col-total"><?= $cmRate($gNC+$gAC, $gNE+$gAE) ?></td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 業務人員明細 -->
+    <div style="padding:4px 10px;font-size:13px;color:#555;background:#fafafa;border-top:1px solid #eee">
+        業務人員明細（限 <b>業務主管</b>、<b>業務</b> 角色；其他角色或未指派者不列入此表，但仍計入上方分公司總計）
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="vertical-align:middle">分公司</th>
+                    <th rowspan="2" style="vertical-align:middle">業務人員</th>
+                    <th rowspan="2" style="vertical-align:middle">職務</th>
+                    <th colspan="3" style="text-align:center;background:#e3f2fd">新案</th>
+                    <th colspan="3" style="text-align:center;background:#fff3e0">老客戶追加</th>
+                </tr>
+                <tr>
+                    <th>進件</th><th>成交</th><th>成交率</th>
+                    <th>進件</th><th>成交</th><th>成交率</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($cmSalesAgg)): ?>
+                <tr><td colspan="9" class="text-muted text-center"><?= e($cmLabel) ?> 無業務主管／業務承辦的新案 / 老客戶追加</td></tr>
+                <?php else: foreach ($cmSalesAgg as $bn => $sales): ?>
+                <?php foreach ($sales as $sn => $d): ?>
+                <tr>
+                    <td><?= e($bn) ?></td>
+                    <td><?= e($sn) ?></td>
+                    <td><?= $d['role'] === 'sales_manager' ? '業務主管' : '業務' ?></td>
+                    <td><?= $d['new_entry'] ?: '' ?></td>
+                    <td><?= $d['new_closed'] ?: '' ?></td>
+                    <td><?= $cmRate($d['new_closed'], $d['new_entry']) ?></td>
+                    <td><?= $d['add_entry'] ?: '' ?></td>
+                    <td><?= $d['add_closed'] ?: '' ?></td>
+                    <td><?= $cmRate($d['add_closed'], $d['add_entry']) ?></td>
+                </tr>
+                <?php endforeach; endforeach; endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <?php if (empty($months)): ?>

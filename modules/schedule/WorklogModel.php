@@ -208,6 +208,22 @@ class WorklogModel
      */
     public function saveReport(int $worklogId, array $data): void
     {
+        // 結案鎖：若該 worklog 對應的案件已上鎖，拒絕儲存
+        try {
+            $caseStmt = $this->db->prepare('
+                SELECT s.case_id FROM work_logs wl
+                JOIN schedules s ON wl.schedule_id = s.id
+                WHERE wl.id = ?
+            ');
+            $caseStmt->execute(array($worklogId));
+            $cid = (int)$caseStmt->fetchColumn();
+            if ($cid > 0 && function_exists('assertCaseNotLocked')) {
+                assertCaseNotLocked($cid, '新增/修改施工回報');
+            }
+        } catch (\RuntimeException $lockEx) {
+            throw $lockEx;
+        }
+
         $stmt = $this->db->prepare('
             UPDATE work_logs SET
                 work_description = ?,

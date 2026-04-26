@@ -159,6 +159,98 @@ require __DIR__ . '/../_readonly_form_helper.php';
 
 <?php require __DIR__ . '/../layouts/editing_lock_warning.php'; ?>
 
+<?php
+// ============== 結案鎖：上鎖／解鎖狀態列 ==============
+if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($case['is_locked']))):
+    $_lockDb = Database::getInstance();
+    // 取上鎖人 / 解鎖人姓名
+    $_lockerName = '';
+    if (!empty($case['locked_by'])) {
+        $_st = $_lockDb->prepare("SELECT real_name FROM users WHERE id = ?");
+        $_st->execute(array($case['locked_by']));
+        $_lockerName = $_st->fetchColumn() ?: '系統';
+    }
+    $_unlockerName = '';
+    if (!empty($case['unlocked_by'])) {
+        $_st = $_lockDb->prepare("SELECT real_name FROM users WHERE id = ?");
+        $_st->execute(array($case['unlocked_by']));
+        $_unlockerName = $_st->fetchColumn() ?: '';
+    }
+    $_canUnlock = isset($caseCanUnlock) ? $caseCanUnlock : false;
+
+    if ($caseLockState['locked']):
+        // 鎖定狀態 — 紅色
+?>
+<div class="card mb-2" style="background:#ffebee;border-left:4px solid #f44336;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+        <strong style="color:#c62828;font-size:1rem">🔒 此案件已完工結案並上鎖</strong>
+        <span style="color:#666;font-size:.85rem;margin-left:8px">
+            <?php if ($_lockerName): ?>
+            鎖定人：<?= e($_lockerName) ?>
+            <?php endif; ?>
+            <?php if (!empty($case['locked_at'])): ?>
+            ｜鎖定時間：<?= e(date('Y-m-d H:i', strtotime($case['locked_at']))) ?>
+            <?php endif; ?>
+        </span>
+        <div style="color:#666;font-size:.8rem;margin-top:4px">所有欄位禁止編輯。如需修改請聯繫管理員（boss / 副總）解鎖。</div>
+    </div>
+    <?php if ($_canUnlock): ?>
+    <form method="POST" action="/cases.php?action=unlock_case" style="margin:0" onsubmit="return confirm('確定要解鎖此案件？\n\n解鎖後請於 30 分鐘內完成編輯並儲存。\n所有變更會留下修改記錄。');">
+        <?= csrf_field() ?>
+        <input type="hidden" name="case_id" value="<?= (int)$case['id'] ?>">
+        <button type="submit" class="btn btn-sm" style="background:#f44336;color:#fff;font-weight:600">🔓 解鎖編輯</button>
+    </form>
+    <?php endif; ?>
+</div>
+<?php
+    elseif (!empty($case['unlocked_at']) && $case['status'] === 'closed'):
+        // 解鎖中 — 黃色 + 倒數
+        $_unlockTs = strtotime($case['unlocked_at']);
+        $_expiresAt = $_unlockTs + 30 * 60;
+        $_remainSec = max(0, $_expiresAt - time());
+?>
+<div class="card mb-2" style="background:#fff8e1;border-left:4px solid #ff9800;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+        <strong style="color:#e65100;font-size:1rem">🔓 解鎖編輯中</strong>
+        <span style="color:#666;font-size:.85rem;margin-left:8px">
+            由 <?= e($_unlockerName ?: '管理員') ?> 解鎖於 <?= e(date('H:i', $_unlockTs)) ?>
+            ｜剩餘 <span id="lockCountdown" data-remain="<?= (int)$_remainSec ?>" style="font-weight:600;color:#e65100"><?= floor($_remainSec / 60) ?>:<?= str_pad($_remainSec % 60, 2, '0', STR_PAD_LEFT) ?></span> 自動重鎖
+        </span>
+        <div style="color:#666;font-size:.8rem;margin-top:4px">編輯完請按下方「儲存」按鈕，存檔後自動重鎖。若超時未存檔將自動回到鎖定狀態。</div>
+    </div>
+    <?php if ($_canUnlock): ?>
+    <form method="POST" action="/cases.php?action=lock_case" style="margin:0" onsubmit="return confirm('確定要立即重鎖此案件？');">
+        <?= csrf_field() ?>
+        <input type="hidden" name="case_id" value="<?= (int)$case['id'] ?>">
+        <button type="submit" class="btn btn-sm" style="background:#ff9800;color:#fff">🔒 立即重鎖</button>
+    </form>
+    <?php endif; ?>
+</div>
+<script>
+(function(){
+    var el = document.getElementById('lockCountdown');
+    if (!el) return;
+    var remain = parseInt(el.dataset.remain || '0');
+    var timer = setInterval(function(){
+        remain--;
+        if (remain <= 0) {
+            clearInterval(timer);
+            el.textContent = '0:00（已過期）';
+            el.style.color = '#c62828';
+            // 提示重新整理會自動重鎖
+            if (confirm('解鎖時間已到，重新整理頁面將自動重鎖。是否重新載入？')) {
+                location.reload();
+            }
+            return;
+        }
+        var m = Math.floor(remain / 60);
+        var s = remain % 60;
+        el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+})();
+</script>
+<?php endif; endif; ?>
+
 <form method="POST" class="mt-2 <?= $readOnly ? 'form-readonly' : '' ?>" onsubmit="return validateCaseForm()">
     <?= csrf_field() ?>
 
@@ -862,6 +954,11 @@ require __DIR__ . '/../_readonly_form_helper.php';
         $_canEditPayment = $_pmtUser && in_array($_pmtUser['role'], array('boss','accounting_supervisor'), true);
         // 匯費填寫權限：boss / 會計主管 / 會計人員
         $_canEditWireFee = $_pmtUser && in_array($_pmtUser['role'], array('boss','accounting_supervisor','accountant'), true);
+        // 結案鎖：案件已上鎖則所有人都不能編輯帳款（含 boss/會計主管 — 必須先解鎖案件）
+        if (isset($caseLockState) && $caseLockState['locked']) {
+            $_canEditPayment = false;
+            $_canEditWireFee = false;
+        }
     ?>
     <div class="card" id="sec-case-payments">
         <div class="card-header d-flex justify-between align-center">
