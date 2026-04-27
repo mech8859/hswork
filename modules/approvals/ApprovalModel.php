@@ -1257,7 +1257,7 @@ class ApprovalModel
             WHERE module = 'case_completion' AND target_id = ? AND status = 'pending'
         ")->execute(array($caseId));
 
-        // 案件進度改回 in_progress
-        $this->db->prepare("UPDATE cases SET status = 'in_progress' WHERE id = ?")->execute(array($caseId));
+        // 案件進度改回 in_progress 並清掉結案鎖（避免 status 倒退但 is_locked 殘留）
+        $this->db->prepare("UPDATE cases SET status = 'in_progress', is_locked = 0, locked_by = NULL, locked_at = NULL, unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")->execute(array($caseId));
     }
 }

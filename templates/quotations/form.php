@@ -1530,12 +1530,14 @@ function loadEstMaterials(caseId) {
             return false;
         }
         if (d.existing_quotation && !isEditPage) {
-            alert('此進件編號已有報價單（' + d.existing_quotation.quotation_number + '），無法重複建立');
-            caseInput.value = '';
-            caseHidden.value = '';
-            if (estCard) estCard.style.display = 'none';
-            updateCableCaseUI();
-            return false;
+            // 同案允許多張報價（普銷 + 專案分張）。提醒並讓使用者決定。
+            if (!confirm('此進件編號已有報價單（' + d.existing_quotation.quotation_number + '），是否再開一張？')) {
+                caseInput.value = '';
+                caseHidden.value = '';
+                if (estCard) estCard.style.display = 'none';
+                updateCableCaseUI();
+                return false;
+            }
         }
         if (d.case) {
             fillIfEmpty('customer_name', d.case.customer_name);

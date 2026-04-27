@@ -700,15 +700,23 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     此案件無使用設備
                 </label>
                 <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
+                    <?php
+                    $_quoteCreateUrl = '/quotations.php?action=create&case_id=' . $case['id']
+                        . '&customer_id=' . urlencode($case['customer_id'] ?? '')
+                        . '&customer_name=' . urlencode($case['customer_name'] ?? $case['title'] ?? '')
+                        . '&address=' . urlencode($case['address'] ?? '')
+                        . '&contact=' . urlencode($case['contact_person'] ?? '')
+                        . '&phone=' . urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? ''));
+                    ?>
                     <?php if (!$latestQuote): ?>
-                    <a href="/quotations.php?action=create&case_id=<?= $case['id'] ?>&customer_id=<?= urlencode($case['customer_id'] ?? '') ?>&customer_name=<?= urlencode($case['customer_name'] ?? $case['title'] ?? '') ?>&address=<?= urlencode($case['address'] ?? '') ?>&contact=<?= urlencode($case['contact_person'] ?? '') ?>&phone=<?= urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? '')) ?>"
-                       class="btn btn-primary btn-sm">+ 建立報價單</a>
-                    <?php elseif ($latestQuote['status'] === 'customer_accepted'): ?>
-                    <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>"
-                       class="btn btn-outline btn-sm">檢視報價單</a>
+                    <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm">+ 建立報價單</a>
                     <?php else: ?>
-                    <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>"
-                       class="btn btn-primary btn-sm">編輯報價單</a>
+                        <?php if ($latestQuote['status'] === 'customer_accepted'): ?>
+                        <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>" class="btn btn-outline btn-sm">檢視報價單</a>
+                        <?php else: ?>
+                        <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>" class="btn btn-outline btn-sm">編輯最新一張</a>
+                        <?php endif; ?>
+                        <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm">+ 新增另一張報價</a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>

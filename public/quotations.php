@@ -43,17 +43,7 @@ switch ($action) {
         if (!$canManage) { Session::flash('error', '無權限'); redirect('/quotations.php'); }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/quotations.php'); }
-            // 擋重複：同案件已有報價單
-            $postCaseId = (int)($_POST['case_id'] ?? 0);
-            if ($postCaseId > 0) {
-                $dupStmt = Database::getInstance()->prepare('SELECT quotation_number FROM quotations WHERE case_id = ? LIMIT 1');
-                $dupStmt->execute(array($postCaseId));
-                $dupQ = $dupStmt->fetchColumn();
-                if ($dupQ) {
-                    Session::flash('error', '此進件編號已有報價單（' . $dupQ . '），無法重複建立');
-                    redirect('/quotations.php');
-                }
-            }
+            // 同案件允許多張報價（普銷 + 專案分張，由業務從案件頁「+新增另一張報價」進入）
             $quoteId = $model->create($_POST);
             AuditLog::log('quotations', 'create', $quoteId, $_POST['customer_name'] ?? '');
             // 個人預設：勾選才存（以登入者為主）

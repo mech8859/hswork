@@ -526,9 +526,11 @@ function tryAutoCloseCase($caseId)
     $base = (int)$c['total_amount'] > 0 ? (int)$c['total_amount'] : (int)$c['deal_amount'];
     if ($base <= 0) return false;
     if ((int)$c['balance_amount'] !== 0) return false;
-    $l2 = $db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=2 AND status='approved'");
-    $l2->execute(array($caseId));
-    if ((int)$l2->fetchColumn() === 0) return false;
+    // 必須「全部關卡都已核准」（含 L3 會計簽核）才結案上鎖
+    // 早期版本只看 L2 approved，會在 L3 還沒簽就鎖案；現在改用 isFullyApproved
+    require_once __DIR__ . '/../modules/approvals/ApprovalModel.php';
+    $am = new ApprovalModel();
+    if (!$am->isFullyApproved('case_completion', $caseId)) return false;
 
     // 結案時順手上鎖（清掉解鎖時間戳，避免懸空）
     $db->prepare("UPDATE cases SET status = 'closed', is_locked = 1, locked_by = COALESCE(locked_by, ?), locked_at = COALESCE(locked_at, NOW()), unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")

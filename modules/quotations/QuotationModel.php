@@ -570,14 +570,24 @@ class QuotationModel
         $caseId = $stmt->fetchColumn();
         if (!$caseId) return;
 
-        // 報價金額：取最新一筆報價單的 total_amount（不分狀態，草稿即帶入）
-        $stmt = $this->db->prepare('SELECT total_amount FROM quotations WHERE case_id = ? ORDER BY created_at DESC LIMIT 1');
+        // 報價金額：合計「客戶已接受」的所有報價（含舊值 'accepted' 相容）
+        // 同案多張報價單時，只算客戶實際接受的部分
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(total_amount), 0) FROM quotations WHERE case_id = ? AND status IN ('customer_accepted','accepted')");
         $stmt->execute(array($caseId));
-        $quoteTotal = $stmt->fetchColumn();
+        $acceptedSum = (int)$stmt->fetchColumn();
 
-        if ($quoteTotal !== false) {
+        if ($acceptedSum > 0) {
             $this->db->prepare('UPDATE cases SET quote_amount = ? WHERE id = ?')
-                ->execute(array((int)$quoteTotal, $caseId));
+                ->execute(array($acceptedSum, $caseId));
+        } else {
+            // 還沒任何張被接受 → 取最新一張當參考（保留原行為，避免 quote_amount 突然消失）
+            $stmt = $this->db->prepare('SELECT total_amount FROM quotations WHERE case_id = ? ORDER BY created_at DESC LIMIT 1');
+            $stmt->execute(array($caseId));
+            $quoteTotal = $stmt->fetchColumn();
+            if ($quoteTotal !== false) {
+                $this->db->prepare('UPDATE cases SET quote_amount = ? WHERE id = ?')
+                    ->execute(array((int)$quoteTotal, $caseId));
+            }
         }
     }
 
