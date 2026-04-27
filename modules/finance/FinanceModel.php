@@ -1474,7 +1474,9 @@ class FinanceModel
         $total = (int)$countStmt->fetchColumn();
 
         $offset = ($page - 1) * $perPage;
-        $stmt = $this->db->prepare("SELECT * FROM bank_transactions WHERE {$where} ORDER BY transaction_date DESC, id DESC LIMIT {$perPage} OFFSET {$offset}");
+        $sortDir = (!empty($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
+        // 同日期下用 id 排序（id 反映原資料匯入順序）
+        $stmt = $this->db->prepare("SELECT * FROM bank_transactions WHERE {$where} ORDER BY transaction_date {$sortDir}, id {$sortDir} LIMIT {$perPage} OFFSET {$offset}");
         $stmt->execute($params);
 
         return array(
@@ -1648,12 +1650,13 @@ class FinanceModel
 
         $sortDir = (!empty($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
         $offset = ($page - 1) * $perPage;
+        // 同日期下用單據編號（entry_number）排序，符合會計閱讀順序
         $stmt = $this->db->prepare("
             SELECT pc.*, b.name AS branch_name
             FROM petty_cash pc
             LEFT JOIN branches b ON pc.branch_id = b.id
             WHERE {$where}
-            ORDER BY pc.entry_date {$sortDir}, pc.id {$sortDir}
+            ORDER BY pc.entry_date {$sortDir}, pc.entry_number {$sortDir}, pc.id {$sortDir}
             LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);
@@ -1949,12 +1952,13 @@ class FinanceModel
 
         $sortDir = (!empty($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
         $offset = ($page - 1) * $perPage;
+        // 同日期下用單據編號（entry_number）排序
         $stmt = $this->db->prepare("
             SELECT rf.*, b.name AS branch_name
             FROM reserve_fund rf
             LEFT JOIN branches b ON rf.branch_id = b.id
             WHERE {$where}
-            ORDER BY rf.expense_date {$sortDir}, rf.id {$sortDir}
+            ORDER BY rf.expense_date {$sortDir}, rf.entry_number {$sortDir}, rf.id {$sortDir}
             LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);
@@ -2209,12 +2213,13 @@ class FinanceModel
 
         $sortDir = (!empty($filters['sort']) && $filters['sort'] === 'asc') ? 'ASC' : 'DESC';
         $offset = ($page - 1) * $perPage;
+        // 同日期下用單據編號（entry_number）排序
         $stmt = $this->db->prepare("
             SELECT cd.*, b.name AS branch_name
             FROM cash_details cd
             LEFT JOIN branches b ON cd.branch_id = b.id
             WHERE {$where}
-            ORDER BY cd.transaction_date {$sortDir}, cd.id {$sortDir}
+            ORDER BY cd.transaction_date {$sortDir}, cd.entry_number {$sortDir}, cd.id {$sortDir}
             LIMIT {$perPage} OFFSET {$offset}
         ");
         $stmt->execute($params);

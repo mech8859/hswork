@@ -1094,11 +1094,11 @@ class ApprovalModel
             $params[] = (int)$filters['approver_id'];
         }
         if (!empty($filters['date_from'])) {
-            $where[] = 'DATE(af.created_at) >= ?';
+            $where[] = 'DATE(af.submitted_at) >= ?';
             $params[] = $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $where[] = 'DATE(af.created_at) <= ?';
+            $where[] = 'DATE(af.submitted_at) <= ?';
             $params[] = $filters['date_to'];
         }
 

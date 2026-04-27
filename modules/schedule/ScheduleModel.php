@@ -6,7 +6,7 @@ class ScheduleModel
 {
     /** 每日工作容量（小時） */
     const DAILY_HOURS_CAPACITY = 10;
-    /** 預設預估工時（estimated_hours 為空時） */
+    /** 預設預估工時（est_labor_hours 為空時） */
     const DEFAULT_ESTIMATED_HOURS = 4;
 
     /** @var PDO */
@@ -35,7 +35,7 @@ class ScheduleModel
 
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
-                   c.case_type, c.total_visits, c.max_engineers, c.customer_name,
+                   c.case_type, c.total_visits, c.est_labor_people AS max_engineers, c.customer_name,
                    c.planned_start_time AS case_designated_time,
                    c.notes AS case_note, c.sales_note AS case_sales_note,
                    v.plate_number, v.vehicle_type, v.seats,
@@ -139,7 +139,7 @@ class ScheduleModel
     {
         $stmt = $this->db->prepare('
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
-                   c.total_visits, c.max_engineers, c.branch_id,
+                   c.total_visits, c.est_labor_people AS max_engineers, c.branch_id,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name
             FROM schedules s
@@ -517,7 +517,7 @@ class ScheduleModel
         $hoursMapByDate = array(); // date => user_id => hours
         foreach ($allDates as $d) {
             $busyStmt = $this->db->prepare("
-                SELECT se.user_id, SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultH})) AS hours_used
+                SELECT se.user_id, SUM(COALESCE(NULLIF(c.est_labor_hours, 0), {$defaultH})) AS hours_used
                 FROM schedule_engineers se
                 JOIN schedules s ON se.schedule_id = s.id
                 JOIN cases c ON s.case_id = c.id
@@ -533,7 +533,7 @@ class ScheduleModel
         $hoursMap = $hoursMapByDate[$date]; // 主日期工時（相容原邏輯）
 
         // 取得目標案件工時
-        $caseStmt2 = $this->db->prepare('SELECT estimated_hours FROM cases WHERE id = ?');
+        $caseStmt2 = $this->db->prepare('SELECT est_labor_hours AS estimated_hours FROM cases WHERE id = ?');
         $caseStmt2->execute(array($caseId));
         $targetHours = (float)$caseStmt2->fetchColumn();
         if ($targetHours <= 0) $targetHours = self::DEFAULT_ESTIMATED_HOURS;
@@ -638,7 +638,7 @@ class ScheduleModel
         $params = array_merge($branchIds, $branchIds);
         $stmt = $this->db->prepare("
             SELECT c.id, c.case_number, c.title, c.address, c.difficulty,
-                   c.total_visits, c.current_visit, c.max_engineers,
+                   c.total_visits, c.current_visit, c.est_labor_people AS max_engineers,
                    c.planned_start_time, c.work_time_start, c.work_time_end,
                    c.est_labor_days, c.planned_start_date,
                    b.name AS branch_name
@@ -704,7 +704,7 @@ class ScheduleModel
 
         $stmt = $this->db->prepare("
             SELECT s.*, c.title AS case_title, c.case_number, c.address, c.difficulty,
-                   c.case_type, c.total_visits, c.max_engineers, c.customer_name,
+                   c.case_type, c.total_visits, c.est_labor_people AS max_engineers, c.customer_name,
                    v.plate_number, v.vehicle_type, v.seats,
                    b.name AS branch_name, b.code AS branch_code
             FROM schedules s
@@ -803,11 +803,11 @@ class ScheduleModel
         $case = $caseStmt->fetch();
         if (!$case) return [];
 
-        $maxEng = (int)($case['max_engineers'] ?: 4);
+        $maxEng = (int)($case['est_labor_people'] ?: 4);
         $visitNumber = (int)($case['current_visit'] ?: 1);
 
         // 案件預估工時
-        $caseHours = (float)($case['estimated_hours'] ?: 0);
+        $caseHours = (float)($case['est_labor_hours'] ?: 0);
         if ($caseHours <= 0) {
             $caseHours = self::DEFAULT_ESTIMATED_HOURS;
         }
@@ -904,11 +904,11 @@ class ScheduleModel
         }
         $endDate = date('Y-m-d', strtotime('+' . $days . ' days', strtotime($startDate)));
 
-        // 已排工人員工時 (by date) — 用 estimated_hours 計算每人每日已用時數
+        // 已排工人員工時 (by date) — 用 est_labor_hours 計算每人每日已用時數
         $defaultHours = self::DEFAULT_ESTIMATED_HOURS;
         $busyStmt = $this->db->prepare("
             SELECT s.schedule_date, se.user_id,
-                   SUM(COALESCE(NULLIF(c.estimated_hours, 0), {$defaultHours})) AS hours_used
+                   SUM(COALESCE(NULLIF(c.est_labor_hours, 0), {$defaultHours})) AS hours_used
             FROM schedule_engineers se
             JOIN schedules s ON se.schedule_id = s.id
             JOIN cases c ON s.case_id = c.id

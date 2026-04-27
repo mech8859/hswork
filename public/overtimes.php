@@ -28,6 +28,7 @@ switch ($action) {
             'status'        => !empty($_GET['status']) ? $_GET['status'] : '',
             'overtime_type' => !empty($_GET['overtime_type']) ? $_GET['overtime_type'] : '',
             'branch_id'     => !empty($_GET['branch_id']) ? $_GET['branch_id'] : '',
+            'keyword'       => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
         );
         // 只有 own 權限的人只看自己的
         $onlyUserId = null;
@@ -252,8 +253,9 @@ switch ($action) {
             Session::flash('error', '加班單不存在');
             redirect('/overtimes.php');
         }
-        // 本人 + pending/rejected 可刪 ; 或 manage 權限
-        $canDelete = ($record['user_id'] == Auth::id() && in_array($record['status'], array('pending', 'rejected'))) || $canManage;
+        // 本人 + pending/rejected 可刪；張孟歆 (id=7) 任何狀態可刪
+        $isAdmin = (Auth::id() == 7);
+        $canDelete = ($record['user_id'] == Auth::id() && in_array($record['status'], array('pending', 'rejected'))) || $isAdmin;
         if (!$canDelete) {
             Session::flash('error', '權限不足');
             redirect('/overtimes.php?action=view&id=' . $id);

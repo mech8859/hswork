@@ -341,9 +341,10 @@ class CaseModel
             $data['status'] ?? 'tracking',
             $data['sub_status'] ?: null,
             $data['difficulty'] ?? 3,
-            $data['estimated_hours'] ?: null,
+            // 鏡射同步：表單只填 est_labor_*，舊欄位用同值寫入維持下游相容（CSV 匯出、Ragic 同步、API）
+            (!empty($data['est_labor_hours']) ? $data['est_labor_hours'] : (!empty($data['estimated_hours']) ? $data['estimated_hours'] : null)),
             $data['total_visits'] ?? 1,
-            $data['max_engineers'] ?? 4,
+            (!empty($data['est_labor_people']) ? $data['est_labor_people'] : ($data['max_engineers'] ?? 4)),
             $data['address'] ?? null,
             $data['description'] ?? null,
             $data['system_type'] ?: null,
@@ -532,9 +533,10 @@ class CaseModel
             isset($data['status']) && $data['status'] !== '' ? $data['status'] : 'tracking',
             !empty($data['sub_status']) ? $data['sub_status'] : null,
             isset($data['difficulty']) ? $data['difficulty'] : 3,
-            !empty($data['estimated_hours']) ? $data['estimated_hours'] : null,
+            // 鏡射同步（同 create()）
+            (!empty($data['est_labor_hours']) ? $data['est_labor_hours'] : (!empty($data['estimated_hours']) ? $data['estimated_hours'] : null)),
             isset($data['total_visits']) && $data['total_visits'] !== '' ? $data['total_visits'] : 1,
-            isset($data['max_engineers']) && $data['max_engineers'] !== '' ? $data['max_engineers'] : 4,
+            (!empty($data['est_labor_people']) ? $data['est_labor_people'] : (isset($data['max_engineers']) && $data['max_engineers'] !== '' ? $data['max_engineers'] : 4)),
             !empty($data['address']) ? $data['address'] : null,
             !empty($data['description']) ? $data['description'] : null,
             !empty($data['system_type']) ? $data['system_type'] : null,
@@ -1527,6 +1529,13 @@ class CaseModel
             'needs_reschedule'   => '已進場/需再安排',
             'awaiting_dispatch'  => '待安排派工查修',
             'customer_cancel'    => '客戶取消',
+            // 歷史值（較早 schema enum 留下）
+            'cancelled'          => '已取消',
+            'maintenance_case'   => '保養案件',
+            'ready'              => '已就緒',
+            'pending'            => '待處理',
+            'in_progress'        => '進行中',
+            'completed'          => '已完工',
         );
         return self::loadDropdownOptions('case_progress', $fallback);
     }

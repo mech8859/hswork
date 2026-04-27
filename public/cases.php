@@ -38,8 +38,8 @@ function updateTotalCollected($caseId, $changeSource = 'payment') {
     $wireStmt = $db->prepare("SELECT COALESCE(SUM(wire_fee), 0) FROM case_payments WHERE case_id = ?");
     $wireStmt->execute(array($caseId));
     $wireTotal = (int)$wireStmt->fetchColumn();
-    // 訂金（類別=訂金的合計 + 最新一筆的支付方式）
-    $depStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM case_payments WHERE case_id = ? AND payment_type = '訂金'");
+    // 訂金（類別=訂金的應收合計：amount + wire_fee。amount 是實收已扣折讓，加回 wire_fee 才是應收/含稅）
+    $depStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) + COALESCE(SUM(wire_fee), 0) FROM case_payments WHERE case_id = ? AND payment_type = '訂金'");
     $depStmt->execute(array($caseId));
     $depositAmount = (int)$depStmt->fetchColumn();
     $depMethodStmt = $db->prepare("SELECT transaction_type FROM case_payments WHERE case_id = ? AND payment_type = '訂金' ORDER BY payment_date DESC, id DESC LIMIT 1");

@@ -170,6 +170,15 @@ if (!empty($records)) {
                 </tr>
             </thead>
             <tbody>
+                <?php if (!empty($filters['date_from']) && (int)$page === 1): ?>
+                <tr style="background:#f1f5f9;font-weight:600">
+                    <td></td>
+                    <td colspan="2" style="font-size:.85rem;color:#475569">前期餘額（<?= e(date('Y-m-d', strtotime($filters['date_from'] . ' -1 day'))) ?> 以前累計）</td>
+                    <td colspan="3"></td>
+                    <td class="text-right"><strong style="color:<?= $openingBalance < 0 ? 'var(--danger)' : '#475569' ?>">$<?= number_format($openingBalance) ?></strong></td>
+                    <td colspan="2"></td>
+                </tr>
+                <?php endif; ?>
                 <?php foreach ($records as $r): ?>
                 <?php $isStar = !empty($r['is_starred']); ?>
                 <tr style="cursor:pointer" onclick="location.href='/cash_details.php?action=edit&id=<?= e($r['id']) ?>'">

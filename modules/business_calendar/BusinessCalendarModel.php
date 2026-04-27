@@ -53,6 +53,14 @@ class BusinessCalendarModel
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // 計算 display_status（未回報判定：planned + 無 result + 今日17:00後或過期）
+        $today = date('Y-m-d');
+        $afterFour = (int)date('H') >= 17;
+        foreach ($rows as &$row) {
+            $row['display_status'] = self::computeDisplayStatus($row, $today, $afterFour);
+        }
+        unset($row);
+
         // 按日期分組
         $events = array();
         foreach ($rows as $row) {
@@ -63,6 +71,25 @@ class BusinessCalendarModel
             $events[$d][] = $row;
         }
         return $events;
+    }
+
+    /**
+     * 計算事件顯示狀態（用 display_status 取代原 status，避免污染原始狀態）
+     * 規則：planned 且無 result，當日 17:00 後或已過期 → 'no_report'
+     */
+    public static function computeDisplayStatus($row, $today = null, $afterFour = null)
+    {
+        if ($today === null) $today = date('Y-m-d');
+        if ($afterFour === null) $afterFour = (int)date('H') >= 17;
+
+        $status = isset($row['status']) ? $row['status'] : 'planned';
+        $hasResult = !empty($row['result']);
+        if ($status === 'planned' && !$hasResult) {
+            $d = $row['event_date'];
+            if ($d < $today) return 'no_report';
+            if ($d === $today && $afterFour) return 'no_report';
+        }
+        return $status;
     }
 
     /**
@@ -111,7 +138,14 @@ class BusinessCalendarModel
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // 計算 display_status（含未回報）
+        $today = date('Y-m-d');
+        $afterFour = (int)date('H') >= 17;
+        foreach ($rows as &$row) {
+            $row['display_status'] = self::computeDisplayStatus($row, $today, $afterFour);
+        }
+        return $rows;
     }
 
     /**

@@ -52,6 +52,25 @@ class LeaveModel
             $where .= ' AND l.status = ?';
             $params[] = $filters['status'];
         }
+        if (!empty($filters['keyword'])) {
+            $kw = '%' . $filters['keyword'] . '%';
+            // 假別 leave_type 存英文 key，把搜尋字反查成 keys
+            $matchedTypeKeys = array();
+            foreach (self::$typeLabels as $key => $label) {
+                if (mb_stripos($label, $filters['keyword']) !== false || mb_stripos($key, $filters['keyword']) !== false) {
+                    $matchedTypeKeys[] = $key;
+                }
+            }
+            if ($matchedTypeKeys) {
+                $ph = implode(',', array_fill(0, count($matchedTypeKeys), '?'));
+                $where .= " AND (u.real_name LIKE ? OR l.reason LIKE ? OR l.leave_type IN ($ph))";
+                $params[] = $kw; $params[] = $kw;
+                foreach ($matchedTypeKeys as $k) $params[] = $k;
+            } else {
+                $where .= ' AND (u.real_name LIKE ? OR l.reason LIKE ?)';
+                $params[] = $kw; $params[] = $kw;
+            }
+        }
 
         $stmt = $this->db->prepare("
             SELECT l.*, u.real_name, u.branch_id, b.name AS branch_name,
@@ -132,7 +151,10 @@ class LeaveModel
      */
     public function delete($id)
     {
-        $this->db->prepare("DELETE FROM leaves WHERE id = ? AND status = 'pending'")->execute(array($id));
+        // 連帶清掉簽核紀錄（避免孤兒 approval_flows）
+        $this->db->prepare("DELETE FROM approval_flows WHERE module = 'leaves' AND target_id = ?")->execute(array($id));
+        // 權限檢查由 controller 把關，model 不再限制 status
+        $this->db->prepare("DELETE FROM leaves WHERE id = ?")->execute(array($id));
     }
 
     /**

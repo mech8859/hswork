@@ -87,6 +87,25 @@ class OvertimeModel
             $where .= ' AND o.overtime_date <= ?';
             $params[] = $filters['date_to'];
         }
+        if (!empty($filters['keyword'])) {
+            $kw = '%' . $filters['keyword'] . '%';
+            // overtime_type 存英文 key，反查中文 label 對應的 keys
+            $matchedTypeKeys = array();
+            foreach (self::typeOptions() as $key => $label) {
+                if (mb_stripos($label, $filters['keyword']) !== false || mb_stripos($key, $filters['keyword']) !== false) {
+                    $matchedTypeKeys[] = $key;
+                }
+            }
+            if ($matchedTypeKeys) {
+                $ph = implode(',', array_fill(0, count($matchedTypeKeys), '?'));
+                $where .= " AND (u.real_name LIKE ? OR o.reason LIKE ? OR o.overtime_type IN ($ph))";
+                $params[] = $kw; $params[] = $kw;
+                foreach ($matchedTypeKeys as $k) $params[] = $k;
+            } else {
+                $where .= ' AND (u.real_name LIKE ? OR o.reason LIKE ?)';
+                $params[] = $kw; $params[] = $kw;
+            }
+        }
 
         $stmt = $this->db->prepare("
             SELECT o.*, u.real_name, u.branch_id, b.name AS branch_name,
@@ -232,15 +251,14 @@ class OvertimeModel
     }
 
     /**
-     * 刪除（只能刪 pending 或 rejected）
+     * 刪除（權限由 controller 把關）
      */
     public function delete($id)
     {
         $row = $this->getById($id);
         if (!$row) return false;
-        if ($row['status'] === 'approved') {
-            throw new Exception('已核准的加班單不可刪除，請先撤回為待審核');
-        }
+        // 連帶清掉簽核紀錄（避免孤兒 approval_flows）
+        $this->db->prepare("DELETE FROM approval_flows WHERE module = 'overtime' AND target_id = ?")->execute(array($id));
         $this->db->prepare("DELETE FROM overtimes WHERE id = ?")->execute(array($id));
         return true;
     }

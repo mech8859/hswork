@@ -155,16 +155,25 @@ $records = $result['data'];
 $totalBalance = $model->getCashDetailsBalanceUpTo($filters);
 $sortAsc = (!empty($filters['sort']) && $filters['sort'] === 'asc');
 
+// 前期餘額：date_from 之前的累計（其他篩選同步保留）
+$openingBalance = 0;
+if (!empty($filters['date_from'])) {
+    $openingFilters = $filters;
+    unset($openingFilters['date_from']);
+    $openingFilters['date_to'] = date('Y-m-d', strtotime($filters['date_from'] . ' -1 day'));
+    $openingBalance = (float)$model->getCashDetailsBalanceUpTo($openingFilters);
+}
+
 if ($sortAsc) {
-    // 舊→新：從 0 累加
+    // 舊→新：從 openingBalance 累加
     $perPage = $result['perPage'];
     $skipCount = ($page - 1) * $perPage;
     if ($skipCount > 0) {
         $newerCount = $result['total'] - $skipCount;
         $newerSum = $model->getCashDetailsPageSum($filters, $newerCount);
-        $runningBalance = $totalBalance - $newerSum;
+        $runningBalance = $openingBalance + $totalBalance - $newerSum;
     } else {
-        $runningBalance = 0;
+        $runningBalance = $openingBalance;
     }
     foreach ($records as $idx => $r) {
         $income = !empty($r['income_amount']) ? (float)$r['income_amount'] : 0;
@@ -173,13 +182,13 @@ if ($sortAsc) {
         $records[$idx]['running_balance'] = $runningBalance;
     }
 } else {
-    // 新→舊：從總餘額開始，每筆減掉自己
-    $runningBalance = $totalBalance;
+    // 新→舊：從 (openingBalance + totalBalance) 開始，每筆減掉自己
+    $runningBalance = $openingBalance + $totalBalance;
     if ($page > 1) {
         $perPage = $result['perPage'];
         $skipCount = ($page - 1) * $perPage;
         $stmtSkip = $model->getCashDetailsPageSum($filters, $skipCount);
-        $runningBalance = $totalBalance - $stmtSkip;
+        $runningBalance = $openingBalance + $totalBalance - $stmtSkip;
     }
     foreach ($records as $idx => $r) {
         $records[$idx]['running_balance'] = $runningBalance;

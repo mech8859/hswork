@@ -80,8 +80,9 @@ $statusBadges = array(
         <?php foreach ($items as $item):
             $evColor = BusinessCalendarModel::activityColor($item['activity_type']);
             $atLabel = isset($activityTypes[$item['activity_type']]) ? $activityTypes[$item['activity_type']] : $item['activity_type'];
-            $stLabel = isset($statusLabels[$item['status']]) ? $statusLabels[$item['status']] : $item['status'];
-            $stBadge = isset($statusBadges[$item['status']]) ? $statusBadges[$item['status']] : 'secondary';
+            $dispStatus = isset($item['display_status']) ? $item['display_status'] : $item['status'];
+            $stLabel = isset($statusLabels[$dispStatus]) ? $statusLabels[$dispStatus] : ($dispStatus === 'no_report' ? '未回報' : $dispStatus);
+            $stBadge = $dispStatus === 'no_report' ? 'danger' : (isset($statusBadges[$dispStatus]) ? $statusBadges[$dispStatus] : 'secondary');
         ?>
         <div class="staff-card" onclick="location.href='/business_calendar.php?action=edit&id=<?= $item['id'] ?>'" style="border-left:3px solid <?= e($evColor) ?>">
             <div class="d-flex justify-between align-center">
@@ -122,8 +123,9 @@ $statusBadges = array(
                 <?php foreach ($items as $item):
                     $evColor = BusinessCalendarModel::activityColor($item['activity_type']);
                     $atLabel = isset($activityTypes[$item['activity_type']]) ? $activityTypes[$item['activity_type']] : $item['activity_type'];
-                    $stLabel = isset($statusLabels[$item['status']]) ? $statusLabels[$item['status']] : $item['status'];
-                    $stBadge = isset($statusBadges[$item['status']]) ? $statusBadges[$item['status']] : 'secondary';
+                    $dispStatus = isset($item['display_status']) ? $item['display_status'] : $item['status'];
+                    $stLabel = isset($statusLabels[$dispStatus]) ? $statusLabels[$dispStatus] : ($dispStatus === 'no_report' ? '未回報' : $dispStatus);
+                    $stBadge = $dispStatus === 'no_report' ? 'danger' : (isset($statusBadges[$dispStatus]) ? $statusBadges[$dispStatus] : 'secondary');
                     $regionLabel = isset($regionOptions[$item['region']]) ? $regionOptions[$item['region']] : ($item['region'] ?: '-');
                 ?>
                 <tr>

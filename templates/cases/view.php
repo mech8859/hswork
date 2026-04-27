@@ -79,15 +79,15 @@
         </div>
         <div class="detail-item">
             <span class="detail-label">預估工時</span>
-            <span class="detail-value"><?= $case['estimated_hours'] ? $case['estimated_hours'] . ' 小時' : '-' ?></span>
+            <span class="detail-value"><?= !empty($case['est_labor_hours']) ? $case['est_labor_hours'] . ' 小時' : '-' ?></span>
         </div>
         <div class="detail-item">
             <span class="detail-label">施工進度</span>
             <span class="detail-value"><?= $case['current_visit'] ?> / <?= $case['total_visits'] ?> 次</span>
         </div>
         <div class="detail-item">
-            <span class="detail-label">最多施工人數</span>
-            <span class="detail-value"><?= $case['max_engineers'] ?> 人</span>
+            <span class="detail-label">預估施工人數</span>
+            <span class="detail-value"><?= !empty($case['est_labor_people']) ? $case['est_labor_people'] : '-' ?> 人</span>
         </div>
         <div class="detail-item">
             <span class="detail-label">承辦業務</span>

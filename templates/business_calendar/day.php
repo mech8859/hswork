@@ -48,8 +48,9 @@ $calMonth = (int)date('m', strtotime($date));
         $evColor = BusinessCalendarModel::activityColor($item['activity_type']);
         $staffColor = BusinessCalendarModel::staffColor($item['staff_name']);
         $atLabel = isset($activityTypes[$item['activity_type']]) ? $activityTypes[$item['activity_type']] : $item['activity_type'];
-        $stLabel = isset($statusLabels[$item['status']]) ? $statusLabels[$item['status']] : $item['status'];
-        $stBadge = isset($statusBadges[$item['status']]) ? $statusBadges[$item['status']] : 'secondary';
+        $dispStatus = isset($item['display_status']) ? $item['display_status'] : $item['status'];
+        $stLabel = isset($statusLabels[$dispStatus]) ? $statusLabels[$dispStatus] : ($dispStatus === 'no_report' ? '未回報' : $dispStatus);
+        $stBadge = $dispStatus === 'no_report' ? 'danger' : (isset($statusBadges[$dispStatus]) ? $statusBadges[$dispStatus] : 'secondary');
         $regionLabel = isset($regionOptions[$item['region']]) ? $regionOptions[$item['region']] : ($item['region'] ?: '');
     ?>
     <div class="card bc-day-card" style="border-left:4px solid <?= e($staffColor) ?>">

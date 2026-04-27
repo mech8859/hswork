@@ -486,11 +486,11 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                 <label>場勘日期</label>
                 <input type="date" name="survey_date" class="form-control" value="<?= e($case['survey_date'] ?? '') ?>">
             </div>
-            <div class="form-group" style="flex:0 0 130px">
+            <div class="form-group" style="flex:0 0 170px">
                 <label>場勘時間</label>
                 <input type="time" name="survey_time" class="form-control" value="<?= e($case['survey_time'] ?? '') ?>">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="flex:0 0 130px">
                 <label>拜訪方式</label>
                 <select name="visit_method" class="form-control">
                     <option value="">請選擇</option>
@@ -500,7 +500,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     <option value="視訊" <?= ($case['visit_method'] ?? '') === '視訊' ? 'selected' : '' ?>>視訊</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="flex:0 0 180px">
                 <label>承辦業務</label>
                 <select name="sales_id" class="form-control">
                     <option value="">請選擇</option>
@@ -508,32 +508,6 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     <option value="<?= $u['id'] ?>" <?= ($case['sales_id'] ?? '') == $u['id'] ? 'selected' : '' ?>><?= e($u['real_name']) ?><?= !empty($u['is_active']) ? '' : '(離職)' ?></option>
                     <?php endforeach; ?>
                 </select>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>難易度 (業務填寫)</label>
-                <select name="difficulty" class="form-control">
-                    <?php for ($i = 1; $i <= 5; $i++): ?>
-                    <option value="<?= $i ?>" <?= ($case['difficulty'] ?? 3) == $i ? 'selected' : '' ?>><?= $i ?> 星</option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>難易度 (系統判別)</label>
-                <input type="text" class="form-control" value="<?= ($case && !empty($case['system_difficulty'])) ? $case['system_difficulty'] . ' 星' : '尚未評估' ?>" readonly style="background:#f5f5f5;color:var(--gray-500)">
-            </div>
-            <div class="form-group">
-                <label>預估工時 (小時)</label>
-                <input type="number" name="estimated_hours" class="form-control" step="0.5" min="0" value="<?= e($case['estimated_hours'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>預估施工次數</label>
-                <input type="number" name="total_visits" class="form-control" min="1" value="<?= e($case['total_visits'] ?? 1) ?>">
-            </div>
-            <div class="form-group">
-                <label>最多施工人數</label>
-                <input type="number" name="max_engineers" class="form-control" min="1" max="10" value="<?= e($case['max_engineers'] ?? 2) ?>">
             </div>
         </div>
         <div class="form-group">
@@ -1737,6 +1711,24 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     <option value="<?= $i ?>" <?= ($case['urgency'] ?? 3) == $i ? 'selected' : '' ?>><?= $i ?> <?= $i <= 2 ? '(低)' : ($i >= 4 ? '(高)' : '(中)') ?></option>
                     <?php endfor; ?>
                 </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>難易度 (業務填寫)</label>
+                <select name="difficulty" class="form-control">
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                    <option value="<?= $i ?>" <?= ($case['difficulty'] ?? 3) == $i ? 'selected' : '' ?>><?= $i ?> 星</option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>難易度 (系統判別)</label>
+                <input type="text" class="form-control" value="<?= ($case && !empty($case['system_difficulty'])) ? $case['system_difficulty'] . ' 星' : '尚未評估' ?>" readonly style="background:#f5f5f5;color:var(--gray-500)">
+            </div>
+            <div class="form-group">
+                <label>預估施工次數</label>
+                <input type="number" name="total_visits" class="form-control" min="1" value="<?= e($case['total_visits'] ?? 1) ?>">
             </div>
         </div>
         <div class="form-row">

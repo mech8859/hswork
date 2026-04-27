@@ -866,4 +866,42 @@ class QuotationModel
             'items' => $items,
         );
     }
+
+    /**
+     * 取得業務的個人預設（收款條件、附註說明）
+     * @return array|null  ['payment_terms'=>..., 'notes'=>...] 或 null
+     */
+    public function getUserDefaults($userId)
+    {
+        $userId = (int)$userId;
+        if ($userId <= 0) return null;
+        try {
+            $stmt = $this->db->prepare("SELECT payment_terms, notes FROM user_quotation_defaults WHERE user_id = ?");
+            $stmt->execute(array($userId));
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * upsert 業務的個人預設
+     * 任一欄位傳入 null 表示「不更新該欄」（保留原值）
+     */
+    public function saveUserDefaults($userId, $paymentTerms, $notes)
+    {
+        $userId = (int)$userId;
+        if ($userId <= 0) return;
+        $existing = $this->getUserDefaults($userId);
+        $newPt = $paymentTerms !== null ? $paymentTerms : ($existing['payment_terms'] ?? null);
+        $newNt = $notes !== null ? $notes : ($existing['notes'] ?? null);
+        if ($existing) {
+            $this->db->prepare("UPDATE user_quotation_defaults SET payment_terms = ?, notes = ? WHERE user_id = ?")
+                     ->execute(array($newPt, $newNt, $userId));
+        } else {
+            $this->db->prepare("INSERT INTO user_quotation_defaults (user_id, payment_terms, notes) VALUES (?, ?, ?)")
+                     ->execute(array($userId, $newPt, $newNt));
+        }
+    }
 }

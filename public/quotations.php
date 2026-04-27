@@ -56,6 +56,10 @@ switch ($action) {
             }
             $quoteId = $model->create($_POST);
             AuditLog::log('quotations', 'create', $quoteId, $_POST['customer_name'] ?? '');
+            // 個人預設：勾選才存（以登入者為主）
+            $_pt = !empty($_POST['save_payment_terms_default']) ? ($_POST['payment_terms'] ?? '') : null;
+            $_nt = !empty($_POST['save_notes_default']) ? ($_POST['notes'] ?? '') : null;
+            if ($_pt !== null || $_nt !== null) $model->saveUserDefaults(Auth::id(), $_pt, $_nt);
             if (!empty($_POST['sections'])) {
                 $model->saveSections($quoteId, $_POST['sections']);
             }
@@ -85,6 +89,23 @@ switch ($action) {
             redirect('/quotations.php?action=view&id=' . $quoteId);
         }
         $quote = null;
+        // 從案件帶入施工天數/人數/時數預設（B 方案：單向 case → quotation 預填）
+        // 用獨立變數避免污染 $quote（$quote 為 null 表示「新增」狀態）
+        $caseLaborDefaults = null;
+        $_preCaseId = (int)($_GET['case_id'] ?? 0);
+        if ($_preCaseId > 0) {
+            $_preStmt = Database::getInstance()->prepare("SELECT est_labor_days, est_labor_people, est_labor_hours FROM cases WHERE id = ?");
+            $_preStmt->execute(array($_preCaseId));
+            $_preCase = $_preStmt->fetch(PDO::FETCH_ASSOC);
+            if ($_preCase) {
+                $caseLaborDefaults = array(
+                    'labor_days'   => $_preCase['est_labor_days'],
+                    'labor_people' => $_preCase['est_labor_people'],
+                    'labor_hours'  => $_preCase['est_labor_hours'],
+                );
+            }
+        }
+        $userDefaults = $model->getUserDefaults(Auth::id());
         $salespeople = $model->getSalespeople($branchIds);
         $branches = $model->getBranches();
         $cases = $model->getCaseOptions($branchIds);
@@ -132,6 +153,10 @@ switch ($action) {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/quotations.php?action=edit&id='.$id); }
             AuditLog::logChange('quotations', $id, $quote['quote_number'] ?? "報價單#{$id}", $quote, $_POST, array('customer_name','status','total_amount','valid_until'));
             $model->update($id, $_POST);
+            // 個人預設：勾選才存（以登入者為主）
+            $_pt = !empty($_POST['save_payment_terms_default']) ? ($_POST['payment_terms'] ?? '') : null;
+            $_nt = !empty($_POST['save_notes_default']) ? ($_POST['notes'] ?? '') : null;
+            if ($_pt !== null || $_nt !== null) $model->saveUserDefaults(Auth::id(), $_pt, $_nt);
             if (isset($_POST['sections'])) {
                 $model->saveSections($id, $_POST['sections']);
             }
@@ -801,7 +826,8 @@ switch ($action) {
         $cStmt = $db->prepare("
             SELECT c.case_number, c.title, c.customer_name, c.customer_phone, c.customer_mobile,
                    c.contact_person, c.contact_address, c.construction_area,
-                   c.billing_title, c.billing_tax_id
+                   c.billing_title, c.billing_tax_id,
+                   c.est_labor_days, c.est_labor_people, c.est_labor_hours
             FROM cases c WHERE c.id = ?
         ");
         $cStmt->execute(array($qCaseId));
@@ -825,6 +851,9 @@ switch ($action) {
                 'site_address'    => $c['contact_address'],
                 'invoice_title'   => $c['billing_title'],
                 'invoice_tax_id'  => $c['billing_tax_id'],
+                'est_labor_days'   => $c['est_labor_days'],
+                'est_labor_people' => $c['est_labor_people'],
+                'est_labor_hours'  => $c['est_labor_hours'],
             ),
             'existing_quotation' => $existing,
         ));

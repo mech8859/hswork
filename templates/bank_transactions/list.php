@@ -95,6 +95,14 @@
                 <label>關鍵字</label>
                 <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="摘要/編號/金額" autocomplete="off">
             </div>
+            <?php $sortVal = !empty($filters['sort']) ? $filters['sort'] : 'desc'; ?>
+            <div class="form-group">
+                <label>排序</label>
+                <select name="sort" class="form-control">
+                    <option value="desc" <?= $sortVal === 'desc' ? 'selected' : '' ?>>新→舊</option>
+                    <option value="asc"  <?= $sortVal === 'asc'  ? 'selected' : '' ?>>舊→新</option>
+                </select>
+            </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
                 <a href="/bank_transactions.php" class="btn btn-outline btn-sm">清除</a>

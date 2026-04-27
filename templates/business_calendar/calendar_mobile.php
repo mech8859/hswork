@@ -232,16 +232,9 @@ function _bcMobileUrl($extra = array()) {
                 $typeColor = BusinessCalendarModel::activityColor($ev['activity_type']);
                 $staffColor = BusinessCalendarModel::staffColor($ev['staff_name']);
 
-                // 未回報判定：planned + 無 result + (今日17:00後 或 過期)
-                $evStatus = isset($ev['status']) ? $ev['status'] : 'planned';
+                // 顯示狀態由 BusinessCalendarModel 後端計算（含未回報判定）
+                $evStatus = isset($ev['display_status']) ? $ev['display_status'] : (isset($ev['status']) ? $ev['status'] : 'planned');
                 $hasResult = !empty($ev['result']);
-                if ($evStatus === 'planned' && !$hasResult) {
-                    if ($dateStr < $today) {
-                        $evStatus = 'no_report';
-                    } elseif ($dateStr === $today && (int)date('H') >= 17) {
-                        $evStatus = 'no_report';
-                    }
-                }
                 $statusLabels = array('planned'=>'未進行','completed'=>'已完成','cancelled'=>'取消','no_report'=>'未回報');
                 $statusText = isset($statusLabels[$evStatus]) ? $statusLabels[$evStatus] : $evStatus;
                 $showStatus = ($evStatus !== 'planned' || $hasResult);

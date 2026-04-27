@@ -20,6 +20,7 @@ switch ($action) {
             'date_from'    => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
             'date_to'      => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
             'keyword'      => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
+            'sort'         => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getBankTransactions($filters, $page);

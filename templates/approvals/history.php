@@ -14,6 +14,7 @@ $moduleOptions = array(
     'no_deposit_schedule'  => '無訂金排工',
 );
 ?>
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>簽核紀錄 <small style="font-size:.7em;color:#666">(最近 200 筆)</small></h2>
     <div class="d-flex gap-1">
@@ -76,6 +77,7 @@ $moduleOptions = array(
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <?php if (empty($history)): ?>
 <div class="card">
@@ -85,7 +87,7 @@ $moduleOptions = array(
 <div class="card" style="padding:0">
     <div class="table-responsive">
         <table class="table" style="font-size:.85rem">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th>模組</th>
                     <th>關卡</th>
@@ -121,7 +123,7 @@ $moduleOptions = array(
                     </td>
                     <td>
                         <?= e($r['submitter_name'] ?? '-') ?>
-                        <br><small style="color:#999"><?= e(date('Y-m-d H:i', strtotime($r['created_at']))) ?></small>
+                        <br><small style="color:#999"><?= !empty($r['submitted_at']) ? e(date('Y-m-d H:i', strtotime($r['submitted_at']))) : '-' ?></small>
                     </td>
                     <td>
                         <?php if (!empty($r['decided_at'])): ?>

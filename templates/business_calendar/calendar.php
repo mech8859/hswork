@@ -70,6 +70,9 @@ $currentKeyword = isset($filters['keyword']) ? $filters['keyword'] : '';
     transition: background .15s;
 }
 .bc-event:hover { background: #eef1f5; text-decoration: none; }
+.bc-event-no_report { background: #fef2f2; }
+.bc-event-no_report:hover { background: #fee2e2; }
+.bc-badge-no_report { display:inline-block; padding:1px 5px; border-radius:3px; background:#ef4444; color:#fff; font-size:.65rem; font-weight:600; vertical-align:middle; }
 .bc-event-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bc-event-info { display: flex; gap: 4px; align-items: center; font-size: .7rem; color: var(--gray-500); }
 .bc-event-staff { font-size: .65rem; color: var(--gray-400); }
@@ -147,6 +150,7 @@ var bcAllEvents = <?php
                 'color' => BusinessCalendarModel::activityColor($ev['activity_type']),
                 'staff_color' => BusinessCalendarModel::staffColor($ev['staff_name']),
                 'phone' => $ev['phone'] ?: '',
+                'no_report' => (isset($ev['display_status']) && $ev['display_status'] === 'no_report') ? 1 : 0,
             );
         }
     }
@@ -161,9 +165,12 @@ function showDayPopup(dateStr) {
     var html = '';
     for (var i = 0; i < items.length; i++) {
         var it = items[i];
-        html += '<a href="/business_calendar.php?action=edit&id=' + it.id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + it.staff_color + ';background:#f8f9fa;border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
-            ' onmouseover="this.style.background=\'#eef1f5\'" onmouseout="this.style.background=\'#f8f9fa\'">' +
-            '<div style="font-weight:600;font-size:.95rem">' + it.customer + '</div>' +
+        var bg = it.no_report ? '#fef2f2' : '#f8f9fa';
+        var bgHover = it.no_report ? '#fee2e2' : '#eef1f5';
+        var noReportBadge = it.no_report ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#ef4444;color:#fff;font-size:.7rem;margin-right:4px">未回報</span>' : '';
+        html += '<a href="/business_calendar.php?action=edit&id=' + it.id + '" style="display:block;padding:10px 12px;margin-bottom:6px;border-left:4px solid ' + it.staff_color + ';background:' + bg + ';border-radius:6px;text-decoration:none;color:inherit;transition:background .15s"' +
+            ' onmouseover="this.style.background=\'' + bgHover + '\'" onmouseout="this.style.background=\'' + bg + '\'">' +
+            '<div style="font-weight:600;font-size:.95rem">' + noReportBadge + it.customer + '</div>' +
             '<div style="display:flex;gap:8px;font-size:.8rem;color:#888;margin-top:2px">' +
             '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:' + it.color + ';color:#fff;font-size:.7rem">' + it.type + '</span>' +
             '<span>' + it.staff + '</span>' +
@@ -277,9 +284,15 @@ document.getElementById('bcDayPopup').addEventListener('click', function(e) { if
                 $evStaffColor = BusinessCalendarModel::staffColor($ev['staff_name']);
                 $evLabel = isset($activityTypes[$ev['activity_type']]) ? $activityTypes[$ev['activity_type']] : $ev['activity_type'];
             ?>
-            <?php $evTime = !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : ''; ?>
-            <a href="/business_calendar.php?action=edit&id=<?= $ev['id'] ?>" class="bc-event" style="border-left:3px solid <?= e($evStaffColor) ?>">
-                <div class="bc-event-title"><?= e(mb_substr($ev['customer_name'], 0, 8)) ?><?php if ($evTime): ?> <span style="color:#e65100;font-weight:600"><?= $evTime ?></span><?php endif; ?></div>
+            <?php
+            $evTime = !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : '';
+            $evDispStatus = isset($ev['display_status']) ? $ev['display_status'] : (isset($ev['status']) ? $ev['status'] : 'planned');
+            ?>
+            <a href="/business_calendar.php?action=edit&id=<?= $ev['id'] ?>" class="bc-event<?= $evDispStatus === 'no_report' ? ' bc-event-no_report' : '' ?>" style="border-left:3px solid <?= e($evStaffColor) ?>">
+                <div class="bc-event-title">
+                    <?php if ($evDispStatus === 'no_report'): ?><span class="bc-badge-no_report" title="尚未回報">未回報</span> <?php endif; ?>
+                    <?= e(mb_substr($ev['customer_name'], 0, 8)) ?><?php if ($evTime): ?> <span style="color:#e65100;font-weight:600"><?= $evTime ?></span><?php endif; ?>
+                </div>
                 <div class="bc-event-staff"><?= e($ev['staff_name']) ?></div>
             </a>
             <?php endforeach; ?>
@@ -311,6 +324,7 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
             'time' => !empty($ev['start_time']) ? substr($ev['start_time'], 0, 5) : '',
             'address' => !empty($ev['address']) ? $ev['address'] : '',
             'note' => !empty($ev['note']) ? $ev['note'] : '',
+            'no_report' => (isset($ev['display_status']) && $ev['display_status'] === 'no_report') ? 1 : 0,
         );
     }
     $leaves = array();
@@ -393,9 +407,11 @@ function bcOpenDay(dateStr) {
     }
     for (var i = 0; i < data.events.length; i++) {
         var ev = data.events[i];
-        html += '<div class="mday-item" style="border-left-color:' + ev.staff_color + ';cursor:pointer" onclick="location.href=\'/business_calendar.php?action=edit&id=' + ev.id + '\'">';
+        var bgStyle = ev.no_report ? 'background:#fef2f2;' : '';
+        var noReportBadge = ev.no_report ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#ef4444;color:#fff;font-size:.7rem;margin-right:4px">未回報</span>' : '';
+        html += '<div class="mday-item" style="' + bgStyle + 'border-left-color:' + ev.staff_color + ';cursor:pointer" onclick="location.href=\'/business_calendar.php?action=edit&id=' + ev.id + '\'">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-        html += '<span style="font-weight:600;font-size:.95rem">' + bcE(ev.customer) + '</span>';
+        html += '<span style="font-weight:600;font-size:.95rem">' + noReportBadge + bcE(ev.customer) + '</span>';
         html += '<span class="bc-badge-type" style="background:' + ev.color + '">' + bcE(ev.type) + '</span>';
         html += '</div>';
         html += '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:.82rem;color:var(--gray-600)">';

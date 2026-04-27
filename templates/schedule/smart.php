@@ -23,7 +23,7 @@
             </div>
             <div class="summary-item">
                 <span class="detail-label">預估工時</span>
-                <span><?= $case['estimated_hours'] ? $case['estimated_hours'] . ' 小時' : '-' ?></span>
+                <span><?= !empty($case['est_labor_hours']) ? $case['est_labor_hours'] . ' 小時' : '-' ?></span>
             </div>
         </div>
         <div class="summary-row">
@@ -32,8 +32,8 @@
                 <span>第 <?= (int)($case['current_visit'] ?: 1) ?> / <?= (int)($case['total_visits'] ?: 1) ?> 次</span>
             </div>
             <div class="summary-item">
-                <span class="detail-label">最多人數</span>
-                <span><?= (int)($case['max_engineers'] ?: 4) ?> 人</span>
+                <span class="detail-label">預估人數</span>
+                <span><?= (int)($case['est_labor_people'] ?: 4) ?> 人</span>
             </div>
             <div class="summary-item">
                 <span class="detail-label">施工地址</span>

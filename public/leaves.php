@@ -15,6 +15,7 @@ switch ($action) {
             'month'   => $_GET['month'] ?? date('Y-m'),
             'user_id' => $_GET['user_id'] ?? '',
             'status'  => $_GET['status'] ?? '',
+            'keyword' => $_GET['keyword'] ?? '',
         );
         // 只有 leaves.own 的人只看自己的
         $onlyUserId = null;
@@ -119,10 +120,10 @@ switch ($action) {
     case 'delete':
         if (verify_csrf()) {
             $leave = $model->getById((int)$_GET['id']);
-            // 自己的待審核假單可以刪除，或有 leaves.delete 權限
+            // 自己的待審核假單可以刪除，或張孟歆 (id=7) 專用刪除
             $canDeleteLeave = ($leave && $leave['user_id'] == Auth::id() && $leave['status'] === 'pending');
-            $hasDeletePerm = Auth::hasPermission('leaves.delete') || Auth::hasPermission('all');
-            if ($canDeleteLeave || $hasDeletePerm) {
+            $isAdmin = (Auth::id() == 7); // 張孟歆專用
+            if ($canDeleteLeave || $isAdmin) {
                 $model->delete((int)$_GET['id']);
                 Session::flash('success', '已刪除');
             } else {

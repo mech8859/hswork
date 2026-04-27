@@ -399,16 +399,23 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
         $_hasCase = $isEdit && !empty($quote['case_id']);
         $_cableNotUsed = $isEdit && !empty($quote['cable_not_used']);
     ?>
+    <?php
+    // 新增時若 URL 有 case_id，使用 case 的 est_labor_* 當預設
+    $_caseLD = isset($caseLaborDefaults) ? $caseLaborDefaults : null;
+    $_defLaborDays   = $quote['labor_days']   ?? ($_caseLD['labor_days']   ?? '');
+    $_defLaborPeople = $quote['labor_people'] ?? ($_caseLD['labor_people'] ?? '');
+    $_defLaborHours  = $quote['labor_hours']  ?? ($_caseLD['labor_hours']  ?? '');
+    ?>
     <div class="card">
         <div class="card-header">內部成本分析（不顯示在報價單）<small style="color:#c5221f;margin-left:6px;font-weight:400">* 送簽核前需填寫：施工天數或時數擇一、施工人數</small></div>
         <div class="form-row">
             <div class="form-group">
                 <label>施工天數</label>
-                <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($quote['labor_days'] ?? '') ?>" step="0.5" min="0" oninput="autoCalcHours()">
+                <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($_defLaborDays) ?>" step="0.5" min="0" oninput="autoCalcHours()">
             </div>
             <div class="form-group">
                 <label>施工人數</label>
-                <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($quote['labor_people'] ?? '') ?>" min="0" oninput="autoCalcHours()">
+                <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($_defLaborPeople) ?>" min="0" oninput="autoCalcHours()">
             </div>
             <?php
             $_preLockHours = $isEdit && !empty($quote['labor_days']) && !empty($quote['labor_people']);
@@ -417,7 +424,7 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
             ?>
             <div class="form-group">
                 <label>總施工時數</label>
-                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($quote['labor_hours'] ?? '') ?>" step="0.5" min="1" oninput="recalcLaborCost()" <?= $_hoursReadonly ?> style="<?= $_hoursStyle ?>">
+                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($_defLaborHours) ?>" step="0.5" min="1" oninput="recalcLaborCost()" <?= $_hoursReadonly ?> style="<?= $_hoursStyle ?>">
                 <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">總人時，天數×人數×8（天數+人數都填時鎖定）</small>
             </div>
             <div class="form-group">
@@ -473,15 +480,35 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
     <?php endif; ?>
 
     <!-- 附加資訊 -->
+    <?php
+    // 新增時帶個人預設（沒設過則 fallback 硬編碼）；編輯時用 $quote 既有值
+    $_userDef = isset($userDefaults) ? $userDefaults : null;
+    $_defaultPaymentTerms = ($_userDef && $_userDef['payment_terms'] !== null && $_userDef['payment_terms'] !== '')
+        ? $_userDef['payment_terms']
+        : '30%定金 70% 完工當日付現或當日匯款';
+    $_defaultNotes = ($_userDef && $_userDef['notes'] !== null) ? $_userDef['notes'] : '';
+    ?>
     <div class="card">
         <div class="card-header">附加資訊</div>
         <div class="form-group">
-            <label>收款條件</label>
-            <textarea name="payment_terms" class="form-control" rows="2"><?= e($quote['payment_terms'] ?? '30%定金 70% 完工當日付現或當日匯款') ?></textarea>
+            <label style="display:flex;justify-content:space-between;align-items:center">
+                <span>收款條件</span>
+                <label class="checkbox-label" style="font-weight:normal;font-size:.85rem;color:#1565c0">
+                    <input type="checkbox" name="save_payment_terms_default" value="1">
+                    設為個人預設
+                </label>
+            </label>
+            <textarea name="payment_terms" class="form-control" rows="2"><?= e($quote['payment_terms'] ?? $_defaultPaymentTerms) ?></textarea>
         </div>
         <div class="form-group">
-            <label>附註說明</label>
-            <textarea name="notes" class="form-control" rows="2"><?= e($quote['notes'] ?? '') ?></textarea>
+            <label style="display:flex;justify-content:space-between;align-items:center">
+                <span>附註說明</span>
+                <label class="checkbox-label" style="font-weight:normal;font-size:.85rem;color:#1565c0">
+                    <input type="checkbox" name="save_notes_default" value="1">
+                    設為個人預設
+                </label>
+            </label>
+            <textarea name="notes" class="form-control" rows="2"><?= e($quote['notes'] ?? $_defaultNotes) ?></textarea>
         </div>
     </div>
 
@@ -1518,6 +1545,12 @@ function loadEstMaterials(caseId) {
             fillIfEmpty('site_address', d.case.site_address);
             fillIfEmpty('invoice_title', d.case.invoice_title);
             fillIfEmpty('invoice_tax_id', d.case.invoice_tax_id);
+            // 從案件帶入施工天數/人數/時數（單向預填，已填的不覆蓋）
+            fillIfEmpty('labor_days', d.case.est_labor_days);
+            fillIfEmpty('labor_people', d.case.est_labor_people);
+            fillIfEmpty('labor_hours', d.case.est_labor_hours);
+            // 觸發人力成本重算（只在有值的情況下）
+            if (typeof recalcLaborCost === 'function') recalcLaborCost();
         }
         if (estCard) { estCard.style.display = ''; loadEstMaterials(caseId); }
         updateCableCaseUI();

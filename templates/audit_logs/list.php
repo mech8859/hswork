@@ -1,12 +1,65 @@
 <?php
 $actionLabels = array(
+    // 基本
     'login' => '登入', 'logout' => '登出',
     'create' => '新增', 'update' => '編輯', 'delete' => '刪除',
     'view' => '查看', 'export' => '匯出', 'import' => '匯入',
+    'status' => '狀態變更',
+    'lock' => '上鎖', 'unlock' => '解鎖',
+    'cancel' => '取消', 'cancel_reserve' => '取消預約',
+    'complete' => '完成', 'confirm' => '確認', 'unconfirm' => '取消確認',
+    'void' => '作廢', 'ship' => '出貨', 'prepare' => '備料', 'reserve' => '預約',
+    'link_to_case' => '連結案件', 'toggle_star' => '切換星標',
+    // 簽核
+    'submit_approval' => '送簽核',
+    'submit_no_deposit_approval' => '送無訂金簽核',
+    'resubmit_approval' => '重送簽核',
+    'reset_pending' => '重置待簽',
+    'approve' => '核准', 'auto_approve' => '自動核准',
+    'reject' => '退回',
+    'request_revision' => '要求變更',
+    'revision_approved' => '變更核准',
+    'revision_auto_approved' => '變更自動核准',
+    'revision_rejected' => '變更退回',
+    'revision_to_draft' => '變更退草稿',
+    // 配對 / 對帳
+    'confirm_match' => '確認配對',
+    'batch_match' => '批次配對',
+    'batch_lock_clean' => '批次解鎖清除',
+    'bulk_fix_stuck_reject' => '批次修退回卡單',
+    'bulk_rebind' => '批次重綁',
+    'bulk_update' => '批次更新',
+    'manual_fix' => '手動修復',
+    'generate_payment' => '產生付款',
+    // 帳號管理
+    'change_password' => '修改密碼',
+    'force_change_password' => '強制改密碼',
+    'sync_permissions' => '同步權限',
+    'admin_delete' => '管理員刪除',
+    'admin_edit_basic' => '管理員編輯',
+    'auto_disable' => '自動停用',
+    'auto_status' => '自動更新狀態',
+    // 報價/品項
+    'edit_items' => '編輯品項',
+    'update_date' => '更新日期',
+    'update_item_note' => '更新品項備註',
+    'update_support_branches' => '更新協辦分公司',
+    // 規則 / 系統
+    'rule_create' => '建規則',
+    'rule_fix' => '修規則',
+    'migration' => '資料遷移',
 );
 $actionColors = array(
     'login' => '#4CAF50', 'logout' => '#9E9E9E',
     'create' => '#2196F3', 'update' => '#FF9800', 'delete' => '#f44336',
+    'approve' => '#16a34a', 'auto_approve' => '#16a34a', 'revision_approved' => '#16a34a', 'revision_auto_approved' => '#16a34a',
+    'reject' => '#dc2626', 'revision_rejected' => '#dc2626',
+    'submit_approval' => '#0ea5e9', 'submit_no_deposit_approval' => '#0ea5e9', 'resubmit_approval' => '#0ea5e9',
+    'request_revision' => '#f59e0b', 'revision_to_draft' => '#f59e0b',
+    'lock' => '#6b7280', 'unlock' => '#a855f7',
+    'cancel' => '#ef4444', 'void' => '#ef4444',
+    'confirm' => '#16a34a', 'unconfirm' => '#9E9E9E', 'confirm_match' => '#16a34a',
+    'complete' => '#16a34a',
 );
 $moduleLabels = array(
     'auth' => '系統登入', 'cases' => '案件管理', 'schedule' => '工程行事曆',

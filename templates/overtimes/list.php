@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>加班單管理 <small class="text-muted">(<?= count($records) ?>)</small></h2>
     <div class="d-flex gap-1">
@@ -54,6 +55,10 @@
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="form-group" style="flex:1.5;min-width:180px">
+                <label>關鍵字</label>
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="申請人 / 類別 / 事由">
+            </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
                 <a href="/overtimes.php" class="btn btn-outline btn-sm">清除</a>
@@ -61,6 +66,7 @@
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <?php
 // 計算總時數
@@ -103,7 +109,7 @@ foreach ($records as $r) $totalHours += (float)$r['hours'];
     <!-- 桌面版 -->
     <div class="table-responsive hide-mobile">
         <table class="table">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th>加班日期</th>
                     <th>申請人</th>
@@ -136,7 +142,21 @@ foreach ($records as $r) $totalHours += (float)$r['hours'];
                         <?php endif; ?>
                     </td>
                     <td>
-                        <a href="/overtimes.php?action=view&id=<?= $r['id'] ?>" class="btn btn-outline btn-sm">檢視</a>
+                        <div class="d-flex gap-1">
+                            <a href="/overtimes.php?action=view&id=<?= $r['id'] ?>" class="btn btn-outline btn-sm">檢視</a>
+                            <?php
+                            $_canDelOwn = ($r['user_id'] == Auth::id() && in_array($r['status'], array('pending','rejected')));
+                            $_canDelAdmin = (Auth::id() == 7); // 張孟歆專用
+                            if ($_canDelOwn || $_canDelAdmin):
+                                $_confirmMsg = $r['status'] === 'approved' ? '確定刪除已核准的加班單？簽核紀錄也會一併移除' : '確定刪除?';
+                            ?>
+                            <form method="POST" action="/overtimes.php?action=delete" style="display:inline" onsubmit="return confirm('<?= $_confirmMsg ?>');">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="id" value="<?= $r['id'] ?>">
+                                <button type="submit" class="btn btn-outline btn-sm">刪除</button>
+                            </form>
+                            <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>

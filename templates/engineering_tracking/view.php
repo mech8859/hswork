@@ -79,7 +79,7 @@ $currentStage = $caseModel->syncStage($case['id']);
     <div class="detail-grid">
         <div class="detail-item"><span class="detail-label">預定開工日</span><span class="detail-value"><?= e($case['planned_start_date'] ?: '-') ?></span></div>
         <div class="detail-item"><span class="detail-label">預定完工日</span><span class="detail-value"><?= e($case['planned_end_date'] ?: '-') ?></span></div>
-        <div class="detail-item"><span class="detail-label">預估工時</span><span class="detail-value"><?= $case['estimated_hours'] ? $case['estimated_hours'] . ' 小時' : '-' ?></span></div>
+        <div class="detail-item"><span class="detail-label">預估工時</span><span class="detail-value"><?= !empty($case['est_labor_hours']) ? $case['est_labor_hours'] . ' 小時' : '-' ?></span></div>
         <div class="detail-item"><span class="detail-label">施工進度</span><span class="detail-value"><?= !empty($case['total_visits']) ? '第' . (int)($case['current_visit'] ?: 1) . '/' . (int)$case['total_visits'] . ' 次' : '-' ?></span></div>
         <div class="detail-item"><span class="detail-label">難易度</span><span class="detail-value"><?= $case['difficulty'] ? $case['difficulty'] . '/5' : '-' ?></span></div>
         <div class="detail-item"><span class="detail-label">完工日期</span><span class="detail-value"><?= e($case['completed_date'] ?: '-') ?></span></div>

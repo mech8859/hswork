@@ -61,6 +61,22 @@ if (Session::getUser() && php_sapi_name() !== 'cli') {
     }
 }
 
+// 自動修復卡住簽核（每 30 分鐘最多一次，背景執行不阻塞）
+if (Session::getUser() && php_sapi_name() !== 'cli') {
+    $fixFlag = __DIR__ . '/../data/backups/last_approval_fix.txt';
+    $lastFix = file_exists($fixFlag) ? (int)trim(@file_get_contents($fixFlag)) : 0;
+    if (time() - $lastFix > 1800) { // 30 分鐘
+        @file_put_contents($fixFlag, time());
+        $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+        $ch = curl_init($baseUrl . '/cron_fix_stuck_approvals.php?key=hswork_approval_fix_2026');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
+        @curl_exec($ch);
+        curl_close($ch);
+    }
+}
+
 // 確保沒有殘留的未關閉事務
 try {
     $__db = Database::getInstance();

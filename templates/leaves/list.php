@@ -1,3 +1,4 @@
+<div class="page-sticky-head">
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
     <h2>請假管理</h2>
     <a href="/leaves.php?action=create" class="btn btn-primary btn-sm">+ 申請請假</a>
@@ -32,6 +33,10 @@
                     <option value="rejected" <?= $filters['status'] === 'rejected' ? 'selected' : '' ?>>已駁回</option>
                 </select>
             </div>
+            <div class="form-group" style="flex:1.5;min-width:180px">
+                <label>關鍵字</label>
+                <input type="text" name="keyword" class="form-control" value="<?= e($filters['keyword'] ?? '') ?>" placeholder="申請人 / 假別 / 原因">
+            </div>
             <div class="form-group" style="align-self:flex-end">
                 <button type="submit" class="btn btn-primary btn-sm">搜尋</button>
                 <a href="/leaves.php?action=list" class="btn btn-outline btn-sm">清除</a>
@@ -39,6 +44,7 @@
         </div>
     </form>
 </div>
+</div><!-- /.page-sticky-head -->
 
 <div class="card">
     <?php if (empty($leaves)): ?>
@@ -78,7 +84,7 @@
     <!-- 桌面版 -->
     <div class="table-responsive hide-mobile">
         <table class="table">
-            <thead>
+            <thead class="sticky-thead">
                 <tr>
                     <th>申請人</th>
                     <th>據點</th>
@@ -117,9 +123,14 @@
                                class="btn btn-success btn-sm" onclick="return confirm('確定核准?')">核准</a>
                             <button type="button" class="btn btn-danger btn-sm" onclick="showRejectModal(<?= $lv['id'] ?>)">駁回</button>
                             <?php endif; ?>
-                            <?php if ($lv['user_id'] == Auth::id() && $lv['status'] === 'pending'): ?>
+                            <?php
+                            $_canDelOwn = ($lv['user_id'] == Auth::id() && $lv['status'] === 'pending');
+                            $_canDelAdmin = (Auth::id() == 7); // 張孟歆專用
+                            if ($_canDelOwn || $_canDelAdmin):
+                                $_confirmMsg = $lv['status'] === 'approved' ? '確定刪除已核准的請假？行事曆也會一併移除' : '確定刪除?';
+                            ?>
                             <a href="/leaves.php?action=delete&id=<?= $lv['id'] ?>&csrf_token=<?= e(Session::getCsrfToken()) ?>"
-                               class="btn btn-outline btn-sm" onclick="return confirm('確定刪除?')">刪除</a>
+                               class="btn btn-outline btn-sm" onclick="return confirm('<?= $_confirmMsg ?>')">刪除</a>
                             <?php endif; ?>
                         </div>
                     </td>

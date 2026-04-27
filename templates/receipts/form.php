@@ -176,19 +176,19 @@
         <div class="form-row">
             <div class="form-group">
                 <label>小計 (未稅)</label>
-                <input type="number" name="subtotal" id="f_subtotal" class="form-control calc-trigger" step="1" min="0"
+                <input type="number" name="subtotal" id="f_subtotal" class="form-control calc-trigger" step="1"
                        value="<?= $isEdit && !empty($record['subtotal']) ? (int)$record['subtotal'] : 0 ?>">
             </div>
             <div class="form-group">
                 <label>稅額</label>
-                <input type="number" name="tax" id="f_tax" class="form-control calc-trigger" step="1" min="0"
+                <input type="number" name="tax" id="f_tax" class="form-control calc-trigger" step="1"
                        value="<?= $isEdit && !empty($record['tax']) ? (int)$record['tax'] : 0 ?>">
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>折讓/匯費</label>
-                <input type="number" name="discount" id="f_discount" class="form-control calc-trigger" step="1" min="0"
+                <input type="number" name="discount" id="f_discount" class="form-control calc-trigger" step="1"
                        value="<?= $isEdit && !empty($record['discount']) ? (int)$record['discount'] : 0 ?>">
             </div>
             <div class="form-group">
