@@ -149,9 +149,9 @@ function _scMobileUrl($extra = array()) {
         <a href="<?= _scMobileUrl(array('mode' => 'grid', 'date' => null)) ?>" class="scm-tab <?= $defaultMode === 'grid' ? 'active' : '' ?>">📅 月曆</a>
     </div>
 
-    <!-- 篩選：分公司 + 人員 + 關鍵字 -->
-    <?php if ($canManage): ?>
+    <!-- 篩選：分公司 + 人員（管理者）+ 關鍵字（所有人） -->
     <div class="scm-filters">
+        <?php if ($canManage): ?>
         <?php if (count($branchList) > 1): ?>
         <select id="scmBranchFilter" onchange="scmChangeFilter('branch_id', this.value)">
             <option value="0">全部分公司</option>
@@ -166,6 +166,7 @@ function _scMobileUrl($extra = array()) {
             <option value="<?= $eng['id'] ?>" <?= $filterUserId == $eng['id'] ? 'selected' : '' ?>><?= e($eng['real_name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <?php endif; ?>
         <div class="scm-keyword-wrap">
             <input type="text" id="scmKeyword" placeholder="搜尋客戶/案件/地址"
                    value="<?= e($currentKeyword) ?>" onkeydown="if(event.key==='Enter')scmApplyKeyword()">
@@ -174,7 +175,6 @@ function _scMobileUrl($extra = array()) {
     </div>
     <?php if ($currentKeyword !== ''): ?>
     <span class="scm-kw-badge">🔍 <?= e($currentKeyword) ?> <a href="javascript:void(0)" onclick="scmClearKeyword()">✕</a></span>
-    <?php endif; ?>
     <?php endif; ?>
 
     <!-- 月份切換 -->

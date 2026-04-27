@@ -293,6 +293,7 @@ switch ($action) {
                     if ($module === 'quotations') {
                         require_once __DIR__ . '/../modules/quotations/QuotationModel.php';
                         $qm = new QuotationModel();
+                        $db = Database::getInstance();
                         // 判斷是否為變更簽核
                         $revFlow = $db->prepare("SELECT payload FROM approval_flows WHERE module = 'quotations' AND target_id = ? AND payload IS NOT NULL AND payload != '' LIMIT 1");
                         $revFlow->execute(array($targetId));

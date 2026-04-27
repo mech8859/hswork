@@ -23,6 +23,7 @@ $statusLabels = array(
 // 備用金→零用金 專用狀態
 $rfPcStatusLabels = array(
     'matched_precise'         => array('精準匹配', '#16a34a'),
+    'matched_by_cash'         => array('精準匹配', '#16a34a'),
     'unmatched_rf'            => array('零用金未對應', '#ef4444'),
     'unmatched_pc'            => array('備用金未對應', '#ef4444'),
     'manually_confirmed'      => array('已人工核對', '#16a34a'),
@@ -138,10 +139,16 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                 if ($source === 'cash_pc_match') $_filterLabels = $cashPcStatusLabels;
                 elseif ($source === 'rf_pc_match') $_filterLabels = $rfPcStatusLabels;
                 else $_filterLabels = $statusLabels;
+                // 精準匹配子類型加註說明，避免 dropdown 出現兩個一樣的「精準匹配」
+                $_optExtra = array(
+                    'matched_precise' => '精準匹配（自動配對）',
+                    'matched_by_cash' => '精準匹配（現金已核對）',
+                );
                 foreach ($_filterLabels as $sk => $sv):
                     if ($sk === 'merged_into_prev') continue;
+                    $_optLabel = isset($_optExtra[$sk]) ? $_optExtra[$sk] : $sv[0];
                 ?>
-                <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($sv[0]) ?></option>
+                <option value="<?= e($sk) ?>" <?= $statusFilter === $sk ? 'selected' : '' ?>><?= e($_optLabel) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -168,11 +175,21 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
     if ($source === 'cash_pc_match') $_statCardLabels = $cashPcStatusLabels;
     elseif ($source === 'rf_pc_match') $_statCardLabels = $rfPcStatusLabels;
     else $_statCardLabels = $statusLabels;
+    // 兩個「精準匹配」加註區分（自動配對 / 現金已核對）
+    $_cardLabelExtra = array(
+        'matched_precise' => array('精準匹配', '自動配對'),
+        'matched_by_cash' => array('精準匹配', '現金已核對'),
+    );
     foreach ($_statCardLabels as $sk => $sv):
         if ($sk === 'merged_into_prev') continue;
+        $_mainLabel = isset($_cardLabelExtra[$sk]) ? $_cardLabelExtra[$sk][0] : $sv[0];
+        $_subLabel  = isset($_cardLabelExtra[$sk]) ? $_cardLabelExtra[$sk][1] : '';
     ?>
     <a href="/accounting.php?action=voucher_reconciliation&source=<?= e($source) ?>&start_date=<?= e($startDate) ?>&end_date=<?= e($endDate) ?><?= $branchFilter && $source !== 'bank' ? '&branch_id=' . $branchFilter : '' ?>&status_filter=<?= e($sk) ?>" class="card" style="padding:12px;text-align:center;text-decoration:none;color:inherit;border-left:3px solid <?= $sv[1] ?>">
-        <div style="font-size:.8rem;color:<?= $sv[1] ?>;font-weight:600"><?= e($sv[0]) ?></div>
+        <div style="font-size:.8rem;color:<?= $sv[1] ?>;font-weight:600">
+            <?= e($_mainLabel) ?>
+            <?php if ($_subLabel): ?><span style="font-size:.7rem;font-weight:400;opacity:.85">（<?= e($_subLabel) ?>）</span><?php endif; ?>
+        </div>
         <div style="font-size:1.3rem;font-weight:700;color:<?= $sv[1] ?>"><?= number_format(isset($stats[$sk]) ? $stats[$sk] : 0) ?></div>
     </a>
     <?php endforeach; ?>
@@ -270,7 +287,18 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                 <td style="padding:8px;text-align:center;white-space:nowrap">
                     <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:<?= $st[1] ?>;color:#fff;font-size:.72rem;font-weight:600"><?= e($st[0]) ?></span>
                     <?php if ($isConfirmed): ?>
-                    <div style="color:#16a34a;font-size:.7rem;margin-top:2px;font-weight:600">✓ 已人工核對</div>
+                    <div style="color:#16a34a;font-size:.7rem;margin-top:2px;font-weight:600">
+                        <?php
+                        if ($r['match_status'] === 'matched_by_cash') {
+                            echo '✓ 現金已核對';
+                        } elseif (!empty($r['is_confirmed'])) {
+                            echo '✓ 已人工核對';
+                        } else {
+                            // matched_precise 但無真實人工確認 → 自動配對
+                            echo '（自動配對）';
+                        }
+                        ?>
+                    </div>
                     <?php endif; ?>
                 </td>
                 <td style="padding:8px;text-align:center">
@@ -282,7 +310,9 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
                         ? '確認此備用金支出與零用金收入配對無誤？\n確認後此筆會鎖定為精準匹配。'
                         : '確認此筆人工核對無誤？\n（單邊未對應也標記為已核對，下次預設視圖會隱藏）';
                     ?>
-                    <?php if ($hasAny && ($canManage ?? false)): ?>
+                    <?php if ($r['match_status'] === 'matched_by_cash'): ?>
+                    <span style="color:#16a34a;font-size:.72rem">已被現金核對</span>
+                    <?php elseif ($hasAny && ($canManage ?? false)): ?>
                         <?php if ($isConfirmed): ?>
                         <form method="POST" action="/accounting.php?action=<?= e($_confirmAction) ?>" style="display:inline" onsubmit="return confirm('取消此筆人工核對？');">
                             <?= csrf_field() ?>

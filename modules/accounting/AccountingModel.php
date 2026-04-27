@@ -1258,11 +1258,11 @@ class AccountingModel
      */
     public function getReserveFundToPettyCashMatch($startDate, $endDate, $branchId = null)
     {
-        // 抓備用金支出 + 用途含「入零用金」
+        // 抓備用金支出，REGEXP 支援「入零用金」「入台中零用金」「入清水零用金」等變體
         $rfSql = "SELECT id, entry_number, expense_date, expense_amount, branch_id, description, type
                   FROM reserve_fund
                   WHERE type = '支出' AND expense_date BETWEEN ? AND ?
-                    AND description LIKE '%入零用金%'";
+                    AND description REGEXP '入.{0,10}零用金'";
         $rfParams = array($startDate, $endDate);
         if ($branchId) { $rfSql .= " AND branch_id = ?"; $rfParams[] = (int)$branchId; }
         $rfSql .= " ORDER BY expense_date, id";
@@ -1270,12 +1270,12 @@ class AccountingModel
         $st->execute($rfParams);
         $rfRows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        // 抓零用金收入 + 用途含「入零用金」
+        // 抓零用金收入 + 用途含「入○零用金」
         // 注意：petty_cash 的「收支日期」實際是 entry_date 欄（不是 expense_date）
         $pcSql = "SELECT id, entry_number, entry_date AS expense_date, income_amount, branch_id, description, type
                   FROM petty_cash
                   WHERE type = '收入' AND entry_date BETWEEN ? AND ?
-                    AND description LIKE '%入零用金%'";
+                    AND description REGEXP '入.{0,10}零用金'";
         $pcParams = array($startDate, $endDate);
         if ($branchId) { $pcSql .= " AND branch_id = ?"; $pcParams[] = (int)$branchId; }
         $pcSql .= " ORDER BY entry_date, id";
@@ -1310,6 +1310,31 @@ class AccountingModel
                 }
             }
         } catch (Exception $e) { /* 表還沒建就跳過 */ }
+
+        // 預先抓「已被現金成功配對的 pc」(用於把 unmatched_pc 升級為 matched_by_cash)
+        // 1. 同日同額且都符合 入零用金 規則 → 會在現金分頁自動精準匹配
+        // 2. cash_pc_match_confirmed 已人工綁定
+        $cashMatchedPcIds = array();
+        try {
+            $stmt = $this->db->query("
+                SELECT DISTINCT p2.id
+                FROM petty_cash p2
+                INNER JOIN cash_details cd
+                    ON cd.transaction_date = p2.entry_date
+                   AND cd.expense_amount = p2.income_amount
+                WHERE cd.expense_amount > 0
+                  AND p2.type = '收入'
+                  AND cd.description REGEXP '入.{0,10}零用金'
+                  AND p2.description REGEXP '入.{0,10}零用金'
+            ");
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $pid) {
+                $cashMatchedPcIds[(int)$pid] = true;
+            }
+            $stmt = $this->db->query("SELECT pc_id FROM cash_pc_match_confirmed WHERE pc_id IS NOT NULL");
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $pid) {
+                $cashMatchedPcIds[(int)$pid] = true;
+            }
+        } catch (Exception $e) {}
 
         // pc 列以 id 索引，方便依 confirmed 找出對應索引
         $pcIdToIdx = array();
@@ -1413,9 +1438,17 @@ class AccountingModel
         }
 
         // 第二輪：剩下沒被匹配的零用金收入 → unmatched_pc
+        // 若已被現金成功配對 → 升級為 matched_by_cash（綠色，不需要 rf 端再核對）
         foreach ($pcRows as $idx => $p) {
             if (in_array($idx, $pcUsed, true)) continue;
             $pcBranch = (int)$p['branch_id'];
+            $pid = (int)$p['id'];
+            $matchStatus = 'unmatched_pc';
+            $isConfirmed = isset($confirmedPcAlone[$pid]);
+            if (isset($cashMatchedPcIds[$pid])) {
+                $matchStatus = 'matched_by_cash';
+                $isConfirmed = true;
+            }
             $out[] = array(
                 'date'           => $p['expense_date'],
                 'rf_id'          => null,
@@ -1424,15 +1457,15 @@ class AccountingModel
                 'rf_description' => null,
                 'rf_branch_id'   => null,
                 'rf_branch_name' => null,
-                'pc_id'          => (int)$p['id'],
+                'pc_id'          => $pid,
                 'pc_number'      => $p['entry_number'],
                 'pc_amount'      => (int)$p['income_amount'],
                 'pc_description' => $p['description'],
                 'pc_branch_id'   => $pcBranch,
                 'pc_branch_name' => isset($brMap[$pcBranch]) ? $brMap[$pcBranch] : '',
                 'pc_date'        => $p['expense_date'],
-                'match_status'   => 'unmatched_pc',
-                'is_confirmed'   => isset($confirmedPcAlone[(int)$p['id']]),
+                'match_status'   => $matchStatus,
+                'is_confirmed'   => $isConfirmed,
             );
         }
 
@@ -1485,17 +1518,16 @@ class AccountingModel
     }
 
     /**
-     * 現金支出 ↔ 零用金收入 配對（用途含「入零用金」）
+     * 現金支出 ↔ 零用金收入 配對（用途含「入○零用金」，中間可有分公司名等）
      * 規則同 getReserveFundToPettyCashMatch
      */
     public function getCashToPettyCashMatch($startDate, $endDate, $branchId = null)
     {
-        // 現金支出（排除用途只有「入零用金」三字無其他字句的）
+        // 現金支出，REGEXP 支援「入零用金」「入台中零用金」「入清水零用金」等變體
         $cashSql = "SELECT id, entry_number, transaction_date AS expense_date, expense_amount, branch_id, description
                     FROM cash_details
                     WHERE expense_amount > 0 AND transaction_date BETWEEN ? AND ?
-                      AND description LIKE '%入零用金%'
-                      AND TRIM(description) <> '入零用金'";
+                      AND description REGEXP '入.{0,10}零用金'";
         $cashParams = array($startDate, $endDate);
         if ($branchId) { $cashSql .= " AND branch_id = ?"; $cashParams[] = (int)$branchId; }
         $cashSql .= " ORDER BY transaction_date, id";
@@ -1503,13 +1535,27 @@ class AccountingModel
         $st->execute($cashParams);
         $cashRows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        // 零用金收入 + 用途含「入零用金」（同樣排除單純「入零用金」三字）
+        // 零用金收入 + 用途含「入○零用金」
         // 注意：petty_cash 的「收支日期」實際是 entry_date 欄（不是 expense_date）
+        // 排除已被備用金佔走的 pc（備用金→零用金 為優先比對）：
+        //   1. 已被備用金人工核對綁定的 pc（rf_pc_match_confirmed）
+        //   2. 有對應備用金支出（同日同額且都符合入零用金規則）的 pc → 會在備用金分頁自動精準匹配
         $pcSql = "SELECT id, entry_number, entry_date AS expense_date, income_amount, branch_id, description, type
                   FROM petty_cash
                   WHERE type = '收入' AND entry_date BETWEEN ? AND ?
-                    AND description LIKE '%入零用金%'
-                    AND TRIM(description) <> '入零用金'";
+                    AND description REGEXP '入.{0,10}零用金'
+                    AND id NOT IN (
+                        SELECT pc_id FROM rf_pc_match_confirmed WHERE pc_id IS NOT NULL
+                    )
+                    AND id NOT IN (
+                        SELECT p2.id FROM petty_cash p2
+                        INNER JOIN reserve_fund rf
+                            ON rf.expense_date = p2.entry_date
+                           AND rf.expense_amount = p2.income_amount
+                        WHERE rf.type = '支出'
+                          AND rf.description REGEXP '入.{0,10}零用金'
+                          AND p2.type = '收入'
+                    )";
         $pcParams = array($startDate, $endDate);
         if ($branchId) { $pcSql .= " AND branch_id = ?"; $pcParams[] = (int)$branchId; }
         $pcSql .= " ORDER BY entry_date, id";

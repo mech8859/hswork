@@ -53,6 +53,7 @@ $cmStmt = $cmDb->query("
            c.sales_id,
            u.real_name AS sales_name,
            u.role AS sales_role,
+           u.is_sales AS sales_flag,
            c.case_type,
            c.sub_status
     FROM cases c
@@ -80,7 +81,8 @@ foreach ($cmRows as $r) {
     if ($isAdd) { $cmBranchAgg[$bn]['add_entry']++; if ($isClosed) $cmBranchAgg[$bn]['add_closed']++; }
     else        { $cmBranchAgg[$bn]['new_entry']++; if ($isClosed) $cmBranchAgg[$bn]['new_closed']++; }
 
-    if (!in_array($role, array('sales_manager','sales'))) continue;
+    // 計入業務績效的條件：is_sales=1 旗標（含門市做業務的 admin_staff、副總等）
+    if (empty($r['sales_flag'])) continue;
     if (!isset($cmSalesAgg[$bn])) $cmSalesAgg[$bn] = array();
     if (!isset($cmSalesAgg[$bn][$sn])) {
         $cmSalesAgg[$bn][$sn] = array('role'=>$role,'new_entry'=>0,'new_closed'=>0,'add_entry'=>0,'add_closed'=>0);

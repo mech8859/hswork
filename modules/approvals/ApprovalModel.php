@@ -1258,6 +1258,6 @@ class ApprovalModel
         ")->execute(array($caseId));
 
         // 案件進度改回 in_progress
-        $this->db->prepare("UPDATE cases SET progress = 'in_progress' WHERE id = ?")->execute(array($caseId));
+        $this->db->prepare("UPDATE cases SET status = 'in_progress' WHERE id = ?")->execute(array($caseId));
     }
 }

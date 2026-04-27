@@ -1523,7 +1523,7 @@ switch ($action) {
             } else {
                 $records = $model->getReserveFundToPettyCashMatch($startDate, $endDate, $branchFilter ?: null);
             }
-            $stats = array('matched_precise'=>0, 'manually_confirmed'=>0, 'unmatched_rf'=>0, 'unmatched_pc'=>0, 'total'=>0);
+            $stats = array('matched_precise'=>0, 'matched_by_cash'=>0, 'manually_confirmed'=>0, 'unmatched_rf'=>0, 'unmatched_pc'=>0, 'total'=>0);
             foreach ($records as $r) {
                 $stats['total']++;
                 $isConf = !empty($r['is_confirmed']);
