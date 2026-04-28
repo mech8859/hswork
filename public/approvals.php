@@ -142,6 +142,16 @@ switch ($action) {
                     if ($flowLevel === 2) {
                         $hasPayment      = !empty($_POST['has_payment']);
                         $warrantyService = !empty($_POST['warranty_service']);
+
+                        // 衝突檢查：「有收款」與「保固/服務」不可同時勾選
+                        if ($hasPayment && $warrantyService) {
+                            $db->prepare("UPDATE approval_flows SET status='pending', decided_at=NULL WHERE id=?")->execute(array($flowId));
+                            Session::flash('error', '「有收款」與「保固／做服務」不可同時勾選：有收款 → 取消「保固／做服務」改走第 3 關會計確認；保固服務 → 取消「有收款」讓案件直接結案。');
+                            $redirect = !empty($_POST['redirect']) ? $_POST['redirect'] : '/approvals.php';
+                            redirect($redirect);
+                            break;
+                        }
+
                         $model->setFlowPayload($flowId, array(
                             'has_payment'      => $hasPayment,
                             'warranty_service' => $warrantyService,

@@ -1295,6 +1295,14 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                 <script>
                 function completionApproveSubmit() {
                     if (!confirm('確定核准？')) return;
+                    <?php if ($_myFlow['level_order'] == 2): ?>
+                    var hpEl = document.getElementById('compHasPayment');
+                    var wsEl = document.getElementById('compWarrantyService');
+                    if (hpEl && hpEl.checked && wsEl && wsEl.checked) {
+                        alert('「有收款」與「保固／做服務」不可同時勾選');
+                        return;
+                    }
+                    <?php endif; ?>
                     <?php if ($_myFlow['level_order'] == 3): ?>
                     var prEl = document.getElementById('compPaymentReceived');
                     if (!prEl || !prEl.checked) { alert('請勾選「款項已入帳」才能核准'); return; }
