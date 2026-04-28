@@ -408,9 +408,10 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
     <?php
     // 新增時若 URL 有 case_id，使用 case 的 est_labor_* 當預設
     $_caseLD = isset($caseLaborDefaults) ? $caseLaborDefaults : null;
-    $_defLaborDays   = $quote['labor_days']   ?? ($_caseLD['labor_days']   ?? '');
-    $_defLaborPeople = $quote['labor_people'] ?? ($_caseLD['labor_people'] ?? '');
-    $_defLaborHours  = $quote['labor_hours']  ?? ($_caseLD['labor_hours']  ?? '');
+    $_defLaborDays      = $quote['labor_days']       ?? ($_caseLD['labor_days']       ?? '');
+    $_defLaborPeople    = $quote['labor_people']     ?? ($_caseLD['labor_people']     ?? '');
+    $_defLaborUnitHours = $quote['labor_unit_hours'] ?? ($_caseLD['labor_unit_hours'] ?? '');
+    $_defLaborHours     = $quote['labor_hours']      ?? ($_caseLD['labor_hours']      ?? '');
     ?>
     <div class="card">
         <div class="card-header">內部成本分析（不顯示在報價單）<small style="color:#c5221f;margin-left:6px;font-weight:400">* 送簽核前需填寫：施工天數或時數擇一、施工人數</small></div>
@@ -420,18 +421,18 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                 <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($_defLaborDays) ?>" step="0.5" min="0" oninput="autoCalcHours()">
             </div>
             <div class="form-group">
-                <label>施工人數</label>
+                <label>施工人數 <small style="color:#c5221f">*必填</small></label>
                 <input type="number" name="labor_people" id="laborPeople" class="form-control" value="<?= e($_defLaborPeople) ?>" min="0" oninput="autoCalcHours()">
             </div>
-            <?php
-            $_preLockHours = $isEdit && !empty($quote['labor_days']) && !empty($quote['labor_people']);
-            $_hoursReadonly = $_preLockHours ? 'readonly' : '';
-            $_hoursStyle = $_preLockHours ? 'background:#f5f5f5;cursor:not-allowed' : '';
-            ?>
+            <div class="form-group">
+                <label>施工時數 <small style="color:#888">(每人工時)</small></label>
+                <input type="number" name="labor_unit_hours" id="laborUnitHours" class="form-control" value="<?= e($_defLaborUnitHours) ?>" step="0.5" min="0" oninput="autoCalcHours()" placeholder="與天數擇一">
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">與施工天數擇一填寫</small>
+            </div>
             <div class="form-group">
                 <label>總施工時數</label>
-                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($_defLaborHours) ?>" step="0.5" min="1" oninput="recalcLaborCost()" <?= $_hoursReadonly ?> style="<?= $_hoursStyle ?>">
-                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">總人時，天數×人數×8（天數+人數都填時鎖定）</small>
+                <input type="number" name="labor_hours" id="laborHours" class="form-control" value="<?= e($_defLaborHours) ?>" step="0.5" min="0" readonly style="background:#f5f5f5;cursor:not-allowed">
+                <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">系統自動計算 = (天數×8 或 每人時數) × 人數</small>
             </div>
             <div class="form-group">
                 <label>人力成本</label>
@@ -1248,13 +1249,12 @@ document.addEventListener('click', function(e) {
 // 人力時薪（由系統設定帶入）
 var laborHourlyCost = <?= isset($_qfHourly) ? (int)$_qfHourly : 560 ?>;
 
-// 人力成本自動計算：人數 × 時數 × 時薪（時數為單人工時）
+// 人力成本自動計算：總時數 × 時薪（labor_hours 已是總人時）
 function recalcLaborCost() {
     var costEl = document.getElementById('laborCostTotal');
     if (!costEl) return;
     var hours = parseFloat(document.getElementById('laborHours').value) || 0;
     if (hours > 0 && hours < 1) hours = 1;
-    // 時數 已是總人時，直接 × 時薪（不再 × 人數）
     var cost = (hours > 0) ? Math.round(hours * laborHourlyCost) : 0;
     costEl.value = cost || '';
     calcGrandTotal();
@@ -1295,33 +1295,31 @@ if (document.getElementById('discountAmount')) {
     document.getElementById('discountAmount').addEventListener('input', calcGrandTotal);
 }
 
-// 施工時數自動計算（天數 × 8 = 單人工時，最低 1）
-// 當天數 + 人數都有值 → 時數自動、鎖定不可修改
-// 只填人數時 → 時數可手動輸入
+// 總施工時數自動計算（一律唯讀）：
+//   天數模式：人 × 8 × 天數
+//   時數模式：人 × 每人時數
+//   只允許「天數 OR 每人時數」二擇一；同時填寫時優先用每人時數
 function autoCalcHours() {
-    var days = parseFloat(document.getElementById('laborDays').value) || 0;
-    var people = parseFloat(document.getElementById('laborPeople').value) || 0;
+    var days      = parseFloat(document.getElementById('laborDays').value) || 0;
+    var people    = parseFloat(document.getElementById('laborPeople').value) || 0;
+    var unitHours = parseFloat(document.getElementById('laborUnitHours').value) || 0;
     var hoursInput = document.getElementById('laborHours');
-    if (days > 0 && people > 0) {
-        // 總人時 = 天 × 人 × 8
-        var h = days * people * 8;
-        if (h < 1) h = 1;
-        // Chrome 對 readonly number input 改 value 不刷新顯示，先解鎖再寫值再鎖回
-        hoursInput.readOnly = false;
-        hoursInput.value = h;
-        hoursInput.setAttribute('value', h);
-        hoursInput.readOnly = true;
-        hoursInput.style.background = '#f5f5f5';
-        hoursInput.style.cursor = 'not-allowed';
-    } else {
-        hoursInput.readOnly = false;
-        hoursInput.style.background = '';
-        hoursInput.style.cursor = '';
-        if (days === 0 && people === 0) {
-            hoursInput.value = '';
-            hoursInput.setAttribute('value', '');
+    var h = 0;
+    if (people > 0) {
+        if (unitHours > 0) {
+            h = unitHours * people;
+        } else if (days > 0) {
+            h = days * 8 * people;
         }
     }
+    if (h > 0 && h < 1) h = 1;
+    // Chrome 對 readonly number input 改 value 不刷新顯示，先解鎖再寫值再鎖回
+    hoursInput.readOnly = false;
+    hoursInput.value = h || '';
+    hoursInput.setAttribute('value', h || '');
+    hoursInput.readOnly = true;
+    hoursInput.style.background = '#f5f5f5';
+    hoursInput.style.cursor = 'not-allowed';
     recalcLaborCost();
 }
 
@@ -1559,12 +1557,13 @@ function loadEstMaterials(caseId) {
             fillIfEmpty('site_address', d.case.site_address);
             fillIfEmpty('invoice_title', d.case.invoice_title);
             fillIfEmpty('invoice_tax_id', d.case.invoice_tax_id);
-            // 從案件帶入施工天數/人數/時數（單向預填，已填的不覆蓋）
+            // 從案件帶入施工天數/人數/每人時數（單向預填，已填的不覆蓋；總時數由系統算）
             fillIfEmpty('labor_days', d.case.est_labor_days);
             fillIfEmpty('labor_people', d.case.est_labor_people);
-            fillIfEmpty('labor_hours', d.case.est_labor_hours);
-            // 觸發人力成本重算（只在有值的情況下）
-            if (typeof recalcLaborCost === 'function') recalcLaborCost();
+            // est_labor_hours（如果有的話）視為「每人時數」帶入新欄位
+            fillIfEmpty('labor_unit_hours', d.case.est_labor_hours);
+            // 觸發總時數重算
+            if (typeof autoCalcHours === 'function') autoCalcHours();
         }
         if (estCard) { estCard.style.display = ''; loadEstMaterials(caseId); }
         updateCableCaseUI();

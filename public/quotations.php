@@ -89,9 +89,9 @@ switch ($action) {
             $_preCase = $_preStmt->fetch(PDO::FETCH_ASSOC);
             if ($_preCase) {
                 $caseLaborDefaults = array(
-                    'labor_days'   => $_preCase['est_labor_days'],
-                    'labor_people' => $_preCase['est_labor_people'],
-                    'labor_hours'  => $_preCase['est_labor_hours'],
+                    'labor_days'       => $_preCase['est_labor_days'],
+                    'labor_people'     => $_preCase['est_labor_people'],
+                    'labor_unit_hours' => $_preCase['est_labor_hours'],
                 );
             }
         }
@@ -308,12 +308,12 @@ switch ($action) {
             break;
         }
 
-        // 送簽核前檢查：施工天數/時數(二擇一) + 施工人數 + 預估使用線材
+        // 送簽核前檢查：施工天數/施工時數(二擇一) + 施工人數 + 預估使用線材
         $_missing = array();
-        $_days = (float)($quote['labor_days'] ?? 0);
-        $_hours = (float)($quote['labor_hours'] ?? 0);
-        $_people = (int)($quote['labor_people'] ?? 0);
-        if ($_days <= 0 && $_hours <= 0) {
+        $_days       = (float)($quote['labor_days']       ?? 0);
+        $_unitHours  = (float)($quote['labor_unit_hours'] ?? 0);
+        $_people     = (int)  ($quote['labor_people']     ?? 0);
+        if ($_days <= 0 && $_unitHours <= 0) {
             $_missing[] = '施工天數或施工時數（需擇一填寫）';
         }
         if ($_people <= 0) {

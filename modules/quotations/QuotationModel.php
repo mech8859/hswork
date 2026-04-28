@@ -221,28 +221,37 @@ class QuotationModel
 
     /**
      * 儲存內部成本欄位
+     *
+     * 業務填寫：施工天數 OR 施工時數（每人工時）擇一 + 施工人數
+     * 系統計算：總施工時數 (labor_hours) = (天數×8 OR 每人時數) × 人數
+     *           人力成本 = 總施工時數 × 時薪（不再 × 人數，因為 labor_hours 已是總人時）
      */
     public function saveLaborCost($id, array $data)
     {
-        $days   = !empty($data['labor_days']) ? (float)$data['labor_days'] : null;
-        $people = !empty($data['labor_people']) ? (int)$data['labor_people'] : null;
-        $hours  = !empty($data['labor_hours']) ? (float)$data['labor_hours'] : null;
+        $days      = !empty($data['labor_days'])       ? (float)$data['labor_days']       : null;
+        $people    = !empty($data['labor_people'])     ? (int)$data['labor_people']       : null;
+        $unitHours = !empty($data['labor_unit_hours']) ? (float)$data['labor_unit_hours'] : null;
 
-        // 時數為單人工時；若有填天數+人數則強制 hours = days × 8（忽略送來的 hours）
-        if ($days && $people) {
-            $hours = $days * 8;
+        // 總施工時數一律後端計算（前端 UI 為唯讀）
+        $hours = null;
+        if ($people && $people > 0) {
+            if ($days && $days > 0) {
+                $hours = $days * 8 * $people;       // 天數模式：人 × 8 × 天
+            } elseif ($unitHours && $unitHours > 0) {
+                $hours = $unitHours * $people;       // 時數模式：人 × 每人時數
+            }
         }
-        // 施工時數最低 1
+        // 最低 1
         if ($hours !== null && $hours > 0 && $hours < 1) {
             $hours = 1;
         }
-        // 人力成本一律 = 人數 × 時數 × 時薪（禁止手動輸入）
+        // 人力成本 = 總時數 × 時薪
         $laborCost = null;
-        if ($hours && $people) {
+        if ($hours) {
             $hrStmt = $this->db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'labor_hourly_cost' LIMIT 1");
             $hrStmt->execute();
             $hourlyCost = (int)$hrStmt->fetchColumn() ?: 560;
-            $laborCost = (int)round($people * $hours * $hourlyCost);
+            $laborCost = (int)round($hours * $hourlyCost);
         }
 
         // cable_not_used：有勾選 → 線材成本 0；無連結案件 → 視為 0
@@ -251,12 +260,12 @@ class QuotationModel
         $cableCost = ($cableNotUsed || !$hasCase) ? 0 : (int)($data['cable_cost'] ?? 0);
 
         $stmt = $this->db->prepare('
-            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_hours = ?,
+            UPDATE quotations SET labor_days = ?, labor_people = ?, labor_unit_hours = ?, labor_hours = ?,
                 labor_cost_total = ?, cable_cost = ?, cable_not_used = ?
             WHERE id = ?
         ');
         $stmt->execute(array(
-            $days, $people, $hours, $laborCost,
+            $days, $people, $unitHours, $hours, $laborCost,
             $cableCost, $cableNotUsed,
             $id,
         ));
@@ -475,11 +484,11 @@ class QuotationModel
 
         // 複製人力成本
         $this->saveLaborCost($newId, array(
-            'labor_days' => $orig['labor_days'],
-            'labor_people' => $orig['labor_people'],
-            'labor_hours' => $orig['labor_hours'],
-            'labor_cost_total' => $orig['labor_cost_total'],
-            'cable_cost' => $orig['cable_cost'],
+            'labor_days'        => $orig['labor_days'],
+            'labor_people'      => $orig['labor_people'],
+            'labor_unit_hours'  => $orig['labor_unit_hours'] ?? null,
+            'labor_cost_total'  => $orig['labor_cost_total'],
+            'cable_cost'        => $orig['cable_cost'],
         ));
 
         return $newId;
