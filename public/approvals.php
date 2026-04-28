@@ -147,14 +147,14 @@ switch ($action) {
                             'warranty_service' => $warrantyService,
                         ));
 
-                        // 保固/服務直結：跳過第 3 關直接結案，仍需尾款 = 0（balance > 0 時 rollback L2 approve）
-                        if ($hasPayment && $warrantyService) {
+                        // 保固/服務直結：不勾「有收款」+ 勾「保固服務」→ 跳過第 3 關直接結案，仍需尾款 = 0（balance > 0 時 rollback L2 approve）
+                        if (!$hasPayment && $warrantyService) {
                             $_balRow = $db->prepare("SELECT GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0) FROM cases WHERE id = ?");
                             $_balRow->execute(array($targetId));
                             $_bal = (int)$_balRow->fetchColumn();
                             if ($_bal > 0) {
                                 $db->prepare("UPDATE approval_flows SET status='pending', decided_at=NULL WHERE id=?")->execute(array($flowId));
-                                Session::flash('error', '保固/服務直結需尾款 = 0，目前尾款 $' . number_format($_bal) . '。請先補收款或折讓，或取消「保固／做服務」改走第 3 關。');
+                                Session::flash('error', '保固/服務直結需尾款 = 0，目前尾款 $' . number_format($_bal) . '。請先補收款或折讓，或取消「保固／做服務」改成「完工未收款」。');
                                 $redirect = !empty($_POST['redirect']) ? $_POST['redirect'] : '/approvals.php';
                                 redirect($redirect);
                                 break;

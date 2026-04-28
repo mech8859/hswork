@@ -1259,13 +1259,13 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                         </label>
                         <small style="color:#666">勾起 → 進入第 3 關（會計確認入帳）<br>不勾 → 案件直接進入「完工未收款」狀態</small>
                     </div>
-                    <!-- Level 2 行政人員：舊客戶維修保固/服務（搭配有收款 → 直接結案，不送會計） -->
+                    <!-- Level 2 行政人員：舊客戶維修保固/服務（不收款且勾此項 → 直接結案，不送會計） -->
                     <div style="margin:6px 0">
                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;pointer-events:auto !important">
                             <input type="checkbox" id="compWarrantyService" value="1" style="pointer-events:auto !important">
                             <span>舊客戶維修案 保固／做服務</span>
                         </label>
-                        <small style="color:#666">與「有收款」同時勾起 → 跳過第 3 關，案件直接結案上鎖（仍要尾款 = 0）</small>
+                        <small style="color:#666">不勾「有收款」、勾此項 → 跳過第 3 關，案件直接結案上鎖（仍要尾款 = 0）</small>
                     </div>
                     <?php elseif ($_myFlow['level_order'] == 3): ?>
                     <!-- Level 3 會計人員：勾款項已入帳 -->

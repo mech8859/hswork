@@ -959,13 +959,8 @@ class ApprovalModel
         $hasPayment      = !empty($payload['has_payment']);
         $warrantyService = !empty($payload['warranty_service']);
 
-        if (!$hasPayment) {
-            // 無收款 → 案件 status='unpaid'，流程結束
-            return array('next_level' => null, 'status' => 'unpaid', 'error' => null);
-        }
-
-        // 舊客戶維修案 保固/做服務：跳過第 3 關，直接結案（仍須尾款 = 0）
-        if ($warrantyService) {
+        // 舊客戶維修案 保固/做服務：不勾「有收款」+ 勾「保固服務」→ 跳過第 3 關，直接結案（仍須尾款 = 0）
+        if (!$hasPayment && $warrantyService) {
             $bal = $this->db->prepare("SELECT GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0) AS real_balance FROM cases WHERE id = ?");
             $bal->execute(array($caseId));
             $balance = (int)$bal->fetchColumn();
@@ -977,6 +972,11 @@ class ApprovalModel
                 );
             }
             return array('next_level' => null, 'status' => 'closed', 'error' => null);
+        }
+
+        if (!$hasPayment) {
+            // 無收款（且未走保固直結）→ 案件 status='unpaid'，流程結束
+            return array('next_level' => null, 'status' => 'unpaid', 'error' => null);
         }
 
         // ---- 3) 檢查 level 3 ----
