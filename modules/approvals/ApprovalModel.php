@@ -965,7 +965,9 @@ class ApprovalModel
         }
 
         // ---- 3) 檢查 level 3 ----
-        $stmt3 = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=3");
+        // 只算 pending/approved 才視為「該關仍在進行中」；rejected/cancelled 視為作廢，
+        // 讓第3關駁回退回第2關後，行政人員再次核准能自動重建第3關 pending。
+        $stmt3 = $this->db->prepare("SELECT COUNT(*) FROM approval_flows WHERE module='case_completion' AND target_id=? AND level_order=3 AND status IN ('pending','approved')");
         $stmt3->execute(array($caseId));
         if ((int)$stmt3->fetchColumn() === 0) {
             // 還沒建 level 3 → 建立
@@ -1259,5 +1261,40 @@ class ApprovalModel
 
         // 案件進度改回 in_progress 並清掉結案鎖（避免 status 倒退但 is_locked 殘留）
         $this->db->prepare("UPDATE cases SET status = 'in_progress', is_locked = 0, locked_by = NULL, locked_at = NULL, unlocked_at = NULL, unlocked_by = NULL WHERE id = ?")->execute(array($caseId));
+    }
+
+    /**
+     * 完工簽核 - 第3關駁回時退回第2關（不重置整個流程）
+     *
+     * 駁回的 flow 已由 reject() 標 'rejected'。本方法處理：
+     * 1) 取消其他第3關 pending（多人擇一情境）
+     * 2) 第2關最近一筆 approved 還原成 pending，讓行政人員重新確認
+     *
+     * 不改 case.status / is_locked / is_completed（仍在簽核流程中，只是退一關）。
+     *
+     * @return int|null 還原為 pending 的第2關 flow id（給呼叫端發通知用）
+     */
+    public function retreatCaseCompletionFromLevel3($caseId)
+    {
+        // 取消其餘第3關 pending（保留剛被 reject() 標 rejected 的駁回紀錄）
+        $this->db->prepare("
+            UPDATE approval_flows SET status = 'cancelled', decided_at = NOW()
+            WHERE module = 'case_completion' AND target_id = ? AND level_order = 3 AND status = 'pending'
+        ")->execute(array($caseId));
+
+        // 第2關最近一筆 approved 還原為 pending
+        $latestL2 = $this->db->prepare("
+            SELECT id FROM approval_flows
+            WHERE module = 'case_completion' AND target_id = ? AND level_order = 2 AND status = 'approved'
+            ORDER BY decided_at DESC LIMIT 1
+        ");
+        $latestL2->execute(array($caseId));
+        $l2Id = $latestL2->fetchColumn();
+        if (!$l2Id) return null;
+        $this->db->prepare("
+            UPDATE approval_flows SET status = 'pending', decided_at = NULL
+            WHERE id = ?
+        ")->execute(array($l2Id));
+        return (int)$l2Id;
     }
 }

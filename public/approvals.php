@@ -345,10 +345,45 @@ switch ($action) {
             }
             if ($model->reject($flowId, Auth::id(), $comment)) {
                 if ($module === 'case_completion' && $targetId) {
-                    // 完工簽核退回 → 案件回到施工中
-                    $model->rejectCaseCompletion($targetId);
-                    AuditLog::log('approvals', 'reject', $flowId, '完工簽核退回 案件#' . $targetId . ' - ' . $comment);
-                    Session::flash('success', '已退回，案件進度已改回施工中');
+                    // 取被駁回 flow 的 level_order：第3關駁回 → 退一關回第2關；第1/2關駁回 → 整個退回施工中
+                    $_lvStmt = Database::getInstance()->prepare("SELECT level_order FROM approval_flows WHERE id = ?");
+                    $_lvStmt->execute(array($flowId));
+                    $rejectedLevel = (int)$_lvStmt->fetchColumn();
+
+                    if ($rejectedLevel === 3) {
+                        // 第3關（會計）駁回 → 退回第2關（行政人員）重新核准
+                        $l2FlowId = $model->retreatCaseCompletionFromLevel3($targetId);
+                        // 通知第2關簽核人
+                        if ($l2FlowId) {
+                            $_db = Database::getInstance();
+                            $_apprStmt = $_db->prepare("SELECT approver_id FROM approval_flows WHERE id = ?");
+                            $_apprStmt->execute(array($l2FlowId));
+                            $l2ApproverId = (int)$_apprStmt->fetchColumn();
+                            if ($l2ApproverId) {
+                                $_caseStmt = $_db->prepare("SELECT case_number, customer_name FROM cases WHERE id = ?");
+                                $_caseStmt->execute(array($targetId));
+                                $_caseInfo = $_caseStmt->fetch(PDO::FETCH_ASSOC);
+                                $_caseTitle = ($_caseInfo['case_number'] ? $_caseInfo['case_number'] . ' ' : '') . ($_caseInfo['customer_name'] ?? '');
+                                require_once __DIR__ . '/../modules/notifications/NotificationModel.php';
+                                $_notifModel = new NotificationModel();
+                                $_notifModel->send(
+                                    $l2ApproverId,
+                                    'approval_pending',
+                                    '完工簽核退回 第2關：' . $_caseTitle,
+                                    '會計駁回，請重新確認' . ($comment ? '（原因：' . $comment . '）' : ''),
+                                    '/cases.php?action=edit&id=' . $targetId . '#sec-billing',
+                                    'case', $targetId, Auth::id()
+                                );
+                            }
+                        }
+                        AuditLog::log('approvals', 'reject', $flowId, '完工簽核退回第2關 案件#' . $targetId . ' - ' . $comment);
+                        Session::flash('success', '已退回第2關，請行政人員重新確認');
+                    } else {
+                        // 第1/2關駁回 → 案件回到施工中（既有行為）
+                        $model->rejectCaseCompletion($targetId);
+                        AuditLog::log('approvals', 'reject', $flowId, '完工簽核退回 案件#' . $targetId . ' - ' . $comment);
+                        Session::flash('success', '已退回，案件進度已改回施工中');
+                    }
                 } elseif ($module === 'case_payments' && $targetId) {
                     $db = Database::getInstance();
                     $db->prepare("UPDATE case_payments SET approval_status = 'rejected' WHERE id = ?")->execute(array($targetId));
