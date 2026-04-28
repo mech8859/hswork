@@ -1236,6 +1236,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                         <td style="padding:4px 8px;color:#666">
                             <?php if (!empty($payload['has_payment'])): ?>✓ 有收款<?php endif; ?>
                             <?php if (isset($payload['has_payment']) && empty($payload['has_payment'])): ?>✗ 無收款<?php endif; ?>
+                            <?php if (!empty($payload['warranty_service'])): ?> 🔧 保固／服務直結<?php endif; ?>
                             <?php if (!empty($payload['payment_received'])): ?> ✓ 款項已入帳<?php endif; ?>
                             <?php if (!empty($f['comment'])): ?> <?= e($f['comment']) ?><?php endif; ?>
                         </td>
@@ -1257,6 +1258,14 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                             <span>有收款（依目前總收款金額自動帶入：$<?= number_format((float)($case['total_collected'] ?? 0)) ?>，可手動勾消）</span>
                         </label>
                         <small style="color:#666">勾起 → 進入第 3 關（會計確認入帳）<br>不勾 → 案件直接進入「完工未收款」狀態</small>
+                    </div>
+                    <!-- Level 2 行政人員：舊客戶維修保固/服務（搭配有收款 → 直接結案，不送會計） -->
+                    <div style="margin:6px 0">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;pointer-events:auto !important">
+                            <input type="checkbox" id="compWarrantyService" value="1" style="pointer-events:auto !important">
+                            <span>舊客戶維修案 保固／做服務</span>
+                        </label>
+                        <small style="color:#666">與「有收款」同時勾起 → 跳過第 3 關，案件直接結案上鎖（仍要尾款 = 0）</small>
                     </div>
                     <?php elseif ($_myFlow['level_order'] == 3): ?>
                     <!-- Level 3 會計人員：勾款項已入帳 -->
@@ -1310,6 +1319,8 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     <?php if ($_myFlow['level_order'] == 2): ?>
                     var hp = document.getElementById('compHasPayment');
                     if (hp && hp.checked) fields['has_payment'] = '1';
+                    var ws = document.getElementById('compWarrantyService');
+                    if (ws && ws.checked) fields['warranty_service'] = '1';
                     <?php endif; ?>
                     <?php if ($_myFlow['level_order'] == 3): ?>
                     fields['payment_received'] = '1';

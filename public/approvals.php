@@ -138,10 +138,28 @@ switch ($action) {
                         break;
                     }
 
-                    // 寫入 payload (Level 2: has_payment, Level 3: payment_received)
+                    // 寫入 payload (Level 2: has_payment + warranty_service, Level 3: payment_received)
                     if ($flowLevel === 2) {
-                        $hasPayment = !empty($_POST['has_payment']);
-                        $model->setFlowPayload($flowId, array('has_payment' => $hasPayment));
+                        $hasPayment      = !empty($_POST['has_payment']);
+                        $warrantyService = !empty($_POST['warranty_service']);
+                        $model->setFlowPayload($flowId, array(
+                            'has_payment'      => $hasPayment,
+                            'warranty_service' => $warrantyService,
+                        ));
+
+                        // 保固/服務直結：跳過第 3 關直接結案，仍需尾款 = 0（balance > 0 時 rollback L2 approve）
+                        if ($hasPayment && $warrantyService) {
+                            $_balRow = $db->prepare("SELECT GREATEST(COALESCE(CASE WHEN total_amount > 0 THEN total_amount ELSE deal_amount END, 0) - COALESCE(total_collected, 0), 0) FROM cases WHERE id = ?");
+                            $_balRow->execute(array($targetId));
+                            $_bal = (int)$_balRow->fetchColumn();
+                            if ($_bal > 0) {
+                                $db->prepare("UPDATE approval_flows SET status='pending', decided_at=NULL WHERE id=?")->execute(array($flowId));
+                                Session::flash('error', '保固/服務直結需尾款 = 0，目前尾款 $' . number_format($_bal) . '。請先補收款或折讓，或取消「保固／做服務」改走第 3 關。');
+                                $redirect = !empty($_POST['redirect']) ? $_POST['redirect'] : '/approvals.php';
+                                redirect($redirect);
+                                break;
+                            }
+                        }
                     } elseif ($flowLevel === 3) {
                         $paymentReceived = !empty($_POST['payment_received']);
                         if (!$paymentReceived) {
@@ -164,8 +182,8 @@ switch ($action) {
                     $advance = $model->advanceCaseCompletion($targetId);
                     $advStatus = isset($advance['status']) ? $advance['status'] : 'no_rule';
 
-                    // L2 (行政人員) 核准後不論有/無收款都標示已完工，完工日期 = 該案最新完工工程回報的施工日期
-                    if ($flowLevel === 2 && in_array($advStatus, array('pending_next', 'unpaid'), true)) {
+                    // L2 (行政人員) 核准後不論有/無收款/是否走保固直結都標示已完工，完工日期 = 該案最新完工工程回報的施工日期
+                    if ($flowLevel === 2 && in_array($advStatus, array('pending_next', 'unpaid', 'closed'), true)) {
                         $cdStmt = $db->prepare("SELECT MAX(s.schedule_date) FROM work_logs wl JOIN schedules s ON wl.schedule_id = s.id WHERE s.case_id = ? AND wl.is_completed = 1");
                         $cdStmt->execute(array($targetId));
                         $compDate = $cdStmt->fetchColumn() ?: date('Y-m-d');
