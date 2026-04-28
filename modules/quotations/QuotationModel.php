@@ -334,8 +334,8 @@ class QuotationModel
         $this->db->prepare('DELETE FROM quotation_sections WHERE quotation_id = ?')->execute(array($quotationId));
 
         $secStmt = $this->db->prepare('
-            INSERT INTO quotation_sections (quotation_id, title, sort_order, subtotal, discount_amount)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO quotation_sections (quotation_id, title, sort_order, subtotal, discount_amount, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
         ');
         $itemStmt = $this->db->prepare('
             INSERT INTO quotation_items (section_id, product_id, item_name, model_number, quantity, unit, unit_price, amount, remark, sort_order, unit_cost, cost_amount)
@@ -353,7 +353,8 @@ class QuotationModel
                 $secDiscount = (int)$sec['discount_amount'];
                 if ($secDiscount < 0) $secDiscount = 0;
             }
-            $secStmt->execute(array($quotationId, $sec['title'] ?: '', (int)$sIdx, 0, $secDiscount));
+            $secNotes = (isset($sec['notes']) && trim($sec['notes']) !== '') ? trim($sec['notes']) : null;
+            $secStmt->execute(array($quotationId, $sec['title'] ?: '', (int)$sIdx, 0, $secDiscount, $secNotes));
             $sectionId = (int)$this->db->lastInsertId();
 
             $items = isset($sec['items']) ? $sec['items'] : array();

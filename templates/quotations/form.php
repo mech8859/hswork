@@ -307,6 +307,12 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                                     <button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button>
                                 </td>
                             </tr>
+                            <tr class="section-notes-row" style="background:#f1f8e9">
+                                <td colspan="<?= $canManage ? 9 : 8 ?>" style="padding:6px 8px">
+                                    <label style="font-size:.82rem;color:#33691e;margin-right:6px;font-weight:600">區段備註</label>
+                                    <input type="text" name="sections[<?= $sIdx ?>][notes]" class="form-control" value="<?= e($sec['notes'] ?? '') ?>" placeholder="列印時以淺綠底顯示在此區段下（例：以上含安裝、保固一年）" style="display:inline-block;width:75%;background:#fff">
+                                </td>
+                            </tr>
                         </tfoot>
                     </table>
                 </div>
@@ -668,6 +674,12 @@ function addSection() {
                 '<input type="number" name="sections[' + sectionIdx + '][discount_amount]" class="form-control section-discount-input" style="width:120px;text-align:right;color:var(--danger);font-weight:700;display:none;margin-top:4px" min="0" placeholder="優惠價" oninput="calcGrandTotal()">' +
             '</td>' +
             '<td colspan="' + extraCols + '"><button type="button" class="btn btn-outline btn-sm" onclick="addItem(this)">+ 新增項目</button></td>' +
+        '</tr>' +
+        '<tr class="section-notes-row" style="background:#f1f8e9">' +
+            '<td colspan="' + (canManage ? 10 : 9) + '" style="padding:6px 8px">' +
+                '<label style="font-size:.82rem;color:#33691e;margin-right:6px;font-weight:600">區段備註</label>' +
+                '<input type="text" name="sections[' + sectionIdx + '][notes]" class="form-control" placeholder="列印時以淺綠底顯示在此區段下（例：以上含安裝、保固一年）" style="display:inline-block;width:75%;background:#fff">' +
+            '</td>' +
         '</tr></tfoot>' +
         '</table></div></div>';
 

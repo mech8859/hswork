@@ -223,6 +223,11 @@ if (!empty($quote['case_id'])) {
             </td>
         </tr>
         <?php endif; ?>
+        <?php if (!empty($sec['notes'])): ?>
+        <tr class="section-notes-row">
+            <td colspan="6" style="background:#e8f5e9;padding:6px 10px;font-size:.9em;color:#1b5e20;white-space:pre-line"><?= e($sec['notes']) ?></td>
+        </tr>
+        <?php endif; ?>
     <?php endforeach; ?>
     </tbody>
 </table>
