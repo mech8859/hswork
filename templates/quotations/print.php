@@ -210,9 +210,17 @@ if (!empty($quote['case_id'])) {
         </tr>
         <?php endforeach; ?>
         <?php if ($quote['format'] === 'project'): ?>
-        <?php $secHasDisc = isset($sec['discount_amount']) && $sec['discount_amount'] !== null && $sec['discount_amount'] !== ''; ?>
+        <?php
+            $secHasDisc = isset($sec['discount_amount']) && $sec['discount_amount'] !== null && $sec['discount_amount'] !== '';
+            $secHasNote = !empty($sec['notes']);
+        ?>
         <tr class="subtotal-row">
-            <td colspan="4" class="text-right"><strong>小計</strong></td>
+            <?php if ($secHasNote): ?>
+                <td colspan="4" style="background:#e8f5e9;color:#1b5e20;font-size:.9em;padding:4px 10px;white-space:pre-line"><?= e($sec['notes']) ?></td>
+                <td class="text-right"><strong>小計</strong></td>
+            <?php else: ?>
+                <td colspan="5" class="text-right"><strong>小計</strong></td>
+            <?php endif; ?>
             <td class="text-right">
                 <?php if ($secHasDisc): ?>
                     <span style="text-decoration:line-through;color:#999;font-weight:400;font-size:.85em"><?= number_format((int)$sec['subtotal']) ?></span>
@@ -222,8 +230,7 @@ if (!empty($quote['case_id'])) {
                 <?php endif; ?>
             </td>
         </tr>
-        <?php endif; ?>
-        <?php if (!empty($sec['notes'])): ?>
+        <?php elseif (!empty($sec['notes'])): ?>
         <tr class="section-notes-row">
             <td colspan="6" style="background:#e8f5e9;padding:6px 10px;font-size:.9em;color:#1b5e20;white-space:pre-line"><?= e($sec['notes']) ?></td>
         </tr>
