@@ -106,28 +106,34 @@ switch ($action) {
         $lockedCount = (int)$db->query("SELECT COUNT(*) FROM cases WHERE status='closed' AND is_locked=1 {$bidFilter}")->fetchColumn();
 
         $anomBalance = $db->query("
-            SELECT id, case_number, title, customer_name, branch_id, is_locked,
-                   total_amount, deal_amount, balance_amount, total_collected,
-                   settlement_confirmed, settlement_date, completion_date
-            FROM cases
-            WHERE status='closed' AND balance_amount IS NOT NULL AND balance_amount != 0 {$bidFilter}
-            ORDER BY id DESC
+            SELECT c.id, c.case_number, c.customer_name, c.branch_id, c.is_locked,
+                   c.total_amount, c.deal_amount, c.balance_amount, c.total_collected,
+                   c.settlement_confirmed, c.settlement_date, c.completion_date,
+                   u.real_name AS sales_name
+            FROM cases c
+            LEFT JOIN users u ON c.sales_id = u.id
+            WHERE c.status='closed' AND c.balance_amount IS NOT NULL AND c.balance_amount != 0 " . str_replace('branch_id', 'c.branch_id', $bidFilter) . "
+            ORDER BY c.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
 
         $anomSettle = $db->query("
-            SELECT id, case_number, title, customer_name, branch_id, is_locked,
-                   balance_amount, settlement_confirmed, completion_date
-            FROM cases
-            WHERE status='closed' AND (settlement_confirmed IS NULL OR settlement_confirmed = 0) {$bidFilter}
-            ORDER BY id DESC
+            SELECT c.id, c.case_number, c.customer_name, c.branch_id, c.is_locked,
+                   c.balance_amount, c.settlement_confirmed, c.completion_date,
+                   u.real_name AS sales_name
+            FROM cases c
+            LEFT JOIN users u ON c.sales_id = u.id
+            WHERE c.status='closed' AND (c.settlement_confirmed IS NULL OR c.settlement_confirmed = 0) " . str_replace('branch_id', 'c.branch_id', $bidFilter) . "
+            ORDER BY c.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
 
         $anomCompletion = $db->query("
-            SELECT id, case_number, title, customer_name, branch_id, is_locked,
-                   completion_date, balance_amount, settlement_confirmed
-            FROM cases
-            WHERE status='closed' AND completion_date IS NULL {$bidFilter}
-            ORDER BY id DESC
+            SELECT c.id, c.case_number, c.customer_name, c.branch_id, c.is_locked,
+                   c.completion_date, c.balance_amount, c.settlement_confirmed,
+                   u.real_name AS sales_name
+            FROM cases c
+            LEFT JOIN users u ON c.sales_id = u.id
+            WHERE c.status='closed' AND c.completion_date IS NULL " . str_replace('branch_id', 'c.branch_id', $bidFilter) . "
+            ORDER BY c.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
 
         $pageTitle = '結案資料異常';

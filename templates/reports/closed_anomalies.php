@@ -75,7 +75,7 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
     <div class="table-responsive">
         <table class="ca-table">
             <thead><tr>
-                <th>ID</th><th>案件編號</th><th>標題</th><th>客戶</th>
+                <th>ID</th><th>案件編號</th><th>客戶</th><th>業務</th>
                 <th class="num">含稅金額</th><th class="num">成交金額</th>
                 <th class="num">已收</th><th class="num">尾款</th>
                 <th>結清</th><th>結清日</th><th>完工日</th><th>動作</th>
@@ -85,8 +85,8 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
                 <tr>
                     <td><?= $p['id'] ?></td>
                     <td><?= e($p['case_number']) ?><?= !empty($p['is_locked']) ? '<span class="ca-locked-badge">🔒</span>' : '' ?></td>
-                    <td><?= e($p['title']) ?></td>
                     <td><?= e($p['customer_name']) ?></td>
+                    <td><?= e($p['sales_name'] ?? '') ?></td>
                     <td class="num"><?= number_format((int)$p['total_amount']) ?></td>
                     <td class="num"><?= number_format((int)$p['deal_amount']) ?></td>
                     <td class="num"><?= number_format((int)$p['total_collected']) ?></td>
@@ -114,7 +114,7 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
     <div class="table-responsive">
         <table class="ca-table">
             <thead><tr>
-                <th>ID</th><th>案件編號</th><th>標題</th><th>客戶</th>
+                <th>ID</th><th>案件編號</th><th>客戶</th><th>業務</th>
                 <th class="num">尾款</th><th>完工日</th><th>動作</th>
             </tr></thead>
             <tbody>
@@ -122,8 +122,8 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
                 <tr>
                     <td><?= $p['id'] ?></td>
                     <td><?= e($p['case_number']) ?><?= !empty($p['is_locked']) ? '<span class="ca-locked-badge">🔒</span>' : '' ?></td>
-                    <td><?= e($p['title']) ?></td>
                     <td><?= e($p['customer_name']) ?></td>
+                    <td><?= e($p['sales_name'] ?? '') ?></td>
                     <td class="num"><?= number_format((int)$p['balance_amount']) ?></td>
                     <td><?= e($p['completion_date'] ?? '') ?></td>
                     <td><a href="/cases.php?action=edit&id=<?= $p['id'] ?>" target="_blank" class="ca-edit-btn">編輯</a></td>
@@ -146,7 +146,7 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
     <div class="table-responsive">
         <table class="ca-table">
             <thead><tr>
-                <th>ID</th><th>案件編號</th><th>標題</th><th>客戶</th>
+                <th>ID</th><th>案件編號</th><th>客戶</th><th>業務</th>
                 <th class="num">尾款</th><th>結清</th><th>動作</th>
             </tr></thead>
             <tbody>
@@ -154,8 +154,8 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
                 <tr>
                     <td><?= $p['id'] ?></td>
                     <td><?= e($p['case_number']) ?><?= !empty($p['is_locked']) ? '<span class="ca-locked-badge">🔒</span>' : '' ?></td>
-                    <td><?= e($p['title']) ?></td>
                     <td><?= e($p['customer_name']) ?></td>
+                    <td><?= e($p['sales_name'] ?? '') ?></td>
                     <td class="num"><?= number_format((int)$p['balance_amount']) ?></td>
                     <td><?= $p['settlement_confirmed'] ? '✓' : '✗' ?></td>
                     <td><a href="/cases.php?action=edit&id=<?= $p['id'] ?>" target="_blank" class="ca-edit-btn">編輯</a></td>
