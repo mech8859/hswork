@@ -528,6 +528,14 @@ class FinanceModel
             $where .= ' AND r.status = ?';
             $params[] = $filters['status'];
         }
+        if (!empty($filters['sales_id'])) {
+            $where .= ' AND r.sales_id = ?';
+            $params[] = (int)$filters['sales_id'];
+        }
+        if (!empty($filters['receipt_method'])) {
+            $where .= ' AND r.receipt_method = ?';
+            $params[] = $filters['receipt_method'];
+        }
         if (!empty($filters['keyword'])) {
             $kwRaw = trim($filters['keyword']);
             // 以 $ 開頭 → 搜尋金額（total_amount = 數字）
@@ -1460,12 +1468,12 @@ class FinanceModel
             $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
             $isNum = ctype_digit($kwNum) && $kwNum !== '';
             if ($isNum) {
-                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR transaction_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
                 $params[] = (int)$kwNum; $params[] = (int)$kwNum;
             } else {
-                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ?)';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR transaction_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
 
@@ -1513,12 +1521,12 @@ class FinanceModel
             $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
             $isNum = ctype_digit($kwNum) && $kwNum !== '';
             if ($isNum) {
-                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR transaction_number LIKE ? OR debit_amount = ? OR credit_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
                 $params[] = (int)$kwNum; $params[] = (int)$kwNum;
             } else {
-                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ?)';
-                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (summary LIKE ? OR description LIKE ? OR remark LIKE ? OR sys_number LIKE ? OR upload_number LIKE ? OR transaction_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
 
@@ -2103,12 +2111,12 @@ class FinanceModel
             $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
             $isNum = ctype_digit($kwNum) && $kwNum !== '';
             if ($isNum) {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
                 $params[] = (int)$kwNum; $params[] = (int)$kwNum;
             } else {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
 
@@ -2147,12 +2155,12 @@ class FinanceModel
             $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
             $isNum = ctype_digit($kwNum) && $kwNum !== '';
             if ($isNum) {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
                 $params[] = (int)$kwNum; $params[] = (int)$kwNum;
             } else {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
 
@@ -2198,12 +2206,12 @@ class FinanceModel
             $kwNum = preg_replace('/[\s,]/', '', $filters['keyword']);
             $isNum = ctype_digit($kwNum) && $kwNum !== '';
             if ($isNum) {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ? OR cd.expense_amount = ? OR cd.income_amount = ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
                 $params[] = (int)$kwNum; $params[] = (int)$kwNum;
             } else {
-                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ?)';
-                $params[] = $kw; $params[] = $kw;
+                $where .= ' AND (cd.description LIKE ? OR cd.entry_number LIKE ? OR cd.upload_number LIKE ?)';
+                $params[] = $kw; $params[] = $kw; $params[] = $kw;
             }
         }
 

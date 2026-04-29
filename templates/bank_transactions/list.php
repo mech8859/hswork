@@ -93,7 +93,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="摘要/編號/金額" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="摘要/編號/銀行交易編號/金額" autocomplete="off">
             </div>
             <?php $sortVal = !empty($filters['sort']) ? $filters['sort'] : 'desc'; ?>
             <div class="form-group">

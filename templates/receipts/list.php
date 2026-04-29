@@ -17,6 +17,24 @@
                 </select>
             </div>
             <div class="form-group">
+                <label>業務人員</label>
+                <select name="sales_id" class="form-control">
+                    <option value="">全部</option>
+                    <?php foreach ($salesUsers as $u): ?>
+                    <option value="<?= (int)$u['id'] ?>" <?= (!empty($filters['sales_id']) && (int)$filters['sales_id'] === (int)$u['id']) ? 'selected' : '' ?>><?= e($u['real_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>收款方式</label>
+                <select name="receipt_method" class="form-control">
+                    <option value="">全部</option>
+                    <?php foreach (FinanceModel::paymentMethodOptions() as $val => $label): ?>
+                    <option value="<?= e($val) ?>" <?= (!empty($filters['receipt_method']) && $filters['receipt_method'] === $val) ? 'selected' : '' ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>關鍵字</label>
                 <input type="text" name="keyword" class="form-control" placeholder="收款單號/客戶名稱／$金額" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>">
             </div>

@@ -94,7 +94,7 @@ if (!empty($records)) {
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="明細/編號/金額" autocomplete="off">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="明細/編號(CD-)/金額" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>排序</label>

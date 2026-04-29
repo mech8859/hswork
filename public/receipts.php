@@ -42,16 +42,19 @@ switch ($action) {
     case 'list':
     default:
         $filters = array(
-            'status'    => !empty($_GET['status']) ? $_GET['status'] : '',
-            'keyword'   => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
-            'date_type' => !empty($_GET['date_type']) ? $_GET['date_type'] : 'register',
-            'date_from' => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
-            'date_to'   => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
-            'sort'      => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',
+            'status'         => !empty($_GET['status']) ? $_GET['status'] : '',
+            'sales_id'       => !empty($_GET['sales_id']) ? (int)$_GET['sales_id'] : '',
+            'receipt_method' => !empty($_GET['receipt_method']) ? $_GET['receipt_method'] : '',
+            'keyword'        => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
+            'date_type'      => !empty($_GET['date_type']) ? $_GET['date_type'] : 'register',
+            'date_from'      => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'        => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
+            'sort'           => !empty($_GET['sort']) ? $_GET['sort'] : 'desc',
         );
         $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         $result = $model->getReceipts($filters, $branchIds, $page);
         $receipts = $result['data'];
+        $salesUsers = $model->getSalesUsers($branchIds);
         $pageTitle = '收款單';
         $currentPage = 'receipts';
         require __DIR__ . '/../templates/layouts/header.php';
