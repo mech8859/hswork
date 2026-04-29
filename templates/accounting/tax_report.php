@@ -331,6 +331,24 @@ function toggleSection(bodyId, arrowId) {
     body.style.display = open ? 'none' : '';
     if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
 }
+function jumpToFmtGroup(bodyId, arrowId, anchorId) {
+    var body = document.getElementById(bodyId);
+    var arrow = document.getElementById(arrowId);
+    if (body && body.style.display === 'none') {
+        body.style.display = '';
+        if (arrow) arrow.style.transform = 'rotate(90deg)';
+    }
+    var target = document.getElementById(anchorId);
+    if (!target) return;
+    setTimeout(function() {
+        target.scrollIntoView({behavior:'smooth', block:'start'});
+        // 短暫高亮
+        var orig = target.style.outline;
+        target.style.outline = '3px solid #fbbf24';
+        target.style.outlineOffset = '-2px';
+        setTimeout(function() { target.style.outline = orig || ''; target.style.outlineOffset = ''; }, 1500);
+    }, 50);
+}
 function toggleTax401(e) {
     if (e && e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL')) return;
     var body = document.getElementById('tax401Body');
@@ -401,9 +419,13 @@ $_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; 
                 <?php foreach ($_sfStats as $_k => $_s):
                     $_isRefund = in_array((string)$_k, array('33', '34'), true);
                     $_prefix = $_isRefund && $_s['count'] > 0 ? '-' : '';
+                    $_clickable = $_s['count'] > 0;
+                    $_rowStyle = $_s['count'] === 0 ? 'color:#bbb' : ($_isRefund ? 'color:var(--danger)' : '');
+                    if ($_clickable) $_rowStyle .= ($_rowStyle ? ';' : '') . 'cursor:pointer';
+                    $_onClick = $_clickable ? "onclick=\"jumpToFmtGroup('salesDetailBody','salesDetailArrow','sf-grp-{$_k}')\" title=\"點擊跳到此聯式的明細\"" : '';
                 ?>
-                <tr<?= $_s['count'] === 0 ? ' style="color:#bbb"' : ($_isRefund ? ' style="color:var(--danger)"' : '') ?>>
-                    <td><strong><?= e($_k) ?></strong></td>
+                <tr style="<?= $_rowStyle ?>" <?= $_onClick ?>>
+                    <td><strong><?= e($_k) ?></strong><?= $_clickable ? ' <span style="color:#888;font-size:.75rem">▸</span>' : '' ?></td>
                     <td><?= e($_sfLabels[$_k]) ?><?= $_isRefund ? '（退出折讓，扣除）' : '' ?></td>
                     <td class="text-right"><?= number_format($_s['count']) ?></td>
                     <td class="text-right"><?= $_prefix ?>$<?= number_format($_s['untaxed']) ?></td>
@@ -412,8 +434,8 @@ $_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; 
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($_sfOther['count'] > 0): ?>
-                <tr>
-                    <td><strong>-</strong></td>
+                <tr style="cursor:pointer" onclick="jumpToFmtGroup('salesDetailBody','salesDetailArrow','sf-grp-other')" title="點擊跳到此分組的明細">
+                    <td><strong>-</strong> <span style="color:#888;font-size:.75rem">▸</span></td>
                     <td style="color:#888">未標註聯式</td>
                     <td class="text-right"><?= number_format($_sfOther['count']) ?></td>
                     <td class="text-right">$<?= number_format($_sfOther['untaxed']) ?></td>
@@ -487,7 +509,8 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                     $sU = 0; $sT = 0; $sA = 0; $sC = 0;
                     $so = InvoiceModel::invoiceStatusOptions();
                     $amtStyle = $isAllowance ? ' style="color:var(--danger,#c5221f)"' : '';
-                    echo '<tbody>';
+                    $anchorId = 'sf-grp-' . ($code !== '' ? $code : 'other');
+                    echo '<tbody id="' . htmlspecialchars($anchorId) . '">';
                     echo '<tr style="background:#eef2ff;font-weight:600">';
                     $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
                     echo '<td colspan="9">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
@@ -607,9 +630,13 @@ $_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; 
                 <?php foreach ($_pfStats as $_k => $_s):
                     $_isRefund = in_array((string)$_k, array('23', '24'), true);
                     $_prefix = $_isRefund && $_s['count'] > 0 ? '-' : '';
+                    $_clickable = $_s['count'] > 0;
+                    $_rowStyle = $_s['count'] === 0 ? 'color:#bbb' : ($_isRefund ? 'color:var(--danger)' : '');
+                    if ($_clickable) $_rowStyle .= ($_rowStyle ? ';' : '') . 'cursor:pointer';
+                    $_onClick = $_clickable ? "onclick=\"jumpToFmtGroup('purchaseDetailBody','purchaseDetailArrow','pf-grp-{$_k}')\" title=\"點擊跳到此聯式的明細\"" : '';
                 ?>
-                <tr<?= $_s['count'] === 0 ? ' style="color:#bbb"' : ($_isRefund ? ' style="color:var(--danger)"' : '') ?>>
-                    <td><strong><?= e($_k) ?></strong></td>
+                <tr style="<?= $_rowStyle ?>" <?= $_onClick ?>>
+                    <td><strong><?= e($_k) ?></strong><?= $_clickable ? ' <span style="color:#888;font-size:.75rem">▸</span>' : '' ?></td>
                     <td><?= e($_pfLabels[$_k]) ?><?= $_isRefund ? '（退出折讓，扣除）' : '' ?></td>
                     <td class="text-right"><?= number_format($_s['count']) ?></td>
                     <td class="text-right"><?= $_prefix ?>$<?= number_format($_s['untaxed']) ?></td>
@@ -618,8 +645,8 @@ $_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; 
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($_pfOther['count'] > 0): ?>
-                <tr>
-                    <td><strong>-</strong></td>
+                <tr style="cursor:pointer" onclick="jumpToFmtGroup('purchaseDetailBody','purchaseDetailArrow','pf-grp-other')" title="點擊跳到此分組的明細">
+                    <td><strong>-</strong> <span style="color:#888;font-size:.75rem">▸</span></td>
                     <td style="color:#888">未標註聯式</td>
                     <td class="text-right"><?= number_format($_pfOther['count']) ?></td>
                     <td class="text-right">$<?= number_format($_pfOther['untaxed']) ?></td>
@@ -689,7 +716,8 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                     $sU = 0; $sT = 0; $sA = 0; $sC = 0;
                     $so = InvoiceModel::invoiceStatusOptions();
                     $amtStyle = $isAllowance ? ' style="color:var(--danger,#c5221f)"' : '';
-                    echo '<tbody>';
+                    $anchorId = 'pf-grp-' . ($code !== '' ? $code : 'other');
+                    echo '<tbody id="' . htmlspecialchars($anchorId) . '">';
                     echo '<tr style="background:#e8f5e9;font-weight:600">';
                     $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
                     echo '<td colspan="10">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
