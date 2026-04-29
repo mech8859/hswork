@@ -718,18 +718,26 @@ class InvoiceModel
         }
 
         // 銷項 - 應稅銷售額 & 稅額；33/34 為銷貨退回折讓，應從合計扣除
+        // 折讓 33/34 需 status='confirmed' 才計入（避免待處理影響稅報）
         $sql = "SELECT
                     COALESCE(SUM(CASE
-                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' AND invoice_format IN ('33','34') THEN -amount_untaxed
-                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN amount_untaxed
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('33','34') AND status != 'confirmed' THEN 0
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND invoice_format IN ('33','34') THEN -amount_untaxed
+                        WHEN invoice_type NOT IN ('免稅','零稅率') THEN amount_untaxed
                         ELSE 0 END), 0) AS sales_taxable_amount,
                     COALESCE(SUM(CASE
-                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' AND invoice_format IN ('33','34') THEN -tax_amount
-                        WHEN invoice_type NOT IN ('免稅','零稅率') AND status != 'voided' THEN tax_amount
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('33','34') AND status != 'confirmed' THEN 0
+                        WHEN invoice_type NOT IN ('免稅','零稅率') AND invoice_format IN ('33','34') THEN -tax_amount
+                        WHEN invoice_type NOT IN ('免稅','零稅率') THEN tax_amount
                         ELSE 0 END), 0) AS sales_tax,
                     COALESCE(SUM(CASE WHEN invoice_type = '免稅' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS sales_exempt_amount,
-                    COALESCE(SUM(CASE WHEN status != 'voided' THEN total_amount ELSE 0 END), 0) AS sales_total,
-                    COUNT(CASE WHEN status != 'voided' THEN 1 END) AS sales_count,
+                    COALESCE(SUM(CASE
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('33','34') AND status != 'confirmed' THEN 0
+                        ELSE total_amount END), 0) AS sales_total,
+                    COUNT(CASE WHEN status != 'voided' AND NOT (invoice_format IN ('33','34') AND status != 'confirmed') THEN 1 END) AS sales_count,
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS sales_voided_count
                 FROM sales_invoices
                 WHERE period IN ($placeholders)$salesExtra";
@@ -738,19 +746,27 @@ class InvoiceModel
         $salesRow = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // 進項 - 可扣抵 & 不可扣抵；23/24 為進貨退出折讓，應從合計扣除
+        // 折讓 23/24 需 status='confirmed' 才計入（避免待處理影響稅報）
         $sql2 = "SELECT
                     COALESCE(SUM(CASE
-                        WHEN deduction_type = 'deductible' AND status != 'voided' AND invoice_format IN ('23','24') THEN -amount_untaxed
-                        WHEN deduction_type = 'deductible' AND status != 'voided' THEN amount_untaxed
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('23','24') AND status != 'confirmed' THEN 0
+                        WHEN deduction_type = 'deductible' AND invoice_format IN ('23','24') THEN -amount_untaxed
+                        WHEN deduction_type = 'deductible' THEN amount_untaxed
                         ELSE 0 END), 0) AS purchase_deductible_amount,
                     COALESCE(SUM(CASE
-                        WHEN deduction_type = 'deductible' AND status != 'voided' AND invoice_format IN ('23','24') THEN -tax_amount
-                        WHEN deduction_type = 'deductible' AND status != 'voided' THEN tax_amount
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('23','24') AND status != 'confirmed' THEN 0
+                        WHEN deduction_type = 'deductible' AND invoice_format IN ('23','24') THEN -tax_amount
+                        WHEN deduction_type = 'deductible' THEN tax_amount
                         ELSE 0 END), 0) AS purchase_deductible_tax,
                     COALESCE(SUM(CASE WHEN deduction_type = 'non_deductible' AND status != 'voided' THEN amount_untaxed ELSE 0 END), 0) AS purchase_non_deductible_amount,
                     COALESCE(SUM(CASE WHEN deduction_type = 'non_deductible' AND status != 'voided' THEN tax_amount ELSE 0 END), 0) AS purchase_non_deductible_tax,
-                    COALESCE(SUM(CASE WHEN status != 'voided' THEN total_amount ELSE 0 END), 0) AS purchase_total,
-                    COUNT(CASE WHEN status != 'voided' THEN 1 END) AS purchase_count,
+                    COALESCE(SUM(CASE
+                        WHEN status = 'voided' THEN 0
+                        WHEN invoice_format IN ('23','24') AND status != 'confirmed' THEN 0
+                        ELSE total_amount END), 0) AS purchase_total,
+                    COUNT(CASE WHEN status != 'voided' AND NOT (invoice_format IN ('23','24') AND status != 'confirmed') THEN 1 END) AS purchase_count,
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS purchase_voided_count
                 FROM purchase_invoices
                 WHERE period IN ($placeholders)$purchExtra";

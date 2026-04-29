@@ -317,9 +317,15 @@ foreach ($_sfLabels as $_k => $_v) {
     $_sfStats[$_k] = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
 }
 $_sfOther = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+$_sfPendingRefund = 0; // 待處理的折讓 33/34 計數
 foreach ($salesDetail as $_r) {
     if ($_r['status'] === 'voided') continue;
     $_fmt = !empty($_r['invoice_format']) ? $_r['invoice_format'] : '';
+    // 折讓 33/34 必須開立確認後才計入 401
+    if (in_array((string)$_fmt, array('33', '34'), true) && ($_r['status'] ?? '') !== 'confirmed') {
+        $_sfPendingRefund++;
+        continue;
+    }
     $_target = isset($_sfStats[$_fmt]) ? $_sfStats[$_fmt] : $_sfOther;
     $_target['count']   += 1;
     $_target['untaxed'] += (int)$_r['amount_untaxed'];
@@ -339,7 +345,12 @@ foreach ($_sfStats as $_k => $s) {
 $_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; $_sfTot['tax']+=$_sfOther['tax']; $_sfTot['total']+=$_sfOther['total'];
 ?>
 <div class="card mt-2">
-    <div class="card-header">銷項發票聯式彙總（不含作廢）</div>
+    <div class="card-header">
+        銷項發票聯式彙總（不含作廢；折讓 33/34 需「開立已確認」才計入）
+        <?php if ($_sfPendingRefund > 0): ?>
+        <span style="color:var(--warning,#f57c00);font-size:.85rem;font-weight:normal;margin-left:8px">⚠ 有 <?= (int)$_sfPendingRefund ?> 筆 33/34 折讓待處理，未列入彙總</span>
+        <?php endif; ?>
+    </div>
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -404,11 +415,17 @@ foreach ($_pfLabels as $_k => $_v) {
     $_pfStats[$_k] = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
 }
 $_pfOther = array('count' => 0, 'untaxed' => 0, 'tax' => 0, 'total' => 0);
+$_pfPendingRefund = 0; // 待處理的進項折讓 23/24 計數
 foreach ($purchaseDetail as $_r) {
     if ($_r['status'] === 'voided') continue;
     // 僅計入「可扣抵」的進項發票，與頂部卡片一致
     if (($_r['deduction_type'] ?? '') !== 'deductible') continue;
     $_fmt = !empty($_r['invoice_format']) ? $_r['invoice_format'] : '';
+    // 折讓 23/24 必須開立確認後才計入 401
+    if (in_array((string)$_fmt, array('23', '24'), true) && ($_r['status'] ?? '') !== 'confirmed') {
+        $_pfPendingRefund++;
+        continue;
+    }
     $_target = isset($_pfStats[$_fmt]) ? $_pfStats[$_fmt] : $_pfOther;
     $_target['count']   += 1;
     $_target['untaxed'] += (int)$_r['amount_untaxed'];
@@ -428,7 +445,12 @@ foreach ($_pfStats as $_k => $s) {
 $_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; $_pfTot['tax']+=$_pfOther['tax']; $_pfTot['total']+=$_pfOther['total'];
 ?>
 <div class="card mt-2">
-    <div class="card-header">進項發票聯式彙總（不含作廢，僅計可扣抵）</div>
+    <div class="card-header">
+        進項發票聯式彙總（不含作廢，僅計可扣抵；折讓 23/24 需「開立已確認」才計入）
+        <?php if ($_pfPendingRefund > 0): ?>
+        <span style="color:var(--warning,#f57c00);font-size:.85rem;font-weight:normal;margin-left:8px">⚠ 有 <?= (int)$_pfPendingRefund ?> 筆 23/24 折讓待處理，未列入彙總</span>
+        <?php endif; ?>
+    </div>
     <div class="table-responsive">
         <table class="table">
             <thead>
