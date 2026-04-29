@@ -88,7 +88,7 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
             </div>
             <div class="form-group">
                 <label>銷項發票聯式</label>
-                <select name="invoice_format" class="form-control">
+                <select name="invoice_format" id="fldInvoiceFormat" class="form-control" onchange="onInvoiceFormatChange()">
                     <option value="">請選擇</option>
                     <option value="31" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '31') ? 'selected' : '' ?>>31：銷項三聯式、電子計算機統一發票</option>
                     <option value="32" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '32') ? 'selected' : '' ?>>32：銷項二聯式、二聯式收銀機統一發票</option>
@@ -117,9 +117,20 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
                        style="text-transform:uppercase">
             </div>
             <div class="form-group">
-                <label>發票日期 *</label>
+                <label>折讓證明單號碼</label>
+                <input type="text" name="allowance_number" id="fldAllowanceNumber" class="form-control"
+                       value="<?= e($isEdit && !empty($record['allowance_number']) ? $record['allowance_number'] : '') ?>"
+                       placeholder="僅聯式 33 可填" maxlength="50">
+            </div>
+            <div class="form-group">
+                <label>開立日期 *</label>
                 <input type="date" max="2099-12-31" name="invoice_date" class="form-control"
                        value="<?= e($isEdit && !empty($record['invoice_date']) ? $record['invoice_date'] : date('Y-m-d')) ?>" required>
+            </div>
+            <div class="form-group">
+                <label>發票日期</label>
+                <input type="date" max="2099-12-31" name="bill_date" class="form-control"
+                       value="<?= e($isEdit && !empty($record['bill_date']) ? $record['bill_date'] : '') ?>">
             </div>
             <div class="form-group">
                 <label>發票類型</label>
@@ -339,6 +350,24 @@ function calcTotal() {
     var tax = _siRead('fldTaxAmt');
     document.getElementById('fldTotal').value = (untaxed + tax) || '';
 }
+
+function onInvoiceFormatChange() {
+    var fmtEl = document.getElementById('fldInvoiceFormat');
+    var allowEl = document.getElementById('fldAllowanceNumber');
+    if (!fmtEl || !allowEl) return;
+    var is33 = (fmtEl.value === '33');
+    allowEl.disabled = !is33;
+    if (is33) {
+        allowEl.style.background = '';
+        allowEl.placeholder = '請輸入折讓證明單號碼';
+    } else {
+        allowEl.value = '';
+        allowEl.style.background = '#f5f5f5';
+        allowEl.placeholder = '僅聯式 33 可填';
+    }
+}
+// 初始化欄位狀態
+document.addEventListener('DOMContentLoaded', onInvoiceFormatChange);
 </script>
 
 <style>

@@ -54,6 +54,7 @@ switch ($action) {
             // 若是從應付帳款單跳過來的回寫流程，先檢查發票號碼是否已存在於 payable_invoices
             $returnPayable = !empty($_POST['return_to_payable']) ? (int)$_POST['return_to_payable'] : 0;
             $postInvNum = !empty($_POST['invoice_number']) ? trim(strtoupper($_POST['invoice_number'])) : '';
+            $postInvFmt = !empty($_POST['invoice_format']) ? (string)$_POST['invoice_format'] : '';
             $returnPayableNumber = null;
             if ($returnPayable > 0) {
                 // 先查這張應付帳款單號（供寫回 reference_id 使用）
@@ -61,7 +62,8 @@ switch ($action) {
                 $pnStmt->execute(array($returnPayable));
                 $returnPayableNumber = $pnStmt->fetchColumn() ?: null;
 
-                if ($postInvNum !== '') {
+                // 聯式 23（進貨退出/折讓）為原發票減項，允許共用發票號碼，不檢查
+                if ($postInvNum !== '' && $postInvFmt !== '23') {
                     $dupStmt = Database::getInstance()->prepare("SELECT p.payable_number FROM payable_invoices pi JOIN payables p ON pi.payable_id = p.id WHERE pi.invoice_number = ? LIMIT 1");
                     $dupStmt->execute(array($postInvNum));
                     $dup = $dupStmt->fetchColumn();

@@ -65,7 +65,9 @@ switch ($action) {
             }
             $data = array(
                 'invoice_number'  => !empty($_POST['invoice_number']) ? $_POST['invoice_number'] : null,
+                'allowance_number'=> !empty($_POST['allowance_number']) ? trim($_POST['allowance_number']) : null,
                 'invoice_date'    => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
+                'bill_date'       => !empty($_POST['bill_date']) ? $_POST['bill_date'] : null,
                 'customer_name'   => !empty($_POST['customer_name']) ? $_POST['customer_name'] : null,
                 'customer_tax_id' => !empty($_POST['customer_tax_id']) ? $_POST['customer_tax_id'] : null,
                 'seller_tax_id'   => !empty($_POST['seller_tax_id']) ? $_POST['seller_tax_id'] : null,
@@ -160,7 +162,9 @@ switch ($action) {
             }
             $data = array(
                 'invoice_number'  => !empty($_POST['invoice_number']) ? $_POST['invoice_number'] : null,
+                'allowance_number'=> !empty($_POST['allowance_number']) ? trim($_POST['allowance_number']) : null,
                 'invoice_date'    => !empty($_POST['invoice_date']) ? $_POST['invoice_date'] : date('Y-m-d'),
+                'bill_date'       => !empty($_POST['bill_date']) ? $_POST['bill_date'] : null,
                 'customer_name'   => !empty($_POST['customer_name']) ? $_POST['customer_name'] : null,
                 'customer_tax_id' => !empty($_POST['customer_tax_id']) ? $_POST['customer_tax_id'] : null,
                 'seller_tax_id'   => !empty($_POST['seller_tax_id']) ? $_POST['seller_tax_id'] : null,

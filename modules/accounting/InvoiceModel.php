@@ -227,10 +227,14 @@ class InvoiceModel
      * @param int|null $excludeId 排除的 ID（編輯時用）
      * @return bool 重複回傳 true
      */
-    public function isPurchaseInvoiceNumberDuplicate($invoiceNumber, $excludeId = null)
+    public function isPurchaseInvoiceNumberDuplicate($invoiceNumber, $excludeId = null, $invoiceFormat = null)
     {
         if (empty($invoiceNumber)) {
             return false; // 空白不檢查
+        }
+        // 聯式 23（進貨退出/折讓證明）為原發票減項，允許共用發票號碼
+        if ($invoiceFormat === '23') {
+            return false;
         }
         if ($excludeId) {
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM purchase_invoices WHERE invoice_number = ? AND id != ? AND status != 'voided'");
@@ -247,8 +251,9 @@ class InvoiceModel
      */
     public function createPurchaseInvoice($data)
     {
-        // 唯一性檢查
-        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'])) {
+        // 唯一性檢查（聯式 23 為退折，允許重複）
+        $fmt = !empty($data['invoice_format']) ? (string)$data['invoice_format'] : null;
+        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'], null, $fmt)) {
             throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法新增');
         }
 
@@ -301,8 +306,9 @@ class InvoiceModel
      */
     public function updatePurchaseInvoice($id, $data)
     {
-        // 唯一性檢查（排除自己）
-        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'], $id)) {
+        // 唯一性檢查（排除自己；聯式 23 為退折，允許重複）
+        $fmt = !empty($data['invoice_format']) ? (string)$data['invoice_format'] : null;
+        if (!empty($data['invoice_number']) && $this->isPurchaseInvoiceNumberDuplicate($data['invoice_number'], $id, $fmt)) {
             throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法更新');
         }
 
@@ -518,10 +524,14 @@ class InvoiceModel
      * @param int|null $excludeId 排除的 ID（編輯時用）
      * @return bool 重複回傳 true
      */
-    public function isSalesInvoiceNumberDuplicate($invoiceNumber, $excludeId = null)
+    public function isSalesInvoiceNumberDuplicate($invoiceNumber, $excludeId = null, $invoiceFormat = null)
     {
         if (empty($invoiceNumber)) {
             return false; // 空白不檢查（允許未開立的暫存）
+        }
+        // 聯式 33（銷貨退回/折讓證明）為原發票減項，允許共用發票號碼
+        if ($invoiceFormat === '33') {
+            return false;
         }
         if ($excludeId) {
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM sales_invoices WHERE invoice_number = ? AND id != ?");
@@ -538,8 +548,9 @@ class InvoiceModel
      */
     public function createSalesInvoice($data)
     {
-        // 唯一性檢查
-        if (!empty($data['invoice_number']) && $this->isSalesInvoiceNumberDuplicate($data['invoice_number'])) {
+        // 唯一性檢查（聯式 33 為退折，允許重複）
+        $fmt = !empty($data['invoice_format']) ? (string)$data['invoice_format'] : null;
+        if (!empty($data['invoice_number']) && $this->isSalesInvoiceNumberDuplicate($data['invoice_number'], null, $fmt)) {
             throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法新增');
         }
 
@@ -554,17 +565,19 @@ class InvoiceModel
             : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
 
         $sql = "INSERT INTO sales_invoices
-                (invoice_number, invoice_date, customer_name, customer_tax_id,
+                (invoice_number, allowance_number, invoice_date, bill_date, customer_name, customer_tax_id,
                  seller_tax_id, seller_name,
                  invoice_type, amount_untaxed, tax_amount, total_amount, tax_rate,
                  reference_type, reference_id, period, status, note,
                  report_period, invoice_format, deduction_category,
                  created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
+            !empty($data['allowance_number']) ? $data['allowance_number'] : null,
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
+            !empty($data['bill_date']) ? $data['bill_date'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
             $sellerTaxId,
@@ -592,8 +605,9 @@ class InvoiceModel
      */
     public function updateSalesInvoice($id, $data)
     {
-        // 唯一性檢查（排除自己）
-        if (!empty($data['invoice_number']) && $this->isSalesInvoiceNumberDuplicate($data['invoice_number'], $id)) {
+        // 唯一性檢查（排除自己；聯式 33 為退折，允許重複）
+        $fmt = !empty($data['invoice_format']) ? (string)$data['invoice_format'] : null;
+        if (!empty($data['invoice_number']) && $this->isSalesInvoiceNumberDuplicate($data['invoice_number'], $id, $fmt)) {
             throw new Exception('發票號碼「' . $data['invoice_number'] . '」已存在，無法更新');
         }
 
@@ -608,7 +622,8 @@ class InvoiceModel
             : ($sellerTaxId === '97002927' ? '政遠企業有限公司' : '禾順監視數位科技有限公司');
 
         $sql = "UPDATE sales_invoices SET
-                invoice_number = ?, invoice_date = ?, customer_name = ?, customer_tax_id = ?,
+                invoice_number = ?, allowance_number = ?, invoice_date = ?, bill_date = ?,
+                customer_name = ?, customer_tax_id = ?,
                 seller_tax_id = ?, seller_name = ?,
                 invoice_type = ?, amount_untaxed = ?, tax_amount = ?, total_amount = ?, tax_rate = ?,
                 reference_type = ?, reference_id = ?, period = ?, status = ?,
@@ -618,7 +633,9 @@ class InvoiceModel
         $stmt = $this->db->prepare($sql);
         $stmt->execute(array(
             !empty($data['invoice_number']) ? $data['invoice_number'] : null,
+            !empty($data['allowance_number']) ? $data['allowance_number'] : null,
             !empty($data['invoice_date']) ? $data['invoice_date'] : date('Y-m-d'),
+            !empty($data['bill_date']) ? $data['bill_date'] : null,
             !empty($data['customer_name']) ? $data['customer_name'] : null,
             !empty($data['customer_tax_id']) ? $data['customer_tax_id'] : null,
             $sellerTaxId,
