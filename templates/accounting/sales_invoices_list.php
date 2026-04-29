@@ -83,6 +83,7 @@
                     <th style="width:32px"></th>
                     <th>發票號碼</th>
                     <th>日期</th>
+                    <th>聯式</th>
                     <th>客戶名稱</th>
                     <th>統編</th>
                     <th class="text-right">未稅金額</th>
@@ -94,11 +95,32 @@
                 </tr>
             </thead>
             <tbody>
+                <?php
+                $_sfLabels = array(
+                    '31' => '銷項三聯式、電子計算機統一發票',
+                    '32' => '銷項二聯式、二聯式收銀機統一發票',
+                    '33' => '三聯式銷貨退回或折讓證明單',
+                    '34' => '二聯式銷貨退回或折讓證明單',
+                    '35' => '銷項三聯式收銀機統一發票、電子發票',
+                );
+                ?>
                 <?php foreach ($records as $r): $isStar = !empty($r['is_starred']); ?>
+                <?php
+                    $_fmt = !empty($r['invoice_format']) ? $r['invoice_format'] : '';
+                    $_fmtTitle = isset($_sfLabels[$_fmt]) ? $_fmt . '：' . $_sfLabels[$_fmt] : $_fmt;
+                    $_isAllowance = ($_fmt === '33' || $_fmt === '34');
+                ?>
                 <tr<?= $r['status'] === 'voided' ? ' style="opacity:.5;text-decoration:line-through"' : '' ?>>
                     <td class="text-center"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="toggleStarSalesInvoice(this)" title="標記">&#9733;</span></td>
                     <td><a href="/sales_invoices.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') ?></a></td>
                     <td><?= e(!empty($r['invoice_date']) ? $r['invoice_date'] : '') ?></td>
+                    <td>
+                        <?php if ($_fmt): ?>
+                        <span class="badge" style="background:<?= $_isAllowance ? '#fce4ec;color:#c2185b' : '#e8f5e9;color:#2e7d32' ?>" title="<?= e($_fmtTitle) ?>"><?= e($_fmt) ?></span>
+                        <?php else: ?>
+                        <span style="color:#bbb">-</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= e(!empty($r['customer_name']) ? $r['customer_name'] : '-') ?></td>
                     <td><?= e(!empty($r['customer_tax_id']) ? $r['customer_tax_id'] : '-') ?></td>
                     <td class="text-right">$<?= number_format(!empty($r['amount_untaxed']) ? $r['amount_untaxed'] : 0) ?></td>

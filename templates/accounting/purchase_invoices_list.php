@@ -142,6 +142,7 @@
                     <th style="width:32px"></th>
                     <th>發票號碼</th>
                     <th>日期</th>
+                    <th>聯式</th>
                     <th>申報年月</th>
                     <th>供應商</th>
                     <th>統編</th>
@@ -155,11 +156,32 @@
                 </tr>
             </thead>
             <tbody>
+                <?php
+                $_pfLabels = array(
+                    '21' => '進項三聯式、電子計算機統一發票',
+                    '22' => '進項二聯式收銀機統一發票、載有稅額之其他憑證',
+                    '23' => '三聯式進貨退出或折讓證明單',
+                    '24' => '二聯式進貨退出或折讓證明單',
+                    '25' => '進項三聯式收銀機統一發票、公用事業憑證',
+                );
+                ?>
                 <?php foreach ($records as $r): $isStar = !empty($r['is_starred']); ?>
+                <?php
+                    $_fmt = !empty($r['invoice_format']) ? $r['invoice_format'] : '';
+                    $_fmtTitle = isset($_pfLabels[$_fmt]) ? $_fmt . '：' . $_pfLabels[$_fmt] : $_fmt;
+                    $_isAllowance = ($_fmt === '23' || $_fmt === '24');
+                ?>
                 <tr<?= $r['status'] === 'voided' ? ' style="opacity:.5;text-decoration:line-through"' : '' ?>>
                     <td class="text-center"><span class="star-toggle <?= $isStar ? 'is-on' : '' ?>" data-id="<?= (int)$r['id'] ?>" onclick="toggleStarPurchaseInvoice(this)" title="標記">&#9733;</span></td>
                     <td><a href="/purchase_invoices.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') ?></a></td>
                     <td><?= e(!empty($r['invoice_date']) ? $r['invoice_date'] : '') ?></td>
+                    <td>
+                        <?php if ($_fmt): ?>
+                        <span class="badge" style="background:<?= $_isAllowance ? '#fce4ec;color:#c2185b' : '#e8f5e9;color:#2e7d32' ?>" title="<?= e($_fmtTitle) ?>"><?= e($_fmt) ?></span>
+                        <?php else: ?>
+                        <span style="color:#bbb">-</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?php
                         $rpDisplay = '';
                         $rp = !empty($r['report_period']) ? $r['report_period'] : '';
