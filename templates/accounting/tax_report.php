@@ -330,7 +330,56 @@ function toggleSection(bodyId, arrowId) {
     var open = body.style.display !== 'none';
     body.style.display = open ? 'none' : '';
     if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+    saveTaxReportState();
 }
+
+// 將「展開狀態 + 捲動位置」存到 sessionStorage，重整或重新查詢後復原
+var TAX_STATE_KEY = 'taxReportState_v1';
+function saveTaxReportState() {
+    try {
+        var sd = document.getElementById('salesDetailBody');
+        var pd = document.getElementById('purchaseDetailBody');
+        var t401 = document.getElementById('tax401Body');
+        var st = {
+            sdOpen: !!(sd && sd.style.display !== 'none'),
+            pdOpen: !!(pd && pd.style.display !== 'none'),
+            t401Open: !!(t401 && t401.style.display !== 'none'),
+            scrollY: window.scrollY || window.pageYOffset || 0,
+            ts: Date.now()
+        };
+        sessionStorage.setItem(TAX_STATE_KEY, JSON.stringify(st));
+    } catch (e) { /* sessionStorage 不可用就忽略 */ }
+}
+function restoreTaxReportState() {
+    try {
+        var raw = sessionStorage.getItem(TAX_STATE_KEY);
+        if (!raw) return;
+        var st = JSON.parse(raw);
+        if (!st) return;
+        function setOpen(bodyId, arrowId, isOpen) {
+            var body = document.getElementById(bodyId);
+            var arrow = document.getElementById(arrowId);
+            if (!body) return;
+            body.style.display = isOpen ? '' : 'none';
+            if (arrow) arrow.style.transform = isOpen ? 'rotate(90deg)' : '';
+        }
+        if (typeof st.sdOpen === 'boolean')   setOpen('salesDetailBody', 'salesDetailArrow', st.sdOpen);
+        if (typeof st.pdOpen === 'boolean')   setOpen('purchaseDetailBody', 'purchaseDetailArrow', st.pdOpen);
+        if (typeof st.t401Open === 'boolean') setOpen('tax401Body', 'tax401Arrow', st.t401Open);
+        if (typeof st.scrollY === 'number' && st.scrollY > 0) {
+            // 等內容渲染完再捲動
+            setTimeout(function() { window.scrollTo(0, st.scrollY); }, 30);
+        }
+    } catch (e) { /* ignore */ }
+}
+document.addEventListener('DOMContentLoaded', restoreTaxReportState);
+window.addEventListener('beforeunload', saveTaxReportState);
+// 捲動時節流寫入
+var _taxScrollTimer = null;
+window.addEventListener('scroll', function() {
+    if (_taxScrollTimer) clearTimeout(_taxScrollTimer);
+    _taxScrollTimer = setTimeout(saveTaxReportState, 250);
+});
 function jumpToFmtGroup(bodyId, arrowId, anchorId) {
     var body = document.getElementById(bodyId);
     var arrow = document.getElementById(arrowId);
@@ -346,7 +395,7 @@ function jumpToFmtGroup(bodyId, arrowId, anchorId) {
         var orig = target.style.outline;
         target.style.outline = '3px solid #fbbf24';
         target.style.outlineOffset = '-2px';
-        setTimeout(function() { target.style.outline = orig || ''; target.style.outlineOffset = ''; }, 1500);
+        setTimeout(function() { target.style.outline = orig || ''; target.style.outlineOffset = ''; saveTaxReportState(); }, 1500);
     }, 50);
 }
 function toggleTax401(e) {
@@ -357,6 +406,7 @@ function toggleTax401(e) {
     var open = body.style.display !== 'none';
     body.style.display = open ? 'none' : '';
     if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+    saveTaxReportState();
 }
 </script>
 
