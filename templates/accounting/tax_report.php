@@ -292,6 +292,14 @@ $box115 = max(0, $box110 - $box101);
     </div><!-- /tax401Body -->
 </div>
 <script>
+function toggleSection(bodyId, arrowId) {
+    var body = document.getElementById(bodyId);
+    var arrow = document.getElementById(arrowId);
+    if (!body) return;
+    var open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+}
 function toggleTax401(e) {
     if (e && e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL')) return;
     var body = document.getElementById('tax401Body');
@@ -401,6 +409,116 @@ $_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; 
     </div>
 </div>
 
+<!-- 銷項發票明細（依聯式分組，可收合） -->
+<?php
+$_sdGroups = array();
+foreach ($_sfLabels as $_k => $_v) { $_sdGroups[$_k] = array(); }
+$_sdOther = array();
+foreach ($salesDetail as $_r) {
+    $_fmt = !empty($_r['invoice_format']) ? (string)$_r['invoice_format'] : '';
+    if (isset($_sdGroups[$_fmt])) { $_sdGroups[$_fmt][] = $_r; } else { $_sdOther[] = $_r; }
+}
+$_invSort = function($a, $b) {
+    $c = strcmp((string)($a['invoice_date'] ?? ''), (string)($b['invoice_date'] ?? ''));
+    if ($c !== 0) return $c;
+    return strcmp((string)($a['invoice_number'] ?? ''), (string)($b['invoice_number'] ?? ''));
+};
+foreach ($_sdGroups as $_k => $_g) { usort($_g, $_invSort); $_sdGroups[$_k] = $_g; }
+usort($_sdOther, $_invSort);
+$_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
+?>
+<div class="card mt-2">
+    <div class="card-header d-flex justify-between align-center" style="cursor:pointer" onclick="toggleSection('salesDetailBody','salesDetailArrow')">
+        <span>
+            <span id="salesDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_sdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
+            銷項發票明細 (<?= count($salesDetail) ?> 筆) — 依聯式分組，依日期/發票號碼排序
+        </span>
+        <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
+    </div>
+    <div id="salesDetailBody" style="<?= $_sdOpen ? '' : 'display:none' ?>">
+        <?php if (empty($salesDetail)): ?>
+            <p class="text-muted text-center mt-2">此期間無銷項發票</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:120px">發票號碼</th>
+                        <th style="width:100px">日期</th>
+                        <th>客戶</th>
+                        <th style="width:100px">統編</th>
+                        <th style="width:60px">類型</th>
+                        <th class="text-right">未稅金額</th>
+                        <th class="text-right">稅額</th>
+                        <th class="text-right">含稅金額</th>
+                        <th style="width:80px">狀態</th>
+                    </tr>
+                </thead>
+                <?php
+                $_grandU = 0; $_grandT = 0; $_grandA = 0; $_grandC = 0;
+                $_renderSalesGroup = function($code, $label, $rows, $isAllowance) use (&$_grandU, &$_grandT, &$_grandA, &$_grandC) {
+                    if (empty($rows)) return;
+                    $sU = 0; $sT = 0; $sA = 0; $sC = 0;
+                    $so = InvoiceModel::invoiceStatusOptions();
+                    echo '<tbody>';
+                    echo '<tr style="background:#eef2ff;font-weight:600">';
+                    $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
+                    echo '<td colspan="9">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
+                    echo '</tr>';
+                    foreach ($rows as $r) {
+                        $isVoided = $r['status'] === 'voided';
+                        $voidedStyle = $isVoided ? ' style="opacity:.5;text-decoration:line-through"' : '';
+                        if (!$isVoided) { $sU += (int)$r['amount_untaxed']; $sT += (int)$r['tax_amount']; $sA += (int)$r['total_amount']; $sC++; }
+                        $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
+                        $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
+                        echo '<tr' . $voidedStyle . '>';
+                        echo '<td><a href="/sales_invoices.php?action=edit&id=' . (int)$r['id'] . '">' . htmlspecialchars(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') . '</a></td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['invoice_date']) ? $r['invoice_date'] : '') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['customer_name']) ? $r['customer_name'] : '-') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['customer_tax_id']) ? $r['customer_tax_id'] : '-') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['amount_untaxed']) ? $r['amount_untaxed'] : 0) . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['tax_amount']) ? $r['tax_amount'] : 0) . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) . '</td>';
+                        echo '<td><span class="badge badge-' . $badgeClass . '">' . htmlspecialchars($statusLabel) . '</span></td>';
+                        echo '</tr>';
+                    }
+                    $sign = $isAllowance ? -1 : 1;
+                    $allowNote = $isAllowance ? '（折讓扣除）' : '';
+                    $prefix = $isAllowance ? '-' : '';
+                    echo '<tr style="font-weight:600;background:#fafafa">';
+                    echo '<td colspan="5">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
+                    echo '<td class="text-right">' . ($sU > 0 ? $prefix : '') . '$' . number_format($sU) . '</td>';
+                    echo '<td class="text-right">' . ($sT > 0 ? $prefix : '') . '$' . number_format($sT) . '</td>';
+                    echo '<td class="text-right">' . ($sA > 0 ? $prefix : '') . '$' . number_format($sA) . '</td>';
+                    echo '<td></td>';
+                    echo '</tr>';
+                    echo '</tbody>';
+                    $_grandU += $sign * $sU; $_grandT += $sign * $sT; $_grandA += $sign * $sA; $_grandC += $sC;
+                };
+                foreach ($_sdGroups as $_k => $_g) {
+                    $_isRefund = in_array((string)$_k, array('33', '34'), true);
+                    $_renderSalesGroup($_k, isset($_sfLabels[$_k]) ? $_sfLabels[$_k] : $_k, $_g, $_isRefund);
+                }
+                if (!empty($_sdOther)) {
+                    $_renderSalesGroup('', '未標註聯式', $_sdOther, false);
+                }
+                ?>
+                <tfoot>
+                    <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
+                        <td colspan="5">總計（不含作廢，33/34 已扣除）<?= $_grandC ?> 筆</td>
+                        <td class="text-right">$<?= number_format($_grandU) ?></td>
+                        <td class="text-right">$<?= number_format($_grandT) ?></td>
+                        <td class="text-right">$<?= number_format($_grandA) ?></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <!-- 進項發票聯式彙總 -->
 <?php
 $_pfLabels = array(
@@ -501,140 +619,112 @@ $_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; 
     </div>
 </div>
 
-<!-- 銷項明細 -->
+<!-- 進項發票明細（依聯式分組，可收合） -->
+<?php
+$_pdGroups = array();
+foreach ($_pfLabels as $_k => $_v) { $_pdGroups[$_k] = array(); }
+$_pdOther = array();
+foreach ($purchaseDetail as $_r) {
+    $_fmt = !empty($_r['invoice_format']) ? (string)$_r['invoice_format'] : '';
+    if (isset($_pdGroups[$_fmt])) { $_pdGroups[$_fmt][] = $_r; } else { $_pdOther[] = $_r; }
+}
+foreach ($_pdGroups as $_k => $_g) { usort($_g, $_invSort); $_pdGroups[$_k] = $_g; }
+usort($_pdOther, $_invSort);
+$_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
+?>
 <div class="card mt-2">
-    <div class="card-header d-flex justify-between align-center">
-        <span>銷項發票明細 (<?= count($salesDetail) ?> 筆)</span>
+    <div class="card-header d-flex justify-between align-center" style="cursor:pointer" onclick="toggleSection('purchaseDetailBody','purchaseDetailArrow')">
+        <span>
+            <span id="purchaseDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_pdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
+            進項發票明細 (<?= count($purchaseDetail) ?> 筆) — 依聯式分組，依日期/發票號碼排序
+        </span>
+        <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
     </div>
-    <?php if (empty($salesDetail)): ?>
-        <p class="text-muted text-center mt-2">此期間無銷項發票</p>
-    <?php else: ?>
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>發票號碼</th>
-                    <th>日期</th>
-                    <th>客戶</th>
-                    <th>統編</th>
-                    <th>類型</th>
-                    <th class="text-right">未稅金額</th>
-                    <th class="text-right">稅額</th>
-                    <th class="text-right">含稅金額</th>
-                    <th>狀態</th>
-                </tr>
-            </thead>
-            <tbody>
+    <div id="purchaseDetailBody" style="<?= $_pdOpen ? '' : 'display:none' ?>">
+        <?php if (empty($purchaseDetail)): ?>
+            <p class="text-muted text-center mt-2">此期間無進項發票</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:120px">發票號碼</th>
+                        <th style="width:100px">日期</th>
+                        <th>供應商</th>
+                        <th style="width:100px">統編</th>
+                        <th style="width:60px">類型</th>
+                        <th style="width:80px">扣抵</th>
+                        <th class="text-right">未稅金額</th>
+                        <th class="text-right">稅額</th>
+                        <th class="text-right">含稅金額</th>
+                        <th style="width:80px">狀態</th>
+                    </tr>
+                </thead>
                 <?php
-                $salesTotalUntaxed = 0;
-                $salesTotalTax = 0;
-                $salesTotalAmount = 0;
-                foreach ($salesDetail as $r):
-                    if ($r['status'] !== 'voided') {
-                        $salesTotalUntaxed += (int)$r['amount_untaxed'];
-                        $salesTotalTax += (int)$r['tax_amount'];
-                        $salesTotalAmount += (int)$r['total_amount'];
+                $_pgrandU = 0; $_pgrandT = 0; $_pgrandA = 0; $_pgrandC = 0;
+                $_renderPurchGroup = function($code, $label, $rows, $isAllowance) use (&$_pgrandU, &$_pgrandT, &$_pgrandA, &$_pgrandC) {
+                    if (empty($rows)) return;
+                    $sU = 0; $sT = 0; $sA = 0; $sC = 0;
+                    $so = InvoiceModel::invoiceStatusOptions();
+                    echo '<tbody>';
+                    echo '<tr style="background:#e8f5e9;font-weight:600">';
+                    $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
+                    echo '<td colspan="10">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
+                    echo '</tr>';
+                    foreach ($rows as $r) {
+                        $isVoided = $r['status'] === 'voided';
+                        $voidedStyle = $isVoided ? ' style="opacity:.5;text-decoration:line-through"' : '';
+                        if (!$isVoided) { $sU += (int)$r['amount_untaxed']; $sT += (int)$r['tax_amount']; $sA += (int)$r['total_amount']; $sC++; }
+                        $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
+                        $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
+                        $deduct = (!empty($r['deduction_type']) && $r['deduction_type'] === 'deductible') ? '<span style="color:var(--success)">可扣抵</span>' : '<span style="color:var(--danger)">不可扣抵</span>';
+                        echo '<tr' . $voidedStyle . '>';
+                        echo '<td><a href="/purchase_invoices.php?action=edit&id=' . (int)$r['id'] . '">' . htmlspecialchars(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') . '</a></td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['invoice_date']) ? $r['invoice_date'] : '') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['vendor_tax_id']) ? $r['vendor_tax_id'] : '-') . '</td>';
+                        echo '<td>' . htmlspecialchars(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') . '</td>';
+                        echo '<td>' . $deduct . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['amount_untaxed']) ? $r['amount_untaxed'] : 0) . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['tax_amount']) ? $r['tax_amount'] : 0) . '</td>';
+                        echo '<td class="text-right">$' . number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) . '</td>';
+                        echo '<td><span class="badge badge-' . $badgeClass . '">' . htmlspecialchars($statusLabel) . '</span></td>';
+                        echo '</tr>';
                     }
+                    $sign = $isAllowance ? -1 : 1;
+                    $allowNote = $isAllowance ? '（折讓扣除）' : '';
+                    $prefix = $isAllowance ? '-' : '';
+                    echo '<tr style="font-weight:600;background:#fafafa">';
+                    echo '<td colspan="6">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
+                    echo '<td class="text-right">' . ($sU > 0 ? $prefix : '') . '$' . number_format($sU) . '</td>';
+                    echo '<td class="text-right">' . ($sT > 0 ? $prefix : '') . '$' . number_format($sT) . '</td>';
+                    echo '<td class="text-right">' . ($sA > 0 ? $prefix : '') . '$' . number_format($sA) . '</td>';
+                    echo '<td></td>';
+                    echo '</tr>';
+                    echo '</tbody>';
+                    $_pgrandU += $sign * $sU; $_pgrandT += $sign * $sT; $_pgrandA += $sign * $sA; $_pgrandC += $sC;
+                };
+                foreach ($_pdGroups as $_k => $_g) {
+                    $_isRefund = in_array((string)$_k, array('23', '24'), true);
+                    $_renderPurchGroup($_k, isset($_pfLabels[$_k]) ? $_pfLabels[$_k] : $_k, $_g, $_isRefund);
+                }
+                if (!empty($_pdOther)) {
+                    $_renderPurchGroup('', '未標註聯式', $_pdOther, false);
+                }
                 ?>
-                <tr<?= $r['status'] === 'voided' ? ' style="opacity:.5;text-decoration:line-through"' : '' ?>>
-                    <td><a href="/sales_invoices.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') ?></a></td>
-                    <td><?= e(!empty($r['invoice_date']) ? $r['invoice_date'] : '') ?></td>
-                    <td><?= e(!empty($r['customer_name']) ? $r['customer_name'] : '-') ?></td>
-                    <td><?= e(!empty($r['customer_tax_id']) ? $r['customer_tax_id'] : '-') ?></td>
-                    <td><?= e(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['amount_untaxed']) ? $r['amount_untaxed'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['tax_amount']) ? $r['tax_amount'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
-                    <td>
-                        <?php $so = InvoiceModel::invoiceStatusOptions(); ?>
-                        <span class="badge badge-<?= $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning') ?>">
-                            <?= e(isset($so[$r['status']]) ? $so[$r['status']] : $r['status']) ?>
-                        </span>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr style="font-weight:600;background:var(--gray-50,#f8f9fa)">
-                    <td colspan="5">合計 (不含作廢)</td>
-                    <td class="text-right">$<?= number_format($salesTotalUntaxed) ?></td>
-                    <td class="text-right">$<?= number_format($salesTotalTax) ?></td>
-                    <td class="text-right">$<?= number_format($salesTotalAmount) ?></td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        </table>
+                <tfoot>
+                    <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
+                        <td colspan="6">總計（不含作廢，23/24 已扣除）<?= $_pgrandC ?> 筆</td>
+                        <td class="text-right">$<?= number_format($_pgrandU) ?></td>
+                        <td class="text-right">$<?= number_format($_pgrandT) ?></td>
+                        <td class="text-right">$<?= number_format($_pgrandA) ?></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
-</div>
-
-<!-- 進項明細 -->
-<div class="card mt-2">
-    <div class="card-header d-flex justify-between align-center">
-        <span>進項發票明細 (<?= count($purchaseDetail) ?> 筆)</span>
-    </div>
-    <?php if (empty($purchaseDetail)): ?>
-        <p class="text-muted text-center mt-2">此期間無進項發票</p>
-    <?php else: ?>
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>發票號碼</th>
-                    <th>日期</th>
-                    <th>供應商</th>
-                    <th>統編</th>
-                    <th>類型</th>
-                    <th>扣抵</th>
-                    <th class="text-right">未稅金額</th>
-                    <th class="text-right">稅額</th>
-                    <th class="text-right">含稅金額</th>
-                    <th>狀態</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $purchaseTotalUntaxed = 0;
-                $purchaseTotalTax = 0;
-                $purchaseTotalAmount = 0;
-                foreach ($purchaseDetail as $r):
-                    if ($r['status'] !== 'voided') {
-                        $purchaseTotalUntaxed += (int)$r['amount_untaxed'];
-                        $purchaseTotalTax += (int)$r['tax_amount'];
-                        $purchaseTotalAmount += (int)$r['total_amount'];
-                    }
-                ?>
-                <tr<?= $r['status'] === 'voided' ? ' style="opacity:.5;text-decoration:line-through"' : '' ?>>
-                    <td><a href="/purchase_invoices.php?action=edit&id=<?= $r['id'] ?>"><?= e(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') ?></a></td>
-                    <td><?= e(!empty($r['invoice_date']) ? $r['invoice_date'] : '') ?></td>
-                    <td><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></td>
-                    <td><?= e(!empty($r['vendor_tax_id']) ? $r['vendor_tax_id'] : '-') ?></td>
-                    <td><?= e(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') ?></td>
-                    <td><?= (!empty($r['deduction_type']) && $r['deduction_type'] === 'deductible') ? '<span style="color:var(--success)">可扣抵</span>' : '<span style="color:var(--danger)">不可扣抵</span>' ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['amount_untaxed']) ? $r['amount_untaxed'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['tax_amount']) ? $r['tax_amount'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
-                    <td>
-                        <?php $so = InvoiceModel::invoiceStatusOptions(); ?>
-                        <span class="badge badge-<?= $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning') ?>">
-                            <?= e(isset($so[$r['status']]) ? $so[$r['status']] : $r['status']) ?>
-                        </span>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr style="font-weight:600;background:var(--gray-50,#f8f9fa)">
-                    <td colspan="6">合計 (不含作廢)</td>
-                    <td class="text-right">$<?= number_format($purchaseTotalUntaxed) ?></td>
-                    <td class="text-right">$<?= number_format($purchaseTotalTax) ?></td>
-                    <td class="text-right">$<?= number_format($purchaseTotalAmount) ?></td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
-    <?php endif; ?>
 </div>
 
 <?php else: ?>
