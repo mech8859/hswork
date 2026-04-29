@@ -30,6 +30,37 @@
 </div>
 
 <?php if ($summary): ?>
+<?php
+// 401 報表只列入「開立已確認」的發票，其餘狀態（待處理/作廢/空白/退款）一律排除。
+// 保留原始計數以便顯示警告。
+$_pendingSales = 0; $_pendingPurchase = 0;
+$_voidedSales = 0; $_voidedPurchase = 0;
+foreach ($salesDetail as $_r) {
+    if ($_r['status'] === 'voided') $_voidedSales++;
+    elseif ($_r['status'] !== 'confirmed') $_pendingSales++;
+}
+foreach ($purchaseDetail as $_r) {
+    if ($_r['status'] === 'voided') $_voidedPurchase++;
+    elseif ($_r['status'] !== 'confirmed') $_pendingPurchase++;
+}
+$salesDetail = array_values(array_filter($salesDetail, function($r) { return ($r['status'] ?? '') === 'confirmed'; }));
+$purchaseDetail = array_values(array_filter($purchaseDetail, function($r) { return ($r['status'] ?? '') === 'confirmed'; }));
+?>
+<?php if ($_pendingSales > 0 || $_pendingPurchase > 0): ?>
+<div class="card mt-2" style="background:#fff8e1;border-left:4px solid #f57c00;padding:10px 14px;margin-bottom:10px">
+    <strong style="color:#e65100">⚠ 401 申報只列入「開立已確認」的發票</strong>
+    <div style="font-size:.9rem;color:#5d4037;margin-top:4px">
+        <?php if ($_pendingSales > 0): ?>
+            銷項有 <strong><?= (int)$_pendingSales ?></strong> 筆待處理（未確認）
+        <?php endif; ?>
+        <?php if ($_pendingSales > 0 && $_pendingPurchase > 0): ?>，<?php endif; ?>
+        <?php if ($_pendingPurchase > 0): ?>
+            進項有 <strong><?= (int)$_pendingPurchase ?></strong> 筆待處理（未確認）
+        <?php endif; ?>
+        — 未列入下列彙總／明細，請至發票管理確認後再申報。
+    </div>
+</div>
+<?php endif; ?>
 <!-- 彙總卡片 -->
 <div class="tax-summary-grid">
     <!-- 銷項 -->
@@ -353,12 +384,7 @@ foreach ($_sfStats as $_k => $s) {
 $_sfTot['count']+=$_sfOther['count']; $_sfTot['untaxed']+=$_sfOther['untaxed']; $_sfTot['tax']+=$_sfOther['tax']; $_sfTot['total']+=$_sfOther['total'];
 ?>
 <div class="card mt-2">
-    <div class="card-header">
-        銷項發票聯式彙總（不含作廢；折讓 33/34 需「開立已確認」才計入）
-        <?php if ($_sfPendingRefund > 0): ?>
-        <span style="color:var(--warning,#f57c00);font-size:.85rem;font-weight:normal;margin-left:8px">⚠ 有 <?= (int)$_sfPendingRefund ?> 筆 33/34 折讓待處理，未列入彙總</span>
-        <?php endif; ?>
-    </div>
+    <div class="card-header">銷項發票聯式彙總（僅計開立已確認）</div>
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -431,7 +457,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
     <div class="card-header d-flex justify-between align-center" style="cursor:pointer" onclick="toggleSection('salesDetailBody','salesDetailArrow')">
         <span>
             <span id="salesDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_sdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
-            銷項發票明細 (<?= count($salesDetail) ?> 筆) — 依聯式分組，依日期/發票號碼排序
+            銷項發票明細（已確認 <?= count($salesDetail) ?> 筆） — 依聯式分組，依日期/發票號碼排序
         </span>
         <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
     </div>
@@ -506,7 +532,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                 ?>
                 <tfoot>
                     <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
-                        <td colspan="5">總計（不含作廢，33/34 已扣除）<?= $_grandC ?> 筆</td>
+                        <td colspan="5">總計（已確認，33/34 已扣除）<?= $_grandC ?> 筆</td>
                         <td class="text-right">$<?= number_format($_grandU) ?></td>
                         <td class="text-right">$<?= number_format($_grandT) ?></td>
                         <td class="text-right">$<?= number_format($_grandA) ?></td>
@@ -563,12 +589,7 @@ foreach ($_pfStats as $_k => $s) {
 $_pfTot['count']+=$_pfOther['count']; $_pfTot['untaxed']+=$_pfOther['untaxed']; $_pfTot['tax']+=$_pfOther['tax']; $_pfTot['total']+=$_pfOther['total'];
 ?>
 <div class="card mt-2">
-    <div class="card-header">
-        進項發票聯式彙總（不含作廢，僅計可扣抵；折讓 23/24 需「開立已確認」才計入）
-        <?php if ($_pfPendingRefund > 0): ?>
-        <span style="color:var(--warning,#f57c00);font-size:.85rem;font-weight:normal;margin-left:8px">⚠ 有 <?= (int)$_pfPendingRefund ?> 筆 23/24 折讓待處理，未列入彙總</span>
-        <?php endif; ?>
-    </div>
+    <div class="card-header">進項發票聯式彙總（僅計可扣抵且開立已確認）</div>
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -636,7 +657,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
     <div class="card-header d-flex justify-between align-center" style="cursor:pointer" onclick="toggleSection('purchaseDetailBody','purchaseDetailArrow')">
         <span>
             <span id="purchaseDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_pdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
-            進項發票明細 (<?= count($purchaseDetail) ?> 筆) — 依聯式分組，依日期/發票號碼排序
+            進項發票明細（已確認 <?= count($purchaseDetail) ?> 筆） — 依聯式分組，依日期/發票號碼排序
         </span>
         <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
     </div>
@@ -714,7 +735,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                 ?>
                 <tfoot>
                     <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
-                        <td colspan="6">總計（不含作廢，23/24 已扣除）<?= $_pgrandC ?> 筆</td>
+                        <td colspan="6">總計（已確認，23/24 已扣除）<?= $_pgrandC ?> 筆</td>
                         <td class="text-right">$<?= number_format($_pgrandU) ?></td>
                         <td class="text-right">$<?= number_format($_pgrandT) ?></td>
                         <td class="text-right">$<?= number_format($_pgrandA) ?></td>
