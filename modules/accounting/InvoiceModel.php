@@ -154,8 +154,12 @@ class InvoiceModel
             $params[] = $filters['invoice_type'];
         }
         if (!empty($filters['invoice_format'])) {
-            $where[] = "pi.invoice_format = ?";
-            $params[] = $filters['invoice_format'];
+            if ($filters['invoice_format'] === '__empty__') {
+                $where[] = "(pi.invoice_format IS NULL OR TRIM(pi.invoice_format) = '')";
+            } else {
+                $where[] = "pi.invoice_format = ?";
+                $params[] = $filters['invoice_format'];
+            }
         }
         if (!empty($filters['deduction_type'])) {
             $where[] = "pi.deduction_type = ?";
@@ -447,8 +451,12 @@ class InvoiceModel
             $params[] = $filters['invoice_type'];
         }
         if (!empty($filters['invoice_format'])) {
-            $where[] = "si.invoice_format = ?";
-            $params[] = $filters['invoice_format'];
+            if ($filters['invoice_format'] === '__empty__') {
+                $where[] = "(si.invoice_format IS NULL OR TRIM(si.invoice_format) = '')";
+            } else {
+                $where[] = "si.invoice_format = ?";
+                $params[] = $filters['invoice_format'];
+            }
         }
         // 發票號碼區間（含前後綴英文，按字串比對即可）
         if (!empty($filters['invoice_no_from'])) {

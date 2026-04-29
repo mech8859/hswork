@@ -33,6 +33,7 @@
         </select>
         <select name="invoice_format" class="form-control" style="width:auto;min-width:140px">
             <option value="">銷項發票聯式（全部）</option>
+            <option value="__empty__" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === '__empty__') ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定聯式</option>
             <?php
             $_sfOpts = array(
                 '31' => '31：銷項三聯式、電子計算機統一發票',

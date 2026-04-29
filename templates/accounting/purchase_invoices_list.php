@@ -48,6 +48,7 @@
                 <label>進項發票聯式</label>
                 <select name="invoice_format" class="form-control">
                     <option value="">全部</option>
+                    <option value="__empty__" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === '__empty__') ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定聯式</option>
                     <?php
                     $_formatOpts = array(
                         '21' => '21：進項三聯式、電子計算機統一發票',
