@@ -433,7 +433,7 @@ if ($__pureSaleCaseId > 0) {
         <div class="form-row">
             <div class="form-group">
                 <label>施工天數</label>
-                <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($_defLaborDays) ?>" step="0.5" min="0" oninput="autoCalcHours()">
+                <input type="number" name="labor_days" id="laborDays" class="form-control" value="<?= e($_defLaborDays) ?>" step="0.5" min="0" oninput="onLaborDaysOrHoursInput('days')">
             </div>
             <div class="form-group">
                 <label>施工人數 <small style="color:#c5221f">*必填</small></label>
@@ -441,7 +441,7 @@ if ($__pureSaleCaseId > 0) {
             </div>
             <div class="form-group">
                 <label>施工時數 <small style="color:#888">(每人工時)</small></label>
-                <input type="number" name="labor_unit_hours" id="laborUnitHours" class="form-control" value="<?= e($_defLaborUnitHours) ?>" step="0.5" min="0" oninput="autoCalcHours()" placeholder="與天數擇一">
+                <input type="number" name="labor_unit_hours" id="laborUnitHours" class="form-control" value="<?= e($_defLaborUnitHours) ?>" step="0.5" min="0" oninput="onLaborDaysOrHoursInput('unit_hours')" placeholder="與天數擇一">
                 <small style="color:#888;display:block;margin-top:2px;font-size:.75rem">與施工天數擇一填寫</small>
             </div>
             <div class="form-group">
@@ -1330,6 +1330,19 @@ if (document.getElementById('discountAmount')) {
 //   天數模式：人 × 8 × 天數
 //   時數模式：人 × 每人時數
 //   只允許「天數 OR 每人時數」二擇一；同時填寫時優先用每人時數
+// 施工天數 / 每人時數 擇一：在某一欄輸入有效值時自動清空另一欄
+function onLaborDaysOrHoursInput(which) {
+    var daysEl = document.getElementById('laborDays');
+    var hoursEl = document.getElementById('laborUnitHours');
+    if (!daysEl || !hoursEl) { autoCalcHours(); return; }
+    if (which === 'days' && parseFloat(daysEl.value) > 0) {
+        hoursEl.value = '';
+    } else if (which === 'unit_hours' && parseFloat(hoursEl.value) > 0) {
+        daysEl.value = '';
+    }
+    autoCalcHours();
+}
+
 function autoCalcHours() {
     var days      = parseFloat(document.getElementById('laborDays').value) || 0;
     var people    = parseFloat(document.getElementById('laborPeople').value) || 0;
