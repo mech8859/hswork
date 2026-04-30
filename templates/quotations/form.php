@@ -10,6 +10,20 @@ require __DIR__ . '/../_readonly_form_helper.php';
 $__hasCaseLink = !empty($_GET['case_id']) || ($isEdit && !empty($quote['case_id']));
 // 新增或編輯都檢查：只要未關聯案件就顯示警語（唯讀檢視不顯示）
 $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
+
+// 「單純買賣」案件：隱藏內部成本分析（人力/線材/營運）與預計線材區塊；
+// 利潤計算只用器材成本。讀取案件旗標一次。
+$__pureSaleCaseId = 0;
+if ($isEdit && !empty($quote['case_id'])) $__pureSaleCaseId = (int)$quote['case_id'];
+elseif (!$isEdit && !empty($_GET['case_id'])) $__pureSaleCaseId = (int)$_GET['case_id'];
+$isPureSale = false;
+if ($__pureSaleCaseId > 0) {
+    try {
+        $__psStmt = Database::getInstance()->prepare("SELECT is_pure_sale FROM cases WHERE id = ?");
+        $__psStmt->execute(array($__pureSaleCaseId));
+        $isPureSale = (int)$__psStmt->fetchColumn() === 1;
+    } catch (Exception $__e) { $isPureSale = false; }
+}
 ?>
 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
     <h2 style="margin:0"><?= $isEdit ? ($readOnly ? '檢視報價單 - ' : '編輯報價單 - ') . e($quote['quotation_number']) : '新增報價單' ?></h2>
@@ -343,8 +357,8 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
         <input type="hidden" name="has_discount" id="hasDiscountHidden" value="<?= !empty($quote['has_discount']) ? '1' : '0' ?>">
     </div>
 
-    <!-- 預計使用線材與配件（僅管理者，統計分析用） -->
-    <?php if ($canManage):
+    <!-- 預計使用線材與配件（僅管理者，統計分析用；單純買賣案件不顯示） -->
+    <?php if ($canManage && !$isPureSale):
         $qEstMaterials = array();
         if ($isEdit && !empty($quote['case_id'])) {
             $caseModelEst = new CaseModel();
@@ -414,7 +428,8 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
     $_defLaborHours     = $quote['labor_hours']      ?? ($_caseLD['labor_hours']      ?? '');
     ?>
     <div class="card">
-        <div class="card-header">內部成本分析（不顯示在報價單）<small style="color:#c5221f;margin-left:6px;font-weight:400">* 送簽核前需填寫：施工天數或時數擇一、施工人數</small></div>
+        <div class="card-header">內部成本分析（不顯示在報價單）<?php if (!$isPureSale): ?><small style="color:#c5221f;margin-left:6px;font-weight:400">* 送簽核前需填寫：施工天數或時數擇一、施工人數</small><?php else: ?><small style="color:#1565c0;margin-left:6px;font-weight:400">單純買賣案件：僅顯示器材成本與利潤</small><?php endif; ?></div>
+        <?php if (!$isPureSale): ?>
         <div class="form-row">
             <div class="form-group">
                 <label>施工天數</label>
@@ -457,23 +472,40 @@ $__showNoLinkWarn = !$__hasCaseLink && !$readOnly;
                 <small>未連結案件，線材成本預設為 0</small>
             </div>
         </div>
+        <?php else: ?>
+        <input type="hidden" name="labor_days" id="laborDays" value="0">
+        <input type="hidden" name="labor_people" id="laborPeople" value="0">
+        <input type="hidden" name="labor_unit_hours" id="laborUnitHours" value="0">
+        <input type="hidden" name="labor_hours" id="laborHours" value="0">
+        <input type="hidden" name="labor_cost_total" id="laborCostTotal" value="0">
+        <input type="hidden" name="cable_cost" id="cableCost" value="0">
+        <input type="hidden" name="cable_not_used" id="cableNotUsed" value="1">
+        <?php endif; ?>
         <div class="form-row" style="background:#f8f9fa;padding:8px;border-radius:6px">
             <div class="form-group">
                 <label>器材總成本</label>
                 <div id="materialCost" style="font-weight:600;font-size:1.1rem">$0</div>
             </div>
+            <?php if (!$isPureSale): ?>
             <div class="form-group">
                 <label>營運成本 <small style="color:#999;font-weight:normal">(人力×<?= $_qfOpRate ?>%)</small></label>
                 <div id="opsCostDisplay" style="font-weight:600;font-size:1.1rem;color:#e65100">$0</div>
             </div>
+            <?php else: ?>
+            <div id="opsCostDisplay" style="display:none">$0</div>
+            <?php endif; ?>
             <div class="form-group">
                 <label>總成本</label>
                 <div id="totalCostDisplay" style="font-weight:600;font-size:1.1rem">$0</div>
             </div>
+            <?php if (!$isPureSale): ?>
             <div class="form-group">
                 <label>預估成交金額 <small style="color:#999;font-weight:normal">(優惠價優先)</small></label>
                 <div id="projectedRevenue" style="font-weight:600;font-size:1.1rem;color:#1967d2">$0</div>
             </div>
+            <?php else: ?>
+            <div id="projectedRevenue" style="display:none">$0</div>
+            <?php endif; ?>
             <div class="form-group">
                 <label>利潤金額</label>
                 <div id="profitAmount" style="font-weight:600;font-size:1.1rem">$0</div>

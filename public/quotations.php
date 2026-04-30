@@ -309,29 +309,39 @@ switch ($action) {
         }
 
         // 送簽核前檢查：施工天數/施工時數(二擇一) + 施工人數 + 預估使用線材
-        $_missing = array();
-        $_days       = (float)($quote['labor_days']       ?? 0);
-        $_unitHours  = (float)($quote['labor_unit_hours'] ?? 0);
-        $_people     = (int)  ($quote['labor_people']     ?? 0);
-        if ($_days <= 0 && $_unitHours <= 0) {
-            $_missing[] = '施工天數或施工時數（需擇一填寫）';
-        }
-        if ($_people <= 0) {
-            $_missing[] = '施工人數';
-        }
-        // 預估使用線材：若未勾「無使用線材」則必須有 estimate 紀錄
-        if (empty($quote['cable_not_used'])) {
-            $_emStmt = Database::getInstance()->prepare('SELECT COUNT(*) FROM case_material_estimates WHERE case_id = ?');
-            $_emStmt->execute(array($quote['case_id']));
-            $_emCount = (int)$_emStmt->fetchColumn();
-            if ($_emCount === 0) {
-                $_missing[] = '預估使用線材（或勾選「無使用線材」）';
+        // 單純買賣案件：跳過施工人時與預估線材檢查（這些欄位在表單已隱藏，不適用）
+        $_isPureSale = false;
+        try {
+            $_psStmt = Database::getInstance()->prepare("SELECT is_pure_sale FROM cases WHERE id = ?");
+            $_psStmt->execute(array((int)$quote['case_id']));
+            $_isPureSale = (int)$_psStmt->fetchColumn() === 1;
+        } catch (Exception $_e) { $_isPureSale = false; }
+
+        if (!$_isPureSale) {
+            $_missing = array();
+            $_days       = (float)($quote['labor_days']       ?? 0);
+            $_unitHours  = (float)($quote['labor_unit_hours'] ?? 0);
+            $_people     = (int)  ($quote['labor_people']     ?? 0);
+            if ($_days <= 0 && $_unitHours <= 0) {
+                $_missing[] = '施工天數或施工時數（需擇一填寫）';
             }
-        }
-        if (!empty($_missing)) {
-            Session::flash('error', '送簽核前請先填寫：' . implode('、', $_missing));
-            redirect('/quotations.php?action=view&id=' . $id);
-            break;
+            if ($_people <= 0) {
+                $_missing[] = '施工人數';
+            }
+            // 預估使用線材：若未勾「無使用線材」則必須有 estimate 紀錄
+            if (empty($quote['cable_not_used'])) {
+                $_emStmt = Database::getInstance()->prepare('SELECT COUNT(*) FROM case_material_estimates WHERE case_id = ?');
+                $_emStmt->execute(array($quote['case_id']));
+                $_emCount = (int)$_emStmt->fetchColumn();
+                if ($_emCount === 0) {
+                    $_missing[] = '預估使用線材（或勾選「無使用線材」）';
+                }
+            }
+            if (!empty($_missing)) {
+                Session::flash('error', '送簽核前請先填寫：' . implode('、', $_missing));
+                redirect('/quotations.php?action=view&id=' . $id);
+                break;
+            }
         }
 
         if (verify_csrf()) {

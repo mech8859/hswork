@@ -524,7 +524,7 @@ class CaseModel
                 repair_is_charged = ?, repair_no_charge_reason = ?,
                 sales_note = ?,
                 est_labor_days = ?, est_labor_people = ?, est_labor_hours = ?,
-                no_equipment = ?
+                no_equipment = ?, is_pure_sale = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -614,6 +614,8 @@ class CaseModel
             !empty($data['est_labor_people']) ? (int)$data['est_labor_people'] : null,
             !empty($data['est_labor_hours']) ? $data['est_labor_hours'] : null,
             isset($data['no_equipment']) ? (int)!!$data['no_equipment'] : 0,
+            // 單純買賣與無使用設備互斥（後端保險：兩者皆 1 時以 no_equipment 為主，is_pure_sale 取消）
+            (isset($data['is_pure_sale']) && (int)!!$data['is_pure_sale'] && empty($data['no_equipment'])) ? 1 : 0,
             $id,
         ]);
 

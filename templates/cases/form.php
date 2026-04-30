@@ -691,14 +691,33 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
     $_qStatusMap = array('draft'=>'草稿','pending_approval'=>'待簽核','approved'=>'已核准','rejected_internal'=>'退回修改','sent'=>'已送客戶','accepted'=>'已接受','rejected'=>'已拒絕','customer_accepted'=>'客戶已接受','customer_rejected'=>'客戶已拒絕','revision_needed'=>'待修改');
     $_qBadgeMap = array('draft'=>'warning','pending_approval'=>'info','approved'=>'primary','rejected_internal'=>'danger','sent'=>'primary','accepted'=>'success','rejected'=>'danger','customer_accepted'=>'success','customer_rejected'=>'danger','revision_needed'=>'warning');
     ?>
+    <?php
+    // 報價單建立後，「無使用設備」「單純買賣」兩個 checkbox 鎖定（隱藏，要改需先刪光報價單）
+    $caseHasQuote = !empty($caseQuotes);
+    ?>
     <div class="card" id="sec-quote-drawing">
         <div class="card-header d-flex justify-between align-center">
             <span>報價單 / 圖面</span>
             <div class="d-flex align-center gap-1">
-                <label class="checkbox-label" style="cursor:pointer;font-size:.85rem;color:#555;margin:0;display:inline-flex;align-items:center;gap:4px" title="勾選後隱藏出庫單，排工不必等出庫">
-                    <input type="checkbox" name="no_equipment" value="1" <?= !empty($case['no_equipment']) ? 'checked' : '' ?> style="margin:0">
+                <?php if (!$caseHasQuote): ?>
+                <label class="checkbox-label" style="cursor:pointer;font-size:.85rem;color:#555;margin:0;display:inline-flex;align-items:center;gap:4px" title="勾選後隱藏出庫單，排工不必等出庫；與「單純買賣」互斥">
+                    <input type="checkbox" name="no_equipment" value="1" id="caseNoEquipChk" data-original="<?= !empty($case['no_equipment']) ? '1' : '0' ?>" <?= !empty($case['no_equipment']) ? 'checked' : '' ?> style="margin:0" onchange="onCaseExclusiveFlagChange('no_equipment')">
                     此案件無使用設備
                 </label>
+                <label class="checkbox-label" style="cursor:pointer;font-size:.85rem;color:#555;margin:0;display:inline-flex;align-items:center;gap:4px" title="勾選後報價單不顯示內部成本分析與預計線材；與「無使用設備」互斥">
+                    <input type="checkbox" name="is_pure_sale" value="1" id="casePureSaleChk" data-original="<?= !empty($case['is_pure_sale']) ? '1' : '0' ?>" <?= !empty($case['is_pure_sale']) ? 'checked' : '' ?> style="margin:0" onchange="onCaseExclusiveFlagChange('is_pure_sale')">
+                    單純買賣
+                </label>
+                <?php else: ?>
+                    <input type="hidden" name="no_equipment" value="<?= !empty($case['no_equipment']) ? '1' : '0' ?>">
+                    <input type="hidden" name="is_pure_sale" value="<?= !empty($case['is_pure_sale']) ? '1' : '0' ?>">
+                    <?php if (!empty($case['no_equipment'])): ?>
+                    <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:.75rem;padding:2px 8px" title="已建立報價單，無法變更；如需變更請先刪除所有報價單">🔒 此案件無使用設備</span>
+                    <?php endif; ?>
+                    <?php if (!empty($case['is_pure_sale'])): ?>
+                    <span class="badge" style="background:#fff3e0;color:#e65100;font-size:.75rem;padding:2px 8px" title="已建立報價單，無法變更；如需變更請先刪除所有報價單">🔒 單純買賣</span>
+                    <?php endif; ?>
+                <?php endif; ?>
                 <?php if (Auth::hasPermission('quotations.manage') || Auth::hasPermission('quotations.view')): ?>
                     <?php
                     $_quoteCreateUrl = '/quotations.php?action=create&case_id=' . $case['id']
@@ -709,14 +728,14 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                         . '&phone=' . urlencode(!empty($case['customer_mobile']) ? $case['customer_mobile'] : ($case['customer_phone'] ?? ''));
                     ?>
                     <?php if (!$latestQuote): ?>
-                    <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm">+ 建立報價單</a>
+                    <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm" onclick="return confirmQuoteCreateUnsaved()">+ 建立報價單</a>
                     <?php else: ?>
                         <?php if ($latestQuote['status'] === 'customer_accepted'): ?>
                         <a href="/quotations.php?action=view&id=<?= $latestQuote['id'] ?>" class="btn btn-outline btn-sm">檢視報價單</a>
                         <?php else: ?>
                         <a href="/quotations.php?action=edit&id=<?= $latestQuote['id'] ?>" class="btn btn-outline btn-sm">編輯最新一張</a>
                         <?php endif; ?>
-                        <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm">+ 新增另一張報價</a>
+                        <a href="<?= $_quoteCreateUrl ?>" class="btn btn-primary btn-sm" onclick="return confirmQuoteCreateUnsaved()">+ 新增另一張報價</a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -4305,5 +4324,29 @@ try {
         _btn.style.setProperty('display', 'none', 'important');
     }
 } catch(e) { console.error('force hide btnNewCustomer failed:', e); }
+</script>
+
+<script>
+// 「無使用設備」與「單純買賣」互斥：勾一個自動取消另一個
+function onCaseExclusiveFlagChange(which) {
+    var noEq = document.getElementById('caseNoEquipChk');
+    var pure = document.getElementById('casePureSaleChk');
+    if (!noEq || !pure) return;
+    if (which === 'no_equipment' && noEq.checked) pure.checked = false;
+    if (which === 'is_pure_sale' && pure.checked) noEq.checked = false;
+}
+
+// 點「+建立報價單」前檢查：若 checkbox 改了卻沒按儲存，提醒先儲存
+function confirmQuoteCreateUnsaved() {
+    var noEq = document.getElementById('caseNoEquipChk');
+    var pure = document.getElementById('casePureSaleChk');
+    if (!noEq && !pure) return true;
+    var noEqChanged = noEq && (noEq.checked ? '1' : '0') !== (noEq.getAttribute('data-original') || '0');
+    var pureChanged = pure && (pure.checked ? '1' : '0') !== (pure.getAttribute('data-original') || '0');
+    if (noEqChanged || pureChanged) {
+        return confirm('您剛變更了「單純買賣」或「無使用設備」的勾選但尚未儲存。\n\n請先按下方「儲存」案件後再建立報價單，否則新建的報價單不會套用最新設定。\n\n仍要直接建立報價單嗎？');
+    }
+    return true;
+}
 </script>
 

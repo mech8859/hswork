@@ -279,10 +279,22 @@ $_isSuperseded = ($_acceptedQid > 0 && $quote['status'] === 'customer_accepted' 
     </div>
 </div>
 
-<!-- 預計使用線材與配件（僅管理者，統計分析用） -->
+<?php
+// 「單純買賣」案件：隱藏預計線材與內部成本中的人力/線材/營運欄位
+$viewIsPureSale = false;
+if (!empty($quote['case_id'])) {
+    try {
+        $__vpsStmt = Database::getInstance()->prepare("SELECT is_pure_sale FROM cases WHERE id = ?");
+        $__vpsStmt->execute(array((int)$quote['case_id']));
+        $viewIsPureSale = (int)$__vpsStmt->fetchColumn() === 1;
+    } catch (Exception $__e) { $viewIsPureSale = false; }
+}
+?>
+
+<!-- 預計使用線材與配件（僅管理者，統計分析用；單純買賣案件不顯示） -->
 <?php
 $matCostTotal = 0;
-if ($canManage && !empty($quote['case_id'])) {
+if ($canManage && !empty($quote['case_id']) && !$viewIsPureSale) {
     $viewCaseModel = new CaseModel();
     $viewEstMaterials = $viewCaseModel->getMaterialEstimates($quote['case_id']);
 ?>
@@ -404,15 +416,21 @@ if ($canManage && !empty($quote['case_id'])) {
     }
     ?>
     <div class="info-grid">
+        <?php if (!$viewIsPureSale): ?>
         <div><span class="info-label">施工天數</span><span><?= $viewDays ?: '-' ?></span></div>
         <div><span class="info-label">施工人數</span><span><?= $viewPeople ?: '-' ?></span></div>
         <div><span class="info-label">總施工時數</span><span><?= $viewHours ? $viewHours : '-' ?></span></div>
         <div><span class="info-label">人力成本</span><span>$<?= number_format($viewLaborCost) ?></span></div>
+        <?php endif; ?>
         <div><span class="info-label">器材成本</span><span>$<?= number_format($viewMaterialCost) ?></span></div>
+        <?php if (!$viewIsPureSale): ?>
         <div><span class="info-label">線材成本<?= !empty($quote['cable_not_used']) ? ' <small style="color:#888">(無使用)</small>' : '' ?></span><span>$<?= number_format($viewCableCost) ?></span></div>
         <div><span class="info-label">營運成本 <small style="color:#999">(人力×<?= $_vOpRate ?>%)</small></span><span style="color:#e65100">$<?= number_format($viewOpCost) ?></span></div>
+        <?php endif; ?>
         <div><span class="info-label">總成本</span><span><strong>$<?= number_format($viewRealTotalCost) ?></strong></span></div>
+        <?php if (!$viewIsPureSale): ?>
         <div><span class="info-label">預估成交金額 <small style="color:#999">(優惠價優先)</small></span><span style="color:#1967d2"><strong>$<?= number_format($viewProjected) ?></strong></span></div>
+        <?php endif; ?>
         <div><span class="info-label">利潤</span><span style="color:<?= $viewRealProfit >= 0 ? '#137333' : '#c5221f' ?>"><strong>$<?= number_format($viewRealProfit) ?></strong></span></div>
         <div>
             <span class="info-label">利潤率</span>
