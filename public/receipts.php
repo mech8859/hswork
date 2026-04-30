@@ -43,7 +43,8 @@ switch ($action) {
     default:
         $filters = array(
             'status'         => !empty($_GET['status']) ? $_GET['status'] : '',
-            'sales_id'       => !empty($_GET['sales_id']) ? (int)$_GET['sales_id'] : '',
+            // 支援 '__none__' 篩選空業務人員，否則轉 int
+            'sales_id'       => !empty($_GET['sales_id']) ? ($_GET['sales_id'] === '__none__' ? '__none__' : (int)$_GET['sales_id']) : '',
             'receipt_method' => !empty($_GET['receipt_method']) ? $_GET['receipt_method'] : '',
             'keyword'        => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
             'date_type'      => !empty($_GET['date_type']) ? $_GET['date_type'] : 'register',

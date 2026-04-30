@@ -20,8 +20,9 @@
                 <label>業務人員</label>
                 <select name="sales_id" class="form-control">
                     <option value="">全部</option>
+                    <option value="__none__" <?= (isset($filters['sales_id']) && $filters['sales_id'] === '__none__') ? 'selected' : '' ?>>（無業務人員）</option>
                     <?php foreach ($salesUsers as $u): ?>
-                    <option value="<?= (int)$u['id'] ?>" <?= (!empty($filters['sales_id']) && (int)$filters['sales_id'] === (int)$u['id']) ? 'selected' : '' ?>><?= e($u['real_name']) ?></option>
+                    <option value="<?= (int)$u['id'] ?>" <?= (!empty($filters['sales_id']) && $filters['sales_id'] !== '__none__' && (int)$filters['sales_id'] === (int)$u['id']) ? 'selected' : '' ?>><?= e($u['real_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -29,8 +30,9 @@
                 <label>收款方式</label>
                 <select name="receipt_method" class="form-control">
                     <option value="">全部</option>
+                    <option value="__none__" <?= (isset($filters['receipt_method']) && $filters['receipt_method'] === '__none__') ? 'selected' : '' ?>>（無收款方式）</option>
                     <?php foreach (FinanceModel::paymentMethodOptions() as $val => $label): ?>
-                    <option value="<?= e($val) ?>" <?= (!empty($filters['receipt_method']) && $filters['receipt_method'] === $val) ? 'selected' : '' ?>><?= e($label) ?></option>
+                    <option value="<?= e($val) ?>" <?= (!empty($filters['receipt_method']) && $filters['receipt_method'] !== '__none__' && $filters['receipt_method'] === $val) ? 'selected' : '' ?>><?= e($label) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

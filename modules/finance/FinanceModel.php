@@ -529,12 +529,20 @@ class FinanceModel
             $params[] = $filters['status'];
         }
         if (!empty($filters['sales_id'])) {
-            $where .= ' AND r.sales_id = ?';
-            $params[] = (int)$filters['sales_id'];
+            if ($filters['sales_id'] === '__none__') {
+                $where .= ' AND (r.sales_id IS NULL OR r.sales_id = 0)';
+            } else {
+                $where .= ' AND r.sales_id = ?';
+                $params[] = (int)$filters['sales_id'];
+            }
         }
         if (!empty($filters['receipt_method'])) {
-            $where .= ' AND r.receipt_method = ?';
-            $params[] = $filters['receipt_method'];
+            if ($filters['receipt_method'] === '__none__') {
+                $where .= " AND (r.receipt_method IS NULL OR r.receipt_method = '')";
+            } else {
+                $where .= ' AND r.receipt_method = ?';
+                $params[] = $filters['receipt_method'];
+            }
         }
         if (!empty($filters['keyword'])) {
             $kwRaw = trim($filters['keyword']);
