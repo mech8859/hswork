@@ -113,7 +113,15 @@
                 <td><?= e(mb_substr($e2['description'], 0, 50)) ?><?= mb_strlen($e2['description']) > 50 ? '...' : '' ?></td>
                 <td style="text-align:right"><?= number_format($e2['total_debit']) ?></td>
                 <td style="text-align:right"><?= number_format($e2['total_credit']) ?></td>
-                <td><span style="<?= $statusClass ?>;font-weight:bold"><?= isset($statusOptions[$e2['status']]) ? e($statusOptions[$e2['status']]) : e($e2['status']) ?></span></td>
+                <td>
+                    <span style="<?= $statusClass ?>;font-weight:bold"><?= isset($statusOptions[$e2['status']]) ? e($statusOptions[$e2['status']]) : e($e2['status']) ?></span>
+                    <?php
+                    // 不平衡草稿警示徽章
+                    if ($e2['status'] === 'draft' && abs((float)$e2['total_debit'] - (float)$e2['total_credit']) > 0.01):
+                    ?>
+                    <span style="display:inline-block;background:#fff3e0;color:#e65100;font-size:.7rem;font-weight:600;padding:1px 6px;border-radius:8px;margin-left:4px" title="借貸差額 <?= number_format(abs((float)$e2['total_debit'] - (float)$e2['total_credit'])) ?>，過帳前需修正">⚠ 不平衡</span>
+                    <?php endif; ?>
+                </td>
                 <td><?= e($e2['created_by_name']) ?></td>
             </tr>
             <?php endforeach; ?>

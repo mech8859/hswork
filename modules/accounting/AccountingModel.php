@@ -479,7 +479,7 @@ class AccountingModel
 
     /**
      * Create journal entry with lines
-     * Validates debit = credit balance
+     * 草稿允許借貸不平衡（過帳時才強制平衡，由 postJournalEntry 把關）
      * @param array $data
      * @return int
      * @throws Exception
@@ -498,12 +498,8 @@ class AccountingModel
             $totalCredit += (float)$line['credit_amount'];
         }
 
-        // Balance check (allow small rounding difference)
-        if (abs($totalDebit - $totalCredit) > 0.01) {
-            throw new Exception('Debit and Credit totals must be equal. Debit: ' . number_format($totalDebit, 2) . ', Credit: ' . number_format($totalCredit, 2));
-        }
-
-        if ($totalDebit <= 0) {
+        // 草稿允許不平衡，但至少一邊要有金額
+        if ($totalDebit <= 0 && $totalCredit <= 0) {
             throw new Exception('Total amount must be greater than zero');
         }
 
@@ -631,8 +627,9 @@ class AccountingModel
             $totalCredit += (float)$line['credit_amount'];
         }
 
-        if (abs($totalDebit - $totalCredit) > 0.01) {
-            throw new Exception('Debit and Credit totals must be equal');
+        // 草稿允許不平衡（過帳時才檢查），但至少一邊要有金額
+        if ($totalDebit <= 0 && $totalCredit <= 0) {
+            throw new Exception('Total amount must be greater than zero');
         }
 
         $this->db->beginTransaction();
@@ -722,6 +719,22 @@ class AccountingModel
         if (!$entry) throw new Exception('Journal entry not found');
         if ($entry['status'] !== 'draft') throw new Exception('Only draft entries can be posted');
         if (empty($entry['lines'])) throw new Exception('Cannot post entry with no lines');
+
+        // 過帳前強制檢查借貸平衡（草稿可不平衡，過帳必須平衡）
+        $totalDebit = 0;
+        $totalCredit = 0;
+        foreach ($entry['lines'] as $line) {
+            $totalDebit  += (float)$line['debit_amount'];
+            $totalCredit += (float)$line['credit_amount'];
+        }
+        if (abs($totalDebit - $totalCredit) > 0.01) {
+            throw new Exception(
+                '借貸不平衡，無法過帳。借方 ' . number_format($totalDebit, 2) .
+                '，貸方 ' . number_format($totalCredit, 2) .
+                '，差額 ' . number_format(abs($totalDebit - $totalCredit), 2) .
+                '。請先回到編輯頁修正後再過帳。'
+            );
+        }
 
         $this->db->beginTransaction();
         try {

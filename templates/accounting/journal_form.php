@@ -1247,15 +1247,32 @@ function calcTotals() {
 
     var diff = Math.abs(totalD - totalC);
     var status = document.getElementById('balanceStatus');
-    if (diff === 0 && totalD > 0) {
+    var btn = document.getElementById('submitBtn');
+    if (diff < 0.01 && (totalD > 0 || totalC > 0)) {
+        // 借貸平衡
         status.innerHTML = '<span style="color:green">&#10003; 借貸平衡</span>';
-        document.getElementById('submitBtn').disabled = false;
+        btn.disabled = false;
+        btn.textContent = '儲存傳票';
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-primary');
+        btn.style.background = '';
     } else if (totalD === 0 && totalC === 0) {
+        // 全空，無法存
         status.innerHTML = '';
-        document.getElementById('submitBtn').disabled = true;
+        btn.disabled = true;
+        btn.textContent = '儲存傳票';
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-primary');
+        btn.style.background = '';
     } else {
-        status.innerHTML = '<span style="color:red">&#10007; 差額: ' + diff.toLocaleString() + '</span>';
-        document.getElementById('submitBtn').disabled = true;
+        // 借貸不平衡：允許存為草稿（過帳時會檢查）
+        status.innerHTML = '<span style="color:#e65100">&#9888; 借貸不平衡，差額 ' + diff.toLocaleString() + '（可存為草稿，過帳前需修正）</span>';
+        btn.disabled = false;
+        btn.textContent = '存為草稿（不平衡）';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-warning');
+        btn.style.background = '#f57c00';
+        btn.style.color = '#fff';
     }
 }
 
@@ -1391,21 +1408,28 @@ document.getElementById('journalForm').addEventListener('submit', function(ev) {
         }
     }
 
-    // Re-check balance
+    // 借貸平衡檢查：草稿允許不平衡（過帳時會擋）
     var totalD = 0, totalC = 0;
     var debits = document.querySelectorAll('.debit-input');
     var credits = document.querySelectorAll('.credit-input');
     for (var i = 0; i < debits.length; i++) totalD += _jfNum(debits[i]);
     for (var i = 0; i < credits.length; i++) totalC += _jfNum(credits[i]);
-    if (Math.abs(totalD - totalC) > 0.01) {
-        ev.preventDefault();
-        alert('借方合計與貸方合計不相等，請修正後再儲存');
-        return false;
-    }
-    if (totalD <= 0) {
+    var diff = Math.abs(totalD - totalC);
+    if (totalD <= 0 && totalC <= 0) {
         ev.preventDefault();
         alert('請至少輸入一筆金額');
         return false;
+    }
+    if (diff > 0.01) {
+        // 不平衡：跳 confirm，按確定才存為草稿
+        var msg = '借貸不平衡：\n  借方合計：' + totalD.toLocaleString() +
+                  '\n  貸方合計：' + totalC.toLocaleString() +
+                  '\n  差額：' + diff.toLocaleString() +
+                  '\n\n此傳票將以「不平衡草稿」存檔，過帳前須修正平衡。\n\n確定存為草稿？';
+        if (!confirm(msg)) {
+            ev.preventDefault();
+            return false;
+        }
     }
 
     // 驗證沖帳無餘額錯誤（標記 data-offset-error 的行不可儲存）

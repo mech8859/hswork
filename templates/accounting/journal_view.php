@@ -91,7 +91,12 @@ $statusColor = isset($statusColors[$entry['status']]) ? $statusColors[$entry['st
         </div>
         <div>
             <div style="font-size:0.85em;color:#666">狀態</div>
-            <div><span style="color:<?= $statusColor ?>;font-weight:bold;font-size:1.1em"><?= isset($statusOptions[$entry['status']]) ? e($statusOptions[$entry['status']]) : e($entry['status']) ?></span></div>
+            <div>
+                <span style="color:<?= $statusColor ?>;font-weight:bold;font-size:1.1em"><?= isset($statusOptions[$entry['status']]) ? e($statusOptions[$entry['status']]) : e($entry['status']) ?></span>
+                <?php if ($entry['status'] === 'draft' && abs((float)$entry['total_debit'] - (float)$entry['total_credit']) > 0.01): ?>
+                <span style="display:inline-block;background:#fff3e0;color:#e65100;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:8px;margin-left:6px" title="差額 <?= number_format(abs((float)$entry['total_debit'] - (float)$entry['total_credit'])) ?>">⚠ 不平衡</span>
+                <?php endif; ?>
+            </div>
         </div>
         <div>
             <div style="font-size:0.85em;color:#666">建立者</div>
@@ -217,10 +222,14 @@ $statusColor = isset($statusColors[$entry['status']]) ? $statusColors[$entry['st
 <?php if ($canManage): ?>
 <div class="card" style="padding:16px;display:flex;gap:8px;flex-wrap:wrap">
     <?php if ($entry['status'] === 'draft'): ?>
+    <?php $_unbalanced = abs((float)$entry['total_debit'] - (float)$entry['total_credit']) > 0.01; ?>
     <form method="post" action="/accounting.php?action=journal_post" onsubmit="return confirm('確定要過帳此傳票嗎？過帳後將無法編輯。')">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= $entry['id'] ?>">
-        <button type="submit" class="btn btn-primary">過帳</button>
+        <button type="submit" class="btn btn-primary" <?= $_unbalanced ? 'disabled title="借貸不平衡，請先到編輯頁修正後再過帳"' : '' ?>>過帳</button>
+        <?php if ($_unbalanced): ?>
+        <span style="color:#e65100;font-size:.85rem;margin-left:8px;align-self:center">⚠ 借貸不平衡，無法過帳，請先<a href="/accounting.php?action=journal_edit&id=<?= $entry['id'] ?>" style="color:#1565c0">編輯修正</a></span>
+        <?php endif; ?>
     </form>
     <form method="post" action="/accounting.php?action=journal_delete" onsubmit="return confirm('確定要刪除此傳票嗎？此操作無法復原。')">
         <?= csrf_field() ?>
