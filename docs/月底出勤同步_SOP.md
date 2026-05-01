@@ -257,7 +257,32 @@ V (全勤病假$): =ROUND(2000/30*U{r}, 0)
 
 ### 4-4. 請假扣款（AB 病假$、AD 事假$、AM 請假扣款）
 
-**資料來源**：規則檔類別 C + 系統 `leaves` 表（已核准）
+**資料來源**：規則檔類別 C + 系統 `leaves` 表（**狀態 = 已核准**）
+
+**請假類型對照**（leaves.leave_type → SOP 分類）：
+
+| 系統 leave_type | 對照 | 計入欄位 |
+|---|---|---|
+| `personal` | 事假 | AC（事假天）|
+| `sick` | 病假 | U（全勤病假天）+ AA（病假/生理假天）|
+| `menstrual` | 生理假 | AA（病假/生理假天）|
+| `annual` | 特休 | AE（特休天）|
+| `day_off` | 排休 | 不計入扣薪 |
+| **空白 (`""`)** | **預設為事假** | AC（事假天）|
+
+> **狀態過濾**：SQL 必須 `WHERE status = 'approved'`，已駁回 / 待核 / 取消 一律不算。
+>
+> **空白假別**：歷史資料中部分請假記錄 `leave_type` 欄為空字串（系統舊版未強制必填）。依會計政策，空白者**默認為事假**（避免少扣或漏算）。撈取後處理：
+
+```python
+if not leave_type:        # 空白
+    category = '事假'
+elif leave_type == 'personal':
+    category = '事假'
+elif leave_type == 'sick':
+    category = '病假'
+# ... etc
+```
 
 **計算公式**（規則檔 0501 版）：
 ```
