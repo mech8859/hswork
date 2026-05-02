@@ -1090,7 +1090,8 @@ class AccountingModel
                 $match = $this->_fuzzyMatchVoucher(
                     $r['transaction_date'], $amount,
                     array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
-                    '1113' // 銀行存款科目前綴
+                    '1113', // 銀行存款科目前綴
+                    2, 'bank'
                 );
             }
             $out[] = array(
@@ -1137,7 +1138,8 @@ class AccountingModel
                 $match = $this->_fuzzyMatchVoucher(
                     $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '11122' // 零用金科目前綴
+                    '11122', // 零用金科目前綴
+                    2, 'petty_cash'
                 );
             }
             $out[] = array(
@@ -1183,7 +1185,8 @@ class AccountingModel
                 $match = $this->_fuzzyMatchVoucher(
                     $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '11121' // 備用金科目前綴
+                    '11121', // 備用金科目前綴
+                    2, 'reserve_fund'
                 );
             }
             $out[] = array(
@@ -1228,7 +1231,8 @@ class AccountingModel
                 $match = $this->_fuzzyMatchVoucher(
                     $r['transaction_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '1111' // 現金科目前綴
+                    '1111', // 現金科目前綴
+                    2, 'cash_details'
                 );
             }
             $out[] = array(
@@ -1792,8 +1796,11 @@ class AccountingModel
      * 若都不中再 fallback 同日期+同金額（可能多筆，取最新）
      *
      * $dateTolerance: 日期容差天數（前後 ±N 天）。預設 2 天，銀行可設 0 嚴格比對。
+     * $currentModule: 當前呼叫端的 source 模組名（'bank'/'petty_cash'/'reserve_fund'/'cash_details'）。
+     *   排除規則僅排除「綁定到同模組其他 entry」的傳票；轉帳類傳票（例如綁到 reserve_fund 但
+     *   實際同筆對應到 cash_details）仍可被找到。
      */
-    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 2)
+    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 2, $currentModule = '')
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
         if (!$date) return $unmatched;
@@ -1806,8 +1813,14 @@ class AccountingModel
         }
 
         $matches = array();
-        // 排除已被其他來源精準綁定的傳票（避免一張傳票同時被多筆來源誤配）
-        $excludeBoundSql = " AND NOT (je.source_module IN ('bank','petty_cash','reserve_fund','cash_details') AND je.source_id IS NOT NULL AND je.source_id > 0)";
+        // 排除「綁定到同模組其他 entry」的傳票，避免同模組多筆共用同一張傳票
+        // 但允許跨模組對應（如轉帳：cash_details ↔ reserve_fund 同一張傳票兩邊都應顯示匹配）
+        if ($currentModule !== '' && in_array($currentModule, array('bank','petty_cash','reserve_fund','cash_details'), true)) {
+            $excludeBoundSql = " AND NOT (je.source_module = " . $this->db->quote($currentModule) . " AND je.source_id IS NOT NULL AND je.source_id > 0)";
+        } else {
+            // 未指定 currentModule：保留舊行為（排除任何已綁定來源的傳票）
+            $excludeBoundSql = " AND NOT (je.source_module IN ('bank','petty_cash','reserve_fund','cash_details') AND je.source_id IS NOT NULL AND je.source_id > 0)";
+        }
         // 日期條件：±N 天容差（N=0 即嚴格相等）；ORDER BY 同日優先
         $dateRangeSql = "je.voucher_date BETWEEN DATE_SUB(?, INTERVAL ? DAY) AND DATE_ADD(?, INTERVAL ? DAY)";
         $dateOrderBy = "ABS(DATEDIFF(je.voucher_date, ?)) ASC, je.id DESC";
