@@ -518,79 +518,80 @@ function validateInvoiceNumber(el) {
 })();
 
 // ============================================================
-// 全站 input[type=date] 自動跳段 + 年份限 4 位數
-// 規則：年 4 碼填滿 → 跳月；月 2 碼填滿 → 跳日；達上限後拒收多餘數字
+// 全站日期 input：轉成 type=text 並自動格式化 YYYY/MM/DD
+// 規則：使用者只能輸入數字，每滿 4/2/2 位數自動加 /，年份限 4 位
+// 表單送出時自動轉回 YYYY-MM-DD（後端維持 YYYY-MM-DD 格式）
 // ============================================================
 (function() {
-    function attachDateAutoAdvance(input) {
-        if (input.dataset.dateAutoAdvance) return;
-        input.dataset.dateAutoAdvance = '1';
-        // 限制年份 ≤ 9999（避免 5+ 位數）
-        if (!input.getAttribute('max')) input.setAttribute('max', '9999-12-31');
-        if (!input.getAttribute('min')) input.setAttribute('min', '1900-01-01');
+    function formatDigits(digits) {
+        digits = (digits || '').replace(/\D/g, '').slice(0, 8);
+        if (digits.length <= 4) return digits;
+        if (digits.length <= 6) return digits.slice(0, 4) + '/' + digits.slice(4);
+        return digits.slice(0, 4) + '/' + digits.slice(4, 6) + '/' + digits.slice(6);
+    }
+    function enhanceDateInput(input) {
+        if (input.dataset.dateEnhanced) return;
+        input.dataset.dateEnhanced = '1';
 
-        var typed = [0, 0, 0]; // 年 / 月 / 日 已輸入位數
-        var seg = 0;
-        function reset() { typed = [0, 0, 0]; seg = 0; }
-        function advanceSegment() {
-            try {
-                input.dispatchEvent(new KeyboardEvent('keydown', {
-                    key: '/', code: 'Slash', keyCode: 191, which: 191,
-                    bubbles: true, cancelable: true
-                }));
-            } catch (e) {}
-        }
+        // 把現有值（YYYY-MM-DD）轉成 YYYY/MM/DD 顯示
+        var orig = input.value || '';
+        var display = orig.replace(/-/g, '/');
 
-        input.addEventListener('focus', reset);
-        input.addEventListener('blur', reset);
-        input.addEventListener('mousedown', reset);
+        // 切到 text，保留 name/id/required/class 等屬性
+        input.type = 'text';
+        input.value = display;
+        input.setAttribute('maxlength', '10');
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('autocomplete', 'off');
+        if (!input.getAttribute('placeholder')) input.setAttribute('placeholder', 'YYYY/MM/DD');
+        if (!input.getAttribute('pattern')) input.setAttribute('pattern', '\\d{4}/\\d{1,2}/\\d{1,2}');
 
-        input.addEventListener('keydown', function(e) {
-            var k = e.key;
-            if (k === '/' || k === '-' || k === ' ') {
-                if (seg < 2) { typed[seg] = 0; seg++; }
-                return;
-            }
-            if (k === 'ArrowRight') { if (seg < 2) { seg++; typed[seg] = 0; } return; }
-            if (k === 'ArrowLeft')  { if (seg > 0) { seg--; typed[seg] = 0; } return; }
-            if (k === 'Tab' || k === 'Enter') { reset(); return; }
-            if (k === 'Backspace' || k === 'Delete') {
-                if (typed[seg] > 0) typed[seg]--;
-                return;
-            }
-            if (/^\d$/.test(k)) {
-                var max = (seg === 0) ? 4 : 2;
-                if (typed[seg] >= max) {
-                    // 達上限後阻止再輸入（年只允許 4 位）
-                    e.preventDefault();
-                    return;
-                }
-                typed[seg]++;
-                if (typed[seg] >= max && seg < 2) {
-                    setTimeout(function() {
-                        typed[seg] = 0;
-                        seg++;
-                        advanceSegment();
-                    }, 0);
-                }
+        // 即時格式化：移除非數字，加 /
+        input.addEventListener('input', function() {
+            var v = input.value;
+            input.value = formatDigits(v);
+        });
+        // 失焦時補 0：MM 個位數補 0；DD 個位數補 0
+        input.addEventListener('blur', function() {
+            var v = input.value;
+            var parts = v.split('/');
+            if (parts.length === 3) {
+                if (parts[1].length === 1) parts[1] = '0' + parts[1];
+                if (parts[2].length === 1) parts[2] = '0' + parts[2];
+                input.value = parts.join('/');
             }
         });
     }
+    function enhanceFormSubmit(form) {
+        if (form.dataset.dateEnhancedSubmit) return;
+        form.dataset.dateEnhancedSubmit = '1';
+        form.addEventListener('submit', function() {
+            form.querySelectorAll('input[data-date-enhanced]').forEach(function(inp) {
+                if (inp.value) {
+                    // 轉 YYYY/MM/DD → YYYY-MM-DD
+                    inp.value = inp.value.replace(/\//g, '-');
+                }
+            });
+        }, true);
+    }
     function scanAndAttach(root) {
-        (root || document).querySelectorAll('input[type="date"]').forEach(attachDateAutoAdvance);
+        (root || document).querySelectorAll('input[type="date"]').forEach(enhanceDateInput);
+        // 為包含日期 input 的 form 掛 submit handler
+        (root || document).querySelectorAll('form').forEach(function(f) {
+            if (f.querySelector('input[data-date-enhanced]')) enhanceFormSubmit(f);
+        });
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() { scanAndAttach(); });
     } else {
         scanAndAttach();
     }
-    // 動態加入的 date input 也套用
     if (window.MutationObserver) {
         var mo = new MutationObserver(function(muts) {
             muts.forEach(function(m) {
                 m.addedNodes.forEach(function(n) {
                     if (n.nodeType !== 1) return;
-                    if (n.matches && n.matches('input[type="date"]')) attachDateAutoAdvance(n);
+                    if (n.matches && n.matches('input[type="date"]')) enhanceDateInput(n);
                     if (n.querySelectorAll) scanAndAttach(n);
                 });
             });
