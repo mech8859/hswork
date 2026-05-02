@@ -1854,17 +1854,14 @@ class AccountingModel
             $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        // 金額對比（容許 1 元誤差）
+        // 金額對比（必須完全相同；容許 1 元誤差為四捨五入差）
+        // 政策：日期+金額兩者同時成立才算匹配，金額不符 = 不匹配（不再回傳 matched_amount_mismatch）
         foreach ($matches as $m) {
             if (abs((float)$m['total_debit'] - (float)$amount) <= 1) {
                 return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
             }
         }
-        // 有找到關鍵字但金額不符
-        if (!empty($matches)) {
-            $m = $matches[0];
-            return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
-        }
+        // 關鍵字命中但金額不符 → 不視為配對，往下嘗試 Pass 2/Pass 3
 
         // Pass 2：關鍵字搜不到 → fallback 同日期(±容差)+同金額（允許誤差 1 元），唯一匹配才回傳
         if ((float)$amount > 0) {
