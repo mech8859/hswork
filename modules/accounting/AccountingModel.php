@@ -1786,8 +1786,10 @@ class AccountingModel
      * 模糊匹配：日期+金額+關鍵字（單號/摘要）
      * 搜 journal_entries.description 或 journal_entry_lines.description 含關鍵字，
      * 若都不中再 fallback 同日期+同金額（可能多筆，取最新）
+     *
+     * $dateTolerance: 日期容差天數（前後 ±N 天）。預設 2 天，銀行可設 0 嚴格比對。
      */
-    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '')
+    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 2)
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
         if (!$date) return $unmatched;
@@ -1802,21 +1804,26 @@ class AccountingModel
         $matches = array();
         // 排除已被其他來源精準綁定的傳票（避免一張傳票同時被多筆來源誤配）
         $excludeBoundSql = " AND NOT (je.source_module IN ('bank','petty_cash','reserve_fund','cash_details') AND je.source_id IS NOT NULL AND je.source_id > 0)";
+        // 日期條件：±N 天容差（N=0 即嚴格相等）；ORDER BY 同日優先
+        $dateRangeSql = "je.voucher_date BETWEEN DATE_SUB(?, INTERVAL ? DAY) AND DATE_ADD(?, INTERVAL ? DAY)";
+        $dateOrderBy = "ABS(DATEDIFF(je.voucher_date, ?)) ASC, je.id DESC";
+
         // Pass 1：以關鍵字搜 description
         if (!empty($keys)) {
             $likes = array();
-            $params = array($date);
+            $params = array($date, (int)$dateTolerance, $date, (int)$dateTolerance);
             foreach ($keys as $k) {
                 $likes[] = "(je.description LIKE ? OR EXISTS(SELECT 1 FROM journal_entry_lines jl WHERE jl.journal_entry_id = je.id AND jl.description LIKE ?))";
                 $params[] = '%' . $k . '%';
                 $params[] = '%' . $k . '%';
             }
+            $params[] = $date; // for ORDER BY
             $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
                     FROM journal_entries je
-                    WHERE je.voucher_date = ? AND je.status != 'voided'
+                    WHERE {$dateRangeSql} AND je.status != 'voided'
                       {$excludeBoundSql}
                       AND (" . implode(' OR ', $likes) . ")
-                    ORDER BY je.id DESC LIMIT 10";
+                    ORDER BY {$dateOrderBy} LIMIT 10";
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
             $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1834,17 +1841,17 @@ class AccountingModel
             return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
         }
 
-        // Pass 2：關鍵字搜不到 → fallback 同日期+同金額（允許誤差 1 元），唯一匹配才回傳
+        // Pass 2：關鍵字搜不到 → fallback 同日期(±容差)+同金額（允許誤差 1 元），唯一匹配才回傳
         if ((float)$amount > 0) {
             $stmt = $this->db->prepare("
                 SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
                 FROM journal_entries je
-                WHERE je.voucher_date = ? AND je.status != 'voided'
+                WHERE {$dateRangeSql} AND je.status != 'voided'
                   {$excludeBoundSql}
                   AND ABS(je.total_debit - ?) <= 1
-                ORDER BY je.id DESC LIMIT 2
+                ORDER BY {$dateOrderBy} LIMIT 2
             ");
-            $stmt->execute(array($date, (float)$amount));
+            $stmt->execute(array($date, (int)$dateTolerance, $date, (int)$dateTolerance, (float)$amount, $date));
             $amtMatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
             // 唯一匹配 → fuzzy；多筆 → 不配（避免誤配）
             if (count($amtMatches) === 1) {
@@ -1852,7 +1859,7 @@ class AccountingModel
                 return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
             }
 
-            // Pass 3：合併匯款傳票 — 查同日有單行借/貸金額匹配的傳票（例如一張 JV 包含多筆廠商付款）
+            // Pass 3：合併匯款傳票 — 查同日(±容差)有單行借/貸金額匹配的傳票（例如一張 JV 包含多筆廠商付款）
             // 只查未綁定的 je；若有指定 accountPrefix，只限定該科目（例如銀行存款 1113*、零用金 11122*）
             $acctSql = '';
             $acctParams = array();
@@ -1865,13 +1872,13 @@ class AccountingModel
                 FROM journal_entries je
                 JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
                 JOIN chart_of_accounts coa ON jl.account_id = coa.id
-                WHERE je.voucher_date = ? AND je.status != 'voided'
+                WHERE {$dateRangeSql} AND je.status != 'voided'
                   {$excludeBoundSql}
                   AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)
                   {$acctSql}
-                ORDER BY je.id DESC LIMIT 3
+                ORDER BY {$dateOrderBy} LIMIT 3
             ");
-            $p2 = array_merge(array($date, (float)$amount, (float)$amount), $acctParams);
+            $p2 = array_merge(array($date, (int)$dateTolerance, $date, (int)$dateTolerance, (float)$amount, (float)$amount), $acctParams, array($date));
             $stmt2->execute($p2);
             $lineMatches = $stmt2->fetchAll(PDO::FETCH_ASSOC);
             if (count($lineMatches) === 1) {
