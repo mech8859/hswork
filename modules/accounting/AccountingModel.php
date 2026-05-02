@@ -1160,12 +1160,20 @@ class AccountingModel
                 );
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
-                $match = $this->_fuzzyMatchVoucher(
-                    $r['entry_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '11122', // 零用金科目前綴
-                    0, 'petty_cash'
-                );
+                // 先嘗試分錄行精準匹配（依 branch_id 對應的零用金科目）
+                $pcAcctId = $this->_getPettyCashAccountId($r['branch_id']);
+                $match = null;
+                if ($pcAcctId) {
+                    $match = $this->_findVoucherByLine($pcAcctId, $r['entry_date'], $amount, 'petty_cash');
+                }
+                if (!$match) {
+                    $match = $this->_fuzzyMatchVoucher(
+                        $r['entry_date'], $amount,
+                        array($r['entry_number'], $r['upload_number'], $r['description']),
+                        '11122', // 零用金科目前綴
+                        0, 'petty_cash'
+                    );
+                }
             }
             $out[] = array(
                 'source_id' => (int)$r['id'],
@@ -1207,12 +1215,20 @@ class AccountingModel
                 );
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
-                $match = $this->_fuzzyMatchVoucher(
-                    $r['entry_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '11121', // 備用金科目前綴
-                    0, 'reserve_fund'
-                );
+                // 先嘗試分錄行精準匹配（依 branch_id 對應的備用金科目）
+                $rfAcctId = $this->_getReserveFundAccountId($r['branch_id']);
+                $match = null;
+                if ($rfAcctId) {
+                    $match = $this->_findVoucherByLine($rfAcctId, $r['entry_date'], $amount, 'reserve_fund');
+                }
+                if (!$match) {
+                    $match = $this->_fuzzyMatchVoucher(
+                        $r['entry_date'], $amount,
+                        array($r['entry_number'], $r['upload_number'], $r['description']),
+                        '11121', // 備用金科目前綴
+                        0, 'reserve_fund'
+                    );
+                }
             }
             $out[] = array(
                 'source_id' => (int)$r['id'],
@@ -1253,12 +1269,16 @@ class AccountingModel
                 );
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
-                $match = $this->_fuzzyMatchVoucher(
-                    $r['transaction_date'], $amount,
-                    array($r['entry_number'], $r['upload_number'], $r['description']),
-                    '1111', // 現金科目前綴
-                    0, 'cash_details'
-                );
+                // 先嘗試分錄行精準匹配（現金科目 1111000）
+                $match = $this->_findVoucherByLine(self::$CASH_DETAILS_ACCOUNT_ID, $r['transaction_date'], $amount, 'cash_details');
+                if (!$match) {
+                    $match = $this->_fuzzyMatchVoucher(
+                        $r['transaction_date'], $amount,
+                        array($r['entry_number'], $r['upload_number'], $r['description']),
+                        '1111', // 現金科目前綴
+                        0, 'cash_details'
+                    );
+                }
             }
             $out[] = array(
                 'source_id' => (int)$r['id'],
@@ -1819,6 +1839,30 @@ class AccountingModel
         '政遠企業有限公司-中國信託'         => 24, // 1113301 銀行存款-政遠 中信-47353
     );
 
+    /**
+     * petty_cash branch_id → 會計科目 對應表
+     */
+    private static $PETTY_CASH_BRANCH_TO_ACCOUNT_ID = array(
+        1 => 8,   // 潭子分公司 → 1112201 零用金-潭子
+        2 => 9,   // 清水分公司 → 1112202 零用金-清水
+        3 => 10,  // 員林分公司 → 1112203 零用金-員林
+        4 => 15,  // 東區電子鎖 → 1112301 零用金-東區電子鎖
+        5 => 16,  // 清水電子鎖 → 1112302 零用金-清水電子鎖
+    );
+
+    /**
+     * reserve_fund branch_id → 會計科目 對應表
+     * 目前僅有「備用金-管理處」一個科目
+     */
+    private static $RESERVE_FUND_BRANCH_TO_ACCOUNT_ID = array(
+        21 => 6,  // 中區管理處 → 1112101 備用金-管理處
+    );
+
+    /**
+     * 現金 對應科目（所有 cash_details 共用 1111000 現金）
+     */
+    private static $CASH_DETAILS_ACCOUNT_ID = 2; // 1111000 現金
+
     private function _getBankAccountId($bankAccount)
     {
         if (!$bankAccount) return null;
@@ -1826,6 +1870,25 @@ class AccountingModel
         return isset(self::$BANK_ACCOUNT_TO_ACCOUNT_ID[$key])
             ? (int)self::$BANK_ACCOUNT_TO_ACCOUNT_ID[$key]
             : null;
+    }
+
+    private function _getPettyCashAccountId($branchId)
+    {
+        if (!$branchId) return null;
+        return isset(self::$PETTY_CASH_BRANCH_TO_ACCOUNT_ID[(int)$branchId])
+            ? (int)self::$PETTY_CASH_BRANCH_TO_ACCOUNT_ID[(int)$branchId]
+            : null;
+    }
+
+    private function _getReserveFundAccountId($branchId)
+    {
+        if (!$branchId) {
+            // 沒帶 branch_id 預設管理處
+            return 6;
+        }
+        return isset(self::$RESERVE_FUND_BRANCH_TO_ACCOUNT_ID[(int)$branchId])
+            ? (int)self::$RESERVE_FUND_BRANCH_TO_ACCOUNT_ID[(int)$branchId]
+            : 6; // fallback 管理處
     }
 
     /**
