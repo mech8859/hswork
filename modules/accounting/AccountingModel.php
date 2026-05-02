@@ -1095,11 +1095,11 @@ class AccountingModel
                 );
             } else {
                 $amount = max($debit, $credit);
+                // 銀行 debit (錢出) → 傳票貸方銀行存款；銀行 credit (錢入) → 傳票借方
+                $bankDirection = ($debit > 0) ? 'credit' : 'debit';
                 // 銀行帳戶 → 會計科目對應（用於分錄行精準匹配）
                 $bankAccountId = $this->_getBankAccountId($r['bank_account']);
                 if ($bankAccountId !== null) {
-                    // 銀行 debit (錢出) → 傳票貸方銀行存款；銀行 credit (錢入) → 傳票借方
-                    $bankDirection = ($debit > 0) ? 'credit' : 'debit';
                     $lineMatch = $this->_findVoucherByLine($bankAccountId, $r['transaction_date'], $amount, 'bank', $bankDirection);
                     if ($lineMatch) {
                         $match = $lineMatch;
@@ -1108,7 +1108,7 @@ class AccountingModel
                             $r['transaction_date'], $amount,
                             array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
                             '1113', // 銀行存款科目前綴
-                            0, 'bank'
+                            0, 'bank', $bankDirection
                         );
                     }
                 } else {
@@ -1116,7 +1116,7 @@ class AccountingModel
                         $r['transaction_date'], $amount,
                         array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
                         '1113', // 銀行存款科目前綴
-                        0, 'bank'
+                        0, 'bank', $bankDirection
                     );
                 }
             }
@@ -1161,12 +1161,12 @@ class AccountingModel
                 );
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+                // 收入 → 傳票借方零用金；支出 → 傳票貸方零用金
+                $pcDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
                 // 先嘗試分錄行精準匹配（依 branch_id 對應的零用金科目）
                 $pcAcctId = $this->_getPettyCashAccountId($r['branch_id']);
                 $match = null;
                 if ($pcAcctId) {
-                    // 收入 → 傳票借方零用金；支出 → 傳票貸方零用金
-                    $pcDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
                     $match = $this->_findVoucherByLine($pcAcctId, $r['entry_date'], $amount, 'petty_cash', $pcDirection);
                 }
                 if (!$match) {
@@ -1174,7 +1174,7 @@ class AccountingModel
                         $r['entry_date'], $amount,
                         array($r['entry_number'], $r['upload_number'], $r['description']),
                         '11122', // 零用金科目前綴
-                        0, 'petty_cash'
+                        0, 'petty_cash', $pcDirection
                     );
                 }
             }
@@ -1218,11 +1218,11 @@ class AccountingModel
                 );
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
+                $rfDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
                 // 先嘗試分錄行精準匹配（依 branch_id 對應的備用金科目）
                 $rfAcctId = $this->_getReserveFundAccountId($r['branch_id']);
                 $match = null;
                 if ($rfAcctId) {
-                    $rfDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
                     $match = $this->_findVoucherByLine($rfAcctId, $r['entry_date'], $amount, 'reserve_fund', $rfDirection);
                 }
                 if (!$match) {
@@ -1230,7 +1230,7 @@ class AccountingModel
                         $r['entry_date'], $amount,
                         array($r['entry_number'], $r['upload_number'], $r['description']),
                         '11121', // 備用金科目前綴
-                        0, 'reserve_fund'
+                        0, 'reserve_fund', $rfDirection
                     );
                 }
             }
@@ -1282,7 +1282,7 @@ class AccountingModel
                         $r['transaction_date'], $amount,
                         array($r['entry_number'], $r['upload_number'], $r['description']),
                         '1111', // 現金科目前綴
-                        0, 'cash_details'
+                        0, 'cash_details', $cdDirection
                     );
                 }
             }
@@ -1975,17 +1975,28 @@ class AccountingModel
      * $currentModule: 當前呼叫端的 source 模組名（'bank'/'petty_cash'/'reserve_fund'/'cash_details'）。
      *   排除規則僅排除「綁定到同模組其他 entry」的傳票；轉帳類傳票（例如綁到 reserve_fund 但
      *   實際同筆對應到 cash_details）仍可被找到。
+     * $direction: 方向過濾（'debit'=借方、'credit'=貸方、''=不限）。當 accountPrefix 有值時，
+     *   會強制要求 JV 必須含「accountPrefix 科目 + 對應方向 + 金額」的分錄行才視為匹配。
+     *   現金/銀行/零用金/備用金 的收入 → 'debit'（借），支出 → 'credit'（貸）。
      */
-    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 0, $currentModule = '')
+    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 0, $currentModule = '', $direction = '')
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
         if (!$date) return $unmatched;
 
+        // 純銀行/金流通用詞（無交易識別意義）— 用作 keyword 會誤配到 JV 摘要含這些字的紀錄
+        static $STOPWORDS = array(
+            '匯款', '轉帳', '轉入', '轉出', '存入', '提領', '入帳', '入金',
+            'CD轉入', '網銀轉帳', 'ATM轉帳', '跨行匯款', '同行匯款',
+            '現金', '收入', '支出',
+        );
         // 過濾太短/太通用的關鍵字（避免誤配）
         $keys = array();
         foreach ($keywords as $k) {
             $k = trim((string)$k);
-            if ($k !== '' && mb_strlen($k) >= 2) $keys[] = $k;
+            if ($k === '' || mb_strlen($k) < 2) continue;
+            if (in_array($k, $STOPWORDS, true)) continue;
+            $keys[] = $k;
         }
 
         $matches = array();
@@ -2001,7 +2012,40 @@ class AccountingModel
         $dateRangeSql = "je.voucher_date BETWEEN DATE_SUB(?, INTERVAL ? DAY) AND DATE_ADD(?, INTERVAL ? DAY)";
         $dateOrderBy = "ABS(DATEDIFF(je.voucher_date, ?)) ASC, je.id DESC";
 
+        // 「JV 必須含對應科目（不檢金額/方向）」過濾片段 — 用於 Pass 1 候選列表 + matched_amount_mismatch 判定
+        $acctOnlySql = '';
+        $acctOnlyParams = array();
+        if ($accountPrefix !== '') {
+            $acctOnlySql = " AND EXISTS (SELECT 1 FROM journal_entry_lines jl_a
+                JOIN chart_of_accounts coa_a ON jl_a.account_id = coa_a.id
+                WHERE jl_a.journal_entry_id = je.id AND coa_a.account_code LIKE ?)";
+            $acctOnlyParams[] = $accountPrefix . '%';
+        }
+
+        // 「JV 必須含對應科目+方向+金額」嚴格過濾片段 — 用於 Pass 2 升級為 matched_fuzzy
+        $acctStrictSql = '';
+        $acctStrictParams = array();
+        if ($accountPrefix !== '') {
+            $acctStrictSql = " AND EXISTS (SELECT 1 FROM journal_entry_lines jl_s
+                JOIN chart_of_accounts coa_s ON jl_s.account_id = coa_s.id
+                WHERE jl_s.journal_entry_id = je.id AND coa_s.account_code LIKE ?";
+            $acctStrictParams[] = $accountPrefix . '%';
+            if ($direction === 'debit') {
+                $acctStrictSql .= " AND ABS(jl_s.debit_amount - ?) <= 1 AND jl_s.debit_amount > 0";
+                $acctStrictParams[] = (float)$amount;
+            } elseif ($direction === 'credit') {
+                $acctStrictSql .= " AND ABS(jl_s.credit_amount - ?) <= 1 AND jl_s.credit_amount > 0";
+                $acctStrictParams[] = (float)$amount;
+            } else {
+                $acctStrictSql .= " AND (ABS(jl_s.debit_amount - ?) <= 1 OR ABS(jl_s.credit_amount - ?) <= 1)";
+                $acctStrictParams[] = (float)$amount;
+                $acctStrictParams[] = (float)$amount;
+            }
+            $acctStrictSql .= ")";
+        }
+
         // Pass 1：以關鍵字搜 description（只當作「摘要可對應」依據；金額仍須相同才算匹配）
+        // 加上 acctOnlySql：JV 必須含對應科目，避免關鍵字偶然命中無關傳票
         if (!empty($keys)) {
             $likes = array();
             $params = array($date, (int)$dateTolerance, $date, (int)$dateTolerance);
@@ -2010,12 +2054,14 @@ class AccountingModel
                 $params[] = '%' . $k . '%';
                 $params[] = '%' . $k . '%';
             }
+            $params = array_merge($params, $acctOnlyParams);
             $params[] = $date; // for ORDER BY
             $sql = "SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
                     FROM journal_entries je
                     WHERE {$dateRangeSql} AND je.status != 'voided'
                       {$excludeBoundSql}
                       AND (" . implode(' OR ', $likes) . ")
+                      {$acctOnlySql}
                     ORDER BY {$dateOrderBy} LIMIT 10";
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
@@ -2023,11 +2069,34 @@ class AccountingModel
         }
 
         // 政策：日期+金額為必要條件；摘要可對應 = 升級為 matched_precise
-        // 金額對比（容許 1 元誤差為四捨五入差）
+        // 改用：科目+方向+金額嚴格匹配（不再只比對 total_debit，避免多行傳票誤判）
         foreach ($matches as $m) {
-            if (abs((float)$m['total_debit'] - (float)$amount) <= 1) {
-                // 日期+金額+摘要 全符 → 精準匹配
-                return array('status'=>'matched_precise', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+            if ($accountPrefix !== '') {
+                $checkSql = "SELECT 1 FROM journal_entry_lines jl
+                             JOIN chart_of_accounts coa ON jl.account_id = coa.id
+                             WHERE jl.journal_entry_id = ? AND coa.account_code LIKE ?";
+                $checkParams = array((int)$m['id'], $accountPrefix . '%');
+                if ($direction === 'debit') {
+                    $checkSql .= " AND ABS(jl.debit_amount - ?) <= 1 AND jl.debit_amount > 0";
+                    $checkParams[] = (float)$amount;
+                } elseif ($direction === 'credit') {
+                    $checkSql .= " AND ABS(jl.credit_amount - ?) <= 1 AND jl.credit_amount > 0";
+                    $checkParams[] = (float)$amount;
+                } else {
+                    $checkSql .= " AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)";
+                    $checkParams[] = (float)$amount;
+                    $checkParams[] = (float)$amount;
+                }
+                $st = $this->db->prepare($checkSql . " LIMIT 1");
+                $st->execute($checkParams);
+                if ($st->fetchColumn()) {
+                    return array('status'=>'matched_precise', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$amount);
+                }
+            } else {
+                // 沒指定 accountPrefix：保留舊的 total_debit 比對
+                if (abs((float)$m['total_debit'] - (float)$amount) <= 1) {
+                    return array('status'=>'matched_precise', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+                }
             }
         }
         // 找到日期+摘要關鍵字命中的傳票，但金額對不上 → 'matched_amount_mismatch' (待人工修改)
@@ -2037,7 +2106,7 @@ class AccountingModel
             return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
         }
 
-        // Pass 2：關鍵字搜不到 → fallback 同日期(±容差)+同金額（允許誤差 1 元），唯一匹配才回傳
+        // Pass 2：關鍵字搜不到 → fallback 同日期(±容差)+同金額；強制 JV 含對應科目+方向（解決誤配）
         if ((float)$amount > 0) {
             $stmt = $this->db->prepare("
                 SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit
@@ -2045,9 +2114,15 @@ class AccountingModel
                 WHERE {$dateRangeSql} AND je.status != 'voided'
                   {$excludeBoundSql}
                   AND ABS(je.total_debit - ?) <= 1
+                  {$acctStrictSql}
                 ORDER BY {$dateOrderBy} LIMIT 2
             ");
-            $stmt->execute(array($date, (int)$dateTolerance, $date, (int)$dateTolerance, (float)$amount, $date));
+            $params = array_merge(
+                array($date, (int)$dateTolerance, $date, (int)$dateTolerance, (float)$amount),
+                $acctStrictParams,
+                array($date)
+            );
+            $stmt->execute($params);
             $amtMatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
             // 唯一匹配 → fuzzy；多筆 → 不配（避免誤配）
             if (count($amtMatches) === 1) {
@@ -2055,8 +2130,18 @@ class AccountingModel
                 return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
             }
 
-            // Pass 3：合併匯款傳票 — 查同日(±容差)有單行借/貸金額匹配的傳票（例如一張 JV 包含多筆廠商付款）
-            // 只查未綁定的 je；若有指定 accountPrefix，只限定該科目（例如銀行存款 1113*、零用金 11122*）
+            // Pass 3：合併匯款傳票 — 查同日(±容差)有單行借/貸金額匹配的傳票
+            // 加上 direction 過濾：收入 → 只比借方、支出 → 只比貸方
+            if ($direction === 'debit') {
+                $lineAmtCond = "ABS(jl.debit_amount - ?) <= 1 AND jl.debit_amount > 0";
+                $lineAmtParams = array((float)$amount);
+            } elseif ($direction === 'credit') {
+                $lineAmtCond = "ABS(jl.credit_amount - ?) <= 1 AND jl.credit_amount > 0";
+                $lineAmtParams = array((float)$amount);
+            } else {
+                $lineAmtCond = "(ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)";
+                $lineAmtParams = array((float)$amount, (float)$amount);
+            }
             $acctSql = '';
             $acctParams = array();
             if ($accountPrefix !== '') {
@@ -2070,11 +2155,16 @@ class AccountingModel
                 JOIN chart_of_accounts coa ON jl.account_id = coa.id
                 WHERE {$dateRangeSql} AND je.status != 'voided'
                   {$excludeBoundSql}
-                  AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)
+                  AND {$lineAmtCond}
                   {$acctSql}
                 ORDER BY {$dateOrderBy} LIMIT 3
             ");
-            $p2 = array_merge(array($date, (int)$dateTolerance, $date, (int)$dateTolerance, (float)$amount, (float)$amount), $acctParams, array($date));
+            $p2 = array_merge(
+                array($date, (int)$dateTolerance, $date, (int)$dateTolerance),
+                $lineAmtParams,
+                $acctParams,
+                array($date)
+            );
             $stmt2->execute($p2);
             $lineMatches = $stmt2->fetchAll(PDO::FETCH_ASSOC);
             if (count($lineMatches) === 1) {
