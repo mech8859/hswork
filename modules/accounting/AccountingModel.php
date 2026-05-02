@@ -1833,7 +1833,7 @@ class AccountingModel
         $dateRangeSql = "je.voucher_date BETWEEN DATE_SUB(?, INTERVAL ? DAY) AND DATE_ADD(?, INTERVAL ? DAY)";
         $dateOrderBy = "ABS(DATEDIFF(je.voucher_date, ?)) ASC, je.id DESC";
 
-        // Pass 1：以關鍵字搜 description
+        // Pass 1：以關鍵字搜 description（只當作「摘要可對應」依據；金額仍須相同才算匹配）
         if (!empty($keys)) {
             $likes = array();
             $params = array($date, (int)$dateTolerance, $date, (int)$dateTolerance);
@@ -1854,14 +1854,16 @@ class AccountingModel
             $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
+        // 政策：日期+金額為必要條件；摘要可對應 = 升級為 matched_precise
         // 金額對比（容許 1 元誤差為四捨五入差）
         foreach ($matches as $m) {
             if (abs((float)$m['total_debit'] - (float)$amount) <= 1) {
-                return array('status'=>'matched_fuzzy', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
+                // 日期+金額+摘要 全符 → 精準匹配
+                return array('status'=>'matched_precise', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
             }
         }
-        // 找到日期+關鍵字命中的傳票但金額對不上 → 'matched_amount_mismatch' (待人工修改)
-        // 此狀態下 顯示對應傳票編號 + 金額，UI 標示「金額不符」，user 需手動修正金額或重綁
+        // 找到日期+摘要關鍵字命中的傳票，但金額對不上 → 'matched_amount_mismatch' (待人工修改)
+        // 此狀態下顯示對應傳票編號+金額，UI 標示「金額不符」，user 需手動修正金額或重綁
         if (!empty($matches)) {
             $m = $matches[0];
             return array('status'=>'matched_amount_mismatch', 'voucher_id'=>(int)$m['id'], 'voucher_number'=>$m['voucher_number'], 'voucher_amount'=>(float)$m['total_debit']);
