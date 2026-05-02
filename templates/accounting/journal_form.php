@@ -12,6 +12,7 @@ $isCopy = isset($prefillEntry) && !$entry;
 .debit-input, .credit-input { -moz-appearance: textfield; appearance: textfield; }
 </style>
 <form method="post" id="journalForm" enctype="multipart/form-data" action="/accounting.php?action=<?= $entry ? 'journal_edit&id=' . $entry['id'] : 'journal_create' ?>"
+      onsubmit="return validateOffsetLines(this)">
     <?= csrf_field() ?>
     <?php $_returnTo = isset($_GET['return_to']) ? $_GET['return_to'] : ''; ?>
     <?php if ($_returnTo): ?><input type="hidden" name="return_to" value="<?= e($_returnTo) ?>"><?php endif; ?>
@@ -1332,13 +1333,46 @@ function renumberLines() {
 
 // Initialize with existing lines or empty rows
 <?php if ($src && !empty($src['lines'])): ?>
-<?php foreach ($src['lines'] as $line): ?>
+<?php foreach ($src['lines'] as $line):
+    if ($isCopy) {
+        // 複製模式：清空沖帳關聯（offset_ledger_id 是另一傳票的關聯，不可帶過來）
+        // 強制 user 重新選擇要沖的立帳單；offset_flag 仍保留以提示是立沖科目
+        $line['offset_amount'] = 0;
+        $line['offset_ledger_id'] = null;
+        // 沖帳旗標也清為 0，讓系統依借貸方向重新計算
+        if (isset($line['offset_flag']) && (int)$line['offset_flag'] === 2) {
+            $line['offset_flag'] = 0;
+        }
+    }
+?>
 addLine(<?= json_encode($line, JSON_UNESCAPED_UNICODE) ?>);
 <?php endforeach; ?>
 <?php else: ?>
 addLine();
 addLine();
 <?php endif; ?>
+
+// 表單送出前驗證：所有 offset_flag=2 (沖帳) 的行必須有 offset_ledger_id
+function validateOffsetLines(form) {
+    var rows = document.querySelectorAll('#linesBody tr');
+    for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var flagSel = tr.querySelector('.offset-flag-sel');
+        if (!flagSel || flagSel.value !== '2') continue;
+        var ledgerInp = tr.querySelector('input[name*="[offset_ledger_id]"]');
+        if (!ledgerInp || !ledgerInp.value) {
+            // 找到 idx
+            var amtInp = tr.querySelector('.offset-amt-input');
+            var idxMatch = amtInp ? amtInp.id.match(/_(\d+)$/) : null;
+            var idx = idxMatch ? idxMatch[1] : '?';
+            alert('第 ' + (i + 1) + ' 行（立沖科目「沖帳」）尚未選擇要沖的立帳單。\n請點擊該行的「立沖」下拉，重新選擇沖帳並挑選立帳單。');
+            // focus 到該行的立沖下拉
+            if (flagSel) flagSel.focus();
+            return false;
+        }
+    }
+    return true;
+}
 
 // nothing here
 
