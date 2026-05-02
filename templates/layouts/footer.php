@@ -518,85 +518,23 @@ function validateInvoiceNumber(el) {
 })();
 
 // ============================================================
-// 全站日期 input：轉成 type=text 並自動格式化 YYYY/MM/DD
-// 規則：使用者只能輸入數字，每滿 4/2/2 位數自動加 /，年份限 4 位
-// 表單送出時自動轉回 YYYY-MM-DD（後端維持 YYYY-MM-DD 格式）
+// 全站 input[type=date]：僅設 max=9999-12-31 限制年份
+// 不做其他干涉，跳段交由瀏覽器原生
 // ============================================================
 (function() {
-    function formatDigits(digits) {
-        digits = (digits || '').replace(/\D/g, '').slice(0, 8);
-        if (digits.length <= 4) return digits;
-        if (digits.length <= 6) return digits.slice(0, 4) + '/' + digits.slice(4);
-        return digits.slice(0, 4) + '/' + digits.slice(4, 6) + '/' + digits.slice(6);
-    }
-    function enhanceDateInput(input) {
-        if (input.dataset.dateEnhanced) return;
-        input.dataset.dateEnhanced = '1';
-
-        // 把現有值（YYYY-MM-DD）轉成 YYYY/MM/DD 顯示
-        var orig = input.value || '';
-        var display = orig.replace(/-/g, '/');
-
-        // 切到 text，保留 name/id/required/class 等屬性
-        input.type = 'text';
-        input.value = display;
-        input.setAttribute('maxlength', '10');
-        input.setAttribute('inputmode', 'numeric');
-        input.setAttribute('autocomplete', 'off');
-        if (!input.getAttribute('placeholder')) input.setAttribute('placeholder', 'YYYY/MM/DD');
-        if (!input.getAttribute('pattern')) input.setAttribute('pattern', '\\d{4}/\\d{1,2}/\\d{1,2}');
-
-        // 即時格式化：移除非數字，加 /
-        input.addEventListener('input', function() {
-            var v = input.value;
-            input.value = formatDigits(v);
-        });
-        // 失焦時補 0：MM 個位數補 0；DD 個位數補 0
-        input.addEventListener('blur', function() {
-            var v = input.value;
-            var parts = v.split('/');
-            if (parts.length === 3) {
-                if (parts[1].length === 1) parts[1] = '0' + parts[1];
-                if (parts[2].length === 1) parts[2] = '0' + parts[2];
-                input.value = parts.join('/');
-            }
-        });
-    }
-    function enhanceFormSubmit(form) {
-        if (form.dataset.dateEnhancedSubmit) return;
-        form.dataset.dateEnhancedSubmit = '1';
-        form.addEventListener('submit', function() {
-            form.querySelectorAll('input[data-date-enhanced]').forEach(function(inp) {
-                if (inp.value) {
-                    // 轉 YYYY/MM/DD → YYYY-MM-DD
-                    inp.value = inp.value.replace(/\//g, '-');
-                }
-            });
-        }, true);
+    function attachDateLimit(input) {
+        if (input.dataset.dateLimit) return;
+        input.dataset.dateLimit = '1';
+        if (!input.getAttribute('max')) input.setAttribute('max', '9999-12-31');
+        if (!input.getAttribute('min')) input.setAttribute('min', '1900-01-01');
     }
     function scanAndAttach(root) {
-        (root || document).querySelectorAll('input[type="date"]').forEach(enhanceDateInput);
-        // 為包含日期 input 的 form 掛 submit handler
-        (root || document).querySelectorAll('form').forEach(function(f) {
-            if (f.querySelector('input[data-date-enhanced]')) enhanceFormSubmit(f);
-        });
+        (root || document).querySelectorAll('input[type="date"]').forEach(attachDateLimit);
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() { scanAndAttach(); });
     } else {
         scanAndAttach();
-    }
-    if (window.MutationObserver) {
-        var mo = new MutationObserver(function(muts) {
-            muts.forEach(function(m) {
-                m.addedNodes.forEach(function(n) {
-                    if (n.nodeType !== 1) return;
-                    if (n.matches && n.matches('input[type="date"]')) enhanceDateInput(n);
-                    if (n.querySelectorAll) scanAndAttach(n);
-                });
-            });
-        });
-        if (document.body) mo.observe(document.body, {childList: true, subtree: true});
     }
 })();
 
