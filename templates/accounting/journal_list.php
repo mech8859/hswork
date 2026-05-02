@@ -51,6 +51,12 @@
             <option value="<?= (int)$acct['id'] ?>" <?= (string)($filters['account_id'] ?? '') === (string)$acct['id'] ? 'selected' : '' ?>><?= e($acct['code']) ?> <?= e($acct['name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <select name="cost_center_id" class="form-control" style="width:160px" title="依部門中心搜尋">
+            <option value="">全部部門中心</option>
+            <?php foreach (($costCenters ?? []) as $cc): ?>
+            <option value="<?= (int)$cc['id'] ?>" <?= (string)($filters['cost_center_id'] ?? '') === (string)$cc['id'] ? 'selected' : '' ?>><?= e($cc['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
         <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:140px">
         <span>~</span>
         <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:140px">

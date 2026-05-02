@@ -377,6 +377,14 @@ class AccountingModel
             )';
             $params[] = (int)$filters['account_id'];
         }
+        if (!empty($filters['cost_center_id'])) {
+            // 有任一分錄行屬於該部門中心
+            $where .= ' AND EXISTS(
+                SELECT 1 FROM journal_entry_lines jl
+                WHERE jl.journal_entry_id = je.id AND jl.cost_center_id = ?
+            )';
+            $params[] = (int)$filters['cost_center_id'];
+        }
         return array($where, $params);
     }
 

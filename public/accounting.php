@@ -254,15 +254,16 @@ switch ($action) {
 
     case 'journals':
         $filters = array(
-            'status'       => isset($_GET['status']) ? $_GET['status'] : '',
-            'voucher_type' => isset($_GET['voucher_type']) ? $_GET['voucher_type'] : '',
-            'date_from'    => isset($_GET['date_from']) ? $_GET['date_from'] : '',
-            'date_to'      => isset($_GET['date_to']) ? $_GET['date_to'] : '',
-            'keyword'      => isset($_GET['keyword']) ? $_GET['keyword'] : '',
-            'created_by'   => isset($_GET['created_by']) ? $_GET['created_by'] : '',
-            'amount'       => isset($_GET['amount']) ? $_GET['amount'] : '',
-            'account_id'   => isset($_GET['account_id']) ? $_GET['account_id'] : '',
-            'sort'         => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
+            'status'        => isset($_GET['status']) ? $_GET['status'] : '',
+            'voucher_type'  => isset($_GET['voucher_type']) ? $_GET['voucher_type'] : '',
+            'date_from'     => isset($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'       => isset($_GET['date_to']) ? $_GET['date_to'] : '',
+            'keyword'       => isset($_GET['keyword']) ? $_GET['keyword'] : '',
+            'created_by'    => isset($_GET['created_by']) ? $_GET['created_by'] : '',
+            'amount'        => isset($_GET['amount']) ? $_GET['amount'] : '',
+            'account_id'    => isset($_GET['account_id']) ? $_GET['account_id'] : '',
+            'cost_center_id'=> isset($_GET['cost_center_id']) ? $_GET['cost_center_id'] : '',
+            'sort'          => (isset($_GET['sort']) && $_GET['sort'] === 'asc') ? 'asc' : 'desc',
         );
         $perPage = 100;
         $page = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
@@ -276,6 +277,7 @@ switch ($action) {
         $statusOptions = AccountingModel::statusOptions();
         $creators = $model->getJournalCreators();
         $accounts = $model->getAccountsFlat(false);
+        $costCenters = $model->getCostCenters();
 
         $pageTitle = '傳票管理';
         $currentPage = 'accounting';
