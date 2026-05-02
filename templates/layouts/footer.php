@@ -516,6 +516,124 @@ function validateInvoiceNumber(el) {
         }
     }, {passive:true});
 })();
+
+// ============================================================
+// 全站 input[type=date] 自動跳段 + 年份限 4 位數
+// 規則：年 4 碼填滿 → 跳月；月 2 碼填滿 → 跳日；達上限後拒收多餘數字
+// ============================================================
+(function() {
+    function attachDateAutoAdvance(input) {
+        if (input.dataset.dateAutoAdvance) return;
+        input.dataset.dateAutoAdvance = '1';
+        // 限制年份 ≤ 9999（避免 5+ 位數）
+        if (!input.getAttribute('max')) input.setAttribute('max', '9999-12-31');
+        if (!input.getAttribute('min')) input.setAttribute('min', '1900-01-01');
+
+        var typed = [0, 0, 0]; // 年 / 月 / 日 已輸入位數
+        var seg = 0;
+        function reset() { typed = [0, 0, 0]; seg = 0; }
+        function advanceSegment() {
+            try {
+                input.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: '/', code: 'Slash', keyCode: 191, which: 191,
+                    bubbles: true, cancelable: true
+                }));
+            } catch (e) {}
+        }
+
+        input.addEventListener('focus', reset);
+        input.addEventListener('blur', reset);
+        input.addEventListener('mousedown', reset);
+
+        input.addEventListener('keydown', function(e) {
+            var k = e.key;
+            if (k === '/' || k === '-' || k === ' ') {
+                if (seg < 2) { typed[seg] = 0; seg++; }
+                return;
+            }
+            if (k === 'ArrowRight') { if (seg < 2) { seg++; typed[seg] = 0; } return; }
+            if (k === 'ArrowLeft')  { if (seg > 0) { seg--; typed[seg] = 0; } return; }
+            if (k === 'Tab' || k === 'Enter') { reset(); return; }
+            if (k === 'Backspace' || k === 'Delete') {
+                if (typed[seg] > 0) typed[seg]--;
+                return;
+            }
+            if (/^\d$/.test(k)) {
+                var max = (seg === 0) ? 4 : 2;
+                if (typed[seg] >= max) {
+                    // 達上限後阻止再輸入（年只允許 4 位）
+                    e.preventDefault();
+                    return;
+                }
+                typed[seg]++;
+                if (typed[seg] >= max && seg < 2) {
+                    setTimeout(function() {
+                        typed[seg] = 0;
+                        seg++;
+                        advanceSegment();
+                    }, 0);
+                }
+            }
+        });
+    }
+    function scanAndAttach(root) {
+        (root || document).querySelectorAll('input[type="date"]').forEach(attachDateAutoAdvance);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { scanAndAttach(); });
+    } else {
+        scanAndAttach();
+    }
+    // 動態加入的 date input 也套用
+    if (window.MutationObserver) {
+        var mo = new MutationObserver(function(muts) {
+            muts.forEach(function(m) {
+                m.addedNodes.forEach(function(n) {
+                    if (n.nodeType !== 1) return;
+                    if (n.matches && n.matches('input[type="date"]')) attachDateAutoAdvance(n);
+                    if (n.querySelectorAll) scanAndAttach(n);
+                });
+            });
+        });
+        if (document.body) mo.observe(document.body, {childList: true, subtree: true});
+    }
+})();
+
+// ============================================================
+// 新增/編輯傳票 form：按 Enter 跳下一個輸入欄（不送出）
+// ============================================================
+(function() {
+    function isJournalForm(form) {
+        if (!form) return false;
+        var inp = form.querySelector('#fldVoucherDate, #fldVoucherNumber');
+        return !!inp;
+    }
+    function getFocusable(form) {
+        return Array.prototype.slice.call(form.querySelectorAll(
+            'input:not([type=hidden]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+        )).filter(function(el) { return el.offsetParent !== null; });
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+        var t = e.target;
+        if (!t || !t.tagName) return;
+        if (t.tagName === 'TEXTAREA') return;
+        if (t.type === 'submit' || t.type === 'button') return;
+        var form = t.closest && t.closest('form');
+        if (!isJournalForm(form)) return;
+        e.preventDefault();
+        var arr = getFocusable(form);
+        var idx = arr.indexOf(t);
+        if (idx < 0) return;
+        for (var i = idx + 1; i < arr.length; i++) {
+            if (arr[i].type !== 'submit' && arr[i].type !== 'button') {
+                arr[i].focus();
+                if (arr[i].select) try { arr[i].select(); } catch (e2) {}
+                break;
+            }
+        }
+    });
+})();
 </script>
 </body>
 </html>

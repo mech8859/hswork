@@ -1099,7 +1099,7 @@ class AccountingModel
                     $r['transaction_date'], $amount,
                     array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
                     '1113', // 銀行存款科目前綴
-                    2, 'bank'
+                    0, 'bank'
                 );
             }
             $out[] = array(
@@ -1147,7 +1147,7 @@ class AccountingModel
                     $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
                     '11122', // 零用金科目前綴
-                    2, 'petty_cash'
+                    0, 'petty_cash'
                 );
             }
             $out[] = array(
@@ -1194,7 +1194,7 @@ class AccountingModel
                     $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
                     '11121', // 備用金科目前綴
-                    2, 'reserve_fund'
+                    0, 'reserve_fund'
                 );
             }
             $out[] = array(
@@ -1240,7 +1240,7 @@ class AccountingModel
                     $r['transaction_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
                     '1111', // 現金科目前綴
-                    2, 'cash_details'
+                    0, 'cash_details'
                 );
             }
             $out[] = array(
@@ -1803,12 +1803,12 @@ class AccountingModel
      * 搜 journal_entries.description 或 journal_entry_lines.description 含關鍵字，
      * 若都不中再 fallback 同日期+同金額（可能多筆，取最新）
      *
-     * $dateTolerance: 日期容差天數（前後 ±N 天）。預設 2 天，銀行可設 0 嚴格比對。
+     * $dateTolerance: 日期容差天數（前後 ±N 天）。預設 0：日期必須完全相同（會計政策要求）。
      * $currentModule: 當前呼叫端的 source 模組名（'bank'/'petty_cash'/'reserve_fund'/'cash_details'）。
      *   排除規則僅排除「綁定到同模組其他 entry」的傳票；轉帳類傳票（例如綁到 reserve_fund 但
      *   實際同筆對應到 cash_details）仍可被找到。
      */
-    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 2, $currentModule = '')
+    private function _fuzzyMatchVoucher($date, $amount, $keywords, $accountPrefix = '', $dateTolerance = 0, $currentModule = '')
     {
         $unmatched = array('status'=>'unmatched', 'voucher_id'=>null, 'voucher_number'=>null, 'voucher_amount'=>null);
         if (!$date) return $unmatched;
