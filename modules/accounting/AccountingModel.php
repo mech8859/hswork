@@ -1098,8 +1098,9 @@ class AccountingModel
                 // 銀行帳戶 → 會計科目對應（用於分錄行精準匹配）
                 $bankAccountId = $this->_getBankAccountId($r['bank_account']);
                 if ($bankAccountId !== null) {
-                    // 嘗試找同日該科目分錄行金額相符的傳票（精準匹配）
-                    $lineMatch = $this->_findVoucherByLine($bankAccountId, $r['transaction_date'], $amount, 'bank');
+                    // 銀行 debit (錢出) → 傳票貸方銀行存款；銀行 credit (錢入) → 傳票借方
+                    $bankDirection = ($debit > 0) ? 'credit' : 'debit';
+                    $lineMatch = $this->_findVoucherByLine($bankAccountId, $r['transaction_date'], $amount, 'bank', $bankDirection);
                     if ($lineMatch) {
                         $match = $lineMatch;
                     } else {
@@ -1164,7 +1165,9 @@ class AccountingModel
                 $pcAcctId = $this->_getPettyCashAccountId($r['branch_id']);
                 $match = null;
                 if ($pcAcctId) {
-                    $match = $this->_findVoucherByLine($pcAcctId, $r['entry_date'], $amount, 'petty_cash');
+                    // 收入 → 傳票借方零用金；支出 → 傳票貸方零用金
+                    $pcDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
+                    $match = $this->_findVoucherByLine($pcAcctId, $r['entry_date'], $amount, 'petty_cash', $pcDirection);
                 }
                 if (!$match) {
                     $match = $this->_fuzzyMatchVoucher(
@@ -1219,7 +1222,8 @@ class AccountingModel
                 $rfAcctId = $this->_getReserveFundAccountId($r['branch_id']);
                 $match = null;
                 if ($rfAcctId) {
-                    $match = $this->_findVoucherByLine($rfAcctId, $r['entry_date'], $amount, 'reserve_fund');
+                    $rfDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
+                    $match = $this->_findVoucherByLine($rfAcctId, $r['entry_date'], $amount, 'reserve_fund', $rfDirection);
                 }
                 if (!$match) {
                     $match = $this->_fuzzyMatchVoucher(
@@ -1270,7 +1274,9 @@ class AccountingModel
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 // 先嘗試分錄行精準匹配（現金科目 1111000）
-                $match = $this->_findVoucherByLine(self::$CASH_DETAILS_ACCOUNT_ID, $r['transaction_date'], $amount, 'cash_details');
+                // 收入 → 傳票借方現金；支出 → 傳票貸方現金
+                $cdDirection = ((float)$r['income_amount'] > 0) ? 'debit' : 'credit';
+                $match = $this->_findVoucherByLine(self::$CASH_DETAILS_ACCOUNT_ID, $r['transaction_date'], $amount, 'cash_details', $cdDirection);
                 if (!$match) {
                     $match = $this->_fuzzyMatchVoucher(
                         $r['transaction_date'], $amount,
@@ -1899,9 +1905,14 @@ class AccountingModel
      * @param string $date 交易日期
      * @param float $amount 比對金額
      * @param string $currentModule 當前模組（用於排除同模組已綁的傳票）
+     * @param string $direction 方向過濾：'debit'=只比借方、'credit'=只比貸方、''=兩邊都比
+     *   - cash_details/petty_cash/reserve_fund 收入 → 'debit' (借 現金/零用金)
+     *   - 上述模組 支出 → 'credit' (貸 現金/零用金)
+     *   - bank_transactions 銀行 debit (錢出去) → 'credit' (貸 銀行存款)
+     *   - bank_transactions 銀行 credit (錢進來) → 'debit' (借 銀行存款)
      * @return array|null match info or null
      */
-    private function _findVoucherByLine($accountId, $date, $amount, $currentModule = '')
+    private function _findVoucherByLine($accountId, $date, $amount, $currentModule = '', $direction = '')
     {
         if (!$accountId || !$date || (float)$amount <= 0) return null;
 
@@ -1910,16 +1921,29 @@ class AccountingModel
             $excludeBoundSql = " AND NOT (je.source_module = " . $this->db->quote($currentModule) . " AND je.source_id IS NOT NULL AND je.source_id > 0)";
         }
 
+        // 依方向決定 WHERE 條件
+        if ($direction === 'debit') {
+            $amtCond = "ABS(jl.debit_amount - ?) <= 1 AND jl.debit_amount > 0";
+            $amtParams = array((float)$amount);
+        } elseif ($direction === 'credit') {
+            $amtCond = "ABS(jl.credit_amount - ?) <= 1 AND jl.credit_amount > 0";
+            $amtParams = array((float)$amount);
+        } else {
+            $amtCond = "(ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)";
+            $amtParams = array((float)$amount, (float)$amount);
+        }
+
         $sql = "SELECT DISTINCT je.id, je.voucher_number, je.voucher_date, je.total_debit
                 FROM journal_entries je
                 JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
                 WHERE je.voucher_date = ? AND je.status != 'voided'
                   {$excludeBoundSql}
                   AND jl.account_id = ?
-                  AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)
+                  AND {$amtCond}
                 ORDER BY je.id DESC LIMIT 5";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(array($date, (int)$accountId, (float)$amount, (float)$amount));
+        $params = array_merge(array($date, (int)$accountId), $amtParams);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (count($rows) === 1) {
@@ -1928,7 +1952,7 @@ class AccountingModel
                 'status' => 'matched_precise',
                 'voucher_id' => (int)$m['id'],
                 'voucher_number' => $m['voucher_number'],
-                'voucher_amount' => (float)$amount, // 分錄行金額 = 銀行交易金額
+                'voucher_amount' => (float)$amount, // 分錄行金額 = 來源交易金額
             );
         }
         // 多筆候選 → 不自動命中（避免誤配，由 fuzzy match 接續處理）
