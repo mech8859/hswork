@@ -38,7 +38,7 @@
             <option value="<?= e($k) ?>" <?= $filters['status'] === $k ? 'selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
         </select>
-        <select name="created_by" class="form-control" style="width:140px">
+        <select name="created_by" class="form-control" style="width:170px">
             <option value="">全部建立者</option>
             <?php foreach ($creators as $c): ?>
             <option value="<?= (int)$c['id'] ?>" <?= (string)$filters['created_by'] === (string)$c['id'] ? 'selected' : '' ?>><?= e($c['real_name']) ?></option>
@@ -57,9 +57,9 @@
             <option value="<?= (int)$cc['id'] ?>" <?= (string)($filters['cost_center_id'] ?? '') === (string)$cc['id'] ? 'selected' : '' ?>><?= e($cc['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:140px">
+        <input type="date" name="date_from" value="<?= e($filters['date_from']) ?>" class="form-control" style="width:170px">
         <span>~</span>
-        <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:140px">
+        <input type="date" name="date_to" value="<?= e($filters['date_to']) ?>" class="form-control" style="width:170px">
         <select name="sort" class="form-control" style="width:110px" title="排序">
             <option value="desc" <?= $filters['sort'] === 'desc' ? 'selected' : '' ?>>新 → 舊</option>
             <option value="asc"  <?= $filters['sort'] === 'asc'  ? 'selected' : '' ?>>舊 → 新</option>
