@@ -2193,6 +2193,14 @@ class FinanceModel
                 $params[] = $filters['branch_id'];
             }
         }
+        if (!empty($filters['type'])) {
+            // cash_details 沒有 type 欄位，依金額判斷：收入 = income_amount > 0、支出 = expense_amount > 0
+            if ($filters['type'] === '收入') {
+                $where .= ' AND cd.income_amount > 0';
+            } elseif ($filters['type'] === '支出') {
+                $where .= ' AND cd.expense_amount > 0';
+            }
+        }
         if (!empty($filters['date_from'])) {
             $where .= ' AND cd.transaction_date >= ?';
             $params[] = $filters['date_from'];

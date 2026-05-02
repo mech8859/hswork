@@ -85,6 +85,14 @@ if (!empty($records)) {
                 </select>
             </div>
             <div class="form-group">
+                <label>收支別</label>
+                <select name="type" class="form-control">
+                    <option value="">全部</option>
+                    <option value="收入" <?= (!empty($filters['type']) && $filters['type'] === '收入') ? 'selected' : '' ?>>收入</option>
+                    <option value="支出" <?= (!empty($filters['type']) && $filters['type'] === '支出') ? 'selected' : '' ?>>支出</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>起始日期</label>
                 <input type="date" max="2099-12-31" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>">
             </div>

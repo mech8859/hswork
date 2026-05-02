@@ -139,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ========== 列表 ==========
 $filters = array(
     'branch_id' => !empty($_GET['branch_id']) ? $_GET['branch_id'] : '',
+    'type'      => !empty($_GET['type']) ? $_GET['type'] : '',
     'date_from' => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
     'date_to'   => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
     'keyword'   => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
