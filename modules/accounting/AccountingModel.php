@@ -1095,12 +1095,29 @@ class AccountingModel
                 );
             } else {
                 $amount = max($debit, $credit);
-                $match = $this->_fuzzyMatchVoucher(
-                    $r['transaction_date'], $amount,
-                    array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
-                    '1113', // 銀行存款科目前綴
-                    0, 'bank'
-                );
+                // 銀行帳戶 → 會計科目對應（用於分錄行精準匹配）
+                $bankAccountId = $this->_getBankAccountId($r['bank_account']);
+                if ($bankAccountId !== null) {
+                    // 嘗試找同日該科目分錄行金額相符的傳票（精準匹配）
+                    $lineMatch = $this->_findVoucherByLine($bankAccountId, $r['transaction_date'], $amount, 'bank');
+                    if ($lineMatch) {
+                        $match = $lineMatch;
+                    } else {
+                        $match = $this->_fuzzyMatchVoucher(
+                            $r['transaction_date'], $amount,
+                            array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
+                            '1113', // 銀行存款科目前綴
+                            0, 'bank'
+                        );
+                    }
+                } else {
+                    $match = $this->_fuzzyMatchVoucher(
+                        $r['transaction_date'], $amount,
+                        array($r['sys_number'], $r['upload_number'], $r['summary'], $r['description']),
+                        '1113', // 銀行存款科目前綴
+                        0, 'bank'
+                    );
+                }
             }
             $out[] = array(
                 'source_id' => $rid,
@@ -1789,6 +1806,70 @@ class AccountingModel
         }
 
         return 0;
+    }
+
+    /**
+     * 銀行帳戶 → 會計科目 對應表（用於分錄行精準匹配）
+     * 規則：bank_transactions.bank_account 對應 chart_of_accounts.id
+     */
+    private static $BANK_ACCOUNT_TO_ACCOUNT_ID = array(
+        '禾順監視數位科技有限公司-中國信託' => 19, // 1113101 銀行存款-禾順 中信-73162
+        '禾順監視數位科技有限公司-富邦'     => 20, // 1113102 銀行存款-禾順 富邦-96042
+        '王正宏-彰化銀行'                  => 22, // 1113201 銀行存款-彰化銀行-74600
+        '政遠企業有限公司-中國信託'         => 24, // 1113301 銀行存款-政遠 中信-47353
+    );
+
+    private function _getBankAccountId($bankAccount)
+    {
+        if (!$bankAccount) return null;
+        $key = trim($bankAccount);
+        return isset(self::$BANK_ACCOUNT_TO_ACCOUNT_ID[$key])
+            ? (int)self::$BANK_ACCOUNT_TO_ACCOUNT_ID[$key]
+            : null;
+    }
+
+    /**
+     * 找指定科目同日金額相符的分錄行 → 視為精準匹配
+     * 用於：一張傳票多筆銀行交易（合併匯款/薪資多筆扣款），需要對應分錄行而非傳票總額
+     *
+     * @param int $accountId 限定的科目 id
+     * @param string $date 交易日期
+     * @param float $amount 比對金額
+     * @param string $currentModule 當前模組（用於排除同模組已綁的傳票）
+     * @return array|null match info or null
+     */
+    private function _findVoucherByLine($accountId, $date, $amount, $currentModule = '')
+    {
+        if (!$accountId || !$date || (float)$amount <= 0) return null;
+
+        $excludeBoundSql = '';
+        if ($currentModule !== '' && in_array($currentModule, array('bank','petty_cash','reserve_fund','cash_details'), true)) {
+            $excludeBoundSql = " AND NOT (je.source_module = " . $this->db->quote($currentModule) . " AND je.source_id IS NOT NULL AND je.source_id > 0)";
+        }
+
+        $sql = "SELECT DISTINCT je.id, je.voucher_number, je.voucher_date, je.total_debit
+                FROM journal_entries je
+                JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
+                WHERE je.voucher_date = ? AND je.status != 'voided'
+                  {$excludeBoundSql}
+                  AND jl.account_id = ?
+                  AND (ABS(jl.debit_amount - ?) <= 1 OR ABS(jl.credit_amount - ?) <= 1)
+                ORDER BY je.id DESC LIMIT 5";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(array($date, (int)$accountId, (float)$amount, (float)$amount));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($rows) === 1) {
+            $m = $rows[0];
+            return array(
+                'status' => 'matched_precise',
+                'voucher_id' => (int)$m['id'],
+                'voucher_number' => $m['voucher_number'],
+                'voucher_amount' => (float)$amount, // 分錄行金額 = 銀行交易金額
+            );
+        }
+        // 多筆候選 → 不自動命中（避免誤配，由 fuzzy match 接續處理）
+        return null;
     }
 
     private function _findPreciseMatch($sourceModule, $sourceId)
