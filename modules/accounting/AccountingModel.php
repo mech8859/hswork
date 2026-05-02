@@ -1112,10 +1112,12 @@ class AccountingModel
 
     private function _reconcilePettyCash($startDate, $endDate, $branchId = null)
     {
-        $sql = "SELECT id, entry_number, upload_number, expense_date, description, expense_amount, income_amount, branch_id FROM petty_cash WHERE expense_date BETWEEN ? AND ?";
+        // 注意：petty_cash 的「收支日期」實際是 entry_date 欄（用戶介面顯示為「收支日期」）。
+        // expense_date 是另一個欄位（如發票日期），與 傳票 voucher_date 不一定相符。
+        $sql = "SELECT id, entry_number, upload_number, entry_date, description, expense_amount, income_amount, branch_id FROM petty_cash WHERE entry_date BETWEEN ? AND ?";
         $params = array($startDate, $endDate);
         if ($branchId) { $sql .= " AND branch_id = ?"; $params[] = (int)$branchId; }
-        $sql .= " ORDER BY expense_date, id";
+        $sql .= " ORDER BY entry_date, id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1133,14 +1135,14 @@ class AccountingModel
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
-                    $r['expense_date'], $amount,
+                    $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
                     '11122' // 零用金科目前綴
                 );
             }
             $out[] = array(
                 'source_id' => (int)$r['id'],
-                'date'      => $r['expense_date'],
+                'date'      => $r['entry_date'],
                 'number'    => $r['entry_number'] ?: $r['upload_number'],
                 'description' => $r['description'],
                 'extra'     => '',
@@ -1157,10 +1159,11 @@ class AccountingModel
 
     private function _reconcileReserveFund($startDate, $endDate, $branchId = null)
     {
-        $sql = "SELECT id, entry_number, upload_number, expense_date, description, expense_amount, income_amount, branch_id FROM reserve_fund WHERE expense_date BETWEEN ? AND ?";
+        // 注意：reserve_fund 的「收支日期」也是 entry_date 欄（與 petty_cash 同樣命名）。
+        $sql = "SELECT id, entry_number, upload_number, entry_date, description, expense_amount, income_amount, branch_id FROM reserve_fund WHERE entry_date BETWEEN ? AND ?";
         $params = array($startDate, $endDate);
         if ($branchId) { $sql .= " AND branch_id = ?"; $params[] = (int)$branchId; }
-        $sql .= " ORDER BY expense_date, id";
+        $sql .= " ORDER BY entry_date, id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1178,14 +1181,14 @@ class AccountingModel
             } else {
                 $amount = max((float)$r['expense_amount'], (float)$r['income_amount']);
                 $match = $this->_fuzzyMatchVoucher(
-                    $r['expense_date'], $amount,
+                    $r['entry_date'], $amount,
                     array($r['entry_number'], $r['upload_number'], $r['description']),
                     '11121' // 備用金科目前綴
                 );
             }
             $out[] = array(
                 'source_id' => (int)$r['id'],
-                'date'      => $r['expense_date'],
+                'date'      => $r['entry_date'],
                 'number'    => $r['entry_number'] ?: $r['upload_number'],
                 'description' => $r['description'],
                 'extra'     => '',
@@ -1259,13 +1262,14 @@ class AccountingModel
     public function getReserveFundToPettyCashMatch($startDate, $endDate, $branchId = null)
     {
         // 抓備用金支出，REGEXP 支援「入零用金」「入台中零用金」「入清水零用金」等變體
-        $rfSql = "SELECT id, entry_number, expense_date, expense_amount, branch_id, description, type
+        // 注意：reserve_fund 的「收支日期」也是 entry_date（與 petty_cash 同樣命名）
+        $rfSql = "SELECT id, entry_number, entry_date AS expense_date, expense_amount, branch_id, description, type
                   FROM reserve_fund
-                  WHERE type = '支出' AND expense_date BETWEEN ? AND ?
+                  WHERE type = '支出' AND entry_date BETWEEN ? AND ?
                     AND description REGEXP '入.{0,10}零用金'";
         $rfParams = array($startDate, $endDate);
         if ($branchId) { $rfSql .= " AND branch_id = ?"; $rfParams[] = (int)$branchId; }
-        $rfSql .= " ORDER BY expense_date, id";
+        $rfSql .= " ORDER BY entry_date, id";
         $st = $this->db->prepare($rfSql);
         $st->execute($rfParams);
         $rfRows = $st->fetchAll(PDO::FETCH_ASSOC);
