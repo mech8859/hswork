@@ -539,14 +539,14 @@ function validateInvoiceNumber(el) {
 })();
 
 // ============================================================
-// 新增/編輯傳票 form：按 Enter 跳下一個輸入欄（不送出）
+// 全站表單：Enter 鍵 = 跳下一個欄位；最後一欄再按 Enter = 送出表單
+// 行為：
+//   - 在 input/select 按 Enter → focus 下一個 input/select
+//   - 下一個是 submit 按鈕 → focus 到該按鈕（不送出），再按 Enter 才送出
+//   - 沒有下一個欄位（已在最後一欄）→ 直接送出表單
+//   - textarea / 已 focus 的按鈕 不攔截
 // ============================================================
 (function() {
-    function isJournalForm(form) {
-        if (!form) return false;
-        var inp = form.querySelector('#fldVoucherDate, #fldVoucherNumber');
-        return !!inp;
-    }
     function getFocusable(form) {
         return Array.prototype.slice.call(form.querySelectorAll(
             'input:not([type=hidden]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
@@ -554,22 +554,42 @@ function validateInvoiceNumber(el) {
     }
     document.addEventListener('keydown', function(e) {
         if (e.key !== 'Enter') return;
+        if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
         var t = e.target;
         if (!t || !t.tagName) return;
         if (t.tagName === 'TEXTAREA') return;
-        if (t.type === 'submit' || t.type === 'button') return;
+        // Enter 在按鈕上 → 用瀏覽器預設行為（=點擊送出）
+        if (t.tagName === 'BUTTON' || t.type === 'submit' || t.type === 'button') return;
         var form = t.closest && t.closest('form');
-        if (!isJournalForm(form)) return;
-        e.preventDefault();
+        if (!form) return;
+        // 跳過附 onkeydown 已處理 Enter 的 input（避免衝突）
+        if (t.dataset && t.dataset.enterHandled) return;
+
         var arr = getFocusable(form);
         var idx = arr.indexOf(t);
         if (idx < 0) return;
+
+        // 找下一個非按鈕的欄位
         for (var i = idx + 1; i < arr.length; i++) {
-            if (arr[i].type !== 'submit' && arr[i].type !== 'button') {
-                arr[i].focus();
-                if (arr[i].select) try { arr[i].select(); } catch (e2) {}
-                break;
+            var el = arr[i];
+            if (el.tagName === 'BUTTON' || el.type === 'submit' || el.type === 'button') {
+                // 下一個是按鈕：focus 到按鈕（再按 Enter 才送出）
+                e.preventDefault();
+                el.focus();
+                return;
             }
+            // 下一個是輸入欄
+            e.preventDefault();
+            el.focus();
+            if (el.select) try { el.select(); } catch (err) {}
+            return;
+        }
+        // 已是最後一欄（沒有下一個欄位）→ 直接送出表單
+        e.preventDefault();
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
         }
     });
 })();
