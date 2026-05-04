@@ -143,6 +143,37 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 主管排工模式分析 ----
+    case 'schedule_analysis':
+        if (!Auth::canAccessReport('schedule_analysis') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+        $month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('n');
+        // 預設看「上個月」更實用
+        if (!isset($_GET['month'])) {
+            $year = (int)date('Y', strtotime('-1 month'));
+            $month = (int)date('n', strtotime('-1 month'));
+        }
+        $branchFilter = isset($_GET['branch_id']) ? (int)$_GET['branch_id'] : 0;
+
+        $analysis = $model->getScheduleAnalysis($branchIds, $year, $month, $branchFilter ?: null);
+
+        // 分公司清單（給篩選下拉）
+        $allBranchesStmt = Database::getInstance()->prepare(
+            "SELECT id, name FROM branches WHERE id IN (" . implode(',', array_fill(0, count($branchIds), '?')) . ") ORDER BY id"
+        );
+        $allBranchesStmt->execute($branchIds);
+        $allBranches = $allBranchesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $pageTitle = '主管排工模式分析';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/schedule_analysis.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 完工未收款 / 未完工 ----
     case 'unpaid_cases':
         if (!Auth::canAccessReport('unpaid_cases') && !Auth::hasPermission('all')) {

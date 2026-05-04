@@ -1283,4 +1283,182 @@ class ReportModel
         );
         $stmt->execute(array((int)$userId, (int)$caseId));
     }
+
+    /**
+     * 排工模式分析（依月份）
+     * 回傳：
+     *  - rows：原始排工 + 工程師資料（供 view 整理）
+     *  - summary：隊伍大小分布、主工程師人數分布、案件類型 vs 隊伍組成
+     *  - pairs：工程師配對熱力圖 top N
+     *  - branches：各分公司排工數
+     *  - schedulers：由誰排工
+     *  - leaders：能任主工程師的人 + 該月出勤次數
+     */
+    public function getScheduleAnalysis(array $branchIds, $year, $month, $branchFilter = null)
+    {
+        if (empty($branchIds)) {
+            return array('total' => 0, 'rows' => array(), 'summary' => array(),
+                         'pairs' => array(), 'branches' => array(),
+                         'schedulers' => array(), 'leaders' => array());
+        }
+        $start = sprintf('%04d-%02d-01', $year, $month);
+        $end = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = array_merge(array($start, $end), $branchIds);
+        $extra = '';
+        if ($branchFilter) {
+            $extra = ' AND c.branch_id = ?';
+            $params[] = (int)$branchFilter;
+        }
+
+        $sql = "
+            SELECT s.id AS schedule_id, s.schedule_date, s.case_id, s.created_by,
+                   cb.real_name AS scheduler_name,
+                   c.case_number, c.case_type, c.title, c.customer_name,
+                   c.deal_amount, c.total_amount, c.branch_id,
+                   b.name AS branch_name,
+                   se.user_id, se.is_lead, se.is_override,
+                   u.real_name AS eng_name, u.engineer_level, u.can_lead, u.repair_priority
+            FROM schedules s
+            JOIN schedule_engineers se ON se.schedule_id = s.id
+            JOIN users u ON se.user_id = u.id
+            LEFT JOIN cases c ON s.case_id = c.id
+            LEFT JOIN branches b ON c.branch_id = b.id
+            LEFT JOIN users cb ON s.created_by = cb.id
+            WHERE s.schedule_date BETWEEN ? AND ?
+              AND s.status != 'cancelled'
+              AND c.branch_id IN ($ph)
+              {$extra}
+            ORDER BY s.schedule_date, s.id, se.is_lead DESC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 整理：以 schedule_id 為單位收齊每張排工的組成
+        $byId = array();
+        foreach ($rows as $r) {
+            $sid = $r['schedule_id'];
+            if (!isset($byId[$sid])) {
+                $byId[$sid] = array(
+                    'meta' => array(
+                        'date'        => $r['schedule_date'],
+                        'case_id'     => $r['case_id'],
+                        'case_number' => $r['case_number'],
+                        'case_type'   => $r['case_type'],
+                        'title'       => $r['title'],
+                        'customer'    => $r['customer_name'],
+                        'amount'      => (int)($r['deal_amount'] ?: $r['total_amount'] ?: 0),
+                        'branch_id'   => $r['branch_id'],
+                        'branch_name' => $r['branch_name'],
+                        'scheduler'   => $r['scheduler_name'],
+                    ),
+                    'engs' => array(),
+                );
+            }
+            $byId[$sid]['engs'][] = array(
+                'user_id'         => $r['user_id'],
+                'name'            => $r['eng_name'],
+                'engineer_level'  => $r['engineer_level'],
+                'can_lead'        => (int)$r['can_lead'],
+                'is_lead'         => (int)$r['is_lead'],
+            );
+        }
+
+        // 統計
+        $teamSize = array();
+        $leadCountDist = array();
+        $multiLead = array();
+        $caseTypeSize = array();
+        $branchStat = array();
+        $schedulerStat = array();
+        foreach ($byId as $sid => $s) {
+            $size = count($s['engs']);
+            $teamSize[$size] = ($teamSize[$size] ?? 0) + 1;
+
+            $leadN = 0;
+            foreach ($s['engs'] as $e) if (!empty($e['can_lead'])) $leadN++;
+            $leadCountDist[$leadN] = ($leadCountDist[$leadN] ?? 0) + 1;
+            if ($leadN >= 2) {
+                $multiLead[] = $s;
+            }
+
+            $ct = $s['meta']['case_type'] ?: '(空)';
+            if (!isset($caseTypeSize[$ct])) $caseTypeSize[$ct] = array();
+            $caseTypeSize[$ct][$size] = ($caseTypeSize[$ct][$size] ?? 0) + 1;
+
+            $bn = $s['meta']['branch_name'] ?: '(未分配)';
+            if (!isset($branchStat[$bn])) $branchStat[$bn] = array('total' => 0, 'multi_lead' => 0);
+            $branchStat[$bn]['total']++;
+            if ($leadN >= 2) $branchStat[$bn]['multi_lead']++;
+
+            $sn = $s['meta']['scheduler'] ?: '(未知)';
+            if (!isset($schedulerStat[$sn])) $schedulerStat[$sn] = array('total' => 0, 'multi_lead' => 0);
+            $schedulerStat[$sn]['total']++;
+            if ($leadN >= 2) $schedulerStat[$sn]['multi_lead']++;
+        }
+        ksort($teamSize); ksort($leadCountDist);
+
+        // 配對熱力圖
+        $pairCount = array();
+        foreach ($byId as $s) {
+            $engs = $s['engs'];
+            $n = count($engs);
+            if ($n < 2) continue;
+            for ($i = 0; $i < $n; $i++) {
+                for ($j = $i + 1; $j < $n; $j++) {
+                    $a = (int)$engs[$i]['user_id'];
+                    $b = (int)$engs[$j]['user_id'];
+                    if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+                    $key = $a . '-' . $b;
+                    if (!isset($pairCount[$key])) {
+                        $pairCount[$key] = array(
+                            'count' => 0,
+                            'a_id' => $a, 'a_name' => '',
+                            'b_id' => $b, 'b_name' => '',
+                        );
+                    }
+                    $pairCount[$key]['count']++;
+                    // 名字：依當前 row 對應
+                    if ($engs[$i]['user_id'] == $a) $pairCount[$key]['a_name'] = $engs[$i]['name'];
+                    else $pairCount[$key]['a_name'] = $engs[$j]['name'];
+                    if ($engs[$i]['user_id'] == $b) $pairCount[$key]['b_name'] = $engs[$i]['name'];
+                    else $pairCount[$key]['b_name'] = $engs[$j]['name'];
+                }
+            }
+        }
+        usort($pairCount, function($a, $b) { return $b['count'] - $a['count']; });
+        $topPairs = array_slice($pairCount, 0, 30);
+
+        // 主工程師出勤次數（依 can_lead=1）
+        $leaderCount = array();
+        foreach ($rows as $r) {
+            if (empty($r['can_lead'])) continue;
+            $name = $r['eng_name'];
+            if (!isset($leaderCount[$name])) {
+                $leaderCount[$name] = array(
+                    'count' => 0,
+                    'level' => $r['engineer_level'] ?: '',
+                );
+            }
+            $leaderCount[$name]['count']++;
+        }
+        uasort($leaderCount, function($a, $b) { return $b['count'] - $a['count']; });
+
+        return array(
+            'total'      => count($byId),
+            'rows'       => array_values($byId),
+            'summary'    => array(
+                'team_size'      => $teamSize,
+                'lead_count'     => $leadCountDist,
+                'multi_lead'     => $multiLead,
+                'case_type_size' => $caseTypeSize,
+            ),
+            'pairs'      => $topPairs,
+            'branches'   => $branchStat,
+            'schedulers' => $schedulerStat,
+            'leaders'    => $leaderCount,
+            'period'     => array('start' => $start, 'end' => $end, 'year' => $year, 'month' => $month),
+        );
+    }
 }

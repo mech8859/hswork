@@ -65,6 +65,7 @@
         array('key' => 'sales_personal', 'action' => 'sales_personal', 'icon' => '&#128100;', 'title' => '業務個人分析', 'desc' => '個人進件/成交/金額/案別統計與團隊比較'),
         array('key' => 'branch_monthly', 'action' => 'branch_monthly', 'icon' => '&#127970;', 'title' => '分公司月報', 'desc' => '各分公司每月收款/付款統計與明細'),
         array('key' => 'unpaid_cases', 'action' => 'unpaid_cases', 'icon' => '&#128722;', 'title' => '完工未收款/未完工', 'desc' => '待收尾款案件清單與合計金額'),
+        array('key' => 'schedule_analysis', 'action' => 'schedule_analysis', 'icon' => '&#128197;', 'title' => '主管排工模式分析', 'desc' => '隊伍組成/配對熱力圖/分公司分布（依月份）'),
         array('key' => 'case_progress', 'action' => 'case_progress', 'icon' => '&#128221;', 'title' => '案件更新進度', 'desc' => '案件最後狀態變更追蹤（剔除已完工結案）'),
         array('key' => 'closed_anomalies', 'action' => 'closed_anomalies', 'icon' => '&#9888;&#65039;', 'title' => '結案資料異常', 'desc' => '已結案但帳款未平／未結清／缺完工日的案件清單'),
     );
