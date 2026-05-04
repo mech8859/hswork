@@ -104,6 +104,18 @@ class InvoiceModel
             $where[] = "pi.period = ?";
             $params[] = $filters['period'];
         }
+        if (!empty($filters['date_from'])) {
+            $where[] = "pi.invoice_date >= ?";
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where[] = "pi.invoice_date <= ?";
+            $params[] = $filters['date_to'];
+        }
+        if (!empty($filters['report_period'])) {
+            $where[] = "pi.report_period = ?";
+            $params[] = $filters['report_period'];
+        }
         if (!empty($filters['vendor'])) {
             $where[] = "(pi.vendor_name LIKE ? OR pi.vendor_tax_id LIKE ?)";
             $params[] = '%' . $filters['vendor'] . '%';
@@ -402,6 +414,18 @@ class InvoiceModel
             $where[] = "si.period = ?";
             $params[] = $filters['period'];
         }
+        if (!empty($filters['date_from'])) {
+            $where[] = "si.invoice_date >= ?";
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where[] = "si.invoice_date <= ?";
+            $params[] = $filters['date_to'];
+        }
+        if (!empty($filters['report_period'])) {
+            $where[] = "si.report_period = ?";
+            $params[] = $filters['report_period'];
+        }
         if (!empty($filters['customer'])) {
             $where[] = "(si.customer_name LIKE ? OR si.customer_tax_id LIKE ?)";
             $params[] = '%' . $filters['customer'] . '%';
@@ -698,26 +722,46 @@ class InvoiceModel
     // ============================================================
 
     /**
-     * 取得稅務彙總
-     * @param string $period 期間 e.g. '202603-04' (year + bimonth)
+     * 401 申報期間 WHERE 子句
+     * 以 report_period（申報期間）為主：完整 YYYY-MM-MM 直接比；舊格式 YYYY-MM 落在期間內也算；
+     * 若 report_period 為空則退回用 period（依 invoice_date 推導）。
      */
-    public function getTaxSummary($period, $companyTaxId = null)
+    private function buildReportPeriodWhere($period, $tableAlias = '')
     {
-        // 解析期間 → 起迄月
         $parsed = $this->parseTaxPeriod($period);
         if (!$parsed) {
             return null;
         }
-        $startMonth = $parsed['start'];
-        $endMonth = $parsed['end'];
-        $months = $this->getMonthsInRange($startMonth, $endMonth);
-        $placeholders = implode(',', array_fill(0, count($months), '?'));
+        $months = $this->getMonthsInRange($parsed['start'], $parsed['end']);
+        $monthsPh = implode(',', array_fill(0, count($months), '?'));
+        $ymStart = substr($parsed['start'], 0, 4) . '-' . substr($parsed['start'], 4, 2);
+        $ymEnd   = substr($parsed['end'], 0, 4) . '-' . substr($parsed['end'], 4, 2);
+        $a = $tableAlias === '' ? '' : $tableAlias . '.';
+        $sql = "(
+            {$a}report_period = ?
+            OR {$a}report_period IN (?, ?)
+            OR (({$a}report_period IS NULL OR {$a}report_period = '') AND {$a}period IN ({$monthsPh}))
+        )";
+        $params = array_merge(array($period, $ymStart, $ymEnd), $months);
+        return array('sql' => $sql, 'params' => $params);
+    }
+
+    /**
+     * 取得稅務彙總
+     * @param string $period 期間 e.g. '2026-03-04' (year + bimonth)
+     */
+    public function getTaxSummary($period, $companyTaxId = null)
+    {
+        $rpClause = $this->buildReportPeriodWhere($period, '');
+        if (!$rpClause) {
+            return null;
+        }
 
         // 公司統編過濾（銷項比 seller_tax_id / 進項比 buyer_tax_id）
         $salesExtra = '';
         $purchExtra = '';
-        $salesParams = $months;
-        $purchParams = $months;
+        $salesParams = $rpClause['params'];
+        $purchParams = $rpClause['params'];
         if (!empty($companyTaxId)) {
             $salesExtra = ' AND seller_tax_id = ?';
             $salesParams[] = $companyTaxId;
@@ -744,7 +788,7 @@ class InvoiceModel
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS sales_voided_count,
                     COUNT(CASE WHEN status NOT IN ('confirmed', 'voided') THEN 1 END) AS sales_pending_count
                 FROM sales_invoices
-                WHERE period IN ($placeholders)$salesExtra";
+                WHERE {$rpClause['sql']}$salesExtra";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($salesParams);
         $salesRow = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -769,7 +813,7 @@ class InvoiceModel
                     COUNT(CASE WHEN status = 'voided' THEN 1 END) AS purchase_voided_count,
                     COUNT(CASE WHEN status NOT IN ('confirmed', 'voided') THEN 1 END) AS purchase_pending_count
                 FROM purchase_invoices
-                WHERE period IN ($placeholders)$purchExtra";
+                WHERE {$rpClause['sql']}$purchExtra";
         $stmt2 = $this->db->prepare($sql2);
         $stmt2->execute($purchParams);
         $purchaseRow = $stmt2->fetch(PDO::FETCH_ASSOC);
@@ -789,13 +833,12 @@ class InvoiceModel
      */
     public function getTaxDetail($period, $type = 'purchase', $companyTaxId = null)
     {
-        $parsed = $this->parseTaxPeriod($period);
-        if (!$parsed) {
+        $alias = $type === 'purchase' ? 'pi' : 'si';
+        $rpClause = $this->buildReportPeriodWhere($period, $alias);
+        if (!$rpClause) {
             return array();
         }
-        $months = $this->getMonthsInRange($parsed['start'], $parsed['end']);
-        $placeholders = implode(',', array_fill(0, count($months), '?'));
-        $params = $months;
+        $params = $rpClause['params'];
         $extra = '';
 
         if ($type === 'purchase') {
@@ -803,14 +846,14 @@ class InvoiceModel
             $sql = "SELECT pi.*, u.real_name AS created_by_name
                     FROM purchase_invoices pi
                     LEFT JOIN users u ON u.id = pi.created_by
-                    WHERE pi.period IN ($placeholders)$extra
+                    WHERE {$rpClause['sql']}$extra
                     ORDER BY pi.invoice_date ASC, pi.id ASC";
         } else {
             if (!empty($companyTaxId)) { $extra = ' AND si.seller_tax_id = ?'; $params[] = $companyTaxId; }
             $sql = "SELECT si.*, u.real_name AS created_by_name
                     FROM sales_invoices si
                     LEFT JOIN users u ON u.id = si.created_by
-                    WHERE si.period IN ($placeholders)$extra
+                    WHERE {$rpClause['sql']}$extra
                     ORDER BY si.invoice_date ASC, si.id ASC";
         }
         $stmt = $this->db->prepare($sql);

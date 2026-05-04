@@ -1158,10 +1158,20 @@ class ReportModel
      * - 尾款金額：cases.balance_amount
      * - 排序：completion_date ASC，NULL 放最上方
      */
-    public function getUnpaidCases(array $branchIds): array
+    public function getUnpaidCases(array $branchIds, $salesId = null): array
     {
         if (empty($branchIds)) return array('total' => 0, 'total_balance' => 0, 'rows' => array());
         $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $params = $branchIds;
+        $extra = '';
+        if ($salesId !== null && $salesId !== '' && $salesId !== 'all') {
+            if ($salesId === '__empty__') {
+                $extra = ' AND c.sales_id IS NULL';
+            } else {
+                $extra = ' AND c.sales_id = ?';
+                $params[] = (int)$salesId;
+            }
+        }
         $sql = "
             SELECT c.id, c.case_number, c.title, c.customer_name,
                    c.created_at, c.completion_date, c.status,
@@ -1173,10 +1183,11 @@ class ReportModel
             LEFT JOIN users u ON c.sales_id = u.id
             WHERE c.branch_id IN ($ph)
               AND c.status IN ('unpaid', 'incomplete')
+              {$extra}
             ORDER BY (c.completion_date IS NULL) DESC, c.completion_date ASC, c.id ASC
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($branchIds);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $totalBalance = 0;
@@ -1187,6 +1198,27 @@ class ReportModel
             'total_balance' => $totalBalance,
             'rows' => $rows,
         );
+    }
+
+    /**
+     * 取得「完工未收款/未完工」報表中出現過的業務清單（給篩選下拉用）
+     */
+    public function getUnpaidCasesSalesOptions(array $branchIds): array
+    {
+        if (empty($branchIds)) return array();
+        $ph = implode(',', array_fill(0, count($branchIds), '?'));
+        $sql = "
+            SELECT DISTINCT u.id, u.real_name
+            FROM cases c
+            JOIN users u ON c.sales_id = u.id
+            WHERE c.branch_id IN ($ph)
+              AND c.status IN ('unpaid', 'incomplete')
+              AND c.sales_id IS NOT NULL
+            ORDER BY u.real_name
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($branchIds);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**

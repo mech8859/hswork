@@ -108,15 +108,25 @@ class QuotationModel
      */
     public function getById($id)
     {
-        $stmt = $this->db->prepare('
+        // 偵測 updated_by 欄位是否存在
+        $hasUpdatedBy = false;
+        try {
+            $chk = $this->db->query("SHOW COLUMNS FROM quotations LIKE 'updated_by'");
+            $hasUpdatedBy = ($chk && $chk->rowCount() > 0);
+        } catch (Exception $e) {}
+
+        $sql = '
             SELECT q.*, b.name AS branch_name, s.real_name AS sales_name,
-                   cr.real_name AS creator_name
+                   cr.real_name AS creator_name'
+                . ($hasUpdatedBy ? ', ub.real_name AS updater_name' : ', NULL AS updater_name') . '
             FROM quotations q
             JOIN branches b ON q.branch_id = b.id
             LEFT JOIN users s ON q.sales_id = s.id
-            LEFT JOIN users cr ON q.created_by = cr.id
+            LEFT JOIN users cr ON q.created_by = cr.id'
+                . ($hasUpdatedBy ? ' LEFT JOIN users ub ON q.updated_by = ub.id' : '') . '
             WHERE q.id = ?
-        ');
+        ';
+        $stmt = $this->db->prepare($sql);
         $stmt->execute(array($id));
         $quote = $stmt->fetch();
         if (!$quote) return null;
@@ -184,16 +194,25 @@ class QuotationModel
      */
     public function update($id, array $data)
     {
-        $stmt = $this->db->prepare('
+        // 偵測 updated_by 欄位是否存在（migration 141 是否已執行）
+        $hasUpdatedBy = false;
+        try {
+            $chk = $this->db->query("SHOW COLUMNS FROM quotations LIKE 'updated_by'");
+            $hasUpdatedBy = ($chk && $chk->rowCount() > 0);
+        } catch (Exception $e) {}
+
+        // 政策：報價日期 = 最後編輯日（每次 update 自動帶入今天）
+        $sql = '
             UPDATE quotations SET
                 quote_company = ?, case_id = ?, format = ?, customer_id = ?, customer_name = ?,
                 contact_person = ?, contact_phone = ?, site_name = ?, site_address = ?,
                 invoice_title = ?, invoice_tax_id = ?, quote_date = ?, valid_date = ?,
                 payment_terms = ?, notes = ?, sales_id = ?, hide_model_on_print = ?,
-                tax_free = ?, has_discount = ?, discount_amount = ?, warranty_months = ?
-            WHERE id = ?
-        ');
-        $stmt->execute(array(
+                tax_free = ?, has_discount = ?, discount_amount = ?, warranty_months = ?';
+        if ($hasUpdatedBy) $sql .= ', updated_by = ?';
+        $sql .= ' WHERE id = ?';
+        $stmt = $this->db->prepare($sql);
+        $params = array(
             !empty($data['quote_company']) ? $data['quote_company'] : 'hershun',
             $data['case_id'] ?: null,
             $data['format'],
@@ -205,7 +224,7 @@ class QuotationModel
             $data['site_address'] ?: null,
             $data['invoice_title'] ?: null,
             $data['invoice_tax_id'] ?: null,
-            $data['quote_date'],
+            date('Y-m-d'), // quote_date 強制 = 今天
             $data['valid_date'],
             $data['payment_terms'] ?: null,
             $data['notes'] ?: null,
@@ -215,8 +234,10 @@ class QuotationModel
             !empty($data['has_discount']) ? 1 : 0,
             !empty($data['discount_amount']) ? $data['discount_amount'] : null,
             !empty($data['warranty_months']) ? (int)$data['warranty_months'] : 12,
-            $id,
-        ));
+        );
+        if ($hasUpdatedBy) $params[] = Auth::id();
+        $params[] = $id;
+        $stmt->execute($params);
     }
 
     /**

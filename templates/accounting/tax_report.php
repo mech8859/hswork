@@ -541,8 +541,10 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
             <table class="table">
                 <thead>
                     <tr>
+                        <th style="width:32px"></th>
                         <th style="width:120px">發票號碼</th>
                         <th style="width:100px">日期</th>
+                        <th style="width:90px">申報期間</th>
                         <th>客戶</th>
                         <th style="width:100px">統編</th>
                         <th style="width:60px">類型</th>
@@ -553,8 +555,20 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                     </tr>
                 </thead>
                 <?php
+                $_fmtReportPeriod = function($rp, $period_fallback = '') {
+                    if (!empty($rp) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $rp, $_mm)) {
+                        return $_mm[1] . '/' . (int)$_mm[2] . '-' . (int)$_mm[3] . '月';
+                    }
+                    if (!empty($rp) && preg_match('/^(\d{4})-(\d{2})$/', $rp, $_mm)) {
+                        return $_mm[1] . '/' . $_mm[2];
+                    }
+                    if (!empty($period_fallback) && strlen($period_fallback) >= 6) {
+                        return substr($period_fallback, 0, 4) . '/' . substr($period_fallback, 4, 2);
+                    }
+                    return '-';
+                };
                 $_grandU = 0; $_grandT = 0; $_grandA = 0; $_grandC = 0;
-                $_renderSalesGroup = function($code, $label, $rows, $isAllowance) use (&$_grandU, &$_grandT, &$_grandA, &$_grandC) {
+                $_renderSalesGroup = function($code, $label, $rows, $isAllowance) use (&$_grandU, &$_grandT, &$_grandA, &$_grandC, $_fmtReportPeriod) {
                     if (empty($rows)) return;
                     $sU = 0; $sT = 0; $sA = 0; $sC = 0;
                     $so = InvoiceModel::invoiceStatusOptions();
@@ -563,7 +577,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                     echo '<tbody id="' . htmlspecialchars($anchorId) . '">';
                     echo '<tr style="background:#eef2ff;font-weight:600">';
                     $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
-                    echo '<td colspan="9">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
+                    echo '<td colspan="11">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
                     echo '</tr>';
                     foreach ($rows as $r) {
                         $isVoided = $r['status'] === 'voided';
@@ -571,9 +585,13 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                         if (!$isVoided) { $sU += (int)$r['amount_untaxed']; $sT += (int)$r['tax_amount']; $sA += (int)$r['total_amount']; $sC++; }
                         $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
                         $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
+                        $isStar = !empty($r['is_starred']);
+                        $rpDisp = $_fmtReportPeriod(!empty($r['report_period']) ? $r['report_period'] : '', !empty($r['period']) ? $r['period'] : '');
                         echo '<tr' . $voidedStyle . '>';
+                        echo '<td class="text-center"><span class="star-toggle ' . ($isStar ? 'is-on' : '') . '" data-id="' . (int)$r['id'] . '" onclick="toggleStarTaxSales(this)" title="標記">&#9733;</span></td>';
                         echo '<td><a href="/sales_invoices.php?action=edit&id=' . (int)$r['id'] . '">' . htmlspecialchars(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') . '</a></td>';
                         echo '<td>' . htmlspecialchars(!empty($r['invoice_date']) ? $r['invoice_date'] : '') . '</td>';
+                        echo '<td style="color:#1565c0">' . htmlspecialchars($rpDisp) . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['customer_name']) ? $r['customer_name'] : '-') . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['customer_tax_id']) ? $r['customer_tax_id'] : '-') . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') . '</td>';
@@ -587,7 +605,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                     $allowNote = $isAllowance ? '（折讓扣除）' : '';
                     $prefix = $isAllowance ? '-' : '';
                     echo '<tr style="font-weight:600;background:#fafafa">';
-                    echo '<td colspan="5">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
+                    echo '<td colspan="7">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sU > 0 ? $prefix : '') . '$' . number_format($sU) . '</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sT > 0 ? $prefix : '') . '$' . number_format($sT) . '</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sA > 0 ? $prefix : '') . '$' . number_format($sA) . '</td>';
@@ -606,7 +624,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                 ?>
                 <tfoot>
                     <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
-                        <td colspan="5">總計（已確認，33/34 已扣除）<?= $_grandC ?> 筆</td>
+                        <td colspan="7">總計（已確認，33/34 已扣除）<?= $_grandC ?> 筆</td>
                         <td class="text-right">$<?= number_format($_grandU) ?></td>
                         <td class="text-right">$<?= number_format($_grandT) ?></td>
                         <td class="text-right">$<?= number_format($_grandA) ?></td>
@@ -737,7 +755,12 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
             <span id="purchaseDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_pdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
             進項發票明細（已確認 <?= count($purchaseDetail) ?> 筆） — 依聯式分組，依日期/發票號碼排序
         </span>
-        <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
+        <span style="display:inline-flex;gap:8px;align-items:center">
+            <a href="/tax_report.php?action=export_purchase&period=<?= e($period) ?>&company_tax_id=<?= e($companyTaxId) ?>"
+               class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:.78rem;padding:3px 10px"
+               onclick="event.stopPropagation()" title="下載進項發票明細 CSV（Excel 可直接開啟）">📥 下載 Excel</a>
+            <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
+        </span>
     </div>
     <div id="purchaseDetailBody" style="<?= $_pdOpen ? '' : 'display:none' ?>">
         <?php if (empty($purchaseDetail)): ?>
@@ -747,8 +770,10 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
             <table class="table">
                 <thead>
                     <tr>
+                        <th style="width:32px"></th>
                         <th style="width:120px">發票號碼</th>
                         <th style="width:100px">日期</th>
+                        <th style="width:90px">申報期間</th>
                         <th>供應商</th>
                         <th style="width:100px">統編</th>
                         <th style="width:60px">類型</th>
@@ -761,7 +786,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                 </thead>
                 <?php
                 $_pgrandU = 0; $_pgrandT = 0; $_pgrandA = 0; $_pgrandC = 0;
-                $_renderPurchGroup = function($code, $label, $rows, $isAllowance) use (&$_pgrandU, &$_pgrandT, &$_pgrandA, &$_pgrandC) {
+                $_renderPurchGroup = function($code, $label, $rows, $isAllowance) use (&$_pgrandU, &$_pgrandT, &$_pgrandA, &$_pgrandC, $_fmtReportPeriod) {
                     if (empty($rows)) return;
                     $sU = 0; $sT = 0; $sA = 0; $sC = 0;
                     $so = InvoiceModel::invoiceStatusOptions();
@@ -770,7 +795,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                     echo '<tbody id="' . htmlspecialchars($anchorId) . '">';
                     echo '<tr style="background:#e8f5e9;font-weight:600">';
                     $hdr = $code !== '' ? '代碼 ' . $code . '：' . $label : $label;
-                    echo '<td colspan="10">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
+                    echo '<td colspan="12">' . htmlspecialchars($hdr) . ' (' . count($rows) . ' 筆)</td>';
                     echo '</tr>';
                     foreach ($rows as $r) {
                         $isVoided = $r['status'] === 'voided';
@@ -779,9 +804,13 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                         $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
                         $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
                         $deduct = (!empty($r['deduction_type']) && $r['deduction_type'] === 'deductible') ? '<span style="color:var(--success)">可扣抵</span>' : '<span style="color:var(--danger)">不可扣抵</span>';
+                        $isStar = !empty($r['is_starred']);
+                        $rpDisp = $_fmtReportPeriod(!empty($r['report_period']) ? $r['report_period'] : '', !empty($r['period']) ? $r['period'] : '');
                         echo '<tr' . $voidedStyle . '>';
+                        echo '<td class="text-center"><span class="star-toggle ' . ($isStar ? 'is-on' : '') . '" data-id="' . (int)$r['id'] . '" onclick="toggleStarTaxPurchase(this)" title="標記">&#9733;</span></td>';
                         echo '<td><a href="/purchase_invoices.php?action=edit&id=' . (int)$r['id'] . '">' . htmlspecialchars(!empty($r['invoice_number']) ? $r['invoice_number'] : '-') . '</a></td>';
                         echo '<td>' . htmlspecialchars(!empty($r['invoice_date']) ? $r['invoice_date'] : '') . '</td>';
+                        echo '<td style="color:#1565c0">' . htmlspecialchars($rpDisp) . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['vendor_tax_id']) ? $r['vendor_tax_id'] : '-') . '</td>';
                         echo '<td>' . htmlspecialchars(!empty($r['invoice_type']) ? $r['invoice_type'] : '-') . '</td>';
@@ -796,7 +825,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                     $allowNote = $isAllowance ? '（折讓扣除）' : '';
                     $prefix = $isAllowance ? '-' : '';
                     echo '<tr style="font-weight:600;background:#fafafa">';
-                    echo '<td colspan="6">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
+                    echo '<td colspan="8">小計 ' . htmlspecialchars($code !== '' ? $code : '-') . $allowNote . ' (' . $sC . ' 筆)</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sU > 0 ? $prefix : '') . '$' . number_format($sU) . '</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sT > 0 ? $prefix : '') . '$' . number_format($sT) . '</td>';
                     echo '<td class="text-right"' . $amtStyle . '>' . ($sA > 0 ? $prefix : '') . '$' . number_format($sA) . '</td>';
@@ -815,7 +844,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                 ?>
                 <tfoot>
                     <tr style="font-weight:700;background:var(--gray-50,#f8f9fa);border-top:2px solid #aaa">
-                        <td colspan="6">總計（已確認，23/24 已扣除）<?= $_pgrandC ?> 筆</td>
+                        <td colspan="8">總計（已確認，23/24 已扣除）<?= $_pgrandC ?> 筆</td>
                         <td class="text-right">$<?= number_format($_pgrandU) ?></td>
                         <td class="text-right">$<?= number_format($_pgrandT) ?></td>
                         <td class="text-right">$<?= number_format($_pgrandA) ?></td>
@@ -845,7 +874,33 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
 .badge-success { background: var(--success); color: #fff; }
 .badge-warning { background: var(--warning); color: #fff; }
 .badge { padding: 2px 8px; border-radius: 4px; font-size: .8rem; }
+.star-toggle { display:inline-block; cursor:pointer; font-size:1.2rem; color:#d0d0d0; transition:color .15s,transform .15s; user-select:none; line-height:1; }
+.star-toggle:hover { color:#f1c40f; transform:scale(1.15); }
+.star-toggle.is-on { color:#f1c40f; }
+.star-toggle.saving { opacity:.5; pointer-events:none; }
 @media (max-width: 767px) {
     .tax-summary-grid { grid-template-columns: 1fr; }
 }
 </style>
+<script>
+function _taxStarToggle(el, url) {
+    if (el.classList.contains('saving')) return;
+    var id = el.getAttribute('data-id'); if (!id) return;
+    el.classList.add('saving');
+    var fd = new FormData(); fd.append('id', id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.onload = function() {
+        el.classList.remove('saving');
+        try {
+            var res = JSON.parse(xhr.responseText);
+            if (res.error) { alert(res.error); return; }
+            el.classList.toggle('is-on', !!res.starred);
+        } catch (e) { alert('回應錯誤'); }
+    };
+    xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
+    xhr.send(fd);
+}
+function toggleStarTaxSales(el)    { _taxStarToggle(el, '/sales_invoices.php?action=toggle_star'); }
+function toggleStarTaxPurchase(el) { _taxStarToggle(el, '/purchase_invoices.php?action=toggle_star'); }
+</script>

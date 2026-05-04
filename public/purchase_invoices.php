@@ -17,6 +17,9 @@ switch ($action) {
     case 'list':
         $filters = array(
             'period'         => !empty($_GET['period']) ? $_GET['period'] : '',
+            'date_from'      => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'        => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
+            'report_period'  => !empty($_GET['report_period']) ? $_GET['report_period'] : '',
             'vendor'         => !empty($_GET['vendor']) ? $_GET['vendor'] : '',
             'status'         => !empty($_GET['status']) ? $_GET['status'] : '',
             'keyword'        => !empty($_GET['keyword']) ? $_GET['keyword'] : '',
@@ -30,6 +33,7 @@ switch ($action) {
         $result = $model->getPurchaseInvoices($filters, $page);
         $records = $result['data'];
         $periodOptions = $model->getPeriodOptions();
+        $taxPeriodOptions = $model->getTaxPeriodOptions();
         $vendors = $model->getVendors();
 
         $pageTitle = '進項發票管理';

@@ -23,11 +23,19 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>期間</label>
-                <select name="period" class="form-control">
+                <label>日期</label>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <input type="date" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" style="min-width:140px">
+                    <span style="color:#888">~</span>
+                    <input type="date" name="date_to" class="form-control" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" style="min-width:140px">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>申報期間</label>
+                <select name="report_period" class="form-control">
                     <option value="">全部</option>
-                    <?php foreach ($periodOptions as $p): ?>
-                    <option value="<?= e($p) ?>" <?= (!empty($filters['period']) && $filters['period'] === $p) ? 'selected' : '' ?>><?= e(substr($p, 0, 4) . '/' . substr($p, 4, 2)) ?></option>
+                    <?php foreach ($taxPeriodOptions as $_opt): ?>
+                    <option value="<?= e($_opt['value']) ?>" <?= (!empty($filters['report_period']) && $filters['report_period'] === $_opt['value']) ? 'selected' : '' ?>><?= e($_opt['label']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -65,7 +73,7 @@
             </div>
             <div class="form-group">
                 <label>關鍵字</label>
-                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報年月/金額（$1500 精準比對）">
+                <input type="text" name="keyword" class="form-control" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報期間/金額（$1500 精準比對）">
             </div>
             <div class="form-group">
                 <label>排序</label>
@@ -144,7 +152,7 @@
                     <th>發票號碼</th>
                     <th>日期</th>
                     <th>聯式</th>
-                    <th>申報年月</th>
+                    <th>申報期間</th>
                     <th>供應商</th>
                     <th>統編</th>
                     <th class="text-right">未稅金額</th>

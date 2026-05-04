@@ -911,10 +911,12 @@ document.addEventListener('click', function(e) {
         }
 
         // 狀態欄加 × 刪除按鈕
-        var statusCell = row.querySelector('td:last-child');
-        // 因為 return-col 可能是 last child，先找非 return-col
+        // 末尾有多個 .return-col 隱藏 cell，要過濾掉才能拿到真正的「狀態」cell
         var tds = row.querySelectorAll('td');
-        var statCell = tds[tds.length - 2]; // 倒數第二個是狀態，倒數第一是 return-col
+        var statCell = null;
+        for (var i = tds.length - 1; i >= 0; i--) {
+            if (!tds[i].classList.contains('return-col')) { statCell = tds[i]; break; }
+        }
         if (statCell) {
             var btn = document.createElement('button');
             btn.type = 'button';

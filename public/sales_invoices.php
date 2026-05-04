@@ -17,6 +17,8 @@ switch ($action) {
     case 'list':
         $filters = array(
             'period'       => !empty($_GET['period']) ? $_GET['period'] : '',
+            'date_from'    => !empty($_GET['date_from']) ? $_GET['date_from'] : '',
+            'date_to'      => !empty($_GET['date_to']) ? $_GET['date_to'] : '',
             'customer'     => !empty($_GET['customer']) ? $_GET['customer'] : '',
             'status'       => !empty($_GET['status']) ? $_GET['status'] : '',
             'keyword'      => !empty($_GET['keyword']) ? $_GET['keyword'] : '',

@@ -149,7 +149,9 @@ switch ($action) {
             Session::flash('error', '無權限');
             redirect('/reports.php');
         }
-        $data = $model->getUnpaidCases($branchIds);
+        $salesFilter = isset($_GET['sales_id']) ? trim($_GET['sales_id']) : '';
+        $data = $model->getUnpaidCases($branchIds, $salesFilter !== '' ? $salesFilter : null);
+        $salesOptions = $model->getUnpaidCasesSalesOptions($branchIds);
 
         $pageTitle = '完工未收款/未完工';
         $currentPage = 'reports';
@@ -157,6 +159,93 @@ switch ($action) {
         require __DIR__ . '/../templates/reports/unpaid_cases.php';
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
+
+    // ---- 完工未收款 / 未完工 → CSV 下載 ----
+    case 'unpaid_cases_export':
+        if (!Auth::canAccessReport('unpaid_cases') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $salesFilter = isset($_GET['sales_id']) ? trim($_GET['sales_id']) : '';
+        $data = $model->getUnpaidCases($branchIds, $salesFilter !== '' ? $salesFilter : null);
+        $today = date('Y-m-d');
+
+        $fname = '完工未收款_未完工_' . ($salesFilter === '' || $salesFilter === 'all' ? '全部業務' : ($salesFilter === '__empty__' ? '未指派業務' : '業務' . $salesFilter)) . '_' . date('YmdHis') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        $fp = fopen('php://output', 'w');
+        fwrite($fp, "\xEF\xBB\xBF"); // BOM
+
+        // 拆兩塊：未完工 + 完工未收款
+        $incomplete = array(); $unpaid = array();
+        $incompleteTotal = 0; $unpaidTotal = 0;
+        foreach ($data['rows'] as $r) {
+            $balance = (int)$r['balance_amount'];
+            if ($r['status'] === 'incomplete') {
+                $startDate = $r['created_at'] ? substr($r['created_at'], 0, 10) : null;
+                $r['_days'] = $startDate ? (int)((strtotime($today) - strtotime($startDate)) / 86400) : null;
+                $incomplete[] = $r;
+                $incompleteTotal += $balance;
+            } elseif ($r['status'] === 'unpaid') {
+                $startDate = $r['completion_date'] ?: null;
+                $r['_days'] = $startDate ? (int)((strtotime($today) - strtotime($startDate)) / 86400) : null;
+                $unpaid[] = $r;
+                $unpaidTotal += $balance;
+            }
+        }
+        $sortByDays = function($a, $b) {
+            if ($a['_days'] === null && $b['_days'] === null) return 0;
+            if ($a['_days'] === null) return -1;
+            if ($b['_days'] === null) return 1;
+            return $b['_days'] - $a['_days'];
+        };
+        usort($incomplete, $sortByDays);
+        usort($unpaid, $sortByDays);
+
+        fputcsv($fp, array('完工未收款 / 未完工 報表'));
+        fputcsv($fp, array('業務篩選', $salesFilter === '' || $salesFilter === 'all' ? '全部業務' : ($salesFilter === '__empty__' ? '未指派業務' : (string)$salesFilter), '匯出時間', date('Y-m-d H:i:s')));
+        fputcsv($fp, array());
+
+        // 未完工
+        fputcsv($fp, array('【未完工（以進件日期起算）】', count($incomplete) . ' 筆', '尾款合計', $incompleteTotal));
+        fputcsv($fp, array('案件編號', '進件日期', '完工日期', '天數', '客戶名稱', '案件名稱', '尾款金額', '分公司', '業務'));
+        foreach ($incomplete as $r) {
+            fputcsv($fp, array(
+                $r['case_number'] ?: '-',
+                !empty($r['created_at']) ? date('Y-m-d', strtotime($r['created_at'])) : '',
+                $r['completion_date'] ?: '未完工',
+                $r['_days'] !== null ? $r['_days'] : '-',
+                $r['customer_name'] ?: '',
+                $r['title'] ?: '',
+                (int)$r['balance_amount'],
+                $r['branch_name'] ?: '',
+                $r['sales_name'] ?: '',
+            ));
+        }
+
+        fputcsv($fp, array());
+
+        // 完工未收款
+        fputcsv($fp, array('【完工未收款（以完工日起算）】', count($unpaid) . ' 筆', '尾款合計', $unpaidTotal));
+        fputcsv($fp, array('案件編號', '進件日期', '完工日期', '天數', '客戶名稱', '案件名稱', '尾款金額', '分公司', '業務'));
+        foreach ($unpaid as $r) {
+            fputcsv($fp, array(
+                $r['case_number'] ?: '-',
+                !empty($r['created_at']) ? date('Y-m-d', strtotime($r['created_at'])) : '',
+                $r['completion_date'] ?: '',
+                $r['_days'] !== null ? $r['_days'] : '-',
+                $r['customer_name'] ?: '',
+                $r['title'] ?: '',
+                (int)$r['balance_amount'],
+                $r['branch_name'] ?: '',
+                $r['sales_name'] ?: '',
+            ));
+        }
+
+        fputcsv($fp, array());
+        fputcsv($fp, array('總計', '', '', '', '', '', $incompleteTotal + $unpaidTotal, '', ''));
+        fclose($fp);
+        exit;
 
     // ---- 案件更新進度 ----
     case 'case_progress':

@@ -3,6 +3,26 @@
     <a href="/reports.php" class="btn btn-outline btn-sm">← 返回報表</a>
 </div>
 
+<?php $_curSales = isset($_GET['sales_id']) ? $_GET['sales_id'] : ''; ?>
+<div class="card" style="padding:10px 14px;margin-bottom:10px">
+    <form method="GET" action="/reports.php" class="d-flex gap-2 align-center flex-wrap" style="margin:0">
+        <input type="hidden" name="action" value="unpaid_cases">
+        <label style="font-size:.9rem;color:#555">業務</label>
+        <select name="sales_id" class="form-control" style="width:auto;min-width:160px" onchange="this.form.submit()">
+            <option value="">全部業務</option>
+            <option value="__empty__" <?= $_curSales === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未指派業務</option>
+            <?php foreach ($salesOptions as $s): ?>
+            <option value="<?= (int)$s['id'] ?>" <?= $_curSales !== '' && $_curSales !== '__empty__' && (int)$_curSales === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['real_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">套用</button>
+        <a href="/reports.php?action=unpaid_cases" class="btn btn-outline btn-sm">清除</a>
+        <span style="flex:1"></span>
+        <a href="/reports.php?action=unpaid_cases_export&sales_id=<?= e($_curSales) ?>"
+           class="btn btn-sm" style="background:#16a34a;color:#fff" title="下載 CSV（Excel 可直接開啟）">📥 下載 Excel</a>
+    </form>
+</div>
+
 <?php
 $today = date('Y-m-d');
 // 分開統計

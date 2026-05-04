@@ -29,7 +29,18 @@ if (!empty($quote['case_id'])) {
 </div>
 <?php endif; ?>
 <div class="d-flex justify-between align-center flex-wrap gap-1 mb-2">
-    <h2>報價單 <?= e($quote['quotation_number']) ?></h2>
+    <div>
+        <h2 style="margin:0">報價單 <?= e($quote['quotation_number']) ?></h2>
+        <?php
+        $_lastEditTime = !empty($quote['updated_at']) ? substr($quote['updated_at'], 0, 16) : '';
+        $_lastEditor = !empty($quote['updater_name']) ? $quote['updater_name'] : (!empty($quote['creator_name']) ? $quote['creator_name'] : '');
+        if ($_lastEditTime):
+        ?>
+        <div style="font-size:.8rem;color:#888;margin-top:2px">
+            最後修改：<?= e($_lastEditTime) ?><?= $_lastEditor ? ' by ' . e($_lastEditor) : '' ?>
+        </div>
+        <?php endif; ?>
+    </div>
     <div class="d-flex gap-1 flex-wrap">
         <?php if (in_array($quote['status'], array('approved', 'sent', 'customer_accepted'))): ?>
         <a href="/quotations.php?action=print&id=<?= $quote['id'] ?>" class="btn btn-outline btn-sm" target="_blank">🖨 列印</a>

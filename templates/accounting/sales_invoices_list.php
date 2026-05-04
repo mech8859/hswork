@@ -18,12 +18,9 @@
             <option value="97002927" <?= $_sellerTaxDefault === '97002927' ? 'selected' : '' ?>>97002927 政遠企業有限公司</option>
             <option value="__empty__" <?= $_sellerTaxDefault === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定賣方</option>
         </select>
-        <select name="period" class="form-control" style="width:auto;min-width:100px">
-            <option value="">全部期間</option>
-            <?php foreach ($periodOptions as $p): ?>
-            <option value="<?= e($p) ?>" <?= (!empty($filters['period']) && $filters['period'] === $p) ? 'selected' : '' ?>><?= e(substr($p, 0, 4) . '/' . substr($p, 4, 2)) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <input type="date" name="date_from" class="form-control" style="width:auto;min-width:140px" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" title="日期起">
+        <span style="color:#888">~</span>
+        <input type="date" name="date_to" class="form-control" style="width:auto;min-width:140px" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" title="日期迄">
         <input type="text" name="customer" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['customer']) ? $filters['customer'] : '') ?>" placeholder="客戶名稱/統編">
         <select name="status" class="form-control" style="width:auto;min-width:80px">
             <option value="">全部狀態</option>
@@ -47,7 +44,7 @@
             <option value="<?= e($_k) ?>" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === $_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
             <?php endforeach; ?>
         </select>
-        <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報年月/金額（$1500 精準比對）">
+        <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報期間/金額（$1500 精準比對）">
         <input type="text" name="invoice_no_from" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_from']) ? $filters['invoice_no_from'] : '') ?>" placeholder="號碼起">
         <span style="color:#888">~</span>
         <input type="text" name="invoice_no_to" class="form-control" style="width:auto;min-width:120px" value="<?= e(!empty($filters['invoice_no_to']) ? $filters['invoice_no_to'] : '') ?>" placeholder="號碼迄">

@@ -1310,6 +1310,14 @@ switch ($action) {
             try { assertCaseNotLocked($caseId, '新增/修改請款項目'); }
             catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
         }
+        $_biDate = !empty($_POST['billing_date']) ? trim($_POST['billing_date']) : null;
+        if ($_biDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $_biDate)) { $_biDate = null; }
+        // 偵測 billing_date 欄位是否存在（migration 140 是否已執行）— 沒跑就略過該欄位寫入
+        $_hasBillingDate = false;
+        try {
+            $_chkCol = $db->query("SHOW COLUMNS FROM case_billing_items LIKE 'billing_date'");
+            $_hasBillingDate = ($_chkCol && $_chkCol->rowCount() > 0);
+        } catch (Exception $_chkEx) {}
         $biData = array(
             !empty($_POST['payment_category']) ? $_POST['payment_category'] : '',
             !empty($_POST['amount_untaxed']) ? (int)str_replace(',', '', $_POST['amount_untaxed']) : null,
@@ -1324,6 +1332,9 @@ switch ($action) {
             !empty($_POST['invoice_number']) ? trim($_POST['invoice_number']) : null,
             !empty($_POST['note']) ? trim($_POST['note']) : null,
         );
+        if ($_hasBillingDate) {
+            array_unshift($biData, $_biDate);
+        }
         // 處理附件上傳
         $attachPath = null;
         if (!empty($_FILES['bi_attachment']['tmp_name']) && $_FILES['bi_attachment']['error'] === UPLOAD_ERR_OK) {
@@ -1348,21 +1359,31 @@ switch ($action) {
         $newPaid = !empty($_POST['customer_paid']) ? 1 : 0;
         $newBilled = !empty($_POST['is_billed']) ? 1 : 0;
 
-        if ($biId) {
-            $sql = "UPDATE case_billing_items SET payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=?";
-            $params = array_merge($biData);
-            if ($attachPath) { $sql .= ", attachment_path=?"; $params[] = $attachPath; }
-            $sql .= " WHERE id=? AND case_id=?";
-            $params[] = $biId;
-            $params[] = $caseId;
-            $db->prepare($sql)->execute($params);
-        } else {
-            $maxSeq = $db->prepare("SELECT COALESCE(MAX(seq_no),0) FROM case_billing_items WHERE case_id=?");
-            $maxSeq->execute(array($caseId));
-            $seqNo = (int)$maxSeq->fetchColumn() + 1;
-            $db->prepare("INSERT INTO case_billing_items (case_id, seq_no, payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, attachment_path, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute(array_merge(array($caseId, $seqNo), $biData, array($attachPath, Auth::id())));
-            $biId = (int)$db->lastInsertId();
+        // 依欄位是否存在動態組 SQL（首次部署在 migration 未跑時也能存）
+        $_setBillingDate  = $_hasBillingDate ? 'billing_date=?, ' : '';
+        $_colsBillingDate = $_hasBillingDate ? 'billing_date, '  : '';
+        $_phsBillingDate  = $_hasBillingDate ? '?,'              : '';
+        try {
+            if ($biId) {
+                $sql = "UPDATE case_billing_items SET {$_setBillingDate}payment_category=?, amount_untaxed=?, tax_amount=?, total_amount=?, tax_included=?, customer_billable=?, customer_paid=?, customer_paid_info=?, is_billed=?, billed_info=?, invoice_number=?, note=?";
+                $params = array_merge($biData);
+                if ($attachPath) { $sql .= ", attachment_path=?"; $params[] = $attachPath; }
+                $sql .= " WHERE id=? AND case_id=?";
+                $params[] = $biId;
+                $params[] = $caseId;
+                $db->prepare($sql)->execute($params);
+            } else {
+                $maxSeq = $db->prepare("SELECT COALESCE(MAX(seq_no),0) FROM case_billing_items WHERE case_id=?");
+                $maxSeq->execute(array($caseId));
+                $seqNo = (int)$maxSeq->fetchColumn() + 1;
+                $insSql = "INSERT INTO case_billing_items (case_id, seq_no, {$_colsBillingDate}payment_category, amount_untaxed, tax_amount, total_amount, tax_included, customer_billable, customer_paid, customer_paid_info, is_billed, billed_info, invoice_number, note, attachment_path, created_by) VALUES (?,?,{$_phsBillingDate}?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                $db->prepare($insSql)
+                    ->execute(array_merge(array($caseId, $seqNo), $biData, array($attachPath, Auth::id())));
+                $biId = (int)$db->lastInsertId();
+            }
+        } catch (Exception $_saveEx) {
+            echo json_encode(array('success' => false, 'error' => '儲存失敗：' . $_saveEx->getMessage()));
+            break;
         }
 
         // 通知：偵測三個勾選變更（從 0→1 才發）
