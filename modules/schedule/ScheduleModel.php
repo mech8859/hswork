@@ -1393,43 +1393,33 @@ class ScheduleModel
             }
         }
 
-        // 硬規則：兩個 leader 在同組 → 嘗試把多餘的 leader 換成非 leader；換不掉才保留（fallback）
-        // 注意：判別用 engineer_level='leader'（can_lead 欄位被全打勾失去判別力，4/2026 確認）
+        // 硬規則：兩位「可任主工程師」在同組 → 嘗試把多餘的換成非主工程師；換不掉才保留（fallback）
+        // 判別用 can_lead=1（語意 = 可任主工程師；資料已整理乾淨：leader+senior 才為 1）
         $candidates = $this->dedupeMultipleLeads($candidates, $sorted, $teamSize);
 
         return $candidates;
     }
 
     /**
-     * 是否視為「組長」— 用於同組是否要避免重複
-     * 改用 engineer_level='leader' 為準（can_lead 欄位資料品質低）
-     */
-    private function isLeaderEngineer(array $eng)
-    {
-        return isset($eng['engineer_level']) && $eng['engineer_level'] === 'leader';
-    }
-
-    /**
-     * 候選團隊去重「兩個組長」：leader 數 ≥ 2 時嘗試替換為「1 leader + 0 leader」
+     * 候選團隊去重「兩個可任主工程師」：can_lead 數 ≥ 2 時嘗試替換為「1 主 + 0 主」
      * - 候選池 $sorted 已依技能分排序
-     * - 若所有可用人員都是 leader → 保留原候選（fallback，不破壞推薦）
+     * - 若所有可用人員都是 can_lead → 保留原候選（fallback，不破壞推薦）
      */
     private function dedupeMultipleLeads(array $candidates, array $sorted, $teamSize)
     {
-        $isLead = function($e) { return isset($e['engineer_level']) && $e['engineer_level'] === 'leader'; };
-        $countLead = function($team) use ($isLead) {
+        $countLead = function($team) {
             $n = 0;
-            foreach ($team as $e) if ($isLead($e)) $n++;
+            foreach ($team as $e) if (!empty($e['can_lead'])) $n++;
             return $n;
         };
 
-        // 候選池中所有非 leader 工程師（依技能分排序）
+        // 候選池中所有非 can_lead 工程師（依技能分排序）
         $nonLeadPool = array();
         foreach ($sorted as $e) {
-            if (!$isLead($e)) $nonLeadPool[] = $e;
+            if (empty($e['can_lead'])) $nonLeadPool[] = $e;
         }
 
-        // 若候選池無非 leader 人員 → 全部保留（fallback）
+        // 若候選池無非 can_lead 人員 → 全部保留（fallback）
         if (empty($nonLeadPool)) {
             return $candidates;
         }
@@ -1442,11 +1432,11 @@ class ScheduleModel
                 continue;
             }
 
-            // 替換策略：保留技能分最高的 1 位 leader，其餘 leader 用非 leader 替換
+            // 替換策略：保留技能分最高的 1 位主工程師，其餘用非主工程師替換
             $leads = array();
             $nonLeads = array();
             foreach ($team as $e) {
-                if ($isLead($e)) $leads[] = $e;
+                if (!empty($e['can_lead'])) $leads[] = $e;
                 else $nonLeads[] = $e;
             }
             usort($leads, function($a, $b) {
@@ -1475,7 +1465,7 @@ class ScheduleModel
             }
         }
 
-        // 若 $fixed 至少有一個 single/zero-leader 隊伍 → 過濾掉 multi-leader 候選
+        // 若 $fixed 至少有一個 single/zero-lead 隊伍 → 過濾掉 multi-lead 候選
         $hasGood = false;
         foreach ($fixed as $t) {
             if ($countLead($t) <= 1) { $hasGood = true; break; }
@@ -1587,11 +1577,11 @@ class ScheduleModel
         }
 
         // ---- 可帶隊分散 ----
-        // 多位 leader 在同一組會扣分（應分散到不同組帶不同隊）
-        // 判別用 engineer_level='leader'（can_lead 欄位被全打勾失去判別力，4/2026 確認）
+        // 多位「可任主工程師」(can_lead=1) 在同一組會扣分（應分散到不同組帶不同隊）
+        // 雙主工程師 = 隱性的兩個指揮中心；硬規則先過濾，這裡是 fallback
         $leadCount = 0;
         foreach ($team as $eng) {
-            if (isset($eng['engineer_level']) && $eng['engineer_level'] === 'leader') $leadCount++;
+            if (!empty($eng['can_lead'])) $leadCount++;
         }
         if ($leadCount > 1) {
             $breakdown['lead_penalty'] = -30 * ($leadCount - 1);
