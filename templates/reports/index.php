@@ -68,6 +68,7 @@
         array('key' => 'schedule_analysis', 'action' => 'schedule_analysis', 'icon' => '&#128197;', 'title' => '主管排工模式分析', 'desc' => '隊伍組成/配對熱力圖/分公司分布（依月份）'),
         array('key' => 'case_progress', 'action' => 'case_progress', 'icon' => '&#128221;', 'title' => '案件更新進度', 'desc' => '案件最後狀態變更追蹤（剔除已完工結案）'),
         array('key' => 'closed_anomalies', 'action' => 'closed_anomalies', 'icon' => '&#9888;&#65039;', 'title' => '結案資料異常', 'desc' => '已結案但帳款未平／未結清／缺完工日的案件清單'),
+        array('key' => 'completion_stats', 'action' => 'completion_stats', 'icon' => '&#127937;', 'title' => '完工統計', 'desc' => '各年度月份完工件數與金額（依完工日 + 成交金額）'),
     );
     ?>
     <div class="report-links">

@@ -27,7 +27,7 @@ foreach ($history as $h):
     <div class="timeline-content">
         <div class="d-flex justify-between align-center">
             <strong><?= e($h['case_title']) ?></strong>
-            <span class="badge badge-primary" style="font-size:.7rem"><?= e($h['case_number']) ?></span>
+            <a href="/schedule.php?action=view&id=<?= (int)$h['schedule_id'] ?>" class="badge badge-primary" style="font-size:.7rem;text-decoration:none" onclick="event.stopPropagation()"><?= e($h['case_number']) ?></a>
         </div>
 
         <div class="timeline-meta">

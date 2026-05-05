@@ -97,9 +97,9 @@ return [
 
     // 報表權限（角色預設）
     'report_defaults' => [
-        'boss'              => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis'],
-        'vice_president'    => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis'],
-        'manager'           => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis'],
+        'boss'              => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis','completion_stats'],
+        'vice_president'    => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis','completion_stats'],
+        'manager'           => ['case_summary','case_profit','staff_value','finance_summary','inter_branch_monthly','sales_personal','unpaid_cases','case_progress','closed_anomalies','schedule_analysis','completion_stats'],
         'assistant_manager' => ['case_summary','case_profit','finance_summary','unpaid_cases','case_progress'],
         'sales_manager'   => ['case_summary','case_profit','sales_personal','unpaid_cases','case_progress'],
         'eng_manager'     => ['case_summary','staff_value','inter_branch_monthly','unpaid_cases','case_progress'],
@@ -128,6 +128,7 @@ return [
         'case_progress'         => '案件更新進度',
         'closed_anomalies'      => '結案資料異常',
         'schedule_analysis'     => '主管排工模式分析',
+        'completion_stats'      => '完工統計',
     ],
 
     // 假別

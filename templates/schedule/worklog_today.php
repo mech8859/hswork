@@ -32,7 +32,7 @@
 <div class="card worklog-card">
     <div class="d-flex justify-between align-center mb-1">
         <strong style="font-size:1.1rem"><?= e($ts['case_title']) ?></strong>
-        <span class="badge badge-primary"><?= e($ts['case_number']) ?></span>
+        <a href="/schedule.php?action=view&id=<?= (int)$ts['id'] ?>" class="badge badge-primary" style="text-decoration:none"><?= e($ts['case_number']) ?></a>
     </div>
 
     <?php if ($ts['address']): ?>

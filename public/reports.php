@@ -174,6 +174,56 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    // ---- 完工統計（依完工日 + 成交金額） ----
+    case 'completion_stats':
+        if (!Auth::canAccessReport('completion_stats') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限');
+            redirect('/reports.php');
+        }
+        $statsYear = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+        $statsBranchId = isset($_GET['branch_id']) ? (int)$_GET['branch_id'] : 0;
+
+        $db = Database::getInstance();
+        $allBranches = $db->query("SELECT id, name FROM branches WHERE is_active = 1 AND id IN (" . implode(',', array_map('intval', $branchIds ?: array(0))) . ") ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+
+        $effBranchIds = ($statsBranchId > 0 && in_array($statsBranchId, $branchIds, true)) ? array($statsBranchId) : $branchIds;
+        $bidIn = empty($effBranchIds) ? '0' : implode(',', array_map('intval', $effBranchIds));
+
+        // 年度合計（所有有完工日的年份）
+        $yearStats = $db->query("
+            SELECT YEAR(completion_date) y,
+                   COUNT(*) cnt,
+                   COALESCE(SUM(deal_amount), 0) amt
+            FROM cases
+            WHERE completion_date IS NOT NULL
+              AND branch_id IN ({$bidIn})
+            GROUP BY YEAR(completion_date)
+            ORDER BY y DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 月份明細（指定年）
+        $monthStats = array_fill(1, 12, array('cnt' => 0, 'amt' => 0));
+        $stmt = $db->prepare("
+            SELECT MONTH(completion_date) m,
+                   COUNT(*) cnt,
+                   COALESCE(SUM(deal_amount), 0) amt
+            FROM cases
+            WHERE YEAR(completion_date) = ?
+              AND branch_id IN ({$bidIn})
+            GROUP BY MONTH(completion_date)
+        ");
+        $stmt->execute(array($statsYear));
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $monthStats[(int)$r['m']] = array('cnt' => (int)$r['cnt'], 'amt' => (int)$r['amt']);
+        }
+
+        $pageTitle = '完工統計';
+        $currentPage = 'reports';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/reports/completion_stats.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     // ---- 完工未收款 / 未完工 ----
     case 'unpaid_cases':
         if (!Auth::canAccessReport('unpaid_cases') && !Auth::hasPermission('all')) {

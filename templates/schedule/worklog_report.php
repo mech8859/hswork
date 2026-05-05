@@ -29,7 +29,7 @@ $_fromScheduleId = isset($_GET['from_schedule']) ? (int)$_GET['from_schedule'] :
 <div class="card">
     <div class="d-flex justify-between align-center">
         <strong><?= e($worklog['case_title']) ?></strong>
-        <span class="badge badge-primary"><?= e($worklog['case_number']) ?></span>
+        <a href="/schedule.php?action=view&id=<?= (int)$worklog['schedule_id'] ?>" class="badge badge-primary" style="text-decoration:none"><?= e($worklog['case_number']) ?></a>
     </div>
     <div class="text-muted" style="font-size:.85rem;margin-top:4px">
         <?= format_date($worklog['schedule_date']) ?>
