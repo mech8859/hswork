@@ -129,11 +129,6 @@ function _scMobileUrl($extra = array()) {
 .scm-fab { position:fixed; right:16px; bottom:16px; width:56px; height:56px; border-radius:50%; background:#1565c0; color:#fff; border:none; font-size:1.8rem; box-shadow:0 4px 12px rgba(21,101,192,.4); z-index:100; cursor:pointer; }
 .scm-fab:active { transform:scale(.95); }
 
-.scm-warn { position:relative; background:#fff3e0; border-left:4px solid #f9a825; padding:8px 30px 8px 12px; border-radius:4px; font-size:.8rem; color:#6a4800; margin-bottom:10px; }
-.scm-warn ul { margin:4px 0 0; padding-left:16px; }
-.scm-warn-close { position:absolute; top:4px; right:6px; background:none; border:none; font-size:1.2rem; line-height:1; color:#6a4800; cursor:pointer; padding:4px 8px; }
-.scm-warn-close:active { color:#000; }
-
 .scm-filter-clear { display:inline-block; font-size:.8rem; background:#e3f2fd; color:#1565c0; padding:4px 10px; border-radius:14px; text-decoration:none; margin-bottom:8px; }
 </style>
 
@@ -194,28 +189,6 @@ function _scMobileUrl($extra = array()) {
         <button type="button" class="scm-ct-tab" data-ct="maintenance">維護保養</button>
     </div>
     </div>
-
-    <!-- 多次施工人員不同組警告（只顯示 filterDate 或今日的） -->
-    <?php
-    $warnDate = $filterDate ?: $today;
-    $filteredWarnings = array();
-    foreach ($visitWarnings as $w) {
-        if (!empty($w['visit_date']) && $w['visit_date'] === $warnDate) {
-            $filteredWarnings[] = $w;
-        }
-    }
-    if (!empty($filteredWarnings)):
-    ?>
-    <div class="scm-warn" id="scmWarnBox">
-        <button type="button" class="scm-warn-close" onclick="scmCloseWarn()" aria-label="關閉">&times;</button>
-        <strong>⚠ 多次施工人員組別不同（<?= e($warnDate) ?>）：</strong>
-        <ul>
-            <?php foreach ($filteredWarnings as $w): ?>
-            <li><?= e($w['customer_name'] ?: ($w['case_title'] ?: $w['case_number'])) ?> 第<?= $w['visit_number'] ?>次與第<?= $w['previous_visit_number'] ?>次不同</li>
-            <?php endforeach; ?>
-        </ul>
-    </div>
-    <?php endif; ?>
 
     <?php if ($filterDate): ?>
     <a class="scm-filter-clear" href="<?= _scMobileUrl(array('date' => null)) ?>">✕ 清除日期篩選（只看 <?= $filterDate ?>）</a>
@@ -391,11 +364,6 @@ function scmClearKeyword() {
     var url = new URL(window.location.href);
     url.searchParams.delete('keyword');
     window.location.href = url.toString();
-}
-
-function scmCloseWarn() {
-    var box = document.getElementById('scmWarnBox');
-    if (box) box.style.display = 'none';
 }
 
 function scmScrollToToday() {

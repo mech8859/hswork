@@ -74,18 +74,6 @@ if ($currentKeyword !== '')  $keepQs .= '&keyword=' . urlencode($currentKeyword)
     <?php endif; ?>
 </div>
 
-<!-- 多次施工人員不同組通知 -->
-<?php if (!empty($visitWarnings)): ?>
-<div class="alert alert-warning">
-    <strong>多次施工人員組別不同：</strong>
-    <ul style="margin:4px 0 0 16px;padding:0">
-        <?php foreach ($visitWarnings as $w): ?>
-        <li><?= e($w['case_number']) ?> <?= e($w['case_title']) ?> - 第<?= $w['visit_number'] ?>次施工人員與第<?= $w['previous_visit_number'] ?>次不同</li>
-        <?php endforeach; ?>
-    </ul>
-</div>
-<?php endif; ?>
-
 <!-- 月份切換 -->
 <div class="d-flex justify-between align-center mb-1 hide-mobile">
     <a href="/schedule.php?year=<?= $prevYear ?>&month=<?= $prevMonth ?><?= $keepQs ?>" class="btn btn-outline btn-sm">&laquo; 上月</a>

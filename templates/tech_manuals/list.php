@@ -90,7 +90,7 @@
                     <?php if ($canManage): ?>
                     <a href="/tech_manuals.php?action=edit&id=<?= (int)$r['id'] ?>" class="btn btn-outline btn-xs">編輯</a>
                     <form method="POST" action="/tech_manuals.php?action=delete" style="display:inline" onsubmit="return confirm('確定刪除「<?= e(addslashes($r['title'])) ?>」？')">
-                        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                         <button type="submit" class="btn btn-outline btn-xs" style="color:#c62828">刪除</button>
                     </form>

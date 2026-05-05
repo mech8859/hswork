@@ -296,19 +296,21 @@ switch ($action) {
         break;
 
     case 'toggle_star':
+    case 'toggle_star_tax':
         header('Content-Type: application/json; charset=utf-8');
         if (!$canManage) { echo json_encode(array('error' => '無權限')); exit; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(array('error' => '方法錯誤')); exit; }
         $sid = isset($_POST['id']) ? (int)$_POST['id'] : 0;
         if ($sid <= 0) { echo json_encode(array('error' => '參數錯誤')); exit; }
+        $col = ($action === 'toggle_star_tax') ? 'is_starred_tax' : 'is_starred';
         try {
             $db = Database::getInstance();
-            $cur = $db->prepare("SELECT is_starred FROM sales_invoices WHERE id = ?");
+            $cur = $db->prepare("SELECT {$col} FROM sales_invoices WHERE id = ?");
             $cur->execute(array($sid));
             $c = $cur->fetchColumn();
             if ($c === false) { echo json_encode(array('error' => '記錄不存在')); exit; }
             $new = ((int)$c === 1) ? 0 : 1;
-            $db->prepare("UPDATE sales_invoices SET is_starred = ? WHERE id = ?")->execute(array($new, $sid));
+            $db->prepare("UPDATE sales_invoices SET {$col} = ? WHERE id = ?")->execute(array($new, $sid));
             echo json_encode(array('success' => true, 'starred' => $new));
         } catch (Exception $e) {
             echo json_encode(array('error' => $e->getMessage()));

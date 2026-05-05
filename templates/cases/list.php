@@ -209,7 +209,18 @@ $subStatusOptions = CaseModel::subStatusOptions();
             </div>
             <div class="case-card-title">
                 <?= e($row['title'] ?: $row['customer_name'] ?: '') ?>
-                <?php if (!empty($row['deal_amount']) && (int)$row['deal_amount'] > 0): ?><span class="badge" style="background:#2e7d32;color:#fff;font-size:.65em" title="成交金額">$<?= number_format((int)$row['deal_amount']) ?></span><?php endif; ?>
+                <?php
+                $_totalAmt   = isset($row['total_amount']) ? (int)$row['total_amount'] : 0;
+                $_collected  = isset($row['total_collected']) ? (int)$row['total_collected'] : 0;
+                $_balance    = isset($row['balance_amount']) ? (int)$row['balance_amount'] : 0;
+                if ($_totalAmt > 0 || $_collected > 0 || $_balance > 0):
+                ?>
+                <div style="font-size:.7rem;color:#666;margin-top:2px">
+                    <?php if ($_totalAmt > 0): ?>含稅 $<?= number_format($_totalAmt) ?> · <?php endif; ?>
+                    收款 $<?= number_format($_collected) ?> ·
+                    尾款 <span style="color:<?= $_balance > 0 ? '#c62828' : '#16a34a' ?>;font-weight:600">$<?= number_format($_balance) ?></span>
+                </div>
+                <?php endif; ?>
                 <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.6em">黑名單</span><?php endif; ?>
                 <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.6em">未成交</span><?php endif; ?>
                 <?php
@@ -261,9 +272,20 @@ $subStatusOptions = CaseModel::subStatusOptions();
                     <td style="white-space:nowrap"><?= !empty($row['created_at']) ? date('Y/m/d', strtotime($row['created_at'])) : '-' ?><?php if (!empty($row['updated_at']) && $row['updated_at'] !== $row['created_at']): ?><br><span style="font-size:.7rem;color:#aaa"><?= date('m/d H:i', strtotime($row['updated_at'])) ?></span><?php endif; ?></td>
                     <td>
                         <a href="/cases.php?action=edit&id=<?= $row['id'] ?>"><?= e($row['title'] ?: $row['customer_name'] ?: '') ?></a>
-                        <?php if (!empty($row['deal_amount']) && (int)$row['deal_amount'] > 0): ?><span class="badge" style="background:#2e7d32;color:#fff;font-size:.7em" title="成交金額">$<?= number_format((int)$row['deal_amount']) ?></span><?php endif; ?>
                         <?php if (!empty($row['is_blacklisted'])): ?><span class="badge" style="background:#e53e3e;color:#fff;font-size:.65em">黑名單</span><?php endif; ?>
                         <?php if (!empty($row['customer_id']) && empty($row['customer_has_deal'])): ?><span class="badge" style="background:#999;color:#fff;font-size:.65em">未成交</span><?php endif; ?>
+                        <?php
+                        $_totalAmt   = isset($row['total_amount']) ? (int)$row['total_amount'] : 0;
+                        $_collected  = isset($row['total_collected']) ? (int)$row['total_collected'] : 0;
+                        $_balance    = isset($row['balance_amount']) ? (int)$row['balance_amount'] : 0;
+                        if ($_totalAmt > 0 || $_collected > 0 || $_balance > 0):
+                        ?>
+                        <div style="font-size:.72rem;color:#666;margin-top:2px;line-height:1.4">
+                            <?php if ($_totalAmt > 0): ?>含稅 $<?= number_format($_totalAmt) ?> · <?php endif; ?>
+                            收款 $<?= number_format($_collected) ?> ·
+                            尾款 <span style="color:<?= $_balance > 0 ? '#c62828' : '#16a34a' ?>;font-weight:600">$<?= number_format($_balance) ?></span>
+                        </div>
+                        <?php endif; ?>
                         <?php
                         $showReadinessCheck = in_array($row['sub_status'] ?? '', array('電話報價成交','已成交','跨月成交','現簽'));
                         if ($showReadinessCheck):

@@ -38,8 +38,6 @@ switch ($action) {
         } else {
             $schedules = $model->getByDateRange($branchIds, $startDate, $endDate, $filterKeyword);
         }
-        $visitWarnings = $model->getVisitWarnings($branchIds);
-
         // 按日期分組
         $schedulesByDate = [];
         foreach ($schedules as $s) {

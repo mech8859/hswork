@@ -585,7 +585,7 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
                         if (!$isVoided) { $sU += (int)$r['amount_untaxed']; $sT += (int)$r['tax_amount']; $sA += (int)$r['total_amount']; $sC++; }
                         $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
                         $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
-                        $isStar = !empty($r['is_starred']);
+                        $isStar = !empty($r['is_starred_tax']);
                         $rpDisp = $_fmtReportPeriod(!empty($r['report_period']) ? $r['report_period'] : '', !empty($r['period']) ? $r['period'] : '');
                         echo '<tr' . $voidedStyle . '>';
                         echo '<td class="text-center"><span class="star-toggle ' . ($isStar ? 'is-on' : '') . '" data-id="' . (int)$r['id'] . '" onclick="toggleStarTaxSales(this)" title="標記">&#9733;</span></td>';
@@ -804,7 +804,7 @@ $_pdOpen = !empty($_GET['pdOpen']) && $_GET['pdOpen'] === '1';
                         $statusLabel = isset($so[$r['status']]) ? $so[$r['status']] : $r['status'];
                         $badgeClass = $r['status'] === 'voided' ? 'danger' : ($r['status'] === 'confirmed' ? 'success' : 'warning');
                         $deduct = (!empty($r['deduction_type']) && $r['deduction_type'] === 'deductible') ? '<span style="color:var(--success)">可扣抵</span>' : '<span style="color:var(--danger)">不可扣抵</span>';
-                        $isStar = !empty($r['is_starred']);
+                        $isStar = !empty($r['is_starred_tax']);
                         $rpDisp = $_fmtReportPeriod(!empty($r['report_period']) ? $r['report_period'] : '', !empty($r['period']) ? $r['period'] : '');
                         echo '<tr' . $voidedStyle . '>';
                         echo '<td class="text-center"><span class="star-toggle ' . ($isStar ? 'is-on' : '') . '" data-id="' . (int)$r['id'] . '" onclick="toggleStarTaxPurchase(this)" title="標記">&#9733;</span></td>';
@@ -901,6 +901,6 @@ function _taxStarToggle(el, url) {
     xhr.onerror = function() { el.classList.remove('saving'); alert('網路錯誤'); };
     xhr.send(fd);
 }
-function toggleStarTaxSales(el)    { _taxStarToggle(el, '/sales_invoices.php?action=toggle_star'); }
-function toggleStarTaxPurchase(el) { _taxStarToggle(el, '/purchase_invoices.php?action=toggle_star'); }
+function toggleStarTaxSales(el)    { _taxStarToggle(el, '/sales_invoices.php?action=toggle_star_tax'); }
+function toggleStarTaxPurchase(el) { _taxStarToggle(el, '/purchase_invoices.php?action=toggle_star_tax'); }
 </script>

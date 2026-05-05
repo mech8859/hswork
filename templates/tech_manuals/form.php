@@ -6,7 +6,7 @@
 
 <div class="card">
     <form method="POST" action="/tech_manuals.php?action=store" enctype="multipart/form-data">
-        <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+        <?= csrf_field() ?>
         <?php if ($isEdit): ?>
         <input type="hidden" name="id" value="<?= (int)$record['id'] ?>">
         <?php endif; ?>
