@@ -358,6 +358,35 @@ switch ($action) {
         $matchedItems = array();
         $vendorId = $vendorMatch ? $vendorMatch['id'] : null;
 
+        // 名稱相似度檢查：去除型號/數字/符號後，比較中文描述部分的 bigram 重疊率
+        // 必須 ≥ 50% bigram 重疊才視為相符，防止只是型號雷同的不同產品誤匹配
+        // 例：AI「EMT盒接 E-25B 3/4"」vs DB「BM金蔥 E-25B 3/4"」→ 去掉 E-25B 後「EMT盒接」vs「BM金蔥」無重疊 → 不匹配
+        $hsAiNameMatches = function($aiName, $dbName, $aiModel = '') {
+            if (empty($aiName) || empty($dbName)) return false;
+            $strip = function($s, $model) {
+                if (!empty($model)) $s = str_ireplace($model, '', $s);
+                $s = preg_replace('/[\s\-\/"\(\)（）0-9.]+/u', '', $s);
+                return mb_strtolower($s);
+            };
+            $a = $strip($aiName, $aiModel);
+            $b = $strip($dbName, $aiModel);
+            $aLen = mb_strlen($a);
+            $bLen = mb_strlen($b);
+            if ($aLen < 2 || $bLen < 2) return false;
+            $bigrams = function($s, $len) {
+                $out = array();
+                for ($i = 0; $i <= $len - 2; $i++) {
+                    $out[mb_substr($s, $i, 2)] = true;
+                }
+                return $out;
+            };
+            $aBi = $bigrams($a, $aLen);
+            $bBi = $bigrams($b, $bLen);
+            $common = count(array_intersect_key($aBi, $bBi));
+            $minCnt = min(count($aBi), count($bBi));
+            return $minCnt > 0 && ($common / $minCnt) >= 0.5;
+        };
+
         foreach ($items as $item) {
             $matched = $item;
             $matched['product_id'] = null;
@@ -366,31 +395,35 @@ switch ($action) {
             $aiName = !empty($item['product_name']) ? $item['product_name'] : '';
 
             if ($vendorId && $aiModel) {
-                // 先查 vendor_products
+                // 先查 vendor_products（取多筆候選做名稱比對）
                 $stmt = $db->prepare("SELECT vp.product_id, vp.vendor_model, vp.vendor_name, p.name as product_name, p.model as product_model
                     FROM vendor_products vp LEFT JOIN products p ON vp.product_id = p.id
-                    WHERE vp.vendor_id = ? AND vp.vendor_model LIKE ? LIMIT 1");
+                    WHERE vp.vendor_id = ? AND vp.vendor_model LIKE ? LIMIT 10");
                 $stmt->execute(array($vendorId, '%' . $aiModel . '%'));
-                $vpMatch = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($vpMatch) {
-                    $matched['product_id'] = $vpMatch['product_id'];
-                    $matched['product_name'] = $vpMatch['product_name'] ? $vpMatch['product_name'] : $aiName;
-                    $matched['model'] = $vpMatch['product_model'] ? $vpMatch['product_model'] : $aiModel;
-                    $matched['match_source'] = 'vendor_products';
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $vpMatch) {
+                    if ($hsAiNameMatches($aiName, $vpMatch['product_name'] ?: $vpMatch['vendor_name'], $aiModel)) {
+                        $matched['product_id'] = $vpMatch['product_id'];
+                        $matched['product_name'] = $vpMatch['product_name'] ? $vpMatch['product_name'] : $aiName;
+                        $matched['model'] = $vpMatch['product_model'] ? $vpMatch['product_model'] : $aiModel;
+                        $matched['match_source'] = 'vendor_products';
+                        break;
+                    }
                 }
             }
 
             if (!$matched['product_id'] && $aiModel) {
-                // 查 products 表 by model
-                $stmt = $db->prepare("SELECT id, name, model, unit FROM products WHERE model LIKE ? AND is_active = 1 LIMIT 1");
+                // 查 products 表 by model（取多筆候選做名稱比對）
+                $stmt = $db->prepare("SELECT id, name, model, unit FROM products WHERE model LIKE ? AND is_active = 1 LIMIT 10");
                 $stmt->execute(array('%' . $aiModel . '%'));
-                $pMatch = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($pMatch) {
-                    $matched['product_id'] = $pMatch['id'];
-                    $matched['product_name'] = $pMatch['name'];
-                    $matched['model'] = $pMatch['model'];
-                    if (!empty($pMatch['unit'])) $matched['unit'] = $pMatch['unit'];
-                    $matched['match_source'] = 'products_model';
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $pMatch) {
+                    if ($hsAiNameMatches($aiName, $pMatch['name'], $aiModel)) {
+                        $matched['product_id'] = $pMatch['id'];
+                        $matched['product_name'] = $pMatch['name'];
+                        $matched['model'] = $pMatch['model'];
+                        if (!empty($pMatch['unit'])) $matched['unit'] = $pMatch['unit'];
+                        $matched['match_source'] = 'products_model';
+                        break;
+                    }
                 }
             }
 
