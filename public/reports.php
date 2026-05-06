@@ -614,6 +614,38 @@ switch ($action) {
             if ($statusEng) { $sql .= " AND c.status = ?"; $params[] = $statusEng; }
             if ($salesName) { $sql .= " AND u.real_name = ?"; $params[] = $salesName; }
             $sql .= " ORDER BY c.created_at DESC LIMIT 500";
+        } elseif ($type === 'old_repair') {
+            // 老客戶維修：依 created_at 月份，case_type=old_repair
+            // subset 經由 status_val 傳入：all / with / without / oow
+            $subset = isset($_GET['status_val']) ? $_GET['status_val'] : 'all';
+            $sql = "SELECT c.id, c.case_number, c.title, c.customer_name,
+                        u.real_name AS sales_name, DATE(c.created_at) AS created_date,
+                        c.deal_date, COALESCE(c.total_amount, 0) AS total_amount,
+                        c.sub_status, c.case_type
+                    FROM cases c
+                    LEFT JOIN users u ON c.sales_id = u.id
+                    WHERE c.branch_id IN ($ph)
+                      AND c.case_type = 'old_repair'";
+            if ($month) {
+                $sql .= " AND DATE_FORMAT(c.created_at, '%Y-%m') = ?";
+                $params[] = $month;
+            } else {
+                $sql .= " AND c.created_at BETWEEN ? AND ?";
+                $params[] = $year . '-01-01';
+                $params[] = $year . '-12-31 23:59:59';
+            }
+            if ($subset === 'with') {
+                $sql .= " AND COALESCE(c.total_amount, 0) > 0";
+            } elseif ($subset === 'without') {
+                $sql .= " AND COALESCE(c.total_amount, 0) <= 0";
+            } elseif ($subset === 'oow') {
+                $sql .= " AND (
+                    c.repair_original_warranty_date IS NULL
+                    OR c.repair_original_warranty_date = '0000-00-00'
+                    OR COALESCE(c.repair_report_date, DATE(c.created_at)) > c.repair_original_warranty_date
+                )";
+            }
+            $sql .= " ORDER BY c.created_at DESC, c.id DESC";
         } else {
             echo json_encode(array('cases' => array()));
             exit;

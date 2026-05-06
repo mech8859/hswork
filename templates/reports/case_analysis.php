@@ -1220,6 +1220,95 @@ sort($_pgAllProgress);
 </div>
 <?php endif; ?>
 
+<!-- 十八、老客戶維修 月份統計 -->
+<?php
+$repairDb = Database::getInstance();
+$repairBranches = implode(',', array_map('intval', $branchIds));
+// 「無原案件保固入期」= 維修通報日已過保固到期日 或 沒登錄保固到期日
+//   判斷基準：repair_report_date 為主，沒填則退而用 created_at
+$repairStmt = $repairDb->query("
+    SELECT
+        DATE_FORMAT(created_at, '%Y-%m') AS ym,
+        COUNT(*) AS total_cnt,
+        SUM(CASE WHEN COALESCE(total_amount, 0) > 0 THEN 1 ELSE 0 END) AS with_amt,
+        SUM(CASE WHEN COALESCE(total_amount, 0) <= 0 THEN 1 ELSE 0 END) AS without_amt,
+        SUM(
+            CASE
+                WHEN repair_original_warranty_date IS NULL OR repair_original_warranty_date = '0000-00-00' THEN 1
+                WHEN COALESCE(repair_report_date, DATE(created_at)) > repair_original_warranty_date THEN 1
+                ELSE 0
+            END
+        ) AS out_of_warranty
+    FROM cases
+    WHERE branch_id IN ({$repairBranches})
+    AND case_type = 'old_repair'
+    AND DATE_FORMAT(created_at, '%Y-%m') BETWEEN '{$months[0]}' AND '{$months[$nm-1]}'
+    GROUP BY ym
+    ORDER BY ym
+");
+$repairData = array();
+foreach ($repairStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $repairData[$r['ym']] = array(
+        'total'   => (int)$r['total_cnt'],
+        'with'    => (int)$r['with_amt'],
+        'without' => (int)$r['without_amt'],
+        'oow'     => (int)$r['out_of_warranty'],
+    );
+}
+?>
+<div class="card">
+    <div class="card-header analysis-header">十八、老客戶維修 月份統計<small style="opacity:.7;margin-left:8px">（case_type = old_repair）</small></div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>統計項目</th>
+                <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td>總件數</td>
+                    <?php $rTotalSum = 0; foreach ($months as $m): $v = isset($repairData[$m]['total']) ? $repairData[$m]['total'] : 0; $rTotalSum += $v; ?>
+                    <td class="<?= $v ? 'drillable' : '' ?>" <?= $v ? 'onclick="drillDown(\'old_repair\',\'' . $m . '\',\'\',\'老客戶維修 ' . (int)substr($m,5) . '月 總件數明細\',\'all\')"' : '' ?>><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total <?= $rTotalSum ? 'drillable' : '' ?>" <?= $rTotalSum ? 'onclick="drillDown(\'old_repair\',\'\',\'\',\'老客戶維修 年度總件數明細\',\'all\')"' : '' ?>><?= number_format($rTotalSum) ?></td>
+                </tr>
+                <tr>
+                    <td>有金額件數</td>
+                    <?php $rWithSum = 0; foreach ($months as $m): $v = isset($repairData[$m]['with']) ? $repairData[$m]['with'] : 0; $rWithSum += $v; ?>
+                    <td class="<?= $v ? 'drillable' : '' ?>" <?= $v ? 'onclick="drillDown(\'old_repair\',\'' . $m . '\',\'\',\'老客戶維修 ' . (int)substr($m,5) . '月 有金額件數明細\',\'with\')"' : '' ?>><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total <?= $rWithSum ? 'drillable' : '' ?>" <?= $rWithSum ? 'onclick="drillDown(\'old_repair\',\'\',\'\',\'老客戶維修 年度有金額件數明細\',\'with\')"' : '' ?>><?= number_format($rWithSum) ?></td>
+                </tr>
+                <tr>
+                    <td>無金額件數</td>
+                    <?php $rWithoutSum = 0; foreach ($months as $m): $v = isset($repairData[$m]['without']) ? $repairData[$m]['without'] : 0; $rWithoutSum += $v; ?>
+                    <td class="<?= $v ? 'drillable' : '' ?>" <?= $v ? 'onclick="drillDown(\'old_repair\',\'' . $m . '\',\'\',\'老客戶維修 ' . (int)substr($m,5) . '月 無金額件數明細\',\'without\')"' : '' ?>><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total <?= $rWithoutSum ? 'drillable' : '' ?>" <?= $rWithoutSum ? 'onclick="drillDown(\'old_repair\',\'\',\'\',\'老客戶維修 年度無金額件數明細\',\'without\')"' : '' ?>><?= number_format($rWithoutSum) ?></td>
+                </tr>
+                <tr>
+                    <td>無原案件保固入期件數<small style="opacity:.7;margin-left:4px">（已過保或未登錄保固）</small></td>
+                    <?php $rOowSum = 0; foreach ($months as $m): $v = isset($repairData[$m]['oow']) ? $repairData[$m]['oow'] : 0; $rOowSum += $v; ?>
+                    <td class="<?= $v ? 'drillable' : '' ?>" <?= $v ? 'onclick="drillDown(\'old_repair\',\'' . $m . '\',\'\',\'老客戶維修 ' . (int)substr($m,5) . '月 無原案件保固入期件數明細\',\'oow\')"' : '' ?>><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total <?= $rOowSum ? 'drillable' : '' ?>" <?= $rOowSum ? 'onclick="drillDown(\'old_repair\',\'\',\'\',\'老客戶維修 年度無原案件保固入期件數明細\',\'oow\')"' : '' ?>><?= number_format($rOowSum) ?></td>
+                </tr>
+                <tr class="row-highlight">
+                    <td>有金額比例</td>
+                    <?php foreach ($months as $m):
+                        $t = isset($repairData[$m]['total']) ? $repairData[$m]['total'] : 0;
+                        $w = isset($repairData[$m]['with']) ? $repairData[$m]['with'] : 0;
+                    ?>
+                    <td><?= $t > 0 ? round($w / $t * 100, 1) . '%' : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= $rTotalSum > 0 ? round($rWithSum / $rTotalSum * 100, 1) . '%' : '' ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <?php endif; ?>
 
 <!-- 鑽取明細（內嵌在卡片下方）-->
@@ -1341,14 +1430,14 @@ function drillDown(type, month, salesName, label, statusVal) {
             var html = '<table class="table table-sm" style="font-size:.8rem"><thead><tr>';
             html += '<th>編號</th><th>' + (isReceipt ? '客戶' : '案件名稱') + '</th>';
             if (!isReceipt) html += '<th>客戶</th>';
-            html += '<th>業務</th><th>' + (type === 'entry' || type === 'status' ? '進件日' : '成交日') + '</th>';
+            html += '<th>業務</th><th>' + (type === 'entry' || type === 'status' || type === 'old_repair' ? '進件日' : '成交日') + '</th>';
             html += '<th style="text-align:right">金額</th><th>狀態</th></tr></thead><tbody>';
             var totalAmt = 0;
             for (var i = 0; i < cases.length; i++) {
                 var c = cases[i];
                 var amt = parseInt(c.total_amount) || 0;
                 totalAmt += amt;
-                var dateVal = type === 'entry' ? (c.created_date || '') : (c.deal_date || '');
+                var dateVal = (type === 'entry' || type === 'old_repair') ? (c.created_date || '') : (c.deal_date || '');
                 var link = isReceipt ? '/receipts.php?action=edit&id=' + c.id : '/cases.php?action=edit&id=' + c.id;
                 html += '<tr>';
                 html += '<td><a href="' + link + '" target="_blank">' + escHtml(c.case_number || '-') + '</a></td>';
