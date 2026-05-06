@@ -11,6 +11,8 @@
     <div class="d-flex gap-1 flex-wrap">
         <?php if ($record['status'] === 'pending' && ($record['user_id'] == Auth::id() || $canManage)): ?>
         <a href="/overtimes.php?action=edit&id=<?= (int)$record['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
+        <?php elseif ($record['status'] === 'rejected' && $record['user_id'] == Auth::id()): ?>
+        <a href="/overtimes.php?action=edit&id=<?= (int)$record['id'] ?>" class="btn btn-primary btn-sm" title="修改後將重新提交簽核">✏ 修改後重送</a>
         <?php endif; ?>
 
         <?php if ($canManage && $record['status'] === 'pending'): ?>

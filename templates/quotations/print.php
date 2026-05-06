@@ -293,13 +293,12 @@ if (!empty($quote['case_id'])) {
     <tr>
         <td style="vertical-align:bottom;border:none;padding:0" rowspan="2">
             <div style="display:flex;gap:10px;align-items:flex-end">
-                <?php if (!empty($qs['quote_stamp_image'])): ?>
-                <img src="/<?= e($qs['quote_stamp_image']) ?>" style="max-height:90px">
+                <?php $_stampImg = $_getQsBranch('quote_stamp_image'); if (!empty($_stampImg)): ?>
+                <img src="/<?= e($_stampImg) ?>" style="max-height:90px">
                 <?php endif; ?>
-                <?php if (!empty($qs['quote_qrcode_image'])): ?>
+                <?php $_qrImg = $_getQsBranch('quote_qrcode_image'); if (!empty($_qrImg)): ?>
                 <div style="text-align:center">
-                    <img src="/<?= e($qs['quote_qrcode_image']) ?>" style="max-height:80px"><br>
-                    <span style="font-size:8px">ID:<?= e(isset($qs['quote_line_id']) ? $qs['quote_line_id'] : '') ?></span>
+                    <img src="/<?= e($_qrImg) ?>" style="max-height:80px">
                 </div>
                 <?php endif; ?>
             </div>
@@ -322,10 +321,6 @@ if (!empty($quote['case_id'])) {
         <td style="text-align:left;border:none;padding:8px 15px;height:40px;font-size:10px"></td>
     </tr>
 </table>
-
-<?php if (empty($qs['quote_stamp_image']) && empty($qs['quote_qrcode_image'])): ?>
-<div class="line-id">官方LINE ID : <?= e(isset($qs['quote_line_id']) ? $qs['quote_line_id'] : '@hs0425347007') ?></div>
-<?php endif; ?>
 
 </body>
 </html>

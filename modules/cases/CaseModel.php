@@ -725,7 +725,17 @@ class CaseModel
 
         if ($existing) {
             // 更新既有事件
-            $upd = $this->db->prepare('UPDATE business_calendar SET event_date = ?, staff_id = ?, customer_name = ?, phone = ?, address = ?, note = ?, start_time = ? WHERE id = ?');
+            // 注意：customer_name / phone / address 用 COALESCE(NULLIF(?, ''), 原值)
+            // 案件空值不洗掉業務行程已填的內容
+            $upd = $this->db->prepare("UPDATE business_calendar SET
+                event_date = ?,
+                staff_id = ?,
+                customer_name = COALESCE(NULLIF(?, ''), customer_name),
+                phone = COALESCE(NULLIF(?, ''), phone),
+                address = COALESCE(NULLIF(?, ''), address),
+                note = ?,
+                start_time = ?
+                WHERE id = ?");
             $upd->execute(array($surveyDate, $staffId, $c['customer_name'], $phone, $c['address'], $note, $surveyTime, $existing['id']));
         } else {
             // 新建事件

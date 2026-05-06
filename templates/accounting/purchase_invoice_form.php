@@ -6,17 +6,22 @@ $deductionOptions = InvoiceModel::deductionTypeOptions();
 $refOptions = InvoiceModel::referenceTypeOptions();
 ?>
 
-<div>
-    <h2 style="margin-bottom:2px"><?= $isEdit ? '編輯進項發票 - ' . e($record['invoice_number']) : '新增進項發票' ?></h2>
-    <?php if ($isEdit && !empty($record['updated_at'])): ?>
-    <small class="text-muted">最後修改 <?= e($record['updated_at']) ?><?php
-        if (!empty($record['updated_by'])) {
-            $updater = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
-            $updater->execute(array($record['updated_by']));
-            $un = $updater->fetchColumn();
-            if ($un) echo ' / ' . e($un);
-        }
-    ?></small>
+<div class="d-flex justify-between align-center flex-wrap gap-1">
+    <div>
+        <h2 style="margin-bottom:2px"><?= $isEdit ? '編輯進項發票 - ' . e($record['invoice_number']) : '新增進項發票' ?></h2>
+        <?php if ($isEdit && !empty($record['updated_at'])): ?>
+        <small class="text-muted">最後修改 <?= e($record['updated_at']) ?><?php
+            if (!empty($record['updated_by'])) {
+                $updater = Database::getInstance()->prepare('SELECT real_name FROM users WHERE id = ?');
+                $updater->execute(array($record['updated_by']));
+                $un = $updater->fetchColumn();
+                if ($un) echo ' / ' . e($un);
+            }
+        ?></small>
+        <?php endif; ?>
+    </div>
+    <?php if (!empty($returnToUrl)): ?>
+    <a href="<?= e($returnToUrl) ?>" class="btn btn-outline btn-sm">← 返回對帳</a>
     <?php endif; ?>
 </div>
 
@@ -36,6 +41,9 @@ $refOptions = InvoiceModel::referenceTypeOptions();
 
 <form method="POST" class="mt-2" id="purchaseInvoiceForm">
     <?= csrf_field() ?>
+    <?php if (!empty($returnToUrl)): ?>
+    <input type="hidden" name="return_to" value="<?= e($returnToUrl) ?>">
+    <?php endif; ?>
     <?php if ($isVoided): ?>
     <fieldset disabled style="border:none;padding:0;margin:0">
     <?php endif; ?>
@@ -102,7 +110,7 @@ $refOptions = InvoiceModel::referenceTypeOptions();
                     <option value="22" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '22') ? 'selected' : '' ?>>22：進項二聯式收銀機統一發票、載有稅額之其他憑證</option>
                     <option value="23" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '23') ? 'selected' : '' ?>>23：三聯式進貨退出或折讓證明單</option>
                     <option value="24" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '24') ? 'selected' : '' ?>>24：二聯式進貨退出或折讓證明單</option>
-                    <option value="25" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '25') ? 'selected' : '' ?>>25：進項三聯式收銀機統一發票、公用事業憑證</option>
+                    <option value="25" <?= ($isEdit && !empty($record['invoice_format']) && $record['invoice_format'] === '25') ? 'selected' : '' ?>>25：進項三聯式收銀機統一發票、電子發票</option>
                 </select>
             </div>
             <div class="form-group">

@@ -54,6 +54,15 @@ function jrVoucherLink($id, $number, $tab, $refBase) {
         </datalist>
         <button type="submit" class="btn btn-primary">查詢</button>
         <a href="/accounting.php?action=journal_reports" class="btn btn-outline">清除</a>
+        <?php
+        $jrExportUrl = '/accounting.php?action=journal_reports&export=csv'
+            . '&tab=' . urlencode($jrTab)
+            . '&date_from=' . urlencode($jrDateFrom) . '&date_to=' . urlencode($jrDateTo)
+            . ($jrCostCenterId ? '&cost_center_id=' . (int)$jrCostCenterId : '')
+            . ($jrAccountFrom !== '' ? '&account_from=' . urlencode($jrAccountFrom) : '')
+            . ($jrAccountTo !== '' ? '&account_to=' . urlencode($jrAccountTo) : '');
+        ?>
+        <a href="<?= e($jrExportUrl) ?>" id="jrExportBtn" class="btn" style="background:#16a34a;color:#fff" title="下載當前分頁的 CSV（Excel 可直接開啟）">📥 下載 Excel</a>
     </form>
 </div>
 
@@ -456,6 +465,11 @@ function jrSwitch(tab) {
     document.getElementById('jr-' + tab).style.display = '';
     document.getElementById('jrHiddenTab').value = tab;
     event.target.classList.add('active');
+    // 同步更新「下載 Excel」按鈕的 tab 參數
+    var exportBtn = document.getElementById('jrExportBtn');
+    if (exportBtn) {
+        exportBtn.href = exportBtn.href.replace(/([?&])tab=[^&]*/, '$1tab=' + tab);
+    }
 }
 </script>
 <style>

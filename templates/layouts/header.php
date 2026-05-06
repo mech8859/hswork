@@ -156,7 +156,7 @@
         <!-- 會計管理 -->
         <?php if (Auth::hasPermission('accounting.manage') || Auth::hasPermission('accounting.view') || Auth::hasPermission('finance.manage') || Auth::hasPermission('finance.view')): ?>
         <li class="nav-section">會計管理</li>
-        <li><a href="/accounting.php?action=journals" class="<?= ($currentPage ?? '') === 'accounting' && !in_array(($action ?? ''), array('accounts','cost_centers','journal_reports','ledger','offset_ledger','offset_reports','trial_balance','income_statement','balance_sheet','reconciliation','financial_reports','budget')) ? 'active' : '' ?>">📋 傳票管理</a></li>
+        <li><a href="/accounting.php?action=journals" class="<?= ($currentPage ?? '') === 'accounting' && !in_array(($action ?? ''), array('accounts','cost_centers','journal_reports','ledger','offset_ledger','offset_reports','trial_balance','income_statement','balance_sheet','reconciliation','voucher_reconciliation','invoice_voucher_reconciliation','financial_reports','budget')) ? 'active' : '' ?>">📋 傳票管理</a></li>
         <li><a href="/accounting.php?action=accounts" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'accounts' ? 'active' : '' ?>">📊 會計科目</a></li>
         <li><a href="/accounting.php?action=cost_centers" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'cost_centers' ? 'active' : '' ?>">🏢 成本中心</a></li>
         <li><a href="/accounting.php?action=journal_reports" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'journal_reports' ? 'active' : '' ?>">📄 傳票報表</a></li>
@@ -168,6 +168,7 @@
         <li><a href="/accounting.php?action=balance_sheet" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'balance_sheet' ? 'active' : '' ?>">📊 資產負債表</a></li>
         <li><a href="/accounting.php?action=reconciliation" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'reconciliation' ? 'active' : '' ?>">🏦 銀行對帳</a></li>
         <li><a href="/accounting.php?action=voucher_reconciliation" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'voucher_reconciliation' ? 'active' : '' ?>">✅ 傳票核對</a></li>
+        <li><a href="/accounting.php?action=invoice_voucher_reconciliation&type=sales" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'invoice_voucher_reconciliation' ? 'active' : '' ?>">🧾 發票傳票對帳</a></li>
         <li><a href="/accounting.php?action=financial_reports" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'financial_reports' ? 'active' : '' ?>">📊 財務報表</a></li>
         <li><a href="/accounting.php?action=budget" class="<?= ($currentPage ?? '') === 'accounting' && ($action ?? '') === 'budget' ? 'active' : '' ?>">📝 預算編輯</a></li>
         <?php endif; ?>
@@ -179,6 +180,7 @@
         <li><a href="/purchase_orders.php" class="<?= ($currentPage ?? '') === 'purchase_orders' ? 'active' : '' ?>">🛒 採購單</a></li>
         <li><a href="/vendors.php" class="<?= ($currentPage ?? '') === 'vendors' ? 'active' : '' ?>">🏭 廠商管理</a></li>
         <li><a href="/vendor_products.php" class="<?= ($currentPage ?? '') === 'vendor_products' ? 'active' : '' ?>">🔗 廠商產品對照</a></li>
+        <li><a href="/vendor_invoices.php" class="<?= ($currentPage ?? '') === 'vendor_invoices' ? 'active' : '' ?>">📥 廠商請款單</a></li>
         <?php endif; ?>
 
         <!-- 庫存管理 -->

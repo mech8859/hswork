@@ -22,12 +22,12 @@
                     <option value="__empty__" <?= $_buyerTaxDefault === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定買方</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="min-width:310px;flex-shrink:0">
                 <label>日期</label>
                 <div style="display:flex;gap:6px;align-items:center">
-                    <input type="date" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" style="min-width:140px">
+                    <input type="date" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" style="flex:1;min-width:140px">
                     <span style="color:#888">~</span>
-                    <input type="date" name="date_to" class="form-control" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" style="min-width:140px">
+                    <input type="date" name="date_to" class="form-control" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" style="flex:1;min-width:140px">
                 </div>
             </div>
             <div class="form-group">
@@ -52,9 +52,9 @@
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="min-width:280px;max-width:360px">
                 <label>進項發票聯式</label>
-                <select name="invoice_format" class="form-control">
+                <select name="invoice_format" class="form-control" title="<?= e(!empty($filters['invoice_format']) ? $filters['invoice_format'] : '') ?>">
                     <option value="">全部</option>
                     <option value="__empty__" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === '__empty__') ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定聯式</option>
                     <?php
@@ -63,11 +63,11 @@
                         '22' => '22：進項二聯式收銀機統一發票、載有稅額之其他憑證',
                         '23' => '23：三聯式進貨退出或折讓證明單',
                         '24' => '24：二聯式進貨退出或折讓證明單',
-                        '25' => '25：進項三聯式收銀機統一發票、公用事業憑證',
+                        '25' => '25：進項三聯式收銀機統一發票、電子發票',
                     );
                     foreach ($_formatOpts as $_k => $_v):
                     ?>
-                    <option value="<?= e($_k) ?>" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === $_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
+                    <option value="<?= e((string)$_k) ?>" <?= (!empty($filters['invoice_format']) && (string)$filters['invoice_format'] === (string)$_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -92,14 +92,28 @@
 </div>
 </div><!-- /.page-sticky-head -->
 
-<?php if (!empty($result['summary'])): ?>
+<?php if (!empty($result['summary'])):
+    $_sm = $result['summary'];
+    $_diff = (int)$_sm['total'] - (int)$_sm['confirmed_total'];
+?>
 <div class="card" style="padding:10px 14px;margin-bottom:10px;background:#e3f2fd;border-left:4px solid #1565c0">
-    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:.95rem">
-        <span>📊 <strong>聯式篩選合計</strong>（<?= number_format($result['total']) ?> 筆）</span>
-        <span>未稅：<strong>$<?= number_format((int)$result['summary']['subtotal']) ?></strong></span>
-        <span>稅額：<strong>$<?= number_format((int)$result['summary']['tax']) ?></strong></span>
-        <span>含稅：<strong style="color:var(--primary)">$<?= number_format((int)$result['summary']['total']) ?></strong></span>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:.95rem;align-items:center">
+        <span>📊 <strong>全部狀態合計</strong>（<?= number_format((int)$_sm['cnt']) ?> 筆）</span>
+        <span>未稅：<strong>$<?= number_format((int)$_sm['subtotal']) ?></strong></span>
+        <span>稅額：<strong>$<?= number_format((int)$_sm['tax']) ?></strong></span>
+        <span>含稅：<strong style="color:var(--primary)">$<?= number_format((int)$_sm['total']) ?></strong></span>
     </div>
+    <?php if ((int)$_sm['confirmed_cnt'] !== (int)$_sm['cnt']): ?>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #90caf9;display:flex;gap:24px;flex-wrap:wrap;font-size:.92rem;align-items:center">
+        <span title="401 申報只計已確認的發票">✅ <strong>已確認合計（401 申報基準）</strong>（<?= number_format((int)$_sm['confirmed_cnt']) ?> 筆）</span>
+        <span>未稅：<strong>$<?= number_format((int)$_sm['confirmed_subtotal']) ?></strong></span>
+        <span>稅額：<strong>$<?= number_format((int)$_sm['confirmed_tax']) ?></strong></span>
+        <span>含稅：<strong style="color:#16a34a">$<?= number_format((int)$_sm['confirmed_total']) ?></strong></span>
+        <?php if ($_diff !== 0): ?>
+        <span style="color:#c62828;font-size:.85rem">⚠ 與全部差 $<?= number_format(abs($_diff)) ?>（含待處理/作廢）</span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -171,7 +185,7 @@
                     '22' => '進項二聯式收銀機統一發票、載有稅額之其他憑證',
                     '23' => '三聯式進貨退出或折讓證明單',
                     '24' => '二聯式進貨退出或折讓證明單',
-                    '25' => '進項三聯式收銀機統一發票、公用事業憑證',
+                    '25' => '進項三聯式收銀機統一發票、電子發票',
                 );
                 ?>
                 <?php foreach ($records as $r): $isStar = !empty($r['is_starred']); ?>

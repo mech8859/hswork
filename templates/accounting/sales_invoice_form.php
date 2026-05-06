@@ -5,7 +5,12 @@ $typeOptions = InvoiceModel::salesInvoiceTypeOptions();
 $refOptions = InvoiceModel::salesReferenceTypeOptions();
 ?>
 
-<h2><?= $isEdit ? '編輯銷項發票 - ' . e($record['invoice_number']) : '新增銷項發票' ?></h2>
+<div class="d-flex justify-between align-center mb-2 flex-wrap gap-1">
+    <h2 style="margin:0"><?= $isEdit ? '編輯銷項發票 - ' . e($record['invoice_number']) : '新增銷項發票' ?></h2>
+    <?php if (!empty($returnToUrl)): ?>
+    <a href="<?= e($returnToUrl) ?>" class="btn btn-outline btn-sm">← 返回對帳</a>
+    <?php endif; ?>
+</div>
 
 <?php if (!empty($otherEditors)): ?>
 <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-radius:8px;background:#fff3cd;border:1px solid #ffc107;margin-bottom:12px;">
@@ -32,6 +37,9 @@ $refOptions = InvoiceModel::salesReferenceTypeOptions();
     <div style="background:#e3f2fd;border:1px solid #1976d2;color:#1565c0;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:.9rem">
         🔗 此發票由案件管理建立，存檔後將自動關聯至案件並跳回案件編輯頁
     </div>
+    <?php endif; ?>
+    <?php if (!empty($returnToUrl)): ?>
+    <input type="hidden" name="return_to" value="<?= e($returnToUrl) ?>">
     <?php endif; ?>
 
     <!-- 賣方資訊 -->

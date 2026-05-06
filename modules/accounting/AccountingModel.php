@@ -1822,8 +1822,9 @@ class AccountingModel
         }
 
         // 2) 從摘要抓 JV-... 傳票號
+        $matchedVoucherNo = null;
         if (preg_match('/(JV-\d{8}-\d{3})/', $desc, $m)) {
-            $vn = $m[1];
+            $matchedVoucherNo = $m[1];
             $st = $this->db->prepare("
                 SELECT id FROM offset_ledger
                 WHERE voucher_number = ? AND account_id = ?
@@ -1831,9 +1832,53 @@ class AccountingModel
                 ORDER BY ABS(original_amount - ?) ASC, id DESC
                 LIMIT 1
             ");
-            $st->execute(array($vn, $accId, $relId, $relType, $amount));
+            $st->execute(array($matchedVoucherNo, $accId, $relId, $relType, $amount));
             $found = $st->fetchColumn();
             if ($found) return (int)$found;
+        }
+
+        // 3) 自我修復：找對應「立帳行存在但 ledger 不見了」的孤兒，自動補建 ledger
+        // 條件：同科目 + 同往來 + 來源傳票已過帳 + offset_flag=1 + 該 line 沒有 ledger
+        if ($matchedVoucherNo) {
+            $st = $this->db->prepare("
+                SELECT jl.id AS line_id, jl.cost_center_id,
+                       jl.debit_amount, jl.credit_amount,
+                       je.id AS je_id, je.voucher_date, je.voucher_number
+                FROM journal_entry_lines jl
+                JOIN journal_entries je ON je.id = jl.journal_entry_id
+                LEFT JOIN offset_ledger ol ON ol.journal_line_id = jl.id
+                WHERE jl.offset_flag = 1
+                  AND jl.account_id = ?
+                  AND (jl.relation_id <=> ?) AND (jl.relation_type <=> ?)
+                  AND je.voucher_number = ?
+                  AND je.status = 'posted'
+                  AND ol.id IS NULL
+                ORDER BY ABS(GREATEST(jl.debit_amount, jl.credit_amount) - ?) ASC
+                LIMIT 1
+            ");
+            $st->execute(array($accId, $relId, $relType, $matchedVoucherNo, $amount));
+            $orphan = $st->fetch(PDO::FETCH_ASSOC);
+            if ($orphan) {
+                $amt = max((float)$orphan['debit_amount'], (float)$orphan['credit_amount']);
+                $direction = (float)$orphan['debit_amount'] > 0 ? 'debit' : 'credit';
+                $ins = $this->db->prepare("
+                    INSERT INTO offset_ledger
+                    (journal_entry_id, journal_line_id, account_id, cost_center_id,
+                     relation_type, relation_id, relation_name,
+                     voucher_date, voucher_number, direction,
+                     original_amount, offset_total, remaining_amount, status)
+                    SELECT je.id, ?, ?, ?, ?, ?, jl.relation_name, je.voucher_date, je.voucher_number, ?, ?, 0, ?, 'open'
+                    FROM journal_entry_lines jl
+                    JOIN journal_entries je ON je.id = jl.journal_entry_id
+                    WHERE jl.id = ?
+                ");
+                $ins->execute(array(
+                    $orphan['line_id'], $accId, $orphan['cost_center_id'],
+                    $relType, $relId, $direction, $amt, $amt,
+                    $orphan['line_id']
+                ));
+                return (int)$this->db->lastInsertId();
+            }
         }
 
         return 0;

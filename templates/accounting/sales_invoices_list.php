@@ -28,7 +28,7 @@
             <option value="<?= e($k) ?>" <?= (!empty($filters['status']) && $filters['status'] === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
         </select>
-        <select name="invoice_format" class="form-control" style="width:auto;min-width:140px">
+        <select name="invoice_format" class="form-control" style="width:auto;min-width:280px;max-width:360px" title="<?= e(!empty($filters['invoice_format']) ? $filters['invoice_format'] : '') ?>">
             <option value="">銷項發票聯式（全部）</option>
             <option value="__empty__" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === '__empty__') ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定聯式</option>
             <?php
@@ -41,7 +41,7 @@
             );
             foreach ($_sfOpts as $_k => $_v):
             ?>
-            <option value="<?= e($_k) ?>" <?= (!empty($filters['invoice_format']) && $filters['invoice_format'] === $_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
+            <option value="<?= e((string)$_k) ?>" <?= (!empty($filters['invoice_format']) && (string)$filters['invoice_format'] === (string)$_k) ? 'selected' : '' ?>><?= e($_v) ?></option>
             <?php endforeach; ?>
         </select>
         <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px" value="<?= e(!empty($filters['keyword']) ? $filters['keyword'] : '') ?>" placeholder="發票號碼/備註/統編/日期/申報期間/金額（$1500 精準比對）">
@@ -59,14 +59,28 @@
 </div>
 </div><!-- /.page-sticky-head -->
 
-<?php if (!empty($result['summary'])): ?>
+<?php if (!empty($result['summary'])):
+    $_sm = $result['summary'];
+    $_diff = (int)$_sm['total'] - (int)$_sm['confirmed_total'];
+?>
 <div class="card" style="padding:10px 14px;margin-bottom:10px;background:#e3f2fd;border-left:4px solid #1565c0">
-    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:.95rem">
-        <span>📊 <strong>聯式篩選合計</strong>（<?= number_format($result['total']) ?> 筆）</span>
-        <span>未稅：<strong>$<?= number_format((int)$result['summary']['subtotal']) ?></strong></span>
-        <span>稅額：<strong>$<?= number_format((int)$result['summary']['tax']) ?></strong></span>
-        <span>含稅：<strong style="color:var(--primary)">$<?= number_format((int)$result['summary']['total']) ?></strong></span>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:.95rem;align-items:center">
+        <span>📊 <strong>全部狀態合計</strong>（<?= number_format((int)$_sm['cnt']) ?> 筆）</span>
+        <span>未稅：<strong>$<?= number_format((int)$_sm['subtotal']) ?></strong></span>
+        <span>稅額：<strong>$<?= number_format((int)$_sm['tax']) ?></strong></span>
+        <span>含稅：<strong style="color:var(--primary)">$<?= number_format((int)$_sm['total']) ?></strong></span>
     </div>
+    <?php if ((int)$_sm['confirmed_cnt'] !== (int)$_sm['cnt']): ?>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #90caf9;display:flex;gap:24px;flex-wrap:wrap;font-size:.92rem;align-items:center">
+        <span title="401 申報只計已確認的發票">✅ <strong>已確認合計（401 申報基準）</strong>（<?= number_format((int)$_sm['confirmed_cnt']) ?> 筆）</span>
+        <span>未稅：<strong>$<?= number_format((int)$_sm['confirmed_subtotal']) ?></strong></span>
+        <span>稅額：<strong>$<?= number_format((int)$_sm['confirmed_tax']) ?></strong></span>
+        <span>含稅：<strong style="color:#16a34a">$<?= number_format((int)$_sm['confirmed_total']) ?></strong></span>
+        <?php if ($_diff !== 0): ?>
+        <span style="color:#c62828;font-size:.85rem">⚠ 與全部差 $<?= number_format(abs($_diff)) ?>（含待處理/作廢）</span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 

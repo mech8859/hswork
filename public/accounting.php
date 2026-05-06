@@ -1248,6 +1248,186 @@ switch ($action) {
             $jrGlOpeningBalance[$parentCode]['opening'] += $info['opening'];
         }
 
+        // === 下載 Excel CSV ===
+        if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+            $tabLabels = array(
+                'daily_voucher' => '傳票日報表',
+                'journal'       => '日記帳',
+                'daily_summary' => '日計表',
+                'cash_book'     => '現金簿',
+                'general_ledger'=> '總分類帳',
+                'sub_ledger'    => '明細分類帳',
+            );
+            $tabLabel = isset($tabLabels[$jrTab]) ? $tabLabels[$jrTab] : $jrTab;
+            $fname = $tabLabel . '_' . $jrDateFrom . '_' . $jrDateTo . '.csv';
+            header('Content-Type: text/csv; charset=utf-8');
+            // RFC 5987：中文檔名要 URL encode
+            header("Content-Disposition: attachment; filename=\"" . rawurlencode($fname) . "\"; filename*=UTF-8''" . rawurlencode($fname));
+            $fp = fopen('php://output', 'w');
+            fwrite($fp, "\xEF\xBB\xBF");
+
+            fputcsv($fp, array($tabLabel));
+            fputcsv($fp, array('期間', $jrDateFrom . ' ~ ' . $jrDateTo, '科目區間', ($jrAccountFrom ?: '不限') . ' ~ ' . ($jrAccountTo ?: '不限'), '匯出時間', date('Y-m-d H:i:s')));
+            fputcsv($fp, array());
+
+            if ($jrTab === 'daily_voucher') {
+                fputcsv($fp, array('日期', '傳票號碼', '成本中心', '科目編號', '科目名稱', '摘要', '借方金額', '貸方金額', '建立者'));
+                $prevDate = ''; $totalD = 0; $totalC = 0;
+                foreach ($jrVoucherList as $v) {
+                    if ($prevDate !== '' && $prevDate !== $v['voucher_date']) {
+                        fputcsv($fp, array('—— ' . $prevDate . ' 日合計 ——'));
+                    }
+                    $prevDate = $v['voucher_date'];
+                    // 取該傳票的明細
+                    $vlines = $db->prepare("
+                        SELECT jl.*, coa.code as account_code, coa.name as account_name, cc.name as cc_name
+                        FROM journal_entry_lines jl
+                        JOIN chart_of_accounts coa ON jl.account_id = coa.id
+                        LEFT JOIN cost_centers cc ON jl.cost_center_id = cc.id
+                        WHERE jl.journal_entry_id = ?
+                        ORDER BY jl.sort_order
+                    ");
+                    $vlines->execute(array($v['id']));
+                    foreach ($vlines->fetchAll(PDO::FETCH_ASSOC) as $i => $l) {
+                        fputcsv($fp, array(
+                            $i === 0 ? $v['voucher_date'] : '',
+                            $i === 0 ? $v['voucher_number'] : '',
+                            $l['cc_name'] ?: '',
+                            $l['account_code'],
+                            $l['account_name'],
+                            $l['description'] ?: ($v['description'] ?: ''),
+                            (float)$l['debit_amount'] > 0 ? number_format((float)$l['debit_amount']) : '',
+                            (float)$l['credit_amount'] > 0 ? number_format((float)$l['credit_amount']) : '',
+                            $i === 0 ? ($v['created_by_name'] ?: '') : '',
+                        ));
+                        $totalD += (float)$l['debit_amount'];
+                        $totalC += (float)$l['credit_amount'];
+                    }
+                }
+                fputcsv($fp, array());
+                fputcsv($fp, array('總合計', '', '', '', '', '', number_format($totalD), number_format($totalC)));
+            } elseif ($jrTab === 'journal' || $jrTab === 'cash_book' || $jrTab === 'sub_ledger') {
+                $useLines = $jrLines;
+                if ($jrTab === 'cash_book') {
+                    // 現金簿：只看現金/銀行/零用金/備用金科目（前 4 碼 1111-1119）
+                    $useLines = array_values(array_filter($jrLines, function($l) {
+                        $c = (string)$l['account_code'];
+                        return preg_match('/^111[12345]\d{3}$/', $c);
+                    }));
+                }
+                fputcsv($fp, array('日期', '傳票號碼', '科目編號', '科目名稱', '成本中心', '摘要', '借方金額', '貸方金額'));
+                // 日記帳 → 每日小計；現金簿 / 明細分類帳 → 每月小計
+                $isDailySubtotal = ($jrTab === 'journal');
+                $totalD = 0; $totalC = 0;
+                $subKey = ''; $subD = 0; $subC = 0;
+                $getKey = function($d) use ($isDailySubtotal) {
+                    return $isDailySubtotal ? (string)$d : substr((string)$d, 0, 7); // YYYY-MM-DD or YYYY-MM
+                };
+                $emitSub = function() use (&$subKey, &$subD, &$subC, $fp, $isDailySubtotal) {
+                    if ($subKey === '') return;
+                    $label = '└─ ' . ($isDailySubtotal ? $subKey . ' 日小計' : $subKey . ' 月小計');
+                    fputcsv($fp, array($label, '', '', '', '', '', number_format($subD), number_format($subC)));
+                };
+                foreach ($useLines as $l) {
+                    $k = $getKey($l['voucher_date']);
+                    if ($subKey !== '' && $k !== $subKey) {
+                        $emitSub();
+                        $subD = 0; $subC = 0;
+                    }
+                    $subKey = $k;
+                    fputcsv($fp, array(
+                        $l['voucher_date'], $l['voucher_number'],
+                        $l['account_code'], $l['account_name'],
+                        $l['cost_center_name'] ?: '',
+                        $l['description'] ?: ($l['je_description'] ?: ''),
+                        (float)$l['debit_amount'] > 0 ? number_format((float)$l['debit_amount']) : '',
+                        (float)$l['credit_amount'] > 0 ? number_format((float)$l['credit_amount']) : '',
+                    ));
+                    $totalD += (float)$l['debit_amount']; $totalC += (float)$l['credit_amount'];
+                    $subD   += (float)$l['debit_amount']; $subC   += (float)$l['credit_amount'];
+                }
+                $emitSub();  // 最後一組
+                fputcsv($fp, array());
+                fputcsv($fp, array('總合計', '', '', '', '', '', number_format($totalD), number_format($totalC)));
+            } elseif ($jrTab === 'daily_summary') {
+                // 日計表：依日期合計各科目借/貸（按日期分組顯示，每日小計）
+                $byDateAcc = array();
+                foreach ($jrLines as $l) {
+                    $k = $l['voucher_date'] . '||' . $l['account_code'];
+                    if (!isset($byDateAcc[$k])) {
+                        $byDateAcc[$k] = array(
+                            'date' => $l['voucher_date'],
+                            'code' => $l['account_code'],
+                            'name' => $l['account_name'],
+                            'debit' => 0, 'credit' => 0,
+                        );
+                    }
+                    $byDateAcc[$k]['debit'] += (float)$l['debit_amount'];
+                    $byDateAcc[$k]['credit'] += (float)$l['credit_amount'];
+                }
+                ksort($byDateAcc);
+                fputcsv($fp, array('日期', '科目編號', '科目名稱', '借方合計', '貸方合計'));
+                $totalD = 0; $totalC = 0;
+                $subDate = ''; $subD = 0; $subC = 0;
+                foreach ($byDateAcc as $r) {
+                    if ($subDate !== '' && $r['date'] !== $subDate) {
+                        fputcsv($fp, array('└─ ' . $subDate . ' 日小計', '', '', number_format($subD), number_format($subC)));
+                        $subD = 0; $subC = 0;
+                    }
+                    $subDate = $r['date'];
+                    fputcsv($fp, array($r['date'], $r['code'], $r['name'], number_format($r['debit']), number_format($r['credit'])));
+                    $totalD += $r['debit']; $totalC += $r['credit'];
+                    $subD   += $r['debit']; $subC   += $r['credit'];
+                }
+                if ($subDate !== '') fputcsv($fp, array('└─ ' . $subDate . ' 日小計', '', '', number_format($subD), number_format($subC)));
+                fputcsv($fp, array());
+                fputcsv($fp, array('總合計', '', '', number_format($totalD), number_format($totalC)));
+            } elseif ($jrTab === 'general_ledger') {
+                // 總分類帳：依前 4 碼科目分組，每科目下顯示月別小計 + 科目總計
+                $byAccMonth = array();  // [prefix4][YYYY-MM] = array(name, debit, credit)
+                $accNames = array();
+                foreach ($jrLines as $l) {
+                    $prefix = substr((string)$l['account_code'], 0, 4);
+                    $ym = substr((string)$l['voucher_date'], 0, 7);
+                    if (!isset($byAccMonth[$prefix])) {
+                        $byAccMonth[$prefix] = array();
+                        $accNames[$prefix] = $l['account_name'];
+                    }
+                    if (!isset($byAccMonth[$prefix][$ym])) {
+                        $byAccMonth[$prefix][$ym] = array('debit' => 0, 'credit' => 0);
+                    }
+                    $byAccMonth[$prefix][$ym]['debit']  += (float)$l['debit_amount'];
+                    $byAccMonth[$prefix][$ym]['credit'] += (float)$l['credit_amount'];
+                }
+                ksort($byAccMonth);
+
+                fputcsv($fp, array('科目編號(前 4 碼)', '科目名稱', '月份/類型', '期初餘額', '本期借方', '本期貸方', '期末餘額'));
+                foreach ($byAccMonth as $prefix => $months) {
+                    $accName = $accNames[$prefix];
+                    // 找期初：依 prefix4 對應的虛擬全 0 科目代碼
+                    $openingKey = $prefix . str_repeat('0', 6 - 4); // 例 1131 → 113100 (6 位) 或更長
+                    // 嘗試多種長度找期初（schema 可能 6 位或更多）
+                    $opening = 0;
+                    foreach ($jrGlOpeningBalance as $k => $info) {
+                        if (substr($k, 0, 4) === $prefix) { $opening = (float)$info['opening']; break; }
+                    }
+                    ksort($months);
+                    $accDebit = 0; $accCredit = 0;
+                    // 科目標題行
+                    fputcsv($fp, array('▼ ' . $prefix, $accName, '期初餘額', number_format($opening), '', '', ''));
+                    foreach ($months as $ym => $mv) {
+                        fputcsv($fp, array('', '', $ym . ' 月', '', number_format($mv['debit']), number_format($mv['credit']), ''));
+                        $accDebit += $mv['debit']; $accCredit += $mv['credit'];
+                    }
+                    $closing = $opening + $accDebit - $accCredit;
+                    fputcsv($fp, array('', '', '└─ 科目合計', '', number_format($accDebit), number_format($accCredit), number_format($closing)));
+                    fputcsv($fp, array());
+                }
+            }
+            fclose($fp);
+            exit;
+        }
+
         $pageTitle = '傳票報表';
         $currentPage = 'accounting';
         require __DIR__ . '/../templates/layouts/header.php';
@@ -1746,6 +1926,26 @@ switch ($action) {
                 . '&start_date=' . urlencode($_brStart) . '&end_date=' . urlencode($_brEnd);
         if ($_brBranch && $_brSource !== 'bank') $_brRtn .= '&branch_id=' . $_brBranch;
         redirect($_brRtn);
+        break;
+
+    // ---- 發票↔傳票對帳（進項/銷項都做） ----
+    case 'invoice_voucher_reconciliation':
+        require_once __DIR__ . '/../modules/accounting/InvoiceModel.php';
+        $invModel = new InvoiceModel();
+        $ivrType = isset($_GET['type']) && $_GET['type'] === 'purchase' ? 'purchase' : 'sales';
+        $ivrStart = isset($_GET['start_date']) && $_GET['start_date'] !== '' ? $_GET['start_date'] : date('Y-m-01', strtotime('-1 month'));
+        $ivrEnd   = isset($_GET['end_date'])   && $_GET['end_date']   !== '' ? $_GET['end_date']   : date('Y-m-t');
+        $ivrTaxId = isset($_GET['company_tax_id']) ? $_GET['company_tax_id'] : '';
+        $ivrTab   = isset($_GET['tab']) ? $_GET['tab'] : 'missing'; // matched / missing / orphan
+        if (!in_array($ivrTab, array('matched', 'missing', 'orphan'))) $ivrTab = 'missing';
+
+        $ivrData = $invModel->getInvoiceVoucherReconciliation($ivrType, $ivrStart, $ivrEnd, $ivrTaxId ?: null);
+
+        $pageTitle = '發票傳票對帳';
+        $currentPage = 'accounting';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/accounting/invoice_voucher_reconciliation.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
     case 'reconciliation':
