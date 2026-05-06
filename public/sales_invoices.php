@@ -204,6 +204,11 @@ switch ($action) {
             if ($postReturn === 'case' && $postCaseId > 0) {
                 redirect('/cases.php?action=edit&id=' . $postCaseId);
             }
+            // 任意 return_to URL（例：對帳頁）
+            $postReturnTo = !empty($_POST['return_to']) ? $_POST['return_to'] : '';
+            if ($postReturnTo && (strpos($postReturnTo, '/') === 0)) {
+                redirect($postReturnTo);
+            }
             redirect('/sales_invoices.php');
         }
 
@@ -211,6 +216,9 @@ switch ($action) {
         // GET 模式時也要支援 case_id + return 參數（編輯頁從案件來時用）
         $fromCaseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
         $returnTo = isset($_GET['return']) ? $_GET['return'] : '';
+        // 通用 return_to URL（對帳頁等）
+        $returnToUrl = isset($_GET['return_to']) ? $_GET['return_to'] : '';
+        if ($returnToUrl && strpos($returnToUrl, '/') !== 0) $returnToUrl = '';
         $prefillCustomerName = '';
         $prefillCustomerTaxId = '';
 

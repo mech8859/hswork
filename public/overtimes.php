@@ -120,10 +120,12 @@ switch ($action) {
             Session::flash('error', '權限不足');
             redirect('/overtimes.php');
         }
-        if ($record['status'] !== 'pending') {
-            Session::flash('error', '只能編輯待核准狀態');
+        // 本人可編輯 pending 或 rejected（駁回後修改重送）；管理者也可編輯這兩種
+        if (!in_array($record['status'], array('pending', 'rejected'))) {
+            Session::flash('error', '已核准的加班單不可編輯');
             redirect('/overtimes.php?action=view&id=' . $id);
         }
+        $isResubmit = ($record['status'] === 'rejected');
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) {
@@ -143,8 +145,15 @@ switch ($action) {
                     'note'          => !empty($_POST['note']) ? trim($_POST['note']) : null,
                 );
                 $model->update($id, $data);
-                AuditLog::log('overtimes', 'update', $id, '更新加班單');
-                Session::flash('success', '加班單已更新');
+                if ($isResubmit) {
+                    // 駁回後修改 → 自動重新提送簽核
+                    $model->resetToPending($id);
+                    AuditLog::log('overtimes', 'resubmit', $id, '駁回後修改並重新提送');
+                    Session::flash('success', '加班單已更新並重新提交簽核');
+                } else {
+                    AuditLog::log('overtimes', 'update', $id, '更新加班單');
+                    Session::flash('success', '加班單已更新');
+                }
                 redirect('/overtimes.php?action=view&id=' . $id);
             } catch (Exception $e) {
                 Session::flash('error', $e->getMessage());

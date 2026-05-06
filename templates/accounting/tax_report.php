@@ -531,7 +531,12 @@ $_sdOpen = !empty($_GET['sdOpen']) && $_GET['sdOpen'] === '1';
             <span id="salesDetailArrow" style="display:inline-block;transition:transform .2s;<?= $_sdOpen ? 'transform:rotate(90deg)' : '' ?>">▶</span>
             銷項發票明細（已確認 <?= count($salesDetail) ?> 筆） — 依聯式分組，依日期/發票號碼排序
         </span>
-        <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
+        <span style="display:inline-flex;gap:8px;align-items:center">
+            <a href="/tax_report.php?action=export_sales&period=<?= e($period) ?>&company_tax_id=<?= e($companyTaxId) ?>"
+               class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:.78rem;padding:3px 10px"
+               onclick="event.stopPropagation()" title="下載銷項發票明細 CSV（含代碼小計，Excel 可直接開啟）">📥 下載 Excel</a>
+            <span style="font-size:.85rem;color:#888">點擊展開/收合</span>
+        </span>
     </div>
     <div id="salesDetailBody" style="<?= $_sdOpen ? '' : 'display:none' ?>">
         <?php if (empty($salesDetail)): ?>
@@ -644,7 +649,7 @@ $_pfLabels = array(
     '22' => '22：進項二聯式收銀機統一發票、載有稅額之其他憑證',
     '23' => '23：三聯式進貨退出或折讓證明單',
     '24' => '24：二聯式進貨退出或折讓證明單',
-    '25' => '25：進項三聯式收銀機統一發票、公用事業憑證',
+    '25' => '25：進項三聯式收銀機統一發票、電子發票',
 );
 $_pfStats = array();
 foreach ($_pfLabels as $_k => $_v) {

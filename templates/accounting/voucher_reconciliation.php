@@ -77,6 +77,7 @@ $_buildTabUrl = function($s) use ($startDate, $endDate, $branchFilter, $statusFi
         <?php else: ?>
         <span class="btn btn-outline btn-sm" style="opacity:.4;cursor:not-allowed">下一筆 &raquo;</span>
         <?php endif; ?>
+        <a href="/accounting.php?action=invoice_voucher_reconciliation&type=sales&start_date=<?= e($startDate) ?>&end_date=<?= e($endDate) ?>" class="btn btn-outline btn-sm" title="切換到發票↔傳票對帳工具">🧾 發票傳票對帳</a>
         <button type="button" onclick="location.reload()" class="btn btn-outline" title="重新抓最新傳票狀態">🔄 重新整理</button>
         <?php if ($source !== 'rf_pc_match' && (Auth::hasPermission('accounting.manage') || Auth::hasPermission('all'))): ?>
         <form method="POST" action="/accounting.php?action=voucher_reconciliation_batch" style="display:inline" onsubmit="return confirm('批次把所有「模糊匹配」的來源單綁定到對應傳票？\n\n• 只會綁定尚未綁定的傳票\n• 已綁定其他來源的傳票會被略過\n\n執行後才能精準匹配。');">

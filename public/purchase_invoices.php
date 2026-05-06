@@ -230,10 +230,17 @@ switch ($action) {
             }
             AuditLog::log('purchase_invoices', 'update', $id, '更新進項發票');
             Session::flash('success', '進項發票已更新');
+            // 通用 return_to URL（對帳頁等）
+            $postReturnTo = !empty($_POST['return_to']) ? $_POST['return_to'] : '';
+            if ($postReturnTo && strpos($postReturnTo, '/') === 0) {
+                redirect($postReturnTo);
+            }
             redirect('/purchase_invoices.php');
         }
 
         $vendors = $model->getVendors();
+        $returnToUrl = isset($_GET['return_to']) ? $_GET['return_to'] : '';
+        if ($returnToUrl && strpos($returnToUrl, '/') !== 0) $returnToUrl = '';
 
         // 編輯鎖定
         require_once __DIR__ . '/../includes/EditingLock.php';

@@ -1,11 +1,24 @@
 <?php
 $isEdit = !empty($record);
 $_ot_canOverrideHours = isset($canOverrideHours) ? $canOverrideHours : false;
+$_ot_isResubmit = $isEdit && !empty($record['status']) && $record['status'] === 'rejected';
 ?>
 <div class="d-flex justify-between align-center mb-2">
-    <h2><?= $isEdit ? '編輯加班單' : '申請加班' ?></h2>
+    <h2><?= $_ot_isResubmit ? '修改後重送' : ($isEdit ? '編輯加班單' : '申請加班') ?></h2>
     <a href="/overtimes.php" class="btn btn-outline btn-sm">返回列表</a>
 </div>
+
+<?php if ($_ot_isResubmit): ?>
+<div style="background:#fff3e0;border:1px solid #ffb74d;color:#6a4800;padding:10px 14px;border-radius:6px;margin-bottom:12px">
+    <strong>⚠ 此單原為駁回狀態</strong>
+    <?php if (!empty($record['reject_reason'])): ?>
+    <div style="margin-top:6px;padding:6px 10px;background:#fff;border-left:3px solid #c62828;font-size:.9rem;white-space:pre-line">
+        <strong style="color:#c62828">駁回原因：</strong><?= e($record['reject_reason']) ?>
+    </div>
+    <?php endif; ?>
+    <div style="margin-top:6px;font-size:.85rem">儲存後將自動重新提交簽核。</div>
+</div>
+<?php endif; ?>
 
 <form method="POST" action="/overtimes.php?action=<?= $isEdit ? 'edit&id=' . (int)$record['id'] : 'create' ?>" class="card">
     <?= csrf_field() ?>

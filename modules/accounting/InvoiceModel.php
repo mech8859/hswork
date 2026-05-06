@@ -195,10 +195,19 @@ class InvoiceModel
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        // 選了發票聯式時回傳合計
+        // 選了發票聯式時回傳合計（含「全部狀態」與「僅已確認」兩組數字，方便對齊 401 申報）
         $summary = null;
         if (!empty($filters['invoice_format'])) {
-            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM purchase_invoices pi WHERE " . $whereStr);
+            $sumStmt = $this->db->prepare("SELECT
+                COALESCE(SUM(amount_untaxed),0) AS subtotal,
+                COALESCE(SUM(tax_amount),0) AS tax,
+                COALESCE(SUM(total_amount),0) AS total,
+                COUNT(*) AS cnt,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN amount_untaxed ELSE 0 END),0) AS confirmed_subtotal,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN tax_amount ELSE 0 END),0) AS confirmed_tax,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN total_amount ELSE 0 END),0) AS confirmed_total,
+                COUNT(CASE WHEN status='confirmed' THEN 1 END) AS confirmed_cnt
+                FROM purchase_invoices pi WHERE " . $whereStr);
             $sumStmt->execute($params);
             $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -508,10 +517,19 @@ class InvoiceModel
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        // 選了發票聯式時回傳合計
+        // 選了發票聯式時回傳合計（含「全部狀態」與「僅已確認」兩組數字，方便對齊 401 申報）
         $summary = null;
         if (!empty($filters['invoice_format'])) {
-            $sumStmt = $this->db->prepare("SELECT COALESCE(SUM(amount_untaxed),0) AS subtotal, COALESCE(SUM(tax_amount),0) AS tax, COALESCE(SUM(total_amount),0) AS total FROM sales_invoices si WHERE " . $whereStr);
+            $sumStmt = $this->db->prepare("SELECT
+                COALESCE(SUM(amount_untaxed),0) AS subtotal,
+                COALESCE(SUM(tax_amount),0) AS tax,
+                COALESCE(SUM(total_amount),0) AS total,
+                COUNT(*) AS cnt,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN amount_untaxed ELSE 0 END),0) AS confirmed_subtotal,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN tax_amount ELSE 0 END),0) AS confirmed_tax,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN total_amount ELSE 0 END),0) AS confirmed_total,
+                COUNT(CASE WHEN status='confirmed' THEN 1 END) AS confirmed_cnt
+                FROM sales_invoices si WHERE " . $whereStr);
             $sumStmt->execute($params);
             $summary = $sumStmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -859,6 +877,231 @@ class InvoiceModel
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * 發票↔傳票對帳：以「公司統編 → 稅額科目 + 發票號碼」精準匹配
+     *
+     * 匹配規則：
+     *   1. 依發票買/賣方統編決定目標稅額科目：
+     *      - 94081455 (禾順) 銷 → 2281001 銷項稅額-禾順；進 → 1281001 進項稅額-禾順
+     *      - 97002927 (政遠) 銷 → 2281002 銷項稅額-政遠；進 → 1281002 進項稅額-政遠
+     *   2. 在傳票分錄行 (journal_entry_lines) 找：
+     *      - account_id = 上述稅額科目
+     *      - description 含發票號碼
+     *      - 傳票 status != voided
+     *   3. 同發票號可能對應多張傳票分錄（多筆發票合併到一張傳票）→ 全部加總對比
+     *   4. 退補件 fallback：若公司統編沒對應科目（如未設定買方），用文字匹配
+     *
+     * 回傳：matched / missing_voucher / orphan_voucher
+     */
+    public function getInvoiceVoucherReconciliation($type, $startDate, $endDate, $companyTaxId = null)
+    {
+        $isSales = ($type === 'sales');
+        $invTable = $isSales ? 'sales_invoices' : 'purchase_invoices';
+        $sourceModule = $isSales ? 'sales_invoice' : 'purchase_invoice';
+        $partyCol = $isSales ? 'customer_name' : 'vendor_name';
+        $taxIdCol = $isSales ? 'seller_tax_id' : 'buyer_tax_id';
+
+        // --- 公司統編 → 稅額科目代碼對照 ---
+        // 銷項用「銷項稅額-{公司}」(2281xxx)；進項用「進項稅額-{公司}」(1281xxx)
+        $companyToCode = $isSales
+            ? array('94081455' => '2281001', '97002927' => '2281002')
+            : array('94081455' => '1281001', '97002927' => '1281002');
+
+        // 取得這些科目的 id
+        $allCodes = array_values($companyToCode);
+        $ph = implode(',', array_fill(0, count($allCodes), '?'));
+        $accStmt = $this->db->prepare("SELECT id, account_code FROM chart_of_accounts WHERE account_code IN ({$ph})");
+        $accStmt->execute($allCodes);
+        $codeToId = array();   // code => account id
+        foreach ($accStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $codeToId[$r['account_code']] = (int)$r['id'];
+        }
+        $companyToAccId = array();
+        foreach ($companyToCode as $cTax => $code) {
+            if (isset($codeToId[$code])) $companyToAccId[$cTax] = $codeToId[$code];
+        }
+        $relevantAccIds = array_values($companyToAccId);
+
+        // --- 取得期間內所有 confirmed 發票 ---
+        $params = array($startDate, $endDate);
+        $taxFilter = '';
+        if (!empty($companyTaxId)) {
+            $taxFilter = " AND inv.{$taxIdCol} = ?";
+            $params[] = $companyTaxId;
+        }
+        $invStmt = $this->db->prepare("
+            SELECT inv.id, inv.invoice_number, inv.invoice_date, inv.{$partyCol} AS party_name,
+                   inv.amount_untaxed, inv.tax_amount, inv.total_amount, inv.invoice_format,
+                   inv.{$taxIdCol} AS company_tax_id
+            FROM {$invTable} inv
+            WHERE inv.status = 'confirmed'
+              AND inv.invoice_date BETWEEN ? AND ?
+              {$taxFilter}
+            ORDER BY inv.invoice_date DESC, inv.id DESC
+        ");
+        $invStmt->execute($params);
+        $invoices = $invStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // --- 取得相關稅額分錄行（期間±30 天，限稅額科目） ---
+        $vStart = date('Y-m-d', strtotime($startDate . ' -30 days'));
+        $vEnd   = date('Y-m-d', strtotime($endDate . ' +30 days'));
+        $taxLines = array();
+        if (!empty($relevantAccIds)) {
+            $accPh = implode(',', array_fill(0, count($relevantAccIds), '?'));
+            $linesStmt = $this->db->prepare("
+                SELECT je.id AS voucher_id, je.voucher_number, je.voucher_date,
+                       je.total_debit, je.description AS voucher_desc,
+                       jl.account_id, jl.debit_amount, jl.credit_amount,
+                       jl.description AS line_desc
+                FROM journal_entry_lines jl
+                JOIN journal_entries je ON je.id = jl.journal_entry_id
+                WHERE jl.account_id IN ({$accPh})
+                  AND je.status != 'voided'
+                  AND je.voucher_date BETWEEN ? AND ?
+            ");
+            $linesStmt->execute(array_merge($relevantAccIds, array($vStart, $vEnd)));
+            $taxLines = $linesStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // 也撈所有非作廢傳票（給文字 fallback 用）
+        $voucherStmt = $this->db->prepare("
+            SELECT je.id, je.voucher_number, je.voucher_date, je.total_debit, je.description,
+                   je.source_module, je.source_id,
+                   GROUP_CONCAT(jl.description SEPARATOR ' || ') AS all_summaries
+            FROM journal_entries je
+            LEFT JOIN journal_entry_lines jl ON jl.journal_entry_id = je.id
+            WHERE je.status != 'voided'
+              AND je.voucher_date BETWEEN ? AND ?
+            GROUP BY je.id
+        ");
+        $voucherStmt->execute(array($vStart, $vEnd));
+        $vouchers = $voucherStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // precise 索引（source_module 自動同步用）
+        $byPrecise = array();
+        foreach ($vouchers as $v) {
+            if ($v['source_module'] === $sourceModule && !empty($v['source_id'])) {
+                $byPrecise[(int)$v['source_id']] = $v;
+            }
+        }
+
+        // --- 對每筆發票嘗試匹配 ---
+        $matchedRows = array();
+        $missingRows = array();
+        foreach ($invoices as $inv) {
+            $invNum = (string)$inv['invoice_number'];
+            $cTax = (string)$inv['company_tax_id'];
+            $row = $inv;
+            $matchType = null;
+            $matchedLines = array();
+            $matchedTaxSum = 0.0;
+
+            // 階段 1：稅額科目 + 發票號碼匹配（最精準）
+            $targetAccId = isset($companyToAccId[$cTax]) ? $companyToAccId[$cTax] : null;
+            if ($targetAccId && $invNum !== '') {
+                foreach ($taxLines as $l) {
+                    if ((int)$l['account_id'] !== $targetAccId) continue;
+                    $haystack = (string)($l['line_desc'] ?? '') . ' ' . (string)($l['voucher_desc'] ?? '');
+                    if (mb_strpos($haystack, $invNum) !== false) {
+                        $matchedLines[] = $l;
+                        // 銷項：credit 是正常入帳；debit 是反向（退回折讓）
+                        // 進項：debit 是正常入帳；credit 是反向
+                        $sign = $isSales
+                            ? ((float)$l['credit_amount'] - (float)$l['debit_amount'])
+                            : ((float)$l['debit_amount'] - (float)$l['credit_amount']);
+                        $matchedTaxSum += $sign;
+                    }
+                }
+                if (!empty($matchedLines)) $matchedType = $matchType = 'tax_account';
+            }
+
+            // 階段 2：source_module precise（若 #1 沒中）
+            if (empty($matchedLines) && isset($byPrecise[(int)$inv['id']])) {
+                $v = $byPrecise[(int)$inv['id']];
+                $row['voucher_id']     = $v['id'];
+                $row['voucher_number'] = $v['voucher_number'];
+                $row['voucher_date']   = $v['voucher_date'];
+                $row['total_debit']    = $v['total_debit'];
+                $row['match_type']     = 'precise';
+                $matchedRows[] = $row;
+                continue;
+            }
+
+            // 階段 3：純文字 fallback（公司統編沒對應科目時）
+            if (empty($matchedLines) && !$targetAccId && $invNum !== '') {
+                foreach ($vouchers as $v) {
+                    $haystack = (string)($v['description'] ?? '') . ' || ' . (string)($v['all_summaries'] ?? '');
+                    if (mb_strpos($haystack, $invNum) !== false) {
+                        $row['voucher_id']     = $v['id'];
+                        $row['voucher_number'] = $v['voucher_number'];
+                        $row['voucher_date']   = $v['voucher_date'];
+                        $row['total_debit']    = $v['total_debit'];
+                        $row['match_type']     = 'textual';
+                        $matchedRows[] = $row;
+                        continue 2; // outer loop
+                    }
+                }
+            }
+
+            if (!empty($matchedLines)) {
+                // 多張傳票去重，保留每張的 id+number+date+稅額
+                $vouchersInfo = array();   // voucher_id => array
+                foreach ($matchedLines as $l) {
+                    $vid = (int)$l['voucher_id'];
+                    $sign = $isSales
+                        ? ((float)$l['credit_amount'] - (float)$l['debit_amount'])
+                        : ((float)$l['debit_amount'] - (float)$l['credit_amount']);
+                    if (!isset($vouchersInfo[$vid])) {
+                        $vouchersInfo[$vid] = array(
+                            'voucher_id'     => $vid,
+                            'voucher_number' => $l['voucher_number'],
+                            'voucher_date'   => $l['voucher_date'],
+                            'tax_amount'     => 0.0,
+                        );
+                    }
+                    $vouchersInfo[$vid]['tax_amount'] += $sign;
+                }
+                $vouchersList = array_values($vouchersInfo);
+                $first = $vouchersList[0];
+                $row['voucher_id']            = $first['voucher_id'];
+                $row['voucher_number']        = $first['voucher_number'];
+                $row['voucher_date']          = $first['voucher_date'];
+                $row['total_debit']           = $matchedLines[0]['total_debit'];
+                $row['matched_voucher_count'] = count($vouchersList);
+                $row['matched_vouchers']      = $vouchersList;
+                $row['matched_tax_sum']       = $matchedTaxSum;
+                $row['tax_diff']              = (int)round((float)$inv['tax_amount'] - $matchedTaxSum);
+                $row['match_type']            = 'tax_account';
+                $matchedRows[] = $row;
+            } else {
+                $missingRows[] = $inv;
+            }
+        }
+
+        // --- (C) 孤兒傳票：傳票指向發票，但發票不存在/作廢/未確認 ---
+        $orphan = $this->db->prepare("
+            SELECT je.id AS voucher_id, je.voucher_number, je.voucher_date, je.total_debit, je.description,
+                   je.source_id AS ref_invoice_id,
+                   inv.id AS inv_id, inv.invoice_number AS inv_number, inv.status AS inv_status,
+                   inv.{$partyCol} AS party_name
+            FROM journal_entries je
+            LEFT JOIN {$invTable} inv ON inv.id = je.source_id
+            WHERE je.source_module = ?
+              AND je.status != 'voided'
+              AND je.voucher_date BETWEEN ? AND ?
+              AND (inv.id IS NULL OR inv.status != 'confirmed')
+            ORDER BY je.voucher_date DESC, je.id DESC
+        ");
+        $orphan->execute(array($sourceModule, $startDate, $endDate));
+        $orphanRows = $orphan->fetchAll(PDO::FETCH_ASSOC);
+
+        return array(
+            'matched'         => $matchedRows,
+            'missing_voucher' => $missingRows,
+            'orphan_voucher'  => $orphanRows,
+        );
     }
 
     /**
