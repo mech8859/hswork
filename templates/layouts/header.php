@@ -180,6 +180,7 @@
         <li><a href="/purchase_orders.php" class="<?= ($currentPage ?? '') === 'purchase_orders' ? 'active' : '' ?>">🛒 採購單</a></li>
         <li><a href="/vendors.php" class="<?= ($currentPage ?? '') === 'vendors' ? 'active' : '' ?>">🏭 廠商管理</a></li>
         <li><a href="/vendor_products.php" class="<?= ($currentPage ?? '') === 'vendor_products' ? 'active' : '' ?>">🔗 廠商產品對照</a></li>
+        <li><a href="/vendor_invoices.php" class="<?= ($currentPage ?? '') === 'vendor_invoices' ? 'active' : '' ?>">📥 廠商請款單</a></li>
         <?php endif; ?>
 
         <!-- 庫存管理 -->
