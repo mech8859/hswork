@@ -175,8 +175,9 @@ class OvertimeModel
     public function update($id, array $data)
     {
         $row = $this->getById($id);
-        if (!$row || $row['status'] !== 'pending') {
-            throw new Exception('只能編輯待核准狀態的加班單');
+        // 允許 pending（一般編輯）與 rejected（駁回後修改重送）兩種狀態
+        if (!$row || !in_array($row['status'], array('pending', 'rejected'), true)) {
+            throw new Exception('只能編輯待核准或已駁回狀態的加班單');
         }
         $hours = $this->calcHours($data);
         $stmt = $this->db->prepare("

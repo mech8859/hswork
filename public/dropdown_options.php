@@ -378,7 +378,7 @@ switch ($action) {
         $saveData = array();
 
         if ($branchId > 0) {
-            // 分公司模式：只存 4 個分公司專屬欄位，key 加 _b{id} 後綴
+            // 分公司模式：4 個分公司專屬文字欄位 + 報價章/QR 圖片，key 加 _b{id} 後綴
             $branchKeys = array(
                 'quote_company_title',
                 'quote_contact_address',
@@ -390,12 +390,35 @@ switch ($action) {
                     $saveData[$prefix . $k . '_b' . $branchId] = $_POST[$k];
                 }
             }
+
+            // 分公司專屬報價章 / QR
+            $uploadDir = __DIR__ . '/uploads/settings/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+            if (!empty($_POST['remove_stamp'])) {
+                $saveData[$prefix . 'quote_stamp_image_b' . $branchId] = '';
+            }
+            if (!empty($_FILES['stamp_image']['tmp_name'])) {
+                $ext = pathinfo($_FILES['stamp_image']['name'], PATHINFO_EXTENSION);
+                $fname = $prefix . 'stamp_b' . $branchId . '_' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['stamp_image']['tmp_name'], $uploadDir . $fname);
+                $saveData[$prefix . 'quote_stamp_image_b' . $branchId] = 'uploads/settings/' . $fname;
+            }
+            if (!empty($_POST['remove_qrcode'])) {
+                $saveData[$prefix . 'quote_qrcode_image_b' . $branchId] = '';
+            }
+            if (!empty($_FILES['qrcode_image']['tmp_name'])) {
+                $ext = pathinfo($_FILES['qrcode_image']['name'], PATHINFO_EXTENSION);
+                $fname = $prefix . 'qrcode_b' . $branchId . '_' . time() . '.' . $ext;
+                move_uploaded_file($_FILES['qrcode_image']['tmp_name'], $uploadDir . $fname);
+                $saveData[$prefix . 'quote_qrcode_image_b' . $branchId] = 'uploads/settings/' . $fname;
+            }
         } else {
             // 共用模式：存所有非分公司專屬欄位（排除 4 個分公司專屬欄位）
             $sharedKeys = array(
                 'quote_company_subtitle',
                 'quote_bank_name', 'quote_bank_branch', 'quote_bank_account',
-                'quote_service_phone', 'quote_line_id',
+                'quote_service_phone',
                 'quote_bank_reminder', 'quote_deposit_notice',
                 'quote_warranty_months',
                 'quote_warranty_text_1', 'quote_warranty_text_2', 'quote_warranty_text_3',

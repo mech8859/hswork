@@ -31,6 +31,53 @@ if ($ivrTab === 'matched' && $ivrTaxMatch !== '') {
     }));
 }
 
+// 額外篩選：發票號碼/金額/客戶/聯式
+$ivrKeyword       = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
+$ivrPartyKeyword  = isset($_GET['party']) ? trim($_GET['party']) : '';
+$ivrPartyTaxId    = isset($_GET['party_tax_id']) ? trim($_GET['party_tax_id']) : '';
+$ivrInvoiceFormat = isset($_GET['invoice_format']) ? trim($_GET['invoice_format']) : '';
+
+// 蒐集當前資料中的客戶/供應商清單與聯式清單（給下拉用，未篩前的全集）
+$_partyList = array();
+$_formatList = array();
+foreach (array('matched', 'missing_voucher', 'orphan_voucher') as $_grpKey) {
+    foreach ($ivrData[$_grpKey] as $r) {
+        if (!empty($r['party_name'])) $_partyList[$r['party_name']] = true;
+        if (!empty($r['invoice_format'])) $_formatList[(string)$r['invoice_format']] = true;
+    }
+}
+ksort($_partyList);
+ksort($_formatList);
+
+// 統一篩選函式
+$applyExtraFilters = function($rows) use ($ivrKeyword, $ivrPartyKeyword, $ivrPartyTaxId, $ivrInvoiceFormat) {
+    return array_values(array_filter($rows, function($r) use ($ivrKeyword, $ivrPartyKeyword, $ivrPartyTaxId, $ivrInvoiceFormat) {
+        // 客戶/供應商（部分包含即可）
+        if ($ivrPartyKeyword !== '' && mb_stripos((string)($r['party_name'] ?? ''), $ivrPartyKeyword) === false) return false;
+        // 客戶/供應商統編（部分包含）
+        if ($ivrPartyTaxId !== '' && mb_stripos((string)($r['party_tax_id'] ?? ''), $ivrPartyTaxId) === false) return false;
+        // 聯式
+        if ($ivrInvoiceFormat !== '' && (string)($r['invoice_format'] ?? '') !== $ivrInvoiceFormat) return false;
+        // 關鍵字（發票號碼 或 金額；金額用 $1500 格式精準比對）
+        if ($ivrKeyword !== '') {
+            $kw = $ivrKeyword;
+            if (preg_match('/^\$\s*([\d,]+(?:\.\d+)?)$/u', $kw, $m)) {
+                $amt = (float)str_replace(',', '', $m[1]);
+                $tot = (float)($r['total_amount'] ?? 0);
+                $dr  = (float)($r['total_debit'] ?? 0);
+                if (abs($tot - $amt) > 0.01 && abs($dr - $amt) > 0.01) return false;
+            } else {
+                $haystack = (string)($r['invoice_number'] ?? '') . ' ' . (string)($r['voucher_number'] ?? '') . ' ' . (string)($r['inv_number'] ?? '');
+                if (mb_stripos($haystack, $kw) === false) return false;
+            }
+        }
+        return true;
+    }));
+};
+$ivrData['matched']         = $applyExtraFilters($ivrData['matched']);
+$ivrData['missing_voucher'] = $applyExtraFilters($ivrData['missing_voucher']);
+$ivrData['orphan_voucher']  = $applyExtraFilters($ivrData['orphan_voucher']);
+
 // 日期排序（新→舊 / 舊→新）
 $ivrSort = isset($_GET['sort']) && $_GET['sort'] === 'asc' ? 'asc' : 'desc';
 $_dateKey = function($r) {
@@ -44,13 +91,38 @@ usort($ivrData['orphan_voucher'],  function($a, $b) use ($ivrSort, $_dateKey) { 
 
 function _ivrFmtAmt($n) { return '$' . number_format((int)$n); }
 
+// 聯式代碼 → 顯示文字
+$_ivrFormatLabels = $ivrType === 'sales'
+    ? array(
+        '31' => '31：銷項三聯式',
+        '32' => '32：銷項二聯式',
+        '33' => '33：三聯式銷貨退回/折讓',
+        '34' => '34：二聯式銷貨退回/折讓',
+        '35' => '35：銷項三聯式收銀機/電子發票',
+    )
+    : array(
+        '21' => '21：進項三聯式',
+        '22' => '22：進項二聯式',
+        '23' => '23：三聯式進貨退出/折讓',
+        '24' => '24：二聯式進貨退出/折讓',
+        '25' => '25：進項三聯式收銀機/電子發票',
+    );
+$_fmtLabel = function($code) use ($_ivrFormatLabels) {
+    $code = (string)$code;
+    return isset($_ivrFormatLabels[$code]) ? $_ivrFormatLabels[$code] : $code;
+};
+
 $baseUrl = '/accounting.php?action=invoice_voucher_reconciliation';
-$qs = function($overrides = array()) use ($ivrType, $ivrStart, $ivrEnd, $ivrTaxId, $ivrTab, $ivrTaxMatch, $ivrSort) {
+$qs = function($overrides = array()) use ($ivrType, $ivrStart, $ivrEnd, $ivrTaxId, $ivrTab, $ivrTaxMatch, $ivrSort, $ivrKeyword, $ivrPartyKeyword, $ivrPartyTaxId, $ivrInvoiceFormat) {
     $params = array_merge(array(
         'type' => $ivrType, 'start_date' => $ivrStart, 'end_date' => $ivrEnd,
         'company_tax_id' => $ivrTaxId, 'tab' => $ivrTab,
         'tax_match' => $ivrTaxMatch,
         'sort' => $ivrSort === 'desc' ? '' : $ivrSort,  // desc 是預設，不需放入 URL
+        'keyword' => $ivrKeyword,
+        'party' => $ivrPartyKeyword,
+        'party_tax_id' => $ivrPartyTaxId,
+        'invoice_format' => $ivrInvoiceFormat,
     ), $overrides);
     return http_build_query(array_filter($params, function($v){ return $v !== ''; }));
 };
@@ -103,6 +175,33 @@ $totalAmt = function($rows, $col) {
             <option value="asc"  <?= $ivrSort === 'asc'  ? 'selected' : '' ?>>日期 舊 → 新</option>
         </select>
         <button type="submit" class="btn btn-primary btn-sm">查詢</button>
+        <div style="flex-basis:100%;height:0"></div>
+        <input type="text" name="keyword" class="form-control" style="width:auto;min-width:180px"
+               value="<?= e($ivrKeyword) ?>" placeholder="發票/傳票號碼 或 $1500 金額">
+        <input type="text" name="party" class="form-control" list="ivrPartyList"
+               style="width:auto;min-width:200px" placeholder="<?= e($partyLabel) ?>：全部（可下拉選或輸入）"
+               value="<?= e($ivrPartyKeyword) ?>">
+        <datalist id="ivrPartyList">
+            <?php foreach (array_keys($_partyList) as $_pn): ?>
+            <option value="<?= e($_pn) ?>"></option>
+            <?php endforeach; ?>
+        </datalist>
+        <input type="text" name="party_tax_id" class="form-control"
+               style="width:auto;min-width:160px"
+               placeholder="<?= $ivrType === 'sales' ? '客戶/買方統一編號' : '供應商/賣方統一編號' ?>"
+               value="<?= e($ivrPartyTaxId) ?>">
+        <select name="invoice_format" class="form-control" style="width:auto;min-width:180px">
+            <option value="">聯式：全部</option>
+            <?php
+            $_allFmts = $ivrType === 'sales'
+                ? array('31'=>'31 銷項三聯式','32'=>'32 銷項二聯式','33'=>'33 三聯式銷貨退回','34'=>'34 二聯式銷貨退回','35'=>'35 銷項三聯式收銀機/電子發票')
+                : array('21'=>'21 進項三聯式','22'=>'22 進項二聯式','23'=>'23 三聯式進貨退出','24'=>'24 二聯式進貨退出','25'=>'25 進項三聯式收銀機/電子發票');
+            foreach ($_allFmts as $_fk => $_fv): ?>
+            <option value="<?= e($_fk) ?>" <?= (string)$ivrInvoiceFormat === (string)$_fk ? 'selected' : '' ?>><?= e($_fv) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <a href="<?= $baseUrl ?>&<?= $qs(array('keyword'=>'','party'=>'','party_tax_id'=>'','invoice_format'=>'')) ?>"
+           class="btn btn-outline btn-sm" title="清除上排篩選條件">清除</a>
     </form>
 </div>
 
@@ -175,7 +274,7 @@ $totalAmt = function($rows, $col) {
                 <tr id="row-<?= (int)$r['id'] ?>">
                     <td><a href="/<?= $ivrType === 'sales' ? 'sales' : 'purchase' ?>_invoices.php?action=edit&id=<?= (int)$r['id'] ?>&return_to=<?= $_back ?>"><?= e($r['invoice_number']) ?></a></td>
                     <td><?= e($r['invoice_date']) ?></td>
-                    <td><span class="badge" style="background:#fce4ec;color:#880e4f"><?= e($r['invoice_format']) ?></span></td>
+                    <td><span class="badge" style="background:#fce4ec;color:#880e4f;white-space:nowrap"><?= e($_fmtLabel($r['invoice_format'])) ?></span></td>
                     <td><?= e($r['party_name']) ?></td>
                     <td class="text-right"><?= _ivrFmtAmt($r['amount_untaxed']) ?></td>
                     <td class="text-right"><?= _ivrFmtAmt($r['tax_amount']) ?></td>
@@ -249,7 +348,8 @@ $totalAmt = function($rows, $col) {
             </tr></thead>
             <tbody>
             <?php foreach ($ivrData['matched'] as $r):
-                $invTax = (int)$r['tax_amount'];
+                // 33/34/23/24 視為減項，發票稅額顯示負值
+                $invTax = isset($r['invoice_signed_tax']) ? (int)round((float)$r['invoice_signed_tax']) : (int)$r['tax_amount'];
                 $matchedTax = isset($r['matched_tax_sum']) ? (int)round((float)$r['matched_tax_sum']) : null;
                 $taxDiff = isset($r['tax_diff']) ? (int)$r['tax_diff'] : null;
                 $_back = urlencode($_ivrReturnFor($r['id']));
@@ -257,7 +357,7 @@ $totalAmt = function($rows, $col) {
                 <tr id="row-<?= (int)$r['id'] ?>" <?= ($taxDiff !== null && $taxDiff !== 0) ? 'style="background:#fff3e0"' : '' ?>>
                     <td><a href="/<?= $ivrType === 'sales' ? 'sales' : 'purchase' ?>_invoices.php?action=edit&id=<?= (int)$r['id'] ?>&return_to=<?= $_back ?>"><?= e($r['invoice_number']) ?></a></td>
                     <td><?= e($r['invoice_date']) ?></td>
-                    <td><span class="badge" style="background:#e8eaf6;color:#283593"><?= e($r['invoice_format']) ?></span></td>
+                    <td><span class="badge" style="background:#e8eaf6;color:#283593;white-space:nowrap"><?= e($_fmtLabel($r['invoice_format'])) ?></span></td>
                     <td><?= e($r['party_name']) ?></td>
                     <td class="text-right"><?= _ivrFmtAmt($invTax) ?></td>
                     <td>

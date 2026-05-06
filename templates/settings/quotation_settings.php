@@ -110,6 +110,31 @@ $branchKey = function($baseKey) use ($qs, $settingsPrefix, $currentBranchId) {
         </p>
     </div>
 
+    <!-- 分公司專屬：報價章 / QR Code -->
+    <div class="card">
+        <div class="card-header">報價章 / QR Code <span style="font-size:.85rem;color:#888;font-weight:normal">（此分公司專屬，未上傳則 fallback 共用設定）</span></div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>報價章圖片</label>
+                <?php $_bStamp = $branchKey('quote_stamp_image'); if (!empty($_bStamp)): ?>
+                <div class="mb-1"><img src="/<?= e($_bStamp) ?>" style="max-height:80px;border:1px solid #ddd;border-radius:4px;padding:4px"></div>
+                <label class="checkbox-label"><input type="checkbox" name="remove_stamp" value="1"> 移除現有圖片</label>
+                <?php endif; ?>
+                <input type="file" name="stamp_image" class="form-control" accept="image/*">
+                <small class="text-muted">建議 PNG 透明背景，寬度 200px 左右</small>
+            </div>
+            <div class="form-group">
+                <label>QR Code 圖片</label>
+                <?php $_bQr = $branchKey('quote_qrcode_image'); if (!empty($_bQr)): ?>
+                <div class="mb-1"><img src="/<?= e($_bQr) ?>" style="max-height:80px;border:1px solid #ddd;border-radius:4px;padding:4px"></div>
+                <label class="checkbox-label"><input type="checkbox" name="remove_qrcode" value="1"> 移除現有圖片</label>
+                <?php endif; ?>
+                <input type="file" name="qrcode_image" class="form-control" accept="image/*">
+                <small class="text-muted">建議 PNG，寬度 150px 左右</small>
+            </div>
+        </div>
+    </div>
+
 <?php else: ?>
     <!-- ========== 共用設定（副標題/匯款/服務/保固/圖章/QR） ========== -->
     <!-- 副標題 -->
@@ -147,15 +172,12 @@ $branchKey = function($baseKey) use ($qs, $settingsPrefix, $currentBranchId) {
 
     <!-- 服務／LINE -->
     <div class="card">
-        <div class="card-header">服務專線 / LINE</div>
+        <div class="card-header">服務專線</div>
         <div class="form-row">
-            <div class="form-group">
+            <div class="form-group" style="flex:1">
                 <label>服務專線</label>
                 <input type="text" name="quote_service_phone" class="form-control" value="<?= e($qs[$settingsPrefix . 'quote_service_phone'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>LINE ID</label>
-                <input type="text" name="quote_line_id" class="form-control" value="<?= e($qs[$settingsPrefix . 'quote_line_id'] ?? '') ?>">
+                <small class="text-muted">LINE ID 已內嵌於各分公司 QR Code 圖片，不再單獨設定。</small>
             </div>
         </div>
     </div>

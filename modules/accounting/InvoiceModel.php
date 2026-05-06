@@ -901,6 +901,7 @@ class InvoiceModel
         $invTable = $isSales ? 'sales_invoices' : 'purchase_invoices';
         $sourceModule = $isSales ? 'sales_invoice' : 'purchase_invoice';
         $partyCol = $isSales ? 'customer_name' : 'vendor_name';
+        $partyTaxCol = $isSales ? 'customer_tax_id' : 'vendor_tax_id';
         $taxIdCol = $isSales ? 'seller_tax_id' : 'buyer_tax_id';
 
         // --- 公司統編 → 稅額科目代碼對照 ---
@@ -933,6 +934,7 @@ class InvoiceModel
         }
         $invStmt = $this->db->prepare("
             SELECT inv.id, inv.invoice_number, inv.invoice_date, inv.{$partyCol} AS party_name,
+                   inv.{$partyTaxCol} AS party_tax_id,
                    inv.amount_untaxed, inv.tax_amount, inv.total_amount, inv.invoice_format,
                    inv.{$taxIdCol} AS company_tax_id
             FROM {$invTable} inv
@@ -1000,17 +1002,30 @@ class InvoiceModel
 
             // 階段 1：稅額科目 + 發票號碼匹配（最精準）
             $targetAccId = isset($companyToAccId[$cTax]) ? $companyToAccId[$cTax] : null;
+
+            // 33/34（銷貨退回/折讓）+ 23/24（進貨退出/折讓）視為減項
+            // 匹配的傳票分錄必須是反向（退回方向），不能誤對原始銷貨行
+            $allowanceCodes = $isSales ? array('33', '34') : array('23', '24');
+            $isAllowance = in_array((string)$inv['invoice_format'], $allowanceCodes, true);
+            // 期望匹配方向：1=正常方向；-1=反向（退補件）
+            $expectSign = $isAllowance ? -1 : 1;
+            // 發票稅額簽名值（33/34/23/24 視為負）
+            $invoiceSignedTax = $expectSign * (float)$inv['tax_amount'];
+
             if ($targetAccId && $invNum !== '') {
                 foreach ($taxLines as $l) {
                     if ((int)$l['account_id'] !== $targetAccId) continue;
                     $haystack = (string)($l['line_desc'] ?? '') . ' ' . (string)($l['voucher_desc'] ?? '');
                     if (mb_strpos($haystack, $invNum) !== false) {
-                        $matchedLines[] = $l;
-                        // 銷項：credit 是正常入帳；debit 是反向（退回折讓）
-                        // 進項：debit 是正常入帳；credit 是反向
+                        // 銷項：credit 是正常；debit 是反向
+                        // 進項：debit 是正常；credit 是反向
                         $sign = $isSales
                             ? ((float)$l['credit_amount'] - (float)$l['debit_amount'])
                             : ((float)$l['debit_amount'] - (float)$l['credit_amount']);
+                        // 只取同方向的分錄行（避免把原始銷貨/進貨行誤認為退回對應）
+                        if ($expectSign > 0 && $sign <= 0) continue;
+                        if ($expectSign < 0 && $sign >= 0) continue;
+                        $matchedLines[] = $l;
                         $matchedTaxSum += $sign;
                     }
                 }
@@ -1072,7 +1087,10 @@ class InvoiceModel
                 $row['matched_voucher_count'] = count($vouchersList);
                 $row['matched_vouchers']      = $vouchersList;
                 $row['matched_tax_sum']       = $matchedTaxSum;
-                $row['tax_diff']              = (int)round((float)$inv['tax_amount'] - $matchedTaxSum);
+                // 比對：33/34/23/24 視發票稅額為負值；其他維持正
+                $row['tax_diff']              = (int)round($invoiceSignedTax - $matchedTaxSum);
+                $row['is_allowance']          = $isAllowance;
+                $row['invoice_signed_tax']    = $invoiceSignedTax;
                 $row['match_type']            = 'tax_account';
                 $matchedRows[] = $row;
             } else {
@@ -1085,7 +1103,7 @@ class InvoiceModel
             SELECT je.id AS voucher_id, je.voucher_number, je.voucher_date, je.total_debit, je.description,
                    je.source_id AS ref_invoice_id,
                    inv.id AS inv_id, inv.invoice_number AS inv_number, inv.status AS inv_status,
-                   inv.{$partyCol} AS party_name
+                   inv.{$partyCol} AS party_name, inv.{$partyTaxCol} AS party_tax_id
             FROM journal_entries je
             LEFT JOIN {$invTable} inv ON inv.id = je.source_id
             WHERE je.source_module = ?

@@ -22,12 +22,12 @@
                     <option value="__empty__" <?= $_buyerTaxDefault === '__empty__' ? 'selected' : '' ?> style="color:#c5221f">⚠ 未設定買方</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="min-width:310px;flex-shrink:0">
                 <label>日期</label>
                 <div style="display:flex;gap:6px;align-items:center">
-                    <input type="date" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" style="min-width:140px">
+                    <input type="date" name="date_from" class="form-control" value="<?= e(!empty($filters['date_from']) ? $filters['date_from'] : '') ?>" style="flex:1;min-width:140px">
                     <span style="color:#888">~</span>
-                    <input type="date" name="date_to" class="form-control" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" style="min-width:140px">
+                    <input type="date" name="date_to" class="form-control" value="<?= e(!empty($filters['date_to']) ? $filters['date_to'] : '') ?>" style="flex:1;min-width:140px">
                 </div>
             </div>
             <div class="form-group">
