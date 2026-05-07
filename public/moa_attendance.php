@@ -252,46 +252,105 @@ switch ($action) {
         $records = $model->getRecords($filters, 1000);
         $departments = $model->getDepartments();
 
+        $db = Database::getInstance();
         // 連動 leaves / overtimes
         $leaveMap = array();
         $overtimeMap = array();
-        $userIds = array();
-        foreach ($records as $r) { if (!empty($r['user_id'])) $userIds[(int)$r['user_id']] = true; }
-        $userIds = array_keys($userIds);
-        if (!empty($userIds)) {
-            $db = Database::getInstance();
-            $ph = implode(',', array_fill(0, count($userIds), '?'));
-            // 請假（已核准；可跨天）
-            $lvStmt = $db->prepare("
-                SELECT user_id, leave_type, start_date, end_date
-                FROM leaves
-                WHERE user_id IN ($ph) AND status = 'approved'
-                  AND start_date <= ? AND end_date >= ?
-            ");
-            $params = array_merge($userIds, array($filters['date_to'], $filters['date_from']));
-            $lvStmt->execute($params);
-            foreach ($lvStmt->fetchAll(PDO::FETCH_ASSOC) as $lv) {
-                $startTs = strtotime(max($lv['start_date'], $filters['date_from']));
-                $endTs   = strtotime(min($lv['end_date'],   $filters['date_to']));
-                for ($t = $startTs; $t <= $endTs; $t += 86400) {
-                    $leaveMap[$lv['user_id'] . '|' . date('Y-m-d', $t)] = $lv['leave_type'];
-                }
-            }
-            // 加班（已核准；單日）
-            $otStmt = $db->prepare("
-                SELECT user_id, overtime_date, hours, overtime_type
-                FROM overtimes
-                WHERE user_id IN ($ph) AND status = 'approved'
-                  AND overtime_date BETWEEN ? AND ?
-            ");
-            $otStmt->execute(array_merge($userIds, array($filters['date_from'], $filters['date_to'])));
-            foreach ($otStmt->fetchAll(PDO::FETCH_ASSOC) as $ot) {
-                $overtimeMap[$ot['user_id'] . '|' . $ot['overtime_date']] = array(
-                    'hours' => $ot['hours'],
-                    'type'  => $ot['overtime_type'],
-                );
+
+        // 先撈日期區間內所有「已核准」請假（不限定 user_id，因為整天請假沒打卡的人不會出現在 records）
+        $lvAllStmt = $db->prepare("
+            SELECT l.user_id, l.leave_type, l.start_date, l.end_date,
+                   u.real_name AS hswork_name,
+                   ae.moa_name, ae.moa_dept
+            FROM leaves l
+            JOIN users u ON l.user_id = u.id
+            LEFT JOIN attendance_employees ae ON ae.user_id = u.id
+            WHERE l.status = 'approved'
+              AND l.start_date <= ? AND l.end_date >= ?
+        ");
+        $lvAllStmt->execute(array($filters['date_to'], $filters['date_from']));
+        $leaveRows = $lvAllStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($leaveRows as $lv) {
+            $startTs = strtotime(max($lv['start_date'], $filters['date_from']));
+            $endTs   = strtotime(min($lv['end_date'],   $filters['date_to']));
+            for ($t = $startTs; $t <= $endTs; $t += 86400) {
+                $leaveMap[$lv['user_id'] . '|' . date('Y-m-d', $t)] = $lv['leave_type'];
             }
         }
+
+        // 加班（已核准；單日）
+        $otAllStmt = $db->prepare("
+            SELECT o.user_id, o.overtime_date, o.hours, o.overtime_type,
+                   u.real_name AS hswork_name,
+                   ae.moa_name, ae.moa_dept
+            FROM overtimes o
+            JOIN users u ON o.user_id = u.id
+            LEFT JOIN attendance_employees ae ON ae.user_id = u.id
+            WHERE o.status = 'approved'
+              AND o.overtime_date BETWEEN ? AND ?
+        ");
+        $otAllStmt->execute(array($filters['date_from'], $filters['date_to']));
+        $overtimeRows = $otAllStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($overtimeRows as $ot) {
+            $overtimeMap[$ot['user_id'] . '|' . $ot['overtime_date']] = array(
+                'hours' => $ot['hours'],
+                'type'  => $ot['overtime_type'],
+            );
+        }
+
+        // 補合成列：請假但當天沒打卡 → 也顯示出來
+        $existingKeys = array();
+        foreach ($records as $r) {
+            if (!empty($r['user_id'])) $existingKeys[$r['user_id'] . '|' . $r['work_date']] = true;
+        }
+        $weekdays = array('日','一','二','三','四','五','六');
+        foreach ($leaveRows as $lv) {
+            $startTs = strtotime(max($lv['start_date'], $filters['date_from']));
+            $endTs   = strtotime(min($lv['end_date'],   $filters['date_to']));
+            for ($t = $startTs; $t <= $endTs; $t += 86400) {
+                $d = date('Y-m-d', $t);
+                $key = $lv['user_id'] . '|' . $d;
+                if (isset($existingKeys[$key])) continue; // 已有打卡列就不重複
+                $name = $lv['moa_name'] ?: $lv['hswork_name'];
+                $dept = $lv['moa_dept'] ?: '';
+                // 套用 name / dept 篩選
+                if (!empty($filters['name']) && $name !== $filters['name']) continue;
+                if (!empty($filters['dept']) && $dept !== $filters['dept']) continue;
+                if (!empty($filters['only_abnormal'])) continue; // 整天請假非異常
+                if (!empty($filters['unmatched'])) continue;     // 已有 user_id
+                $records[] = array(
+                    'id' => null,
+                    'user_id' => (int)$lv['user_id'],
+                    'moa_name' => $name,
+                    'moa_employee_no' => null,
+                    'moa_dept' => $dept,
+                    'work_date' => $d,
+                    'weekday' => '周' . $weekdays[(int)date('w', $t)],
+                    'is_abnormal' => 0,
+                    'has_application' => 1,
+                    'expected_minutes' => null,
+                    'actual_minutes' => null,
+                    'sign_in_time' => null,
+                    'sign_out_time' => null,
+                    'sign_in_status' => '請假',
+                    'sign_out_status' => '請假',
+                    'late_minutes' => null,
+                    'early_leave_minutes' => null,
+                    'absent_minutes' => null,
+                    'hswork_name' => $lv['hswork_name'],
+                    '_synthetic' => true,
+                );
+                $existingKeys[$key] = true;
+            }
+        }
+        // 重新排序：日期 DESC、部門、姓名
+        usort($records, function ($a, $b) {
+            $c = strcmp($b['work_date'], $a['work_date']);
+            if ($c !== 0) return $c;
+            $c = strcmp($a['moa_dept'] ?? '', $b['moa_dept'] ?? '');
+            if ($c !== 0) return $c;
+            return strcmp($a['moa_name'] ?? '', $b['moa_name'] ?? '');
+        });
         $pageTitle = 'MOA 考勤明細';
         $currentPage = 'moa_attendance';
         require __DIR__ . '/../templates/layouts/header.php';

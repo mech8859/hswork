@@ -62,7 +62,7 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                 <?php if (empty($records)): ?>
                 <tr><td colspan="13" class="text-center text-muted" style="padding:20px">無資料</td></tr>
                 <?php else: foreach ($records as $r): ?>
-                <tr style="<?= $r['is_abnormal'] ? 'background:#fff3e0' : '' ?>">
+                <tr style="<?= !empty($r['_synthetic']) ? 'background:#e8f5e9;color:#555' : ($r['is_abnormal'] ? 'background:#fff3e0' : '') ?>">
                     <td><?= e($r['work_date']) ?></td>
                     <td><?= e($r['weekday'] ?? '') ?></td>
                     <td><?= e($r['moa_dept'] ?? '') ?></td>
