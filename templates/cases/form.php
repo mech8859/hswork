@@ -86,10 +86,17 @@
             }
         }
         ?>
+        <?php
+        // 高層（系統管理者 / 副總）即使排工條件未備齊仍顯示排工按鈕
+        $_schedElevated = Auth::user() && in_array(Auth::user()['role'], array('boss', 'vice_president'));
+        $_hideSchedForReadiness = !empty($warnings) && !$_schedElevated;
+        ?>
         <?php if ($case && Auth::hasPermission('schedule.manage') && !in_array($case['status'], $hideScheduleStatuses)): ?>
         <?php if ($lossBlockReason): ?>
         <button type="button" class="btn btn-sm" style="background:#9e9e9e;color:#fff;cursor:not-allowed" onclick="alert('<?= e($lossBlockReason) ?>')" title="<?= e($lossBlockReason) ?>">手動排工 🔒</button>
         <button type="button" class="btn btn-sm" style="background:#9e9e9e;color:#fff;cursor:not-allowed" onclick="alert('<?= e($lossBlockReason) ?>')" title="<?= e($lossBlockReason) ?>">智慧排工 🔒</button>
+        <?php elseif ($_hideSchedForReadiness): ?>
+        <?php /* 排工條件未備齊時對一般使用者隱藏排工按鈕（高層除外） */ ?>
         <?php else: ?>
         <a href="/schedule.php?action=create&case_id=<?= $case['id'] ?>" class="btn btn-sm" style="background:#FF9800;color:#fff">手動排工</a>
         <?php if (!empty($warnings)): ?>
@@ -97,7 +104,7 @@
         <?php else: ?>
         <a href="/schedule.php?action=smart&case_id=<?= $case['id'] ?>" class="btn btn-success btn-sm">智慧排工</a>
         <?php endif; ?>
-        <?php endif; /* loss block end */ ?>
+        <?php endif; /* loss block / readiness hide end */ ?>
         <?php endif; /* schedule permission end */ ?>
         <?php if ($case && Auth::canEditSection('delete')): ?>
         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteCase(<?= $case['id'] ?>, '<?= e($case['case_number']) ?>')">刪除</button>
