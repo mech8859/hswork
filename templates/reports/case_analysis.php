@@ -1311,6 +1311,76 @@ foreach ($repairStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 
 <?php endif; ?>
 
+<!-- 十九、施工回報 月份統計（依工程回報時間） -->
+<?php
+$wlDb = Database::getInstance();
+$wlBranches = implode(',', array_map('intval', $branchIds));
+// 依施工回報時間（arrival_time，沒填則退而用 schedule_date）統計：
+//   - 派工人數：每筆 work_logs 算一人次（同排工多工程師會多計）
+//   - 總工作時數：arrival 與 departure 都填才計入
+//   - 總收款金額：payment_collected=1 才計
+$wlStmt = $wlDb->query("
+    SELECT
+        DATE_FORMAT(COALESCE(wl.arrival_time, s.schedule_date), '%Y-%m') AS ym,
+        COUNT(*) AS dispatch_cnt,
+        SUM(CASE WHEN wl.arrival_time IS NOT NULL AND wl.departure_time IS NOT NULL
+            THEN TIMESTAMPDIFF(MINUTE, wl.arrival_time, wl.departure_time) ELSE 0 END) AS total_minutes,
+        SUM(CASE WHEN wl.payment_collected = 1 THEN COALESCE(wl.payment_amount, 0) ELSE 0 END) AS total_payment
+    FROM work_logs wl
+    JOIN schedules s ON wl.schedule_id = s.id
+    JOIN cases c ON s.case_id = c.id
+    WHERE c.branch_id IN ({$wlBranches})
+      AND (wl.arrival_time IS NOT NULL OR (wl.work_description IS NOT NULL AND wl.work_description <> ''))
+      AND COALESCE(wl.arrival_time, s.schedule_date) IS NOT NULL
+      AND DATE_FORMAT(COALESCE(wl.arrival_time, s.schedule_date), '%Y-%m') BETWEEN '{$months[0]}' AND '{$months[$nm-1]}'
+    GROUP BY ym
+    ORDER BY ym
+");
+$wlData = array();
+foreach ($wlStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $wlData[$r['ym']] = array(
+        'dispatch' => (int)$r['dispatch_cnt'],
+        'hours'    => round(((int)$r['total_minutes']) / 60, 1),
+        'payment'  => (float)$r['total_payment'],
+    );
+}
+?>
+<div class="card">
+    <div class="card-header analysis-header">十九、施工回報 月份統計<small style="opacity:.7;margin-left:8px">（依工程回報時間：arrival_time，未填則用排工日）</small></div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>統計項目</th>
+                <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td>派工人數<small style="opacity:.7;margin-left:4px">（人次）</small></td>
+                    <?php $wDispatchSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['dispatch']) ? $wlData[$m]['dispatch'] : 0; $wDispatchSum += $v; ?>
+                    <td><?= $v ?: '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($wDispatchSum) ?></td>
+                </tr>
+                <tr>
+                    <td>總工作時數<small style="opacity:.7;margin-left:4px">（小時）</small></td>
+                    <?php $wHoursSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['hours']) ? $wlData[$m]['hours'] : 0; $wHoursSum += $v; ?>
+                    <td><?= $v > 0 ? number_format($v, 1) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= number_format($wHoursSum, 1) ?></td>
+                </tr>
+                <tr class="row-highlight">
+                    <td>總收款金額<small style="opacity:.7;margin-left:4px">（元，現場收款）</small></td>
+                    <?php $wPaymentSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['payment']) ? $wlData[$m]['payment'] : 0; $wPaymentSum += $v; ?>
+                    <td><?= $v > 0 ? '$' . number_format($v) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total">$<?= number_format($wPaymentSum) ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 鑽取明細（內嵌在卡片下方）-->
 <div id="drillInline" style="display:none">
     <div class="card" style="margin-top:-8px;border-top:3px solid var(--primary);background:#fafbff">
