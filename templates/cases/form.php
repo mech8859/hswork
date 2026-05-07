@@ -842,7 +842,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
         <div class="form-row">
             <div class="form-group">
                 <label>報價金額</label>
-                <input type="number" name="quote_amount" class="form-control" min="0" value="<?= e($case['quote_amount'] ?? '') ?>" placeholder="元" <?= $_quoteLockAttr ?>>
+                <input type="number" name="quote_amount" class="form-control" min="0" value="<?= e($case['quote_amount'] ?? '') ?>" placeholder="元">
             </div>
             <div class="form-group">
                 <label>成交金額 (未稅)</label>
