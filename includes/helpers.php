@@ -227,10 +227,16 @@ function compute_case_readiness_live(array $case): array
     $hasSiteInfo = !empty($sc['structure_type']) || !empty($sc['conduit_type']) || !empty($sc['floor_count']);
     $stored = isset($case['readiness']) && is_array($case['readiness']) ? $case['readiness'] : array();
 
+    // 舊客戶維修案 + 無收費 → 視為金額已確認（不需報價金額）
+    $caseType = isset($case['case_type']) ? $case['case_type'] : '';
+    $repairCharged = isset($case['repair_is_charged']) ? $case['repair_is_charged'] : '';
+    $hasAmountConfirmed = ($dealAmount > 0)
+        || ($caseType === 'old_repair' && $repairCharged === '無收費');
+
     return array(
         'has_quotation'        => $hasQuotation ? 1 : 0,
         'has_site_photos'      => $hasSitePhotos ? 1 : 0,
-        'has_amount_confirmed' => $dealAmount > 0 ? 1 : 0,
+        'has_amount_confirmed' => $hasAmountConfirmed ? 1 : 0,
         'has_site_info'        => $hasSiteInfo ? 1 : 0,
         // 保留「允許無現場照片」的人工標記（儲存在 case_readiness）
         'no_photo_allowed'     => !empty($stored['no_photo_allowed']) ? 1 : 0,

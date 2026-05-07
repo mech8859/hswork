@@ -2107,6 +2107,9 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
         $autoQuotation = !empty($attTypes['quotation']);
         $autoSitePhotos = !empty($attTypes['site_photo']);
         $autoAmount = !empty($case['deal_amount']) && $case['deal_amount'] > 0;
+        // 舊客戶維修案 + 無收費 → 金額確認免檢查
+        $isOldRepairFree = (($case['case_type'] ?? '') === 'old_repair') && (($case['repair_is_charged'] ?? '') === '無收費');
+        if ($isOldRepairFree) { $autoAmount = true; }
         $sc = $case['site_conditions'] ?? array();
         $autoSiteInfo = !empty($sc['structure_type']) || !empty($sc['conduit_type']) || !empty($sc['floor_count']);
         $isNewInstall = ($case['case_type'] ?? '') === 'new_install';
@@ -2116,7 +2119,10 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             $checks[] = array('label' => '報價單', 'ok' => $autoQuotation, 'hint' => $autoQuotation ? '已上傳' : '未上傳報價單附件');
             $checks[] = array('label' => '現場照片', 'ok' => $autoSitePhotos, 'hint' => $autoSitePhotos ? '已上傳' : '未上傳現場照片附件');
         }
-        $checks[] = array('label' => '金額確認', 'ok' => $autoAmount, 'hint' => $autoAmount ? '$' . number_format($case['deal_amount']) : '尚未填寫預估金額');
+        $amountHint = $isOldRepairFree
+            ? '舊客戶維修案 — 無收費，免確認金額'
+            : ($autoAmount ? '$' . number_format($case['deal_amount']) : '尚未填寫預估金額');
+        $checks[] = array('label' => '金額確認', 'ok' => $autoAmount, 'hint' => $amountHint);
         $checks[] = array('label' => '現場資料', 'ok' => $autoSiteInfo, 'hint' => $autoSiteInfo ? '已填寫' : '尚未填寫現場環境');
     ?>
     <div class="card" id="sec-readiness">
