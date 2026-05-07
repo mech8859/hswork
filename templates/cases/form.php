@@ -837,8 +837,15 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
 
     <!-- 帳務資訊 -->
     <div class="card <?= $canEdit['finance'] ? '' : 'section-readonly' ?>" id="sec-finance">
-        <div class="card-header">帳務資訊<?php if (!empty($case['accepted_quotation_id'])): ?><small style="margin-left:10px;font-weight:normal;color:#1976d2;font-size:.8rem">（由已接受報價單自動帶入，請至報價單修改）</small><?php endif; ?></div>
-        <?php $_lockedByQuote = !empty($case['accepted_quotation_id']); $_quoteLockAttr = $_lockedByQuote ? 'readonly style="background:#f5f5f5;color:#555"' : ''; ?>
+        <?php
+        // 帳務金額鎖：只要 deal_amount 有值就鎖（避免覆寫已成交金額）
+        // 例外：系統管理者(boss) / 副總(vice_president) 仍可改
+        $_amtUser = Auth::user();
+        $_amtElevated = $_amtUser && in_array($_amtUser['role'], array('boss','vice_president'), true);
+        $_lockedByQuote = !empty($case['deal_amount']) && !$_amtElevated;
+        $_quoteLockAttr = $_lockedByQuote ? 'readonly style="background:#f5f5f5;color:#555"' : '';
+        ?>
+        <div class="card-header">帳務資訊<?php if ($_lockedByQuote): ?><small style="margin-left:10px;font-weight:normal;color:#1976d2;font-size:.8rem">（已成交，金額欄位鎖定；如需修改請報價單調整或請主管處理）</small><?php endif; ?></div>
         <div class="form-row">
             <div class="form-group">
                 <label>報價金額</label>
