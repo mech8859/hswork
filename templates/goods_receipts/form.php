@@ -441,8 +441,8 @@ function searchProductByName(input, idx) {
                         pack_qty: this.getAttribute('data-pack-qty') || 0
                     });
                     var priceInput = row.querySelector('.item-price');
-                    if (priceInput && (!priceInput.value || priceInput.value == '0')) {
-                        priceInput.value = this.getAttribute('data-cost');
+                    if (priceInput && (!priceInput.value || parseFloat(priceInput.value) === 0)) {
+                        priceInput.value = (parseFloat(this.getAttribute('data-cost')) || 0).toFixed(2);
                         calcRowAmount(row);
                     }
                     if (typeof dd._cleanup === 'function') dd._cleanup();
