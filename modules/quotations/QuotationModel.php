@@ -624,7 +624,7 @@ class QuotationModel
 
     public function fillCaseFinancials($quotationId)
     {
-        $stmt = $this->db->prepare('SELECT case_id, subtotal, tax_amount, total_amount, tax_free FROM quotations WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT case_id, subtotal, tax_amount, total_amount, tax_free, has_discount, discount_amount, tax_rate FROM quotations WHERE id = ?');
         $stmt->execute(array($quotationId));
         $q = $stmt->fetch();
         if (!$q || empty($q['case_id'])) {
@@ -648,7 +648,19 @@ class QuotationModel
         $payStmt->execute(array($caseId));
         $totalCollected = (int)$payStmt->fetchColumn();
 
-        $totalAmount = (int)$q['total_amount'];
+        // 有優惠價 → 改以 discount_amount 為成交金額（未稅），重算稅金與含稅總額
+        $hasDiscount = (int)($q['has_discount'] ?? 0);
+        $discountAmount = (int)($q['discount_amount'] ?? 0);
+        if ($hasDiscount && $discountAmount > 0) {
+            $dealAmount  = $discountAmount;
+            $taxRate     = (float)($q['tax_rate'] ?? 5);
+            $taxAmount   = $isTaxFree ? 0 : (int)round($dealAmount * $taxRate / 100);
+            $totalAmount = $dealAmount + $taxAmount;
+        } else {
+            $dealAmount  = (int)$q['subtotal'];
+            $taxAmount   = (int)$q['tax_amount'];
+            $totalAmount = (int)$q['total_amount'];
+        }
         $balanceAmount = $totalAmount - $totalCollected;
 
         $this->db->prepare('
@@ -662,10 +674,10 @@ class QuotationModel
                 balance_amount = ?
             WHERE id = ?
         ')->execute(array(
-            (int)$q['subtotal'],
+            $dealAmount,
             (int)$quotationId,
             $isTaxIncluded,
-            (int)$q['tax_amount'],
+            $taxAmount,
             $totalAmount,
             $totalCollected,
             $balanceAmount,
