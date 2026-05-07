@@ -114,7 +114,7 @@
                 </div>
                 <div class="price-item">
                     <span class="price-label">成本</span>
-                    <span class="price-value">$<?= number_format((float)$product['cost']) ?></span>
+                    <span class="price-value">$<?= number_format((float)$product['cost'], 2) ?></span>
                 </div>
                 <div class="price-item">
                     <span class="price-label">零售價</span>

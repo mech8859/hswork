@@ -68,7 +68,7 @@ function pv($product, $field, $default = '') {
             </div>
             <div class="form-group">
                 <label>成本 <span style="color:var(--gray-400);font-size:.8rem">(箱裝填整箱成本)</span></label>
-                <input type="number" name="cost" id="prodCost" class="form-control" value="<?= (int)pv($product, 'cost', '0') ?>" min="0" oninput="calcCostPerUnit()">
+                <input type="number" name="cost" id="prodCost" class="form-control" value="<?= number_format((float)pv($product, 'cost', '0'), 2, '.', '') ?>" min="0" step="0.01" oninput="calcCostPerUnit()">
             </div>
         </div>
 

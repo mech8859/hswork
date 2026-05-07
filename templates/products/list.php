@@ -157,7 +157,7 @@ $canManage = Auth::hasPermission('products.manage') || in_array(Auth::user()['ro
                     <td style="font-size:.8rem"><?= e($p['brand'] ?? '-') ?></td>
                     <td><?= e($p['unit'] ?? '-') ?></td>
                     <td style="text-align:right;font-weight:600">$<?= number_format((float)($p['price'] ?? 0)) ?></td>
-                    <td style="text-align:right;color:var(--gray-500)">$<?= number_format((float)($p['cost'] ?? 0)) ?></td>
+                    <td style="text-align:right;color:var(--gray-500)">$<?= number_format((float)($p['cost'] ?? 0), 2) ?></td>
                     <?php $pStock = (int)($p['total_stock'] ?? 0); $pAvail = (int)($p['total_available'] ?? 0); ?>
                     <td style="text-align:right"><span style="color:<?= $pStock > 0 ? 'var(--success)' : 'var(--gray-400)' ?>;font-weight:<?= $pStock > 0 ? '600' : 'normal' ?>"><?= $pStock ?></span></td>
                     <td style="text-align:right"><span style="color:<?= $pAvail > 0 ? 'var(--success)' : 'var(--gray-400)' ?>"><?= $pAvail ?></span></td>

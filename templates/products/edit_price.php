@@ -25,7 +25,7 @@
                 </div>
                 <div class="form-group">
                     <label>成本</label>
-                    <input type="number" name="cost" class="form-control" value="<?= (float)$product['cost'] ?>" step="1" min="0" required>
+                    <input type="number" name="cost" class="form-control" value="<?= number_format((float)$product['cost'], 2, '.', '') ?>" step="0.01" min="0" required>
                 </div>
                 <div class="form-group">
                     <label>零售價</label>
