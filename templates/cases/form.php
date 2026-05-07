@@ -87,9 +87,10 @@
         }
         ?>
         <?php
-        // 高層（系統管理者 / 副總）即使排工條件未備齊仍顯示排工按鈕
+        // 高層（系統管理者 / 副總）或舊客戶維修案：即使排工條件未備齊仍顯示排工按鈕
         $_schedElevated = Auth::user() && in_array(Auth::user()['role'], array('boss', 'vice_president'));
-        $_hideSchedForReadiness = !empty($warnings) && !$_schedElevated;
+        $_isOldRepairCase = ($case['case_type'] ?? '') === 'old_repair';
+        $_hideSchedForReadiness = !empty($warnings) && !$_schedElevated && !$_isOldRepairCase;
         ?>
         <?php if ($case && Auth::hasPermission('schedule.manage') && !in_array($case['status'], $hideScheduleStatuses)): ?>
         <?php if ($lossBlockReason): ?>
