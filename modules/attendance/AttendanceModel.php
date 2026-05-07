@@ -577,7 +577,46 @@ class AttendanceModel
 
     private function writeSyncLog($status, $message, $emps = 0, $records = 0)
     {
+        // 取舊狀態決定是否發失敗通知
+        $oldRow = $this->db->query("SELECT last_sync_status, last_notified_at FROM attendance_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+        $oldStatus = $oldRow['last_sync_status'] ?? null;
+        $lastNotifiedAt = $oldRow['last_notified_at'] ?? null;
+
         $stmt = $this->db->prepare("UPDATE attendance_settings SET last_sync_at = NOW(), last_sync_status = ?, last_sync_message = ?, last_sync_employees = ?, last_sync_records = ? WHERE id = 1");
         $stmt->execute(array($status, $message, $emps, $records));
+
+        // 失敗通知條件：成功→失敗 第一次發；持續失敗每 24h 再發一次
+        if ($status === 'failed') {
+            $shouldNotify = false;
+            if ($oldStatus !== 'failed') {
+                $shouldNotify = true;
+            } elseif ($lastNotifiedAt) {
+                $shouldNotify = (strtotime($lastNotifiedAt) + 24 * 3600) < time();
+            } else {
+                $shouldNotify = true;
+            }
+            if ($shouldNotify) {
+                $this->notifyBossOnFailure($message);
+                $this->db->prepare("UPDATE attendance_settings SET last_notified_at = NOW() WHERE id = 1")->execute();
+            }
+        }
+    }
+
+    private function notifyBossOnFailure($message)
+    {
+        try {
+            require_once __DIR__ . '/../notifications/NotificationModel.php';
+            $notif = new NotificationModel();
+            $bossStmt = $this->db->query("SELECT id FROM users WHERE role IN ('boss','vice_president') AND is_active = 1");
+            $bossIds = $bossStmt->fetchAll(PDO::FETCH_COLUMN);
+            $isCookie = (strpos($message, 'cookie') !== false || strpos($message, 'Cookie') !== false || strpos($message, '305') !== false);
+            $title = $isCookie ? '⚠ MOA Cookie 已失效' : '⚠ MOA 同步失敗';
+            $msg = $message . ($isCookie ? "\n\n處理方式：到 MOA 重新登入 → 複製 Cookie → 貼回設定頁。" : '');
+            foreach ($bossIds as $uid) {
+                $notif->send((int)$uid, 'attendance_sync_failed', $title, $msg, '/moa_attendance.php?action=sync_config');
+            }
+        } catch (Exception $e) {
+            // 通知失敗不應影響同步主流程
+        }
     }
 }
