@@ -85,7 +85,7 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                     <td class="text-right" style="font-size:.8rem;color:#666">
                         <?= e(_m2hm($r['expected_minutes'])) ?> / <?= e(_m2hm($r['actual_minutes'])) ?>
                     </td>
-                    <td class="text-center" style="<?= $r['sign_in_time'] === null ? 'color:#c62828;font-weight:600' : '' ?>">
+                    <td class="text-center" style="<?= ($r['sign_in_time'] === null || ($r['sign_in_time'] && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic']))) ? 'color:#c62828;font-weight:600' : '' ?>">
                         <?= $r['sign_in_time'] ? substr($r['sign_in_time'], 0, 5) : ($r['sign_in_status'] ?: '') ?>
                     </td>
                     <td class="text-center" style="<?= $r['sign_out_time'] === null ? 'color:#c62828;font-weight:600' : '' ?>">
