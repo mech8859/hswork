@@ -322,8 +322,11 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
     ?>
 
     <?php if (!empty($_inheritedFrom)): ?>
-    <div style="background:#e8f5e9;padding:10px 14px;margin:8px 0;border-left:3px solid #2e7d32;border-radius:4px;font-size:.88rem;color:#1b5e20">
-        📋 已帶入 <strong><?= e($_inheritedFrom) ?></strong> 填的器材/耗材資料，你可以直接儲存確認，或修改數量/新增品項。
+    <div style="background:#fff3cd;padding:10px 14px;margin:8px 0;border-left:3px solid #f57c00;border-radius:4px;font-size:.88rem;color:#5d4037">
+        ⚠ 已帶入 <strong><?= e($_inheritedFrom) ?></strong> 填過的材料當參考。
+        <strong style="color:#c62828">請刪除/調整為「你本人這次實際使用」的部分</strong>，
+        若直接儲存會與另一位工程師重複計算成本！
+        （只要兩位工程師同案件同日同產品同數量，系統會自動只算一次，但建議仍只填你本人的部分以求精確）
     </div>
     <?php endif; ?>
 

@@ -519,21 +519,25 @@ switch ($action) {
                 }
             }
             // 2) 實際材料成本（by type）
-            // 同排工同品項取最新 worklog（避免多位工程師重複填造成成本灌水），跨排工合計
+            // 聰明去重：同案件 + 同產品 + 同數量 + 同日（schedule_date）→ 視為重複，只算一次
+            // 跨日（多日施工）即使品項數量相同也合計（例如 5/7 用 5 條 + 5/8 又用 5 條 → 累計 10 條）
             $_muRawStmt = $_paDb->prepare("
                 SELECT mu.material_type, mu.product_id, mu.material_name,
-                       mu.used_qty, mu.unit_cost, wl.updated_at, s.id AS schedule_id
+                       mu.used_qty, mu.unit_cost, wl.updated_at, s.id AS schedule_id, s.schedule_date
                 FROM material_usage mu
                 JOIN work_logs wl ON mu.work_log_id = wl.id
                 JOIN schedules s ON wl.schedule_id = s.id
                 WHERE s.case_id = ?
-                ORDER BY s.id, wl.updated_at DESC, wl.id DESC
+                ORDER BY s.schedule_date, s.id, wl.updated_at DESC, wl.id DESC
             ");
             $_muRawStmt->execute(array($id));
             $_costByType = array('equipment' => 0.0, 'cable' => 0.0, 'consumable' => 0.0);
             $_seenKey = array();
             foreach ($_muRawStmt->fetchAll(PDO::FETCH_ASSOC) as $_mu) {
-                $k = $_mu['schedule_id'] . '|' . (!empty($_mu['product_id']) ? 'p_'.$_mu['product_id'] : 'n_'.$_mu['material_name']);
+                $itemKey = !empty($_mu['product_id']) ? 'p_'.$_mu['product_id'] : 'n_'.$_mu['material_name'];
+                $qtyKey  = round((float)$_mu['used_qty'], 2);
+                $dateKey = $_mu['schedule_date'] ?: '0';
+                $k = $dateKey . '|' . $itemKey . '|' . $qtyKey;
                 if (isset($_seenKey[$k])) continue;
                 $_seenKey[$k] = true;
                 $t = $_mu['material_type'];
