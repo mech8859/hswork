@@ -126,6 +126,20 @@ switch ($action) {
                 Session::flash('error', '請填寫案件名稱');
                 redirect('/cases.php?action=create');
             }
+            // 舊客戶維修案：原案件編號／完工日期／保固日期必填
+            if (($_POST['case_type'] ?? '') === 'old_repair') {
+                $_repairRequired = array(
+                    'repair_original_case'           => '原案件編號',
+                    'repair_original_complete_date'  => '原案件完工日期',
+                    'repair_original_warranty_date'  => '原案件保固日期',
+                );
+                foreach ($_repairRequired as $_f => $_l) {
+                    if (empty(trim((string)($_POST[$_f] ?? '')))) {
+                        Session::flash('error', '案別為「舊客戶維修案」時，' . $_l . '為必填');
+                        redirect('/cases.php?action=create&customer_id=' . (int)($_POST['customer_id'] ?? 0) . '&case_type=old_repair');
+                    }
+                }
+            }
             $caseId = $model->create($_POST);
             $model->updateReadiness($caseId, $_POST);
             $model->updateSiteConditions($caseId, $_POST);
@@ -266,6 +280,20 @@ switch ($action) {
             if ((in_array($postStatus, $lostStatuses) || in_array($postSubStatus, $lostSubStatuses)) && $postSalesNote === '') {
                 Session::flash('error', '此案件狀態需填寫業務備註（未成交原因）');
                 redirect('/cases.php?action=edit&id=' . $id);
+            }
+            // 舊客戶維修案：原案件編號／完工日期／保固日期必填
+            if (($_POST['case_type'] ?? '') === 'old_repair') {
+                $_repairRequired = array(
+                    'repair_original_case'           => '原案件編號',
+                    'repair_original_complete_date'  => '原案件完工日期',
+                    'repair_original_warranty_date'  => '原案件保固日期',
+                );
+                foreach ($_repairRequired as $_f => $_l) {
+                    if (empty(trim((string)($_POST[$_f] ?? '')))) {
+                        Session::flash('error', '案別為「舊客戶維修案」時，' . $_l . '為必填');
+                        redirect('/cases.php?action=edit&id=' . $id);
+                    }
+                }
             }
             // DEBUG: 記錄 POST 值到檔案
             file_put_contents('/tmp/case_save_debug.txt', date('H:i:s') . ' id=' . $id . ' POST[tax_amount]=' . var_export($_POST['tax_amount'] ?? 'NOT_SET', true) . ' POST[total_amount]=' . var_export($_POST['total_amount'] ?? 'NOT_SET', true) . "\n", FILE_APPEND);

@@ -667,17 +667,18 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                     <textarea name="repair_description" class="form-control" rows="2"><?= e($case['repair_description'] ?? '') ?></textarea>
                 </div>
             </div>
+            <?php $_isOldRepair = $_repairTypeNow === 'old_repair'; $_reqMark = $_isOldRepair ? ' <span style="color:#dc3545">*</span>' : ''; ?>
             <div class="form-row">
                 <div class="form-group">
-                    <label>原案件編號</label>
+                    <label>原案件編號<?= $_reqMark ?></label>
                     <input type="text" name="repair_original_case" class="form-control" value="<?= e($case['repair_original_case'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['case_number'] : '')) ?>">
                 </div>
                 <div class="form-group">
-                    <label>原案件完工日期</label>
+                    <label>原案件完工日期<?= $_reqMark ?></label>
                     <input type="date" name="repair_original_complete_date" class="form-control" value="<?= e($case['repair_original_complete_date'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['completion_date'] : '')) ?>">
                 </div>
                 <div class="form-group">
-                    <label>原案件保固日期</label>
+                    <label>原案件保固日期<?= $_reqMark ?></label>
                     <input type="date" name="repair_original_warranty_date" class="form-control" value="<?= e($case['repair_original_warranty_date'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['warranty_date'] : '')) ?>">
                 </div>
             </div>
@@ -3554,6 +3555,24 @@ function validateCaseForm() {
             note.focus();
             note.style.borderColor = '#dc3545';
             return false;
+        }
+    }
+    // 舊客戶維修案 → 原案件編號／完工日期／保固日期必填
+    var caseTypeSel = document.querySelector('select[name="case_type"]');
+    if (caseTypeSel && caseTypeSel.value === 'old_repair') {
+        var checks = [
+            { name: 'repair_original_case', label: '原案件編號' },
+            { name: 'repair_original_complete_date', label: '原案件完工日期' },
+            { name: 'repair_original_warranty_date', label: '原案件保固日期' }
+        ];
+        for (var i = 0; i < checks.length; i++) {
+            var el = document.querySelector('input[name="' + checks[i].name + '"]');
+            if (el && !el.value.trim()) {
+                alert('案別為「舊客戶維修案」時，' + checks[i].label + '為必填');
+                el.focus();
+                el.style.borderColor = '#dc3545';
+                return false;
+            }
         }
     }
     return true;
