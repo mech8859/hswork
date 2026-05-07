@@ -109,6 +109,49 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    case 'debug_dump':
+        // 上傳檔案，dump sheet 名稱與每張 sheet 前 25 列原始解析結果
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['file']['tmp_name'])) {
+            require_once __DIR__ . '/../includes/ExcelReader.php';
+            $tmp = $_FILES['file']['tmp_name'];
+            $names = ExcelReader::listSheets($tmp);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<style>body{font-family:sans-serif;padding:20px;}table{border-collapse:collapse;font-size:.85rem;margin:8px 0}td,th{border:1px solid #ccc;padding:4px 6px;vertical-align:top}h3{margin-top:24px}</style>';
+            echo '<h2>MOA xlsx 解析 dump</h2>';
+            echo '<p>Sheet 名稱：<code>' . implode(' | ', array_map('htmlspecialchars', $names)) . '</code></p>';
+            foreach ($names as $sn) {
+                echo '<h3>Sheet: ' . htmlspecialchars($sn) . '</h3>';
+                $rows = ExcelReader::read($tmp, $sn);
+                echo '<p>共 ' . count($rows) . ' 列，列出前 25 列：</p><table><thead><tr><th>#</th>';
+                $maxC = 0; foreach (array_slice($rows, 0, 25) as $r) { $maxC = max($maxC, count($r)); }
+                for ($c = 0; $c < $maxC; $c++) echo '<th>' . chr(65 + ($c % 26)) . '</th>';
+                echo '</tr></thead><tbody>';
+                foreach (array_slice($rows, 0, 25) as $i => $r) {
+                    echo '<tr><td>' . ($i + 1) . '</td>';
+                    for ($c = 0; $c < $maxC; $c++) echo '<td>' . htmlspecialchars($r[$c] ?? '') . '</td>';
+                    echo '</tr>';
+                }
+                echo '</tbody></table>';
+            }
+            echo '<p><a href="/moa_attendance.php?action=debug_dump">回到上傳</a></p>';
+            exit;
+        }
+        $pageTitle = 'MOA xlsx Debug';
+        $currentPage = 'moa_attendance';
+        require __DIR__ . '/../templates/layouts/header.php';
+        ?>
+        <h2>MOA xlsx Debug Dump</h2>
+        <div class="card"><div style="padding:14px">
+            <form method="POST" enctype="multipart/form-data">
+                <p>上傳同一個 .xlsx，會 dump 出所有 sheet 名稱與前 25 列內容（純診斷用，不會寫入 DB）</p>
+                <input type="file" name="file" accept=".xlsx" required>
+                <button type="submit" class="btn btn-primary btn-sm">Dump</button>
+            </form>
+        </div></div>
+        <?php
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
     case 'list':
     default:
         $filters = array(

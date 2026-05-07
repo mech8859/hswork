@@ -147,6 +147,15 @@ class ExcelReader
                 if ($type === 's') {
                     // shared string
                     $val = isset($strings[(int)$val]) ? $strings[(int)$val] : $val;
+                } elseif ($type === 'inlineStr' || $type === 'str') {
+                    // 內嵌字串：值放在 <is><t>...</t></is>
+                    $isNode = $c->getElementsByTagName('is');
+                    if ($isNode->length > 0) {
+                        $tNodes = $isNode->item(0)->getElementsByTagName('t');
+                        $tVal = '';
+                        foreach ($tNodes as $tn) { $tVal .= $tn->textContent; }
+                        $val = $tVal !== '' ? $tVal : $val;
+                    }
                 } elseif ($type === '' && $style !== '' && in_array((int)$style, $dateFormats)) {
                     // Excel 日期序號轉換
                     $val = self::excelDateToString((float)$val);
