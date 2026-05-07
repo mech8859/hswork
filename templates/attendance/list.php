@@ -91,8 +91,17 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                     <td class="text-center" style="<?= $r['sign_out_time'] === null ? 'color:#c62828;font-weight:600' : '' ?>">
                         <?= $r['sign_out_time'] ? substr($r['sign_out_time'], 0, 5) : ($r['sign_out_status'] ?: '') ?>
                     </td>
-                    <td class="text-right" style="color:<?= $r['late_minutes'] ? '#c62828' : '' ?>">
-                        <?= e(_m2hm($r['late_minutes'])) ?>
+                    <?php
+                    // 遲到分鐘：優先用既有值（Excel 匯入有），否則用 簽到 - 08:00 計算（API 同步用）
+                    $lateMin = $r['late_minutes'];
+                    if (($lateMin === null || $lateMin === '') && !empty($r['sign_in_time']) && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic'])) {
+                        $parts = explode(':', $r['sign_in_time']);
+                        $sec = (int)$parts[0] * 3600 + (int)$parts[1] * 60 + (isset($parts[2]) ? (int)$parts[2] : 0) - 8 * 3600;
+                        $lateMin = (int)floor($sec / 60);
+                    }
+                    ?>
+                    <td class="text-right" style="color:<?= $lateMin ? '#c62828' : '' ?>">
+                        <?= $lateMin ? (int)$lateMin : '' ?>
                     </td>
                     <td class="text-right" style="color:<?= $r['early_leave_minutes'] ? '#c62828' : '' ?>">
                         <?= e(_m2hm($r['early_leave_minutes'])) ?>
