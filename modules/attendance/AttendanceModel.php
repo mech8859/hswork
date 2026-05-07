@@ -408,15 +408,21 @@ class AttendanceModel
         $s = $this->getSettings();
         $companyId = (int)$s['moa_company_id'];
 
-        // 1) 員工列表
-        $userListResp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/hr/userList',
-                                       array('id'=>$companyId, 'filter'=>1, 'count'=>500));
-        if (!$userListResp['ok']) {
-            $stats['errors'][] = '取員工失敗：' . $userListResp['error'];
-            $this->writeSyncLog('failed', '員工列表：' . $userListResp['error']);
-            return $stats;
+        // 1) 員工列表（分頁抓，count>10 會被 MOA 擋成 305）
+        $users = array();
+        for ($page = 0; $page < 50; $page++) {
+            $resp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/hr/userList',
+                                   array('id'=>$companyId, 'filter'=>1, 'count'=>10, 'page'=>$page));
+            if (!$resp['ok']) {
+                $stats['errors'][] = '取員工失敗（page=' . $page . '）：' . $resp['error'];
+                $this->writeSyncLog('failed', '員工列表：' . $resp['error']);
+                return $stats;
+            }
+            $batch = $resp['data']['list'] ?? array();
+            if (empty($batch)) break;
+            $users = array_merge($users, $batch);
+            if (count($batch) < 10) break;
         }
-        $users = $userListResp['data']['list'] ?? array();
         $stats['employees'] = count($users);
 
         // 2) 預先撈 hswork 對照
@@ -492,13 +498,20 @@ class AttendanceModel
             $userId = $u['userId'] ?? null;
             if (!$name || !$userId) continue;
 
-            $resp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/work/record',
-                                   array('id'=>$companyId, 'userId'=>(string)$userId, 'startDate'=>$startTs, 'endDate'=>$endTs, 'page'=>0));
-            if (!$resp['ok']) {
-                $stats['errors'][] = $name . '：' . $resp['error'];
-                continue;
+            // 打卡記錄也分頁，避免單筆過多被截斷
+            $list = array();
+            for ($p = 0; $p < 30; $p++) {
+                $resp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/work/record',
+                                       array('id'=>$companyId, 'userId'=>(string)$userId, 'startDate'=>$startTs, 'endDate'=>$endTs, 'page'=>$p));
+                if (!$resp['ok']) {
+                    $stats['errors'][] = $name . '（page=' . $p . '）：' . $resp['error'];
+                    break;
+                }
+                $batch = $resp['data']['list'] ?? array();
+                if (empty($batch)) break;
+                $list = array_merge($list, $batch);
+                if (count($batch) < 20) break; // count default 20
             }
-            $list = $resp['data']['list'] ?? array();
             $stats['records'] += count($list);
             // 依日期分組，找最早/最晚當作 簽到/簽退
             $byDay = array();
