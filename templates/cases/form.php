@@ -837,15 +837,16 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
 
     <!-- 帳務資訊 -->
     <div class="card <?= $canEdit['finance'] ? '' : 'section-readonly' ?>" id="sec-finance">
-        <div class="card-header">帳務資訊</div>
+        <div class="card-header">帳務資訊<?php if (!empty($case['accepted_quotation_id'])): ?><small style="margin-left:10px;font-weight:normal;color:#1976d2;font-size:.8rem">（由已接受報價單自動帶入，請至報價單修改）</small><?php endif; ?></div>
+        <?php $_lockedByQuote = !empty($case['accepted_quotation_id']); $_quoteLockAttr = $_lockedByQuote ? 'readonly style="background:#f5f5f5;color:#555"' : ''; ?>
         <div class="form-row">
             <div class="form-group">
                 <label>報價金額</label>
-                <input type="number" name="quote_amount" class="form-control" min="0" value="<?= e($case['quote_amount'] ?? '') ?>" placeholder="元">
+                <input type="number" name="quote_amount" class="form-control" min="0" value="<?= e($case['quote_amount'] ?? '') ?>" placeholder="元" <?= $_quoteLockAttr ?>>
             </div>
             <div class="form-group">
                 <label>成交金額 (未稅)</label>
-                <input type="number" name="deal_amount" class="form-control" min="0" value="<?= e($case['deal_amount'] ?? '') ?>" placeholder="元">
+                <input type="number" name="deal_amount" class="form-control" min="0" value="<?= e($case['deal_amount'] ?? '') ?>" placeholder="元" <?= $_quoteLockAttr ?>>
             </div>
             <div class="form-group">
                 <label>成交日期</label>
@@ -864,11 +865,11 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
         <div class="form-row" id="taxRow" style="<?= ($case['is_tax_included'] ?? '') === '未稅(不開發票)' ? 'display:none' : '' ?>">
             <div class="form-group">
                 <label>稅金</label>
-                <input type="text" name="tax_amount" class="form-control" value="<?= !empty($case['tax_amount']) ? number_format($case['tax_amount']) : '' ?>" placeholder="元">
+                <input type="text" name="tax_amount" class="form-control" value="<?= !empty($case['tax_amount']) ? number_format($case['tax_amount']) : '' ?>" placeholder="元" <?= $_quoteLockAttr ?>>
             </div>
             <div class="form-group">
                 <label>含稅金額</label>
-                <input type="text" name="total_amount" class="form-control" value="<?= !empty($case['total_amount']) ? number_format($case['total_amount']) : '' ?>" placeholder="元">
+                <input type="text" name="total_amount" class="form-control" value="<?= !empty($case['total_amount']) ? number_format($case['total_amount']) : '' ?>" placeholder="元" <?= $_quoteLockAttr ?>>
             </div>
         </div>
         <div class="form-row">
