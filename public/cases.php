@@ -521,12 +521,16 @@ switch ($action) {
             // 2) 實際材料成本（by type）
             // 聰明去重：同案件 + 同產品 + 同數量 + 同日（schedule_date）→ 視為重複，只算一次
             // 跨日（多日施工）即使品項數量相同也合計（例如 5/7 用 5 條 + 5/8 又用 5 條 → 累計 10 條）
+            // 成本優先用 products.cost（內部成本），沒對應 product_id 才退回 mu.unit_cost
             $_muRawStmt = $_paDb->prepare("
                 SELECT mu.material_type, mu.product_id, mu.material_name,
-                       mu.used_qty, mu.unit_cost, wl.updated_at, s.id AS schedule_id, s.schedule_date
+                       mu.used_qty, mu.unit_cost,
+                       COALESCE(p.cost, mu.unit_cost) AS cost_per_unit,
+                       wl.updated_at, s.id AS schedule_id, s.schedule_date
                 FROM material_usage mu
                 JOIN work_logs wl ON mu.work_log_id = wl.id
                 JOIN schedules s ON wl.schedule_id = s.id
+                LEFT JOIN products p ON mu.product_id = p.id
                 WHERE s.case_id = ?
                 ORDER BY s.schedule_date, s.id, wl.updated_at DESC, wl.id DESC
             ");
@@ -542,7 +546,7 @@ switch ($action) {
                 $_seenKey[$k] = true;
                 $t = $_mu['material_type'];
                 if (isset($_costByType[$t])) {
-                    $_costByType[$t] += (float)$_mu['used_qty'] * (float)$_mu['unit_cost'];
+                    $_costByType[$t] += (float)$_mu['used_qty'] * (float)$_mu['cost_per_unit'];
                 }
             }
             $caseProfitAnalysis['actual_equipment']  = (int)$_costByType['equipment'];

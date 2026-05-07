@@ -374,10 +374,7 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
                         <label>餘料數量</label>
                         <input type="number" name="materials[<?= $idx ?>][returned_qty]" class="form-control returned-qty" step="0.1" min="0" value="<?= $returnQty > 0 ? $returnQty : e($m['returned_qty'] ?? '') ?>" readonly style="background:#f5f5f5" data-idx="<?= $idx ?>">
                     </div>
-                    <div class="form-group" style="max-width:90px">
-                        <label>單價</label>
-                        <input type="number" name="materials[<?= $idx ?>][unit_cost]" class="form-control" step="1" min="0" value="<?= e($m['unit_cost'] ?? '') ?>">
-                    </div>
+                    <input type="hidden" name="materials[<?= $idx ?>][unit_cost]" value="<?= e($m['unit_cost'] ?? '') ?>">
                     <div class="form-group" style="align-self:flex-end;flex:0">
                         <?php if (!$fromStockOut): ?>
                         <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.material-row').remove()">X</button>
@@ -428,10 +425,7 @@ $departureHM = $worklog['departure_time'] ? date('H:i', strtotime($worklog['depa
                         <input type="hidden" name="materials[<?= $idx ?>][shipped_qty]" value="0">
                         <input type="hidden" name="materials[<?= $idx ?>][returned_qty]" value="0">
                     </div>
-                    <div class="form-group" style="max-width:90px">
-                        <label>單價</label>
-                        <input type="number" name="materials[<?= $idx ?>][unit_cost]" class="form-control" step="1" min="0" value="<?= e($m['unit_cost'] ?? '') ?>">
-                    </div>
+                    <input type="hidden" name="materials[<?= $idx ?>][unit_cost]" value="<?= e($m['unit_cost'] ?? '') ?>">
                     <div class="form-group" style="align-self:flex-end;flex:0">
                         <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.material-row').remove()">X</button>
                     </div>
@@ -683,7 +677,7 @@ function addMaterial(type) {
             '<div class="form-group" style="flex:2;position:relative"><label>品名</label><input type="text" name="materials[' + i + '][material_name]" class="form-control material-name-input" placeholder="輸入關鍵字搜尋產品..." autocomplete="off" oninput="searchProduct(this,' + i + ')"><input type="hidden" name="materials[' + i + '][product_id]" value=""><div class="product-suggestions" id="suggestions-' + i + '" style="display:none"></div></div>' +
             '<div class="form-group" style="max-width:70px"><label>單位</label><input type="text" name="materials[' + i + '][unit]" class="form-control" placeholder="個"></div>' +
             '<div class="form-group"><label>使用數量</label><input type="number" name="materials[' + i + '][used_qty]" class="form-control used-qty" step="0.1" min="0" data-idx="' + i + '"><input type="hidden" name="materials[' + i + '][shipped_qty]" value="0"><input type="hidden" name="materials[' + i + '][returned_qty]" value="0"></div>' +
-            '<div class="form-group" style="max-width:90px"><label>單價</label><input type="number" name="materials[' + i + '][unit_cost]" class="form-control" step="1" min="0"></div>' +
+            '<input type="hidden" name="materials[' + i + '][unit_cost]" value="">' +
             '<div class="form-group" style="align-self:flex-end;flex:0"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'.material-row\').remove()">X</button></div>' +
             '</div></div>';
         document.getElementById('consumableContainer').insertAdjacentHTML('beforeend', html);
@@ -696,7 +690,7 @@ function addMaterial(type) {
             '<div class="form-group"><label>出庫數量</label><input type="number" name="materials[' + i + '][shipped_qty]" class="form-control shipped-qty" step="0.1" min="0" data-idx="' + i + '"></div>' +
             '<div class="form-group"><label>安裝數量</label><input type="number" name="materials[' + i + '][used_qty]" class="form-control used-qty" step="0.1" min="0" oninput="calcReturn(' + i + ')" data-idx="' + i + '"></div>' +
             '<div class="form-group"><label>餘料數量</label><input type="number" name="materials[' + i + '][returned_qty]" class="form-control returned-qty" step="0.1" min="0" readonly style="background:#f5f5f5" data-idx="' + i + '"><div class="return-warning" id="return-warn-' + i + '" style="display:none;font-size:.8rem;color:#e65100;background:#fff3e0;padding:4px 8px;border-radius:4px;margin-top:4px"></div></div>' +
-            '<div class="form-group" style="max-width:90px"><label>單價</label><input type="number" name="materials[' + i + '][unit_cost]" class="form-control" step="1" min="0"></div>' +
+            '<input type="hidden" name="materials[' + i + '][unit_cost]" value="">' +
             '<div class="form-group" style="align-self:flex-end;flex:0"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'.material-row\').remove()">X</button></div>' +
             '</div>' +
             '<div class="return-warning" id="return-warn-' + i + '" style="display:none;font-size:.8rem;color:#e65100;background:#fff3e0;padding:4px 8px;border-radius:4px;margin-top:4px"></div>' +
