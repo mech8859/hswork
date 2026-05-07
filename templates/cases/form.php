@@ -2238,21 +2238,25 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
         $_aMinutes = $_pa['actual_total_minutes'];
         $_aHours = round($_aMinutes / 60, 1);
         $_aLaborCost = round($_aHours * $_hourlyCost);
+        // 完工後最後成交金額：有填則優先當「實際成交金額」
+        $_finalDeal = !empty($_pa['final_deal_amount']) ? (float)$_pa['final_deal_amount'] : null;
+        $_actualDeal = $_finalDeal !== null ? $_finalDeal : $_deal;
+        $_dealDiff = $_finalDeal !== null ? ($_finalDeal - $_deal) : null;
         // 實際營運成本
         if ($_opMode === 'labor_ratio') {
             $_aOpCost = round($_aLaborCost * $_opRate / 100);
         } else {
-            $_aOpCost = round($_deal * $_opRate / 100);
+            $_aOpCost = round($_actualDeal * $_opRate / 100);
         }
         // 實際總成本
         $_aTotalCost = $_aMatTotal + $_aLaborCost + $_aOpCost;
-        $_aProfit = $_deal - $_aTotalCost;
-        $_aProfitRate = $_deal > 0 ? round($_aProfit / $_deal * 100, 1) : 0;
+        $_aProfit = $_actualDeal - $_aTotalCost;
+        $_aProfitRate = $_actualDeal > 0 ? round($_aProfit / $_actualDeal * 100, 1) : 0;
         // 工時
         $_qHours = $_pa['q_labor_hours'];
         // 收款
         $_totalCollected = !empty($_pa['total_collected']) ? $_pa['total_collected'] : 0;
-        $_balance = $_deal - $_totalCollected;
+        $_balance = $_actualDeal - $_totalCollected;
     ?>
     <div class="card" id="sec-profit-analysis">
         <div class="card-header">案件利潤分析表</div>
@@ -2271,10 +2275,12 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                 </thead>
                 <tbody>
                     <tr class="profit-row-highlight">
-                        <td><strong>成交金額</strong></td>
+                        <td><strong>成交金額</strong><?php if ($_finalDeal !== null): ?><small style="color:#1976d2;margin-left:6px">（最後成交金額已修改）</small><?php endif; ?></td>
                         <td class="text-right"><strong>$<?= number_format($_deal) ?></strong></td>
-                        <td class="text-right"><span class="text-muted">-</span></td>
-                        <td class="text-right"><span class="text-muted">-</span></td>
+                        <td class="text-right"><strong>$<?= number_format($_actualDeal) ?></strong></td>
+                        <td class="text-right"><?php if ($_dealDiff !== null && $_dealDiff != 0): ?>
+                            <span style="color:<?= $_dealDiff > 0 ? '#137333' : '#c5221f' ?>"><?= ($_dealDiff > 0 ? '+' : '') . '$' . number_format($_dealDiff) ?></span>
+                        <?php else: ?><span class="text-muted">-</span><?php endif; ?></td>
                     </tr>
                     <tr>
                         <td>器材成本</td>

@@ -464,6 +464,8 @@ switch ($action) {
         $caseProfitAnalysis = array(
             'has_quotation' => false,
             'deal_amount' => (int)($case['deal_amount'] ?? 0),
+            'final_deal_amount' => isset($case['final_deal_amount']) && $case['final_deal_amount'] !== null && (float)$case['final_deal_amount'] > 0
+                ? (float)$case['final_deal_amount'] : null,
             // 報價預估
             'q_material_cost' => 0, 'q_labor_hours' => 0, 'q_labor_cost' => 0,
             'q_labor_days' => 0, 'q_labor_people' => 0, 'q_cable_cost' => 0,
