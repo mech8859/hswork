@@ -473,10 +473,19 @@ switch ($action) {
                 break;
             }
 
-            // 取得預設倉庫
+            // 取得預設倉庫：先看報價單分公司，找不到再退回任意倉庫
             $db = Database::getInstance();
-            $wh = $db->query("SELECT id FROM warehouses ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-            $warehouseId = $wh ? (int)$wh['id'] : 0;
+            $warehouseId = 0;
+            $quoteBranchId = (int)($quote['branch_id'] ?? 0);
+            if ($quoteBranchId > 0) {
+                $whStmt = $db->prepare("SELECT id FROM warehouses WHERE branch_id = ? AND is_active = 1 ORDER BY id LIMIT 1");
+                $whStmt->execute(array($quoteBranchId));
+                $warehouseId = (int)$whStmt->fetchColumn();
+            }
+            if ($warehouseId === 0) {
+                $wh = $db->query("SELECT id FROM warehouses WHERE is_active = 1 ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+                $warehouseId = $wh ? (int)$wh['id'] : 0;
+            }
 
             // 預先載入被排除的分類 ID（含子分類繼承父分類的旗標）
             $excludedCatIds = array();
@@ -606,9 +615,18 @@ switch ($action) {
                 }
             }
 
-            // 取得預設倉庫
-            $wh = $db->query("SELECT id FROM warehouses ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-            $warehouseId = $wh ? (int)$wh['id'] : 0;
+            // 取得預設倉庫：先看報價單分公司，找不到再退回任意倉庫
+            $warehouseId = 0;
+            $quoteBranchId = (int)($quote['branch_id'] ?? 0);
+            if ($quoteBranchId > 0) {
+                $whStmt = $db->prepare("SELECT id FROM warehouses WHERE branch_id = ? AND is_active = 1 ORDER BY id LIMIT 1");
+                $whStmt->execute(array($quoteBranchId));
+                $warehouseId = (int)$whStmt->fetchColumn();
+            }
+            if ($warehouseId === 0) {
+                $wh = $db->query("SELECT id FROM warehouses WHERE is_active = 1 ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+                $warehouseId = $wh ? (int)$wh['id'] : 0;
+            }
 
             // 被排除的分類（與 create_stock_out 相同邏輯）
             $excludedCatIds = array();
