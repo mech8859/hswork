@@ -227,11 +227,11 @@ function compute_case_readiness_live(array $case): array
     $hasSiteInfo = !empty($sc['structure_type']) || !empty($sc['conduit_type']) || !empty($sc['floor_count']);
     $stored = isset($case['readiness']) && is_array($case['readiness']) ? $case['readiness'] : array();
 
-    // 舊客戶維修案 + 無收費 → 視為金額已確認（不需報價金額）
+    // 舊客戶維修案 + 無收費 / 做服務不收費 → 視為金額已確認（不需報價金額）
     $caseType = isset($case['case_type']) ? $case['case_type'] : '';
     $repairCharged = isset($case['repair_is_charged']) ? $case['repair_is_charged'] : '';
     $hasAmountConfirmed = ($dealAmount > 0)
-        || ($caseType === 'old_repair' && $repairCharged === '無收費');
+        || ($caseType === 'old_repair' && in_array($repairCharged, array('無收費', '做服務不收費'), true));
 
     return array(
         'has_quotation'        => $hasQuotation ? 1 : 0,
