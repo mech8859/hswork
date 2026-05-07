@@ -111,7 +111,7 @@
         <div class="form-row">
             <div class="form-group">
                 <label>已付金額</label>
-                <input type="text" class="form-control" value="$<?= number_format((int)$gv('paid_amount', 0)) ?>" readonly style="background:#f5f5f5">
+                <input type="text" class="form-control" value="$<?= number_format((float)$gv('paid_amount', 0), 2) ?>" readonly style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>付款日期</label>
@@ -202,8 +202,8 @@
                                 <input type="hidden" name="items[<?= $idx ?>][received_qty]" class="pack-unit-hidden-qty" value="<?= !empty($item['received_qty']) ? (int)$item['received_qty'] : 0 ?>">
                                 <div class="pack-unit-hint" style="display:none"></div>
                             </td>
-                            <td><input type="number" name="items[<?= $idx ?>][unit_price]" class="form-control item-price" step="1" min="0" value="<?= !empty($item['unit_price']) ? (int)$item['unit_price'] : 0 ?>" oninput="calcRowAmount(this.closest('tr'))"></td>
-                            <td><input type="number" name="items[<?= $idx ?>][amount]" class="form-control item-amount" step="1" min="0" value="<?= !empty($item['amount']) ? (int)$item['amount'] : 0 ?>" readonly></td>
+                            <td><input type="number" name="items[<?= $idx ?>][unit_price]" class="form-control item-price" step="0.01" min="0" value="<?= !empty($item['unit_price']) ? number_format((float)$item['unit_price'], 2, '.', '') : '0.00' ?>" oninput="calcRowAmount(this.closest('tr'))"></td>
+                            <td><input type="number" name="items[<?= $idx ?>][amount]" class="form-control item-amount" step="0.01" min="0" value="<?= !empty($item['amount']) ? number_format((float)$item['amount'], 2, '.', '') : '0.00' ?>" readonly></td>
                             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>
                         </tr>
                         <?php endforeach; ?>
@@ -228,8 +228,8 @@
                                 <input type="hidden" name="items[0][received_qty]" class="pack-unit-hidden-qty" value="0">
                                 <div class="pack-unit-hint" style="display:none"></div>
                             </td>
-                            <td><input type="number" name="items[0][unit_price]" class="form-control item-price" step="1" min="0" value="0" oninput="calcRowAmount(this.closest('tr'))"></td>
-                            <td><input type="number" name="items[0][amount]" class="form-control item-amount" step="1" min="0" value="0" readonly></td>
+                            <td><input type="number" name="items[0][unit_price]" class="form-control item-price" step="0.01" min="0" value="0.00" oninput="calcRowAmount(this.closest('tr'))"></td>
+                            <td><input type="number" name="items[0][amount]" class="form-control item-amount" step="0.01" min="0" value="0.00" readonly></td>
                             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>
                         </tr>
                     <?php endif; ?>
@@ -256,16 +256,16 @@
             </div>
             <div class="form-group">
                 <label>未稅金額</label>
-                <input type="number" id="subtotal_amount" class="form-control" step="1" min="0" value="0" readonly style="background:#f5f5f5">
+                <input type="number" id="subtotal_amount" class="form-control" step="0.01" min="0" value="0.00" readonly style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>稅額 (5%)</label>
-                <input type="number" id="tax_amount" class="form-control" step="1" min="0" value="0" readonly style="background:#f5f5f5">
+                <input type="number" id="tax_amount" class="form-control" step="0.01" min="0" value="0.00" readonly style="background:#f5f5f5">
             </div>
             <div class="form-group">
                 <label>總金額（含稅）</label>
-                <input type="number" name="total_amount" id="total_amount" class="form-control" step="1" min="0"
-                       value="<?= $isEdit && !empty($record['total_amount']) ? (int)$record['total_amount'] : 0 ?>" readonly style="font-weight:700;color:var(--primary)">
+                <input type="number" name="total_amount" id="total_amount" class="form-control" step="0.01" min="0"
+                       value="<?= $isEdit && !empty($record['total_amount']) ? number_format((float)$record['total_amount'], 2, '.', '') : '0.00' ?>" readonly style="font-weight:700;color:var(--primary)">
             </div>
         </div>
     </div>
@@ -276,8 +276,8 @@
         <div class="form-row">
             <div class="form-group">
                 <label>已付金額</label>
-                <input type="number" name="paid_amount" class="form-control" step="1" min="0"
-                       value="<?= $isEdit && !empty($record['paid_amount']) ? (int)$record['paid_amount'] : '' ?>" placeholder="0">
+                <input type="number" name="paid_amount" class="form-control" step="0.01" min="0"
+                       value="<?= $isEdit && !empty($record['paid_amount']) ? number_format((float)$record['paid_amount'], 2, '.', '') : '' ?>" placeholder="0.00">
             </div>
             <div class="form-group">
                 <label>付款日</label>
@@ -322,8 +322,8 @@ function addItemRow() {
         + '<td><input type="number" class="form-control pack-unit-qty item-qty" step="any" min="0" value="0" oninput="hswPackUnitRowSync(this); calcRowAmount(this.closest(\'tr\'))">'
         + '<input type="hidden" name="items['+itemIdx+'][received_qty]" class="pack-unit-hidden-qty" value="0">'
         + '<div class="pack-unit-hint" style="display:none"></div></td>'
-        + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control item-price" step="1" min="0" value="0" oninput="calcRowAmount(this.closest(\'tr\'))"></td>'
-        + '<td><input type="number" name="items['+itemIdx+'][amount]" class="form-control item-amount" step="1" min="0" value="0" readonly></td>'
+        + '<td><input type="number" name="items['+itemIdx+'][unit_price]" class="form-control item-price" step="0.01" min="0" value="0.00" oninput="calcRowAmount(this.closest(\'tr\'))"></td>'
+        + '<td><input type="number" name="items['+itemIdx+'][amount]" class="form-control item-amount" step="0.01" min="0" value="0.00" readonly></td>'
         + '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">X</button></td>';
     tbody.appendChild(tr);
     itemIdx++;
@@ -342,10 +342,11 @@ function reindexItems() {
     }
 }
 
+function _round2(n) { return Math.round(n * 100) / 100; }
 function calcRowAmount(row) {
     var qty = parseFloat(row.querySelector('.item-qty').value) || 0;
     var price = parseFloat(row.querySelector('.item-price').value) || 0;
-    row.querySelector('.item-amount').value = Math.round(qty * price);
+    row.querySelector('.item-amount').value = _round2(qty * price).toFixed(2);
     calcTotals();
 }
 
@@ -358,16 +359,17 @@ function calcTotals() {
     document.querySelectorAll('.item-amount').forEach(function(el) {
         subtotal += parseFloat(el.value) || 0;
     });
-    var tax = Math.round(subtotal * 0.05);
-    var total = subtotal + tax;
+    subtotal = _round2(subtotal);
+    var tax = _round2(subtotal * 0.05);
+    var total = _round2(subtotal + tax);
     document.getElementById('total_qty').value = totalQty;
-    document.getElementById('subtotal_amount').value = subtotal;
-    document.getElementById('tax_amount').value = tax;
-    document.getElementById('total_amount').value = total;
+    document.getElementById('subtotal_amount').value = subtotal.toFixed(2);
+    document.getElementById('tax_amount').value = tax.toFixed(2);
+    document.getElementById('total_amount').value = total.toFixed(2);
     var sumQty = document.getElementById('sumQty');
     var sumAmount = document.getElementById('sumAmount');
     if (sumQty) sumQty.textContent = totalQty.toLocaleString();
-    if (sumAmount) sumAmount.textContent = '$' + subtotal.toLocaleString();
+    if (sumAmount) sumAmount.textContent = '$' + subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 // 品名即時搜尋
@@ -517,7 +519,7 @@ document.getElementById('itemBody').addEventListener('input', function(e) {
                 var nameInput = tr.querySelector('input[name*="[product_name]"]');
                 if (nameInput) nameInput.value = item.getAttribute('data-name');
                 var priceInput = tr.querySelector('.item-price');
-                if (priceInput && item.getAttribute('data-price') > 0) priceInput.value = Math.round(item.getAttribute('data-price'));
+                if (priceInput && item.getAttribute('data-price') > 0) priceInput.value = (parseFloat(item.getAttribute('data-price')) || 0).toFixed(2);
                 var pidInput = tr.querySelector('input[name*="[product_id]"]');
                 if (pidInput) pidInput.value = item.getAttribute('data-product-id');
                 calcRowAmount(tr);

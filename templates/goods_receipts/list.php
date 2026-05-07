@@ -76,7 +76,7 @@ function grStatusBadge($status) {
             </div>
             <div class="staff-card-meta">
                 <span>數量 <?= number_format(!empty($r['total_qty']) ? $r['total_qty'] : 0) ?></span>
-                <span>金額 $<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></span>
+                <span>金額 $<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0, 2) ?></span>
             </div>
         </div>
         <?php endforeach; ?>
@@ -107,7 +107,7 @@ function grStatusBadge($status) {
                     <td><?= e(!empty($r['vendor_name']) ? $r['vendor_name'] : '-') ?></td>
                     <td><?= e(!empty($r['warehouse_name']) ? $r['warehouse_name'] : '') ?></td>
                     <td class="text-right"><?= number_format(!empty($r['total_qty']) ? $r['total_qty'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0) ?></td>
+                    <td class="text-right">$<?= number_format(!empty($r['total_amount']) ? $r['total_amount'] : 0, 2) ?></td>
                     <td>
                         <a href="/goods_receipts.php?action=view&id=<?= $r['id'] ?>" class="btn btn-outline btn-sm">檢視</a>
                         <?php if ($r['status'] === '草稿' || $r['status'] === '待確認'): ?>

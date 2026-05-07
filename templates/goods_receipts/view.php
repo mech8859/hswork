@@ -221,8 +221,8 @@ document.addEventListener('click', function(e) {
                         <div style="font-size:.7rem;color:var(--gray-500)">= <?= number_format((float)($item['received_qty'] ?? 0)) ?> <?= e($item['unit'] ?? '') ?></div>
                         <?php endif; ?>
                     </td>
-                    <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0) ?></td>
-                    <td class="text-right">$<?= number_format(!empty($item['amount']) ? $item['amount'] : 0) ?></td>
+                    <td class="text-right">$<?= number_format(!empty($item['unit_price']) ? $item['unit_price'] : 0, 2) ?></td>
+                    <td class="text-right">$<?= number_format(!empty($item['amount']) ? $item['amount'] : 0, 2) ?></td>
                 </tr>
                 <?php $totalQty += (!empty($item['received_qty']) ? $item['received_qty'] : 0); ?>
                 <?php $totalAmt += (!empty($item['amount']) ? $item['amount'] : 0); ?>
@@ -233,20 +233,20 @@ document.addEventListener('click', function(e) {
                     <td colspan="6" class="text-right">合計</td>
                     <td class="text-right"><?= number_format($totalQty) ?></td>
                     <td></td>
-                    <td class="text-right">$<?= number_format($totalAmt) ?></td>
+                    <td class="text-right">$<?= number_format($totalAmt, 2) ?></td>
                 </tr>
-                <?php $taxAmt = round($totalAmt * 0.05); ?>
+                <?php $taxAmt = round($totalAmt * 0.05, 2); ?>
                 <tr style="font-size:.85rem;color:var(--gray-500)">
                     <td colspan="8" class="text-right">未稅金額</td>
-                    <td class="text-right">$<?= number_format($totalAmt) ?></td>
+                    <td class="text-right">$<?= number_format($totalAmt, 2) ?></td>
                 </tr>
                 <tr style="font-size:.85rem;color:var(--gray-500)">
                     <td colspan="8" class="text-right">稅額 (5%)</td>
-                    <td class="text-right">$<?= number_format($taxAmt) ?></td>
+                    <td class="text-right">$<?= number_format($taxAmt, 2) ?></td>
                 </tr>
                 <tr style="font-weight:bold;font-size:1.05rem;color:var(--primary)">
                     <td colspan="8" class="text-right">總金額（含稅）</td>
-                    <td class="text-right">$<?= number_format($totalAmt + $taxAmt) ?></td>
+                    <td class="text-right">$<?= number_format($totalAmt + $taxAmt, 2) ?></td>
                 </tr>
             </tfoot>
         </table>
@@ -259,7 +259,7 @@ document.addEventListener('click', function(e) {
     <div class="form-row">
         <div class="form-group">
             <label>已付金額</label>
-            <div class="form-value" style="<?= !empty($record['paid_amount']) ? 'color:#2e7d32;font-weight:700' : '' ?>"><?= !empty($record['paid_amount']) ? '$' . number_format($record['paid_amount']) : '-' ?></div>
+            <div class="form-value" style="<?= !empty($record['paid_amount']) ? 'color:#2e7d32;font-weight:700' : '' ?>"><?= !empty($record['paid_amount']) ? '$' . number_format($record['paid_amount'], 2) : '-' ?></div>
         </div>
         <div class="form-group">
             <label>付款日</label>
