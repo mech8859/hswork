@@ -145,6 +145,46 @@ switch ($action) {
                 $_POST['is_completed'] = 0;
             }
             $caseId = $model->create($_POST);
+            // 舊客戶維修案：自動把原案件的報價單附件複製到新案件「舊客戶報價單」分類
+            $copiedCount = 0;
+            if (($_POST['case_type'] ?? '') === 'old_repair' && !empty($_POST['customer_id'])) {
+                $_db = Database::getInstance();
+                $_custStmt = $_db->prepare('SELECT case_number FROM customers WHERE id = ?');
+                $_custStmt->execute(array((int)$_POST['customer_id']));
+                $_origCaseNumber = $_custStmt->fetchColumn();
+                if ($_origCaseNumber) {
+                    $_caseStmt = $_db->prepare('SELECT id FROM cases WHERE case_number = ? LIMIT 1');
+                    $_caseStmt->execute(array($_origCaseNumber));
+                    $_origCaseId = (int)$_caseStmt->fetchColumn();
+                    if ($_origCaseId > 0 && $_origCaseId !== $caseId) {
+                        // 找「舊客戶報價單」分類 key（自訂分類），取不到就退回 quotation
+                        $_typeStmt = $_db->prepare("SELECT option_key FROM dropdown_options WHERE category='case_attach_type' AND label LIKE '%舊客戶報價單%' AND is_active=1 ORDER BY sort_order ASC LIMIT 1");
+                        $_typeStmt->execute();
+                        $_oldQuoteType = $_typeStmt->fetchColumn() ?: 'quotation';
+                        // 取原案件報價單附件（含 quotation 與舊客戶報價單）
+                        $_attStmt = $_db->prepare("SELECT file_name, file_path FROM case_attachments WHERE case_id = ? AND file_type IN ('quotation', ?)");
+                        $_attStmt->execute(array($_origCaseId, $_oldQuoteType));
+                        $_origAtts = $_attStmt->fetchAll(PDO::FETCH_ASSOC);
+                        if ($_origAtts) {
+                            $_dstDir = __DIR__ . '/uploads/cases/' . $caseId;
+                            if (!is_dir($_dstDir)) @mkdir($_dstDir, 0755, true);
+                            foreach ($_origAtts as $_a) {
+                                $_srcFull = __DIR__ . $_a['file_path'];
+                                if (!is_file($_srcFull)) continue;
+                                $_safeName = preg_replace('/[^a-zA-Z0-9._\x{4e00}-\x{9fff}-]/u', '', $_a['file_name']);
+                                $_newFname = date('Ymd_His') . '_' . mt_rand(1000,9999) . '_' . $_safeName;
+                                $_dstFull = $_dstDir . '/' . $_newFname;
+                                if (@copy($_srcFull, $_dstFull)) {
+                                    $_newRel = '/uploads/cases/' . $caseId . '/' . $_newFname;
+                                    $model->saveAttachment($caseId, $_oldQuoteType, $_a['file_name'], $_newRel);
+                                    if (function_exists('backup_to_drive')) { backup_to_drive($_dstFull, 'cases', $caseId); }
+                                    $copiedCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             $model->updateReadiness($caseId, $_POST);
             $model->updateSiteConditions($caseId, $_POST);
             if (!empty($_POST['contacts'])) {
@@ -156,7 +196,11 @@ switch ($action) {
             if (isset($_POST['est_materials'])) {
                 $model->saveMaterialEstimates($caseId, $_POST['est_materials']);
             }
-            Session::flash('success', '案件已新增');
+            $_okMsg = '案件已新增';
+            if ($copiedCount > 0) {
+                $_okMsg .= '；已自動帶入原案件報價單 ' . $copiedCount . ' 份至「舊客戶報價單」附件';
+            }
+            Session::flash('success', $_okMsg);
             redirect('/cases.php?action=view&id=' . $caseId);
         }
 
