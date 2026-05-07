@@ -140,6 +140,10 @@ switch ($action) {
                     }
                 }
             }
+            // 成交類狀態 → 強制 is_completed=0（成交當下尚未完工）
+            if (in_array($_POST['sub_status'] ?? '', array('電話報價成交','已成交','跨月成交','現簽'), true)) {
+                $_POST['is_completed'] = 0;
+            }
             $caseId = $model->create($_POST);
             $model->updateReadiness($caseId, $_POST);
             $model->updateSiteConditions($caseId, $_POST);
@@ -294,6 +298,10 @@ switch ($action) {
                         redirect('/cases.php?action=edit&id=' . $id);
                     }
                 }
+            }
+            // 成交類狀態 → 強制 is_completed=0（成交當下尚未完工）
+            if (in_array($_POST['sub_status'] ?? '', array('電話報價成交','已成交','跨月成交','現簽'), true)) {
+                $_POST['is_completed'] = 0;
             }
             // DEBUG: 記錄 POST 值到檔案
             file_put_contents('/tmp/case_save_debug.txt', date('H:i:s') . ' id=' . $id . ' POST[tax_amount]=' . var_export($_POST['tax_amount'] ?? 'NOT_SET', true) . ' POST[total_amount]=' . var_export($_POST['total_amount'] ?? 'NOT_SET', true) . "\n", FILE_APPEND);

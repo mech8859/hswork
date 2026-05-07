@@ -421,7 +421,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             <div class="form-group">
                 <label>狀態</label>
                 <?php $defaultSubStatus = isset($case['sub_status']) ? $case['sub_status'] : '未指派'; ?>
-                <select name="sub_status" id="subStatusSelect" class="form-control" data-original="<?= e($defaultSubStatus) ?>" onchange="toggleNewCustomerBtn();checkSalesNoteRequired()">
+                <select name="sub_status" id="subStatusSelect" class="form-control" data-original="<?= e($defaultSubStatus) ?>" onchange="toggleNewCustomerBtn();checkSalesNoteRequired();forceIncompleteOnDealStatus()">
                     <option value="">請選擇</option>
                     <?php foreach (CaseModel::subStatusOptions() as $v => $l): ?>
                     <option value="<?= $v ?>" <?= $defaultSubStatus === $v ? 'selected' : '' ?>><?= e($l) ?></option>
@@ -3926,6 +3926,21 @@ if (document.readyState === 'loading') {
     document.head.appendChild(s);
 })();
 var _dealSubStatuses = ['電話報價成交','已成交','跨月成交','現簽'];
+// 狀態切換到成交類時，自動把「是否已完工」設為未完工（成交當下尚未完工）
+function forceIncompleteOnDealStatus() {
+    var subSel = document.getElementById('subStatusSelect');
+    if (!subSel) return;
+    if (_dealSubStatuses.indexOf(subSel.value) === -1) return;
+    var icSel = document.querySelector('select[name="is_completed"]');
+    if (!icSel) return;
+    if (icSel.value !== '0') {
+        icSel.value = '0';
+        // 視覺提示
+        icSel.style.transition = 'background-color .3s';
+        icSel.style.backgroundColor = '#fff3cd';
+        setTimeout(function(){ icSel.style.backgroundColor = ''; }, 1000);
+    }
+}
 function toggleNewCustomerBtn() {
     var sel = document.getElementById('subStatusSelect');
     var btn = document.getElementById('btnNewCustomer');
