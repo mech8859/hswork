@@ -48,6 +48,17 @@ $lockedRate = $totalClosed > 0 ? round($lockedCount / $totalClosed * 100, 1) : 0
 
 <div class="ca-toolbar">
     <button type="button" class="ca-fresh" onclick="location.reload()">🔄 重新整理</button>
+    <form method="GET" action="/reports.php" class="d-flex align-center gap-1" style="margin:0">
+        <input type="hidden" name="action" value="closed_anomalies">
+        <label style="font-size:.85rem">業務</label>
+        <select name="sales_id" class="form-control" style="max-width:160px;font-size:.85rem;padding:4px 8px" onchange="this.form.submit()">
+            <option value="">全部業務</option>
+            <option value="__null__" <?= ($_GET['sales_id'] ?? '') === '__null__' ? 'selected' : '' ?>>未指派</option>
+            <?php foreach ($salesList as $s): ?>
+            <option value="<?= (int)$s['id'] ?>" <?= ($_GET['sales_id'] ?? '') === (string)$s['id'] ? 'selected' : '' ?>><?= e($s['real_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </form>
     <span style="color:#666;font-size:.85rem">最後更新：<?= date('Y-m-d H:i:s') ?></span>
     <span style="color:#888;font-size:.8rem;margin-left:auto">點「編輯」會在新分頁打開案件，修完存檔後回到本頁按「重新整理」即可看到最新狀態</span>
 </div>
