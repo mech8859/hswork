@@ -1311,16 +1311,14 @@ foreach ($repairStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 
 <?php endif; ?>
 
-<!-- 十九、施工回報 月份統計（依工程回報時間） -->
+<!-- 十九、施工回報 業務 × 月份 統計（依工程回報時間） -->
 <?php
 $wlDb = Database::getInstance();
 $wlBranches = implode(',', array_map('intval', $branchIds));
-// 依施工回報時間（arrival_time，沒填則退而用 schedule_date）統計：
-//   - 派工人數：每筆 work_logs 算一人次（同排工多工程師會多計）
-//   - 總工作時數：arrival 與 departure 都填才計入
-//   - 總收款金額：payment_collected=1 才計
+// 業務取自 cases.sales_id；未指派業務的 work_logs 歸到「— 不指派 —」
 $wlStmt = $wlDb->query("
     SELECT
+        COALESCE(NULLIF(u.real_name, ''), '— 不指派 —') AS sales_name,
         DATE_FORMAT(COALESCE(wl.arrival_time, s.schedule_date), '%Y-%m') AS ym,
         COUNT(*) AS dispatch_cnt,
         SUM(CASE WHEN wl.arrival_time IS NOT NULL AND wl.departure_time IS NOT NULL
@@ -1329,56 +1327,80 @@ $wlStmt = $wlDb->query("
     FROM work_logs wl
     JOIN schedules s ON wl.schedule_id = s.id
     JOIN cases c ON s.case_id = c.id
+    LEFT JOIN users u ON c.sales_id = u.id
     WHERE c.branch_id IN ({$wlBranches})
       AND (wl.arrival_time IS NOT NULL OR (wl.work_description IS NOT NULL AND wl.work_description <> ''))
       AND COALESCE(wl.arrival_time, s.schedule_date) IS NOT NULL
       AND DATE_FORMAT(COALESCE(wl.arrival_time, s.schedule_date), '%Y-%m') BETWEEN '{$months[0]}' AND '{$months[$nm-1]}'
-    GROUP BY ym
-    ORDER BY ym
+    GROUP BY sales_name, ym
+    ORDER BY sales_name, ym
 ");
-$wlData = array();
+$wlSalesData = array();
 foreach ($wlStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-    $wlData[$r['ym']] = array(
+    $name = $r['sales_name'];
+    $ym = $r['ym'];
+    if (!isset($wlSalesData[$name])) $wlSalesData[$name] = array();
+    $wlSalesData[$name][$ym] = array(
         'dispatch' => (int)$r['dispatch_cnt'],
         'hours'    => round(((int)$r['total_minutes']) / 60, 1),
         'payment'  => (float)$r['total_payment'],
     );
 }
-?>
-<div class="card">
-    <div class="card-header analysis-header">十九、施工回報 月份統計<small style="opacity:.7;margin-left:8px">（依工程回報時間：arrival_time，未填則用排工日）</small></div>
-    <div class="table-responsive">
+ksort($wlSalesData);
+
+// helper：渲染單一指標的 業務×月份 表格
+$renderSalesMonthTable = function ($title, $field, $isMoney, $isFloat) use ($wlSalesData, $months) {
+    $grand = array(); $grandTotal = 0;
+    ?>
+    <div class="table-responsive" style="margin-top:8px">
+        <div style="font-weight:600;padding:6px 12px;background:#f8f9fa;border-bottom:1px solid #dee2e6"><?= e($title) ?></div>
         <table class="table table-sm analysis-table">
             <thead><tr>
-                <th>統計項目</th>
+                <th>業務</th>
                 <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
                 <th class="col-total">合計</th>
             </tr></thead>
             <tbody>
+            <?php
+            foreach ($wlSalesData as $name => $mdata):
+                $rowTotal = 0;
+                foreach ($months as $m) {
+                    $v = isset($mdata[$m][$field]) ? $mdata[$m][$field] : 0;
+                    $rowTotal += $v;
+                    if (!isset($grand[$m])) $grand[$m] = 0;
+                    $grand[$m] += $v;
+                }
+                $grandTotal += $rowTotal;
+                if ($rowTotal == 0) continue; // 沒資料的業務隱藏
+            ?>
                 <tr>
-                    <td>派工人數<small style="opacity:.7;margin-left:4px">（人次）</small></td>
-                    <?php $wDispatchSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['dispatch']) ? $wlData[$m]['dispatch'] : 0; $wDispatchSum += $v; ?>
-                    <td><?= $v ?: '' ?></td>
+                    <td style="font-weight:600"><?= e($name) ?></td>
+                    <?php foreach ($months as $m): $v = isset($mdata[$m][$field]) ? $mdata[$m][$field] : 0; ?>
+                    <td><?php if ($v > 0) { echo $isMoney ? '$' . number_format($v) : ($isFloat ? number_format($v, 1) : number_format($v)); } ?></td>
                     <?php endforeach; ?>
-                    <td class="col-total"><?= number_format($wDispatchSum) ?></td>
+                    <td class="col-total"><?php echo $isMoney ? '$' . number_format($rowTotal) : ($isFloat ? number_format($rowTotal, 1) : number_format($rowTotal)); ?></td>
                 </tr>
-                <tr>
-                    <td>總工作時數<small style="opacity:.7;margin-left:4px">（小時）</small></td>
-                    <?php $wHoursSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['hours']) ? $wlData[$m]['hours'] : 0; $wHoursSum += $v; ?>
-                    <td><?= $v > 0 ? number_format($v, 1) : '' ?></td>
+            <?php endforeach; ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <?php foreach ($months as $m): $v = isset($grand[$m]) ? $grand[$m] : 0; ?>
+                    <td><?php if ($v > 0) { echo $isMoney ? '$' . number_format($v) : ($isFloat ? number_format($v, 1) : number_format($v)); } ?></td>
                     <?php endforeach; ?>
-                    <td class="col-total"><?= number_format($wHoursSum, 1) ?></td>
-                </tr>
-                <tr class="row-highlight">
-                    <td>總收款金額<small style="opacity:.7;margin-left:4px">（元，現場收款）</small></td>
-                    <?php $wPaymentSum = 0; foreach ($months as $m): $v = isset($wlData[$m]['payment']) ? $wlData[$m]['payment'] : 0; $wPaymentSum += $v; ?>
-                    <td><?= $v > 0 ? '$' . number_format($v) : '' ?></td>
-                    <?php endforeach; ?>
-                    <td class="col-total">$<?= number_format($wPaymentSum) ?></td>
+                    <td class="col-total"><?php echo $isMoney ? '$' . number_format($grandTotal) : ($isFloat ? number_format($grandTotal, 1) : number_format($grandTotal)); ?></td>
                 </tr>
             </tbody>
         </table>
     </div>
+    <?php
+};
+?>
+<div class="card">
+    <div class="card-header analysis-header">十九、施工回報 業務 × 月份 統計<small style="opacity:.7;margin-left:8px">（依工程回報時間：arrival_time，未填則用排工日）</small></div>
+    <?php
+    $renderSalesMonthTable('派工人數（人次）', 'dispatch', false, false);
+    $renderSalesMonthTable('總工作時數（小時）', 'hours', false, true);
+    $renderSalesMonthTable('總收款金額（元，現場收款）', 'payment', true, false);
+    ?>
 </div>
 
 <!-- 鑽取明細（內嵌在卡片下方）-->
