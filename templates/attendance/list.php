@@ -10,7 +10,8 @@ function _m2hm($m) {
     <h2>MOA 考勤明細</h2>
     <div class="d-flex gap-1">
         <?php if (Auth::hasPermission('attendance.manage') || Auth::hasPermission('all')): ?>
-        <a href="/moa_attendance.php?action=import" class="btn btn-success btn-sm">+ 匯入 MOA xlsx</a>
+        <a href="/moa_attendance.php?action=sync_config" class="btn btn-primary btn-sm">⚙ API 同步</a>
+        <a href="/moa_attendance.php?action=import" class="btn btn-success btn-sm">+ 匯入 Excel</a>
         <a href="/moa_attendance.php?action=employees" class="btn btn-outline btn-sm">員工對照</a>
         <?php endif; ?>
     </div>

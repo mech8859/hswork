@@ -109,6 +109,72 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    case 'sync_config':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/moa_attendance.php?action=sync_config'); }
+            if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('all')) {
+                Session::flash('error', '無權限'); redirect('/moa_attendance.php?action=sync_config');
+            }
+            $companyId = (int)($_POST['moa_company_id'] ?? 4545);
+            $orgId     = (int)($_POST['moa_org_id'] ?? 200021);
+            $cookie    = trim($_POST['moa_cookie'] ?? '');
+            // 空字串不覆寫 cookie
+            $model->saveSettings($companyId, $orgId, $cookie !== '' ? $cookie : null);
+            Session::flash('success', '同步設定已儲存');
+            redirect('/moa_attendance.php?action=sync_config');
+        }
+        $settings = $model->getSettings();
+        $pageTitle = 'MOA 同步設定';
+        $currentPage = 'moa_attendance';
+        require __DIR__ . '/../templates/layouts/header.php';
+        require __DIR__ . '/../templates/attendance/sync_config.php';
+        require __DIR__ . '/../templates/layouts/footer.php';
+        break;
+
+    case 'sync_now':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/moa_attendance.php?action=sync_config'); }
+        if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/moa_attendance.php?action=sync_config'); }
+        if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限'); redirect('/moa_attendance.php?action=sync_config');
+        }
+        $df = $_POST['date_from'] ?? date('Y-m-d', strtotime('-1 day'));
+        $dt = $_POST['date_to']   ?? date('Y-m-d');
+        set_time_limit(180);
+        $stats = $model->syncFromApi($df, $dt);
+        if ($stats['ok']) {
+            $msg = '同步完成：員工 ' . $stats['employees'] . '，打卡原始 ' . $stats['records']
+                 . '，員工日 ' . $stats['days'] . '（新 ' . $stats['inserted'] . '、更新 ' . $stats['updated'] . '）';
+            if ($stats['unmatched'] > 0) $msg .= '，未對應姓名 ' . $stats['unmatched'];
+            if (!empty($stats['errors'])) $msg .= '，部分員工失敗 ' . count($stats['errors']) . ' 筆（' . substr(implode(' / ', $stats['errors']), 0, 200) . '）';
+            Session::flash('success', $msg);
+            AuditLog::log('attendance', 'api_sync', 0, $msg);
+        } else {
+            Session::flash('error', '同步失敗：' . implode('；', $stats['errors']));
+        }
+        redirect('/moa_attendance.php?action=sync_config');
+        break;
+
+    case 'cron_sync':
+        // CRON 用：純文字輸出，不需 session（用 token 驗證）
+        // 為簡化先沿用登入 session；後續可改 token
+        header('Content-Type: text/plain; charset=utf-8');
+        $df = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 day'));
+        $dt = $_GET['date_to']   ?? date('Y-m-d', strtotime('-1 day'));
+        set_time_limit(180);
+        $stats = $model->syncFromApi($df, $dt);
+        echo "=== MOA 同步 ===\n";
+        echo "區間：$df ~ $dt\n";
+        echo "結果：" . ($stats['ok'] ? 'OK' : 'FAILED') . "\n";
+        echo "員工：" . $stats['employees'] . "\n";
+        echo "打卡原始：" . $stats['records'] . "\n";
+        echo "員工日：" . $stats['days'] . "（新 " . $stats['inserted'] . " 更新 " . $stats['updated'] . "）\n";
+        echo "未對應姓名：" . $stats['unmatched'] . "\n";
+        if (!empty($stats['errors'])) {
+            echo "錯誤：\n";
+            foreach ($stats['errors'] as $e) echo "  - $e\n";
+        }
+        exit;
+
     case 'debug_dump':
         // 上傳檔案，dump sheet 名稱與每張 sheet 前 25 列原始解析結果
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['file']['tmp_name'])) {

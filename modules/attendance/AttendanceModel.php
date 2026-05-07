@@ -326,4 +326,232 @@ class AttendanceModel
                 LIMIT " . (int)$limit;
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    // ===== MOA API 同步 =====
+
+    public function getSettings()
+    {
+        $row = $this->db->query("SELECT * FROM attendance_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            $this->db->exec("INSERT INTO attendance_settings (id, moa_company_id, moa_org_id) VALUES (1, 4545, 200021)");
+            $row = $this->db->query("SELECT * FROM attendance_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+        }
+        return $row;
+    }
+
+    public function saveSettings($companyId, $orgId, $cookie = null)
+    {
+        if ($cookie !== null) {
+            $stmt = $this->db->prepare("UPDATE attendance_settings SET moa_company_id = ?, moa_org_id = ?, moa_cookie = ?, cookie_set_at = NOW(), cookie_set_by = ? WHERE id = 1");
+            $stmt->execute(array((int)$companyId, (int)$orgId, $cookie, Auth::id()));
+        } else {
+            $stmt = $this->db->prepare("UPDATE attendance_settings SET moa_company_id = ?, moa_org_id = ? WHERE id = 1");
+            $stmt->execute(array((int)$companyId, (int)$orgId));
+        }
+    }
+
+    /**
+     * 呼叫 MOA API
+     * @return array ['ok'=>bool, 'data'=>mixed, 'error'=>string]
+     */
+    public function moaCall($endpoint, array $payload)
+    {
+        $s = $this->getSettings();
+        if (empty($s['moa_cookie'])) {
+            return array('ok'=>false, 'error'=>'尚未設定 MOA Cookie，請至「同步設定」頁貼上 cookie');
+        }
+        $url = 'https://moa.micito.net' . $endpoint;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/json',
+                'Cookie: ' . $s['moa_cookie'],
+                'Origin: https://moa.micito.net',
+                'Referer: https://moa.micito.net/manage/',
+                'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+            ),
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ));
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($body === false) {
+            return array('ok'=>false, 'error'=>'CURL 失敗: ' . $err);
+        }
+        if ($httpCode !== 200) {
+            return array('ok'=>false, 'error'=>'HTTP ' . $httpCode . '：' . substr($body, 0, 200));
+        }
+        $data = json_decode($body, true);
+        if (!is_array($data)) {
+            return array('ok'=>false, 'error'=>'回傳非 JSON：' . substr($body, 0, 200));
+        }
+        if (isset($data['code']) && $data['code'] !== '0' && $data['code'] !== 0) {
+            // 305 通常代表未登入或 cookie 過期
+            return array('ok'=>false, 'error'=>'MOA 回傳 code=' . $data['code'] . '（' . ($data['message'] ?? '') . '）— cookie 可能已過期，請重設');
+        }
+        return array('ok'=>true, 'data'=>$data);
+    }
+
+    /**
+     * 同步打卡資料：抓員工列表 + 每位員工的 work/record，組成 簽到/簽退 寫入
+     * @return array stats
+     */
+    public function syncFromApi($dateFrom, $dateTo)
+    {
+        $stats = array('ok'=>false, 'employees'=>0, 'days'=>0, 'records'=>0, 'inserted'=>0, 'updated'=>0, 'unmatched'=>0, 'errors'=>array());
+        $s = $this->getSettings();
+        $companyId = (int)$s['moa_company_id'];
+
+        // 1) 員工列表
+        $userListResp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/hr/userList',
+                                       array('id'=>$companyId, 'filter'=>1, 'count'=>500));
+        if (!$userListResp['ok']) {
+            $stats['errors'][] = '取員工失敗：' . $userListResp['error'];
+            $this->writeSyncLog('failed', '員工列表：' . $userListResp['error']);
+            return $stats;
+        }
+        $users = $userListResp['data']['list'] ?? array();
+        $stats['employees'] = count($users);
+
+        // 2) 預先撈 hswork 對照
+        $hsUsersStmt = $this->db->query("SELECT id, real_name FROM users WHERE is_active = 1");
+        $hsByName = array();
+        foreach ($hsUsersStmt->fetchAll(PDO::FETCH_ASSOC) as $u) {
+            if ($u['real_name']) $hsByName[$u['real_name']] = (int)$u['id'];
+        }
+        $existingMapStmt = $this->db->query("SELECT moa_name, user_id FROM attendance_employees");
+        $existingMap = array();
+        foreach ($existingMapStmt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+            $existingMap[$m['moa_name']] = $m['user_id'];
+        }
+
+        // 3) 對員工 upsert attendance_employees
+        $upsertEmp = $this->db->prepare("
+            INSERT INTO attendance_employees (moa_name, moa_employee_no, moa_user_id, moa_dept, user_id)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                moa_employee_no = VALUES(moa_employee_no),
+                moa_user_id = VALUES(moa_user_id),
+                moa_dept = VALUES(moa_dept),
+                user_id = COALESCE(attendance_employees.user_id, VALUES(user_id))
+        ");
+        foreach ($users as $u) {
+            $name = $u['name'] ?? '';
+            if (!$name) continue;
+            $uid = isset($existingMap[$name]) && $existingMap[$name] ? (int)$existingMap[$name] : null;
+            if ($uid === null && isset($hsByName[$name])) $uid = $hsByName[$name];
+            if ($uid === null) $stats['unmatched']++;
+            $upsertEmp->execute(array(
+                $name,
+                isset($u['userNo']) ? (string)$u['userNo'] : null,
+                isset($u['userId']) ? (int)$u['userId'] : null,
+                $u['deptName'] ?? null,
+                $uid,
+            ));
+            $existingMap[$name] = $uid;
+        }
+
+        // 4) 對每位員工抓打卡記錄（指定日期區間）
+        $startTs = strtotime($dateFrom . ' 00:00:00');
+        $endTs   = strtotime($dateTo . ' 23:59:59');
+        if (!$startTs || !$endTs) {
+            $stats['errors'][] = '日期格式錯誤';
+            $this->writeSyncLog('failed', '日期格式錯誤');
+            return $stats;
+        }
+
+        $upsertRec = $this->db->prepare("
+            INSERT INTO attendance_records
+                (user_id, moa_name, moa_employee_no, moa_dept, work_date, weekday,
+                 sign_in_time, sign_out_time, sign_in_status, sign_out_status,
+                 sync_source, source_file, imported_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'api', NULL, NOW())
+            ON DUPLICATE KEY UPDATE
+                user_id = VALUES(user_id),
+                moa_employee_no = VALUES(moa_employee_no),
+                moa_dept = VALUES(moa_dept),
+                weekday = VALUES(weekday),
+                sign_in_time = VALUES(sign_in_time),
+                sign_out_time = VALUES(sign_out_time),
+                sign_in_status = VALUES(sign_in_status),
+                sign_out_status = VALUES(sign_out_status),
+                sync_source = 'api',
+                updated_at = NOW()
+        ");
+
+        $existsRec = $this->db->prepare("SELECT 1 FROM attendance_records WHERE moa_name = ? AND work_date = ? LIMIT 1");
+
+        foreach ($users as $u) {
+            $name = $u['name'] ?? '';
+            $userId = $u['userId'] ?? null;
+            if (!$name || !$userId) continue;
+
+            $resp = $this->moaCall('/kaoqin/' . (int)$s['moa_org_id'] . '/web/work/record',
+                                   array('id'=>$companyId, 'userId'=>(string)$userId, 'startDate'=>$startTs, 'endDate'=>$endTs, 'page'=>0));
+            if (!$resp['ok']) {
+                $stats['errors'][] = $name . '：' . $resp['error'];
+                continue;
+            }
+            $list = $resp['data']['list'] ?? array();
+            $stats['records'] += count($list);
+            // 依日期分組，找最早/最晚當作 簽到/簽退
+            $byDay = array();
+            foreach ($list as $rec) {
+                $tsDay = (int)$rec['date'];
+                $secInDay = (int)$rec['time'];
+                $localDate = date('Y-m-d', $tsDay + 8 * 3600); // MOA 日期欄位是 UTC midnight，台灣時區 +8
+                if (!isset($byDay[$localDate])) $byDay[$localDate] = array();
+                $byDay[$localDate][] = $secInDay;
+            }
+            foreach ($byDay as $date => $seconds) {
+                sort($seconds);
+                $minSec = $seconds[0];
+                $maxSec = end($seconds);
+                $signIn  = sprintf('%02d:%02d:%02d', floor($minSec/3600), floor($minSec/60)%60, $minSec%60);
+                $signOut = ($minSec === $maxSec) ? null
+                          : sprintf('%02d:%02d:%02d', floor($maxSec/3600), floor($maxSec/60)%60, $maxSec%60);
+                $existsRec->execute(array($name, $date));
+                $isUpdate = (bool)$existsRec->fetchColumn();
+
+                $weekdays = array('日','一','二','三','四','五','六');
+                $weekday = '周' . $weekdays[(int)date('w', strtotime($date))];
+
+                $upsertRec->execute(array(
+                    isset($existingMap[$name]) ? $existingMap[$name] : null,
+                    $name,
+                    isset($u['userNo']) ? (string)$u['userNo'] : null,
+                    $u['deptName'] ?? null,
+                    $date,
+                    $weekday,
+                    $signIn,
+                    $signOut,
+                    '正常',
+                    $signOut === null ? '只有單筆打卡' : '正常',
+                ));
+                if ($isUpdate) $stats['updated']++; else $stats['inserted']++;
+                $stats['days']++;
+            }
+        }
+
+        $stats['ok'] = true;
+        $msg = "員工 {$stats['employees']} 人 / 打卡 {$stats['records']} 筆 / 寫入 {$stats['days']} 員工日（新 {$stats['inserted']} 更新 {$stats['updated']}）";
+        if ($stats['unmatched'] > 0) $msg .= " / 未對應姓名 {$stats['unmatched']}";
+        if (count($stats['errors']) > 0) {
+            $msg .= " / 錯誤 " . count($stats['errors']) . " 筆";
+        }
+        $this->writeSyncLog('success', $msg, $stats['employees'], $stats['days']);
+        return $stats;
+    }
+
+    private function writeSyncLog($status, $message, $emps = 0, $records = 0)
+    {
+        $stmt = $this->db->prepare("UPDATE attendance_settings SET last_sync_at = NOW(), last_sync_status = ?, last_sync_message = ?, last_sync_employees = ?, last_sync_records = ? WHERE id = 1");
+        $stmt->execute(array($status, $message, $emps, $records));
+    }
 }
