@@ -251,6 +251,47 @@ switch ($action) {
         );
         $records = $model->getRecords($filters, 1000);
         $departments = $model->getDepartments();
+
+        // 連動 leaves / overtimes
+        $leaveMap = array();
+        $overtimeMap = array();
+        $userIds = array();
+        foreach ($records as $r) { if (!empty($r['user_id'])) $userIds[(int)$r['user_id']] = true; }
+        $userIds = array_keys($userIds);
+        if (!empty($userIds)) {
+            $db = Database::getInstance();
+            $ph = implode(',', array_fill(0, count($userIds), '?'));
+            // 請假（已核准；可跨天）
+            $lvStmt = $db->prepare("
+                SELECT user_id, leave_type, start_date, end_date
+                FROM leaves
+                WHERE user_id IN ($ph) AND status = 'approved'
+                  AND start_date <= ? AND end_date >= ?
+            ");
+            $params = array_merge($userIds, array($filters['date_to'], $filters['date_from']));
+            $lvStmt->execute($params);
+            foreach ($lvStmt->fetchAll(PDO::FETCH_ASSOC) as $lv) {
+                $startTs = strtotime(max($lv['start_date'], $filters['date_from']));
+                $endTs   = strtotime(min($lv['end_date'],   $filters['date_to']));
+                for ($t = $startTs; $t <= $endTs; $t += 86400) {
+                    $leaveMap[$lv['user_id'] . '|' . date('Y-m-d', $t)] = $lv['leave_type'];
+                }
+            }
+            // 加班（已核准；單日）
+            $otStmt = $db->prepare("
+                SELECT user_id, overtime_date, hours, overtime_type
+                FROM overtimes
+                WHERE user_id IN ($ph) AND status = 'approved'
+                  AND overtime_date BETWEEN ? AND ?
+            ");
+            $otStmt->execute(array_merge($userIds, array($filters['date_from'], $filters['date_to'])));
+            foreach ($otStmt->fetchAll(PDO::FETCH_ASSOC) as $ot) {
+                $overtimeMap[$ot['user_id'] . '|' . $ot['overtime_date']] = array(
+                    'hours' => $ot['hours'],
+                    'type'  => $ot['overtime_type'],
+                );
+            }
+        }
         $pageTitle = 'MOA 考勤明細';
         $currentPage = 'moa_attendance';
         require __DIR__ . '/../templates/layouts/header.php';

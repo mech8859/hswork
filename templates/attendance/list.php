@@ -5,6 +5,8 @@ function _m2hm($m) {
     if ($m <= 0) return '';
     return floor($m / 60) . ':' . str_pad($m % 60, 2, '0', STR_PAD_LEFT);
 }
+$_leaveLabels = array('annual'=>'特休','personal'=>'事假','sick'=>'病假','official'=>'公假');
+$_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'國定','other'=>'其他');
 ?>
 <div class="d-flex justify-between align-center mb-2">
     <h2>MOA 考勤明細</h2>
@@ -53,11 +55,12 @@ function _m2hm($m) {
                 <th class="text-right">應/實出</th>
                 <th class="text-center">簽到</th><th class="text-center">簽退</th>
                 <th class="text-right">遲到</th><th class="text-right">早退</th><th class="text-right">曠職</th>
+                <th>請假/加班</th>
                 <th>標記</th>
             </tr></thead>
             <tbody>
                 <?php if (empty($records)): ?>
-                <tr><td colspan="12" class="text-center text-muted" style="padding:20px">無資料</td></tr>
+                <tr><td colspan="13" class="text-center text-muted" style="padding:20px">無資料</td></tr>
                 <?php else: foreach ($records as $r): ?>
                 <tr style="<?= $r['is_abnormal'] ? 'background:#fff3e0' : '' ?>">
                     <td><?= e($r['work_date']) ?></td>
@@ -88,6 +91,22 @@ function _m2hm($m) {
                     </td>
                     <td class="text-right" style="color:<?= $r['absent_minutes'] ? '#c62828' : '' ?>">
                         <?= e(_m2hm($r['absent_minutes'])) ?>
+                    </td>
+                    <td style="white-space:nowrap">
+                        <?php
+                        $key = ($r['user_id'] ?? '') . '|' . $r['work_date'];
+                        if (!empty($r['user_id']) && isset($leaveMap[$key])):
+                            $lt = $leaveMap[$key];
+                            $label = isset($_leaveLabels[$lt]) ? $_leaveLabels[$lt] : $lt;
+                        ?>
+                        <span class="badge" style="background:#e3f2fd;color:#0d47a1;font-size:.7rem">🏖 <?= e($label) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($r['user_id']) && isset($overtimeMap[$key])):
+                            $ot = $overtimeMap[$key];
+                            $hh = (float)$ot['hours'];
+                        ?>
+                        <span class="badge" style="background:#fff8e1;color:#e65100;font-size:.7rem" title="<?= e(isset($_otTypeLabels[$ot['type']]) ? $_otTypeLabels[$ot['type']] : $ot['type']) ?>">⏰ +<?= rtrim(rtrim(number_format($hh, 1), '0'), '.') ?>h</span>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <?php if ($r['is_abnormal']): ?><span class="badge" style="background:#fff3e0;color:#e65100">異常</span><?php endif; ?>
