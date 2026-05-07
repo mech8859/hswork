@@ -385,10 +385,11 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
         <div class="form-row">
             <div class="form-group">
                 <label>案別</label>
+                <?php $_caseTypeDefault = $case['case_type'] ?? ($_GET['case_type'] ?? ''); ?>
                 <select name="case_type" class="form-control">
                     <option value="">請選擇</option>
                     <?php foreach (CaseModel::caseTypeOptions() as $v => $l): ?>
-                    <option value="<?= $v ?>" <?= ($case['case_type'] ?? '') === $v ? 'selected' : '' ?>><?= e($l) ?></option>
+                    <option value="<?= $v ?>" <?= $_caseTypeDefault === $v ? 'selected' : '' ?>><?= e($l) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -598,8 +599,13 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
     </div>
 
     <!-- 報價單與圖面 -->
-    <?php if ($case): ?>
-    <?php if (in_array($case['case_type'] ?? '', array('repair','old_repair','new_repair')) || !empty($case['repair_report_date']) || !empty($case['repair_fault_reason'])): ?>
+    <?php
+    // 維修案資料卡片：編輯模式看 case；新增模式看 ?case_type 預選
+    $_repairTypeNow = $case['case_type'] ?? ($_GET['case_type'] ?? '');
+    $_showRepairCard = in_array($_repairTypeNow, array('repair','old_repair','new_repair'))
+        || ($case && (!empty($case['repair_report_date']) || !empty($case['repair_fault_reason'])));
+    ?>
+    <?php if ($_showRepairCard): ?>
     <div class="card" id="sec-repair-info">
         <div class="card-header"><span>維修案資料</span></div>
         <div class="card-body">
@@ -663,16 +669,16 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>原案件客戶編號</label>
-                    <input type="text" name="repair_original_case" class="form-control" value="<?= e($case['repair_original_case'] ?? '') ?>">
+                    <label>原案件編號</label>
+                    <input type="text" name="repair_original_case" class="form-control" value="<?= e($case['repair_original_case'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['case_number'] : '')) ?>">
                 </div>
                 <div class="form-group">
                     <label>原案件完工日期</label>
-                    <input type="date" name="repair_original_complete_date" class="form-control" value="<?= e($case['repair_original_complete_date'] ?? '') ?>">
+                    <input type="date" name="repair_original_complete_date" class="form-control" value="<?= e($case['repair_original_complete_date'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['completion_date'] : '')) ?>">
                 </div>
                 <div class="form-group">
                     <label>原案件保固日期</label>
-                    <input type="date" name="repair_original_warranty_date" class="form-control" value="<?= e($case['repair_original_warranty_date'] ?? '') ?>">
+                    <input type="date" name="repair_original_warranty_date" class="form-control" value="<?= e($case['repair_original_warranty_date'] ?? (isset($prefillRepair) && $prefillRepair ? $prefillRepair['warranty_date'] : '')) ?>">
                 </div>
             </div>
             <div class="form-row">
@@ -685,6 +691,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
     </div>
     <?php endif; ?>
 
+    <?php if ($case): ?>
     <?php
     // 預先查詢報價單，決定按鈕顯示
     $caseQuotes = array();

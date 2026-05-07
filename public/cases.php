@@ -158,6 +158,7 @@ switch ($action) {
 
         // 從客戶管理帶入客戶資料
         $prefillCustomer = null;
+        $prefillRepair = null;
         if (!empty($_GET['customer_id'])) {
             require_once __DIR__ . '/../modules/customers/CustomerModel.php';
             $custModel = new CustomerModel();
@@ -166,6 +167,12 @@ switch ($action) {
                 $cs = Database::getInstance()->prepare('SELECT contact_name, phone, role FROM customer_contacts WHERE customer_id = ? LIMIT 10');
                 $cs->execute(array($prefillCustomer['id']));
                 $prefillCustomer['contacts'] = $cs->fetchAll(PDO::FETCH_ASSOC);
+                // 維修案前置：把客戶的「進件編號／完工日期／保固日期」帶入新案件的維修案資料
+                $prefillRepair = array(
+                    'case_number'     => $prefillCustomer['case_number'] ?? '',
+                    'completion_date' => $prefillCustomer['completion_date'] ?? '',
+                    'warranty_date'   => $prefillCustomer['warranty_date'] ?? '',
+                );
             }
         }
 

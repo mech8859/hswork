@@ -14,7 +14,8 @@
     </div>
     <div class="d-flex gap-1 flex-wrap">
         <?php if (Auth::hasPermission('cases.create')): ?>
-        <a href="/cases.php?action=create&customer_id=<?= $customer['id'] ?>" class="btn btn-success btn-sm">+ 新增案件</a>
+        <a href="/cases.php?action=create&customer_id=<?= $customer['id'] ?>&case_type=old_repair" class="btn btn-success btn-sm" title="案別預設為舊客戶維修，可在表單內修改">+ 新增維修案</a>
+        <a href="/cases.php?action=create&customer_id=<?= $customer['id'] ?>" class="btn btn-outline btn-sm">+ 新增案件</a>
         <?php endif; ?>
         <?php if (Auth::hasPermission('customers.manage')): ?>
         <a href="/customers.php?action=edit&id=<?= $customer['id'] ?>" class="btn btn-primary btn-sm">編輯</a>
