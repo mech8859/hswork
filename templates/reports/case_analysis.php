@@ -1311,19 +1311,18 @@ foreach ($repairStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 
 <?php endif; ?>
 
-<!-- 十九、施工回報 業務 × 月份 統計（依工程回報時間） -->
+<!-- 十九、施工回報 業務 × 月份 統計 -->
 <?php
 $wlDb = Database::getInstance();
 $wlBranches = implode(',', array_map('intval', $branchIds));
-// 業務取自 cases.sales_id；未指派業務的 work_logs 歸到「— 不指派 —」
+// 派工人數 / 工作時數：依工程回報時間（arrival_time，未填用 schedule_date）
 $wlStmt = $wlDb->query("
     SELECT
         COALESCE(NULLIF(u.real_name, ''), '— 不指派 —') AS sales_name,
         DATE_FORMAT(COALESCE(wl.arrival_time, s.schedule_date), '%Y-%m') AS ym,
         COUNT(*) AS dispatch_cnt,
         SUM(CASE WHEN wl.arrival_time IS NOT NULL AND wl.departure_time IS NOT NULL
-            THEN TIMESTAMPDIFF(MINUTE, wl.arrival_time, wl.departure_time) ELSE 0 END) AS total_minutes,
-        SUM(CASE WHEN wl.payment_collected = 1 THEN COALESCE(wl.payment_amount, 0) ELSE 0 END) AS total_payment
+            THEN TIMESTAMPDIFF(MINUTE, wl.arrival_time, wl.departure_time) ELSE 0 END) AS total_minutes
     FROM work_logs wl
     JOIN schedules s ON wl.schedule_id = s.id
     JOIN cases c ON s.case_id = c.id
@@ -1343,8 +1342,31 @@ foreach ($wlStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
     $wlSalesData[$name][$ym] = array(
         'dispatch' => (int)$r['dispatch_cnt'],
         'hours'    => round(((int)$r['total_minutes']) / 60, 1),
-        'payment'  => (float)$r['total_payment'],
+        'payment'  => 0,
     );
+}
+
+// 總收款金額：依案件管理 case_payments.payment_date 月份統計
+$cpStmt = $wlDb->query("
+    SELECT
+        COALESCE(NULLIF(u.real_name, ''), '— 不指派 —') AS sales_name,
+        DATE_FORMAT(cp.payment_date, '%Y-%m') AS ym,
+        SUM(COALESCE(cp.amount, 0)) AS total_payment
+    FROM case_payments cp
+    JOIN cases c ON cp.case_id = c.id
+    LEFT JOIN users u ON c.sales_id = u.id
+    WHERE c.branch_id IN ({$wlBranches})
+      AND cp.payment_date IS NOT NULL
+      AND DATE_FORMAT(cp.payment_date, '%Y-%m') BETWEEN '{$months[0]}' AND '{$months[$nm-1]}'
+    GROUP BY sales_name, ym
+    ORDER BY sales_name, ym
+");
+foreach ($cpStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $name = $r['sales_name'];
+    $ym = $r['ym'];
+    if (!isset($wlSalesData[$name])) $wlSalesData[$name] = array();
+    if (!isset($wlSalesData[$name][$ym])) $wlSalesData[$name][$ym] = array('dispatch'=>0,'hours'=>0,'payment'=>0);
+    $wlSalesData[$name][$ym]['payment'] = (float)$r['total_payment'];
 }
 ksort($wlSalesData);
 
@@ -1395,11 +1417,11 @@ $renderSalesMonthTable = function ($title, $field, $isMoney, $isFloat) use ($wlS
 };
 ?>
 <div class="card">
-    <div class="card-header analysis-header">十九、施工回報 業務 × 月份 統計<small style="opacity:.7;margin-left:8px">（依工程回報時間：arrival_time，未填則用排工日）</small></div>
+    <div class="card-header analysis-header">十九、施工回報 業務 × 月份 統計<small style="opacity:.7;margin-left:8px">（派工/工時依 arrival_time；總收款依案件管理 payment_date）</small></div>
     <?php
     $renderSalesMonthTable('派工人數（人次）', 'dispatch', false, false);
     $renderSalesMonthTable('總工作時數（小時）', 'hours', false, true);
-    $renderSalesMonthTable('總收款金額（元，現場收款）', 'payment', true, false);
+    $renderSalesMonthTable('總收款金額（元，案件管理帳款交易）', 'payment', true, false);
     ?>
 </div>
 
