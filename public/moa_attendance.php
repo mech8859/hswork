@@ -15,6 +15,23 @@ if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('attendanc
 $model = new AttendanceModel();
 $action = $_GET['action'] ?? 'list';
 
+// Migration 檢查：避免 attendance_records 表不存在時 500
+try {
+    $_chk = Database::getInstance()->query("SHOW TABLES LIKE 'attendance_records'")->fetch();
+    if (!$_chk) {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<div style="font-family:sans-serif;max-width:640px;margin:60px auto;padding:24px;border:1px solid #ddd;border-radius:8px;background:#fff8e1">';
+        echo '<h2>⚠ MOA 考勤資料表尚未建立</h2>';
+        echo '<p>請點擊下方連結執行 migration（boss 帳號）：</p>';
+        echo '<p><a href="/run_migration_141.php" target="_blank" style="display:inline-block;background:#1976d2;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none">執行 Migration 141</a></p>';
+        echo '<p style="color:#666;margin-top:20px">完成後重新整理本頁面即可使用。</p>';
+        echo '</div>';
+        exit;
+    }
+} catch (Exception $_e) {
+    // 忽略檢查錯誤
+}
+
 switch ($action) {
     case 'import':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
