@@ -634,6 +634,16 @@ function lockCaseIfClean($caseId)
 }
 
 /**
+ * 案件結案鎖：附件管理特例 — 行政人員（admin_staff）即使案件已上鎖仍可上傳/刪除附件
+ * 用途：客戶事後補件、改傳更清楚的照片等情境
+ */
+function canBypassLockForAttach()
+{
+    $u = Session::getUser();
+    return $u && isset($u['role']) && $u['role'] === 'admin_staff';
+}
+
+/**
  * 案件結案鎖：守門 — 在 UPDATE cases 前呼叫，已鎖則丟例外
  * 對於 boss/vice_president 不擋（解鎖期間或強制接管使用）
  *

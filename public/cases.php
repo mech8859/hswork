@@ -1092,8 +1092,9 @@ switch ($action) {
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $caseId = (int)($_GET['id'] ?? 0);
-        // 結案鎖
-        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+        // 結案鎖（行政人員可繞過，方便事後補件）
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')
+            && !(function_exists('canBypassLockForAttach') && canBypassLockForAttach())) {
             try { assertCaseNotLocked($caseId, '上傳附件'); }
             catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
         }
@@ -1123,7 +1124,9 @@ switch ($action) {
         $_attCheck = Database::getInstance()->prepare('SELECT case_id FROM case_attachments WHERE id = ?');
         $_attCheck->execute(array($attId));
         $_attCaseId = (int)$_attCheck->fetchColumn();
-        if ($_attCaseId > 0 && function_exists('assertCaseNotLocked')) {
+        // 結案鎖（行政人員可繞過）
+        if ($_attCaseId > 0 && function_exists('assertCaseNotLocked')
+            && !(function_exists('canBypassLockForAttach') && canBypassLockForAttach())) {
             try { assertCaseNotLocked($_attCaseId, '刪除附件'); }
             catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
         }
@@ -1147,8 +1150,9 @@ switch ($action) {
         header('Content-Type: application/json');
         if (!verify_csrf()) { echo json_encode(array('success' => false, 'error' => 'CSRF')); break; }
         $caseId = (int)($_POST['case_id'] ?? 0);
-        // 結案鎖
-        if ($caseId > 0 && function_exists('assertCaseNotLocked')) {
+        // 結案鎖（行政人員可繞過，與附件管理共用）
+        if ($caseId > 0 && function_exists('assertCaseNotLocked')
+            && !(function_exists('canBypassLockForAttach') && canBypassLockForAttach())) {
             try { assertCaseNotLocked($caseId, '切換不允許拍照'); }
             catch (\RuntimeException $_lockEx) { echo json_encode(array('success' => false, 'error' => $_lockEx->getMessage())); break; }
         }

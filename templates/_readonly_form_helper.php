@@ -45,6 +45,9 @@
 </style>
 <script>
 (function() {
+    function inBypass(el) {
+        return !!(el.closest && el.closest('[data-readonly-bypass]'));
+    }
     function applyReadonly() {
         var forms = document.querySelectorAll('.form-readonly');
         for (var f = 0; f < forms.length; f++) {
@@ -52,11 +55,13 @@
             // 1. input/textarea 加 readonly 屬性（JS 仍可讀寫，計算邏輯不會壞）
             var inps = form.querySelectorAll('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=file]), textarea');
             for (var i = 0; i < inps.length; i++) {
+                if (inBypass(inps[i])) continue;
                 inps[i].setAttribute('readonly', 'readonly');
             }
             // 2. select 用 mousedown preventDefault 阻止下拉（key event 也阻止）
             var selects = form.querySelectorAll('select');
             for (var s = 0; s < selects.length; s++) {
+                if (inBypass(selects[s])) continue;
                 selects[s].addEventListener('mousedown', function(e) { e.preventDefault(); this.blur(); });
                 selects[s].addEventListener('keydown', function(e) { e.preventDefault(); });
                 selects[s].setAttribute('tabindex', '-1');
@@ -64,16 +69,19 @@
             // 3. checkbox/radio click preventDefault
             var checks = form.querySelectorAll('input[type=checkbox], input[type=radio]');
             for (var c = 0; c < checks.length; c++) {
+                if (inBypass(checks[c])) continue;
                 checks[c].addEventListener('click', function(e) { e.preventDefault(); });
             }
             // 4. file input 直接 disable（不能上傳）
             var files = form.querySelectorAll('input[type=file]');
             for (var fi = 0; fi < files.length; fi++) {
+                if (inBypass(files[fi])) continue;
                 files[fi].disabled = true;
             }
             // 5. 隱藏儲存類按鈕
             var btns = form.querySelectorAll('button[type=submit], input[type=submit]');
             for (var b = 0; b < btns.length; b++) {
+                if (inBypass(btns[b])) continue;
                 btns[b].style.display = 'none';
             }
         }

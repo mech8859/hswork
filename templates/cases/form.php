@@ -131,6 +131,12 @@ $readOnly = $case && !$caseCanEdit;
 if ($readOnly) {
     foreach ($canEdit as $k => $v) { $canEdit[$k] = false; }
 }
+// 結案鎖特例：行政人員仍可編輯附件管理（含「客戶不允許拍照」切換）
+$attachBypassLock = isset($caseLockState) && $caseLockState['locked']
+    && function_exists('canBypassLockForAttach') && canBypassLockForAttach();
+if ($attachBypassLock) {
+    $canEdit['attach'] = Auth::canEditSection('attach');
+}
 require __DIR__ . '/../_readonly_form_helper.php';
 ?>
 
@@ -2014,9 +2020,9 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             }
         }
     ?>
-    <div class="card <?= $canEdit['attach'] ? '' : 'section-readonly' ?>" id="sec-attach">
+    <div class="card <?= $canEdit['attach'] ? '' : 'section-readonly' ?>" id="sec-attach"<?= !empty($attachBypassLock) && $canEdit['attach'] ? ' data-readonly-bypass="1"' : '' ?>>
         <div class="card-header d-flex justify-between align-center">
-            <span>附件管理</span>
+            <span>附件管理<?php if (!empty($attachBypassLock) && $canEdit['attach']): ?><small style="margin-left:8px;font-size:.75rem;color:#1976d2">（已上鎖：行政人員可編輯附件）</small><?php endif; ?></span>
             <?php if ($canEdit['attach']): ?>
             <button type="button" class="btn btn-outline btn-sm" onclick="addNewAttachType()">+ 新增分類</button>
             <?php endif; ?>
