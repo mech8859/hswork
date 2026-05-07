@@ -140,7 +140,28 @@ switch ($action) {
                     }
                 }
             }
+            // 已完工 → 是否需修改成交金額必填；選「是」則最後成交金額必填
+            if ((string)($_POST['is_completed'] ?? '') === '1') {
+                $_fan = isset($_POST['final_amount_needed']) ? trim($_POST['final_amount_needed']) : '';
+                if ($_fan !== '是' && $_fan !== '否') {
+                    Session::flash('error', '案件已完工，請選擇「是否需修改成交金額」');
+                    redirect('/cases.php?action=create');
+                }
+                if ($_fan === '是' && (float)($_POST['final_deal_amount'] ?? 0) <= 0) {
+                    Session::flash('error', '已選擇修改成交金額，請填寫最後成交金額');
+                    redirect('/cases.php?action=create');
+                }
+            }
             $caseId = $model->create($_POST);
+            // 完工後最後成交金額：直接 UPDATE 寫入（避免動 model 大型參數清單）
+            {
+                $_finalChoice = isset($_POST['final_amount_needed']) ? trim($_POST['final_amount_needed']) : '';
+                $_finalAmt = ($_finalChoice === '是' && !empty($_POST['final_deal_amount']))
+                    ? (float)$_POST['final_deal_amount']
+                    : null;
+                Database::getInstance()->prepare('UPDATE cases SET final_deal_amount = ? WHERE id = ?')
+                    ->execute(array($_finalAmt, $caseId));
+            }
             // 舊客戶維修案：自動把原案件的報價單附件複製到新案件「舊客戶報價單」分類
             $copiedCount = 0;
             if (($_POST['case_type'] ?? '') === 'old_repair' && !empty($_POST['customer_id'])) {
@@ -339,6 +360,18 @@ switch ($action) {
                     }
                 }
             }
+            // 已完工 → 是否需修改成交金額必填；選「是」則最後成交金額必填
+            if ((string)($_POST['is_completed'] ?? '') === '1') {
+                $_fan = isset($_POST['final_amount_needed']) ? trim($_POST['final_amount_needed']) : '';
+                if ($_fan !== '是' && $_fan !== '否') {
+                    Session::flash('error', '案件已完工，請選擇「是否需修改成交金額」');
+                    redirect('/cases.php?action=edit&id=' . $id);
+                }
+                if ($_fan === '是' && (float)($_POST['final_deal_amount'] ?? 0) <= 0) {
+                    Session::flash('error', '已選擇修改成交金額，請填寫最後成交金額');
+                    redirect('/cases.php?action=edit&id=' . $id);
+                }
+            }
             // DEBUG: 記錄 POST 值到檔案
             file_put_contents('/tmp/case_save_debug.txt', date('H:i:s') . ' id=' . $id . ' POST[tax_amount]=' . var_export($_POST['tax_amount'] ?? 'NOT_SET', true) . ' POST[total_amount]=' . var_export($_POST['total_amount'] ?? 'NOT_SET', true) . "\n", FILE_APPEND);
             // 金額異動紀錄：存檔前讀舊值
@@ -348,6 +381,15 @@ switch ($action) {
             } catch (\RuntimeException $e) {
                 Session::flash('error', $e->getMessage());
                 redirect('/cases.php?action=edit&id=' . $id);
+            }
+            // 完工後最後成交金額：直接 UPDATE 寫入
+            {
+                $_finalChoice = isset($_POST['final_amount_needed']) ? trim($_POST['final_amount_needed']) : '';
+                $_finalAmt = ($_finalChoice === '是' && !empty($_POST['final_deal_amount']))
+                    ? (float)$_POST['final_deal_amount']
+                    : null;
+                Database::getInstance()->prepare('UPDATE cases SET final_deal_amount = ? WHERE id = ?')
+                    ->execute(array($_finalAmt, $id));
             }
             // 金額異動紀錄：比對新舊值
             if ($oldCase) {

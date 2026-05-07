@@ -951,8 +951,56 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
                 <label>帳款結清日期<?= $_lockSettle ? ' <span style="color:var(--gray-400);font-weight:400;font-size:.8rem">（唯讀）</span>' : '' ?></label>
                 <input type="date" name="settlement_date" class="form-control" value="<?= e($case['settlement_date'] ?? '') ?>" <?= $_lockSettle ? 'readonly style="background:#f5f5f5"' : '' ?> title="<?= e($_lockTip) ?>">
             </div>
-            <div class="form-group"></div>
+            <?php
+            // 完工後最後成交金額：是否已完工=已完工 才顯示
+            $_isCompleted = isset($case['is_completed']) && (int)$case['is_completed'] === 1;
+            $_finalAmt = $case['final_deal_amount'] ?? '';
+            $_finalChoice = ($_finalAmt !== '' && $_finalAmt !== null && (float)$_finalAmt > 0) ? '是' : ($_isCompleted ? '' : '');
+            ?>
+            <div class="form-group" id="finalAmtChoiceWrap" style="<?= $_isCompleted ? '' : 'display:none' ?>">
+                <label>是否需修改成交金額<?= $_isCompleted ? ' <span style="color:#dc3545">*</span>' : '' ?></label>
+                <select name="final_amount_needed" id="finalAmountNeeded" class="form-control" onchange="toggleFinalAmount()">
+                    <option value="">請選擇</option>
+                    <option value="否" <?= $_finalChoice === '否' ? 'selected' : '' ?>>否</option>
+                    <option value="是" <?= $_finalChoice === '是' ? 'selected' : '' ?>>是</option>
+                </select>
+            </div>
+            <div class="form-group" id="finalAmtInputWrap" style="<?= ($_isCompleted && $_finalChoice === '是') ? '' : 'display:none' ?>">
+                <label>最後成交金額<span style="color:#dc3545">*</span> <small style="color:#999">(含稅)</small></label>
+                <input type="number" name="final_deal_amount" id="finalDealAmount" class="form-control" min="0" step="0.01" value="<?= e($_finalAmt !== null ? $_finalAmt : '') ?>" placeholder="元">
+            </div>
         </div>
+        <script>
+        // 是否已完工切換 → 控制「是否需修改成交金額」整列顯示
+        (function(){
+            var icSel = document.querySelector('select[name="is_completed"]');
+            var choiceWrap = document.getElementById('finalAmtChoiceWrap');
+            var inputWrap = document.getElementById('finalAmtInputWrap');
+            var choiceSel = document.getElementById('finalAmountNeeded');
+            if (!choiceWrap) return;
+            function syncByCompleted() {
+                if (!icSel) return;
+                var done = icSel.value === '1';
+                choiceWrap.style.display = done ? '' : 'none';
+                if (!done) {
+                    // 切回未完工 → 重置選項
+                    if (choiceSel) choiceSel.value = '';
+                    inputWrap.style.display = 'none';
+                    var fa = document.getElementById('finalDealAmount');
+                    if (fa) fa.value = '';
+                }
+            }
+            window.toggleFinalAmount = function() {
+                if (!choiceSel) return;
+                inputWrap.style.display = (choiceSel.value === '是') ? '' : 'none';
+                if (choiceSel.value !== '是') {
+                    var fa = document.getElementById('finalDealAmount');
+                    if (fa) fa.value = '';
+                }
+            };
+            if (icSel) icSel.addEventListener('change', syncByCompleted);
+        })();
+        </script>
         <?php if ($case && !empty($case['payments'])): ?>
         <div class="mt-1" style="border-top:1px solid var(--gray-200);padding-top:12px">
             <label style="font-weight:600;font-size:.9rem">收款記錄</label>
@@ -3580,6 +3628,26 @@ function validateCaseForm() {
             note.focus();
             note.style.borderColor = '#dc3545';
             return false;
+        }
+    }
+    // 已完工 → 是否需修改成交金額必填；選「是」則最後成交金額必填
+    var isCompletedSel = document.querySelector('select[name="is_completed"]');
+    if (isCompletedSel && isCompletedSel.value === '1') {
+        var fanSel = document.getElementById('finalAmountNeeded');
+        if (fanSel && !fanSel.value) {
+            alert('案件已完工，請選擇「是否需修改成交金額」');
+            fanSel.focus();
+            fanSel.style.borderColor = '#dc3545';
+            return false;
+        }
+        if (fanSel && fanSel.value === '是') {
+            var fda = document.getElementById('finalDealAmount');
+            if (fda && (!fda.value || parseFloat(fda.value) <= 0)) {
+                alert('已選擇修改成交金額，請填寫最後成交金額');
+                fda.focus();
+                fda.style.borderColor = '#dc3545';
+                return false;
+            }
         }
     }
     // 舊客戶維修案 → 原案件編號／完工日期／保固日期必填
