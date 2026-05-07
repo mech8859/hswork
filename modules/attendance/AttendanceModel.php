@@ -277,9 +277,11 @@ class AttendanceModel
         if (!empty($filters['only_abnormal'])) { $where .= ' AND ar.is_abnormal = 1'; }
         if (!empty($filters['unmatched']))     { $where .= ' AND ar.user_id IS NULL'; }
 
-        $sql = "SELECT ar.*, u.real_name AS hswork_name
+        $sql = "SELECT ar.*, u.real_name AS hswork_name,
+                       ae.work_start_time, ae.work_end_time
                 FROM attendance_records ar
                 LEFT JOIN users u ON ar.user_id = u.id
+                LEFT JOIN attendance_employees ae ON ae.moa_name = ar.moa_name
                 WHERE $where
                 ORDER BY ar.work_date DESC, ar.moa_dept, ar.moa_name
                 LIMIT " . (int)$limit;

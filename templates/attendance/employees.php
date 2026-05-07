@@ -21,11 +21,13 @@
                 <th>MOA 員編</th>
                 <th>MOA 部門</th>
                 <th>對應 hswork 人員</th>
+                <th style="width:100px">上班時間</th>
+                <th style="width:100px">下班時間</th>
                 <th style="width:60px">操作</th>
             </tr></thead>
             <tbody>
                 <?php if (empty($employees)): ?>
-                <tr><td colspan="5" class="text-center text-muted" style="padding:20px">尚無 MOA 員工資料；先到「匯入」頁上傳一份 xlsx 即會自動建立。</td></tr>
+                <tr><td colspan="7" class="text-center text-muted" style="padding:20px">尚無 MOA 員工資料；先到「匯入」頁上傳一份 xlsx 即會自動建立。</td></tr>
                 <?php else: foreach ($employees as $e): ?>
                 <tr style="<?= empty($e['user_id']) ? 'background:#ffebee' : '' ?>">
                     <form method="POST" action="/moa_attendance.php?action=employees" style="display:contents">
@@ -41,6 +43,12 @@
                                 <option value="<?= (int)$u['id'] ?>" <?= (int)$e['user_id'] === (int)$u['id'] ? 'selected' : '' ?>><?= e($u['real_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                        </td>
+                        <td>
+                            <input type="time" name="work_start_time" value="<?= e($e['work_start_time'] ? substr($e['work_start_time'], 0, 5) : '') ?>" class="form-control form-control-sm" placeholder="08:00">
+                        </td>
+                        <td>
+                            <input type="time" name="work_end_time" value="<?= e($e['work_end_time'] ? substr($e['work_end_time'], 0, 5) : '') ?>" class="form-control form-control-sm" placeholder="17:30">
                         </td>
                         <td>
                             <?php if (Auth::hasPermission('attendance.manage') || Auth::hasPermission('all')): ?>

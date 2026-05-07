@@ -85,11 +85,15 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                     <td class="text-right" style="font-size:.8rem;color:#666">
                         <?= e(_m2hm($r['expected_minutes'])) ?> / <?= e(_m2hm($r['actual_minutes'])) ?>
                     </td>
-                    <?php $_canEditAtt = Auth::hasPermission('attendance.manage') || Auth::hasPermission('all'); ?>
+                    <?php
+                    $_canEditAtt = Auth::hasPermission('attendance.manage') || Auth::hasPermission('all');
+                    $_workStart = $r['work_start_time'] ?: '08:00:00';
+                    $_isLate = $r['sign_in_time'] && $r['sign_in_time'] > $_workStart && empty($r['_synthetic']);
+                    ?>
                     <td class="text-center sign-cell <?= $_canEditAtt ? 'editable' : '' ?>"
                         data-field="sign_in" data-name="<?= e($r['moa_name']) ?>" data-date="<?= e($r['work_date']) ?>"
                         data-orig="<?= $r['sign_in_time'] ? substr($r['sign_in_time'], 0, 5) : '' ?>"
-                        style="<?= ($r['sign_in_time'] === null || ($r['sign_in_time'] && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic']))) ? 'color:#c62828;font-weight:600' : '' ?>">
+                        style="<?= ($r['sign_in_time'] === null && !empty($r['sign_in_status']) && $r['sign_in_status'] === '只有單筆打卡') || $_isLate ? 'color:#c62828;font-weight:600' : '' ?>">
                         <?= $r['sign_in_time'] ? substr($r['sign_in_time'], 0, 5) : ($r['sign_in_status'] ?: '') ?>
                     </td>
                     <td class="text-center sign-cell <?= $_canEditAtt ? 'editable' : '' ?>"
@@ -99,12 +103,17 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                         <?= $r['sign_out_time'] ? substr($r['sign_out_time'], 0, 5) : ($r['sign_out_status'] ?: '') ?>
                     </td>
                     <?php
-                    // 遲到分鐘：優先用既有值（Excel 匯入有），否則用 簽到 - 08:00 計算（API 同步用）
+                    // 遲到分鐘：優先用既有值（Excel 匯入有），否則用「簽到 - 該員工上班時間」計算
                     $lateMin = $r['late_minutes'];
-                    if (($lateMin === null || $lateMin === '') && !empty($r['sign_in_time']) && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic'])) {
-                        $parts = explode(':', $r['sign_in_time']);
-                        $sec = (int)$parts[0] * 3600 + (int)$parts[1] * 60 + (isset($parts[2]) ? (int)$parts[2] : 0) - 8 * 3600;
-                        $lateMin = (int)floor($sec / 60);
+                    if (($lateMin === null || $lateMin === '') && !empty($r['sign_in_time']) && empty($r['_synthetic'])) {
+                        $start = $r['work_start_time'] ?: '08:00:00';
+                        if ($r['sign_in_time'] > $start) {
+                            $sParts = explode(':', $r['sign_in_time']);
+                            $tParts = explode(':', $start);
+                            $signInSec = (int)$sParts[0] * 3600 + (int)$sParts[1] * 60 + (isset($sParts[2]) ? (int)$sParts[2] : 0);
+                            $startSec  = (int)$tParts[0] * 3600 + (int)$tParts[1] * 60 + (isset($tParts[2]) ? (int)$tParts[2] : 0);
+                            $lateMin = (int)floor(($signInSec - $startSec) / 60);
+                        }
                     }
                     ?>
                     <td class="text-right" style="color:<?= $lateMin ? '#c62828' : '' ?>">

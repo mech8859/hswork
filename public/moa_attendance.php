@@ -99,7 +99,12 @@ switch ($action) {
             }
             $empId = (int)($_POST['emp_id'] ?? 0);
             $userId = isset($_POST['user_id']) && $_POST['user_id'] !== '' ? (int)$_POST['user_id'] : null;
+            $workStart = !empty($_POST['work_start_time']) ? (strlen($_POST['work_start_time']) === 5 ? $_POST['work_start_time'] . ':00' : $_POST['work_start_time']) : null;
+            $workEnd   = !empty($_POST['work_end_time'])   ? (strlen($_POST['work_end_time']) === 5 ? $_POST['work_end_time'] . ':00' : $_POST['work_end_time']) : null;
             $model->setEmployeeMapping($empId, $userId);
+            // 上下班時間
+            Database::getInstance()->prepare("UPDATE attendance_employees SET work_start_time = ?, work_end_time = ? WHERE id = ?")
+                ->execute(array($workStart, $workEnd, $empId));
             Session::flash('success', '對應已更新');
             redirect('/moa_attendance.php?action=employees');
         }
@@ -385,9 +390,10 @@ switch ($action) {
                 $existingKeys[$r['user_id'] . '|' . $r['work_date']] = true;
             }
         }
-        // attendance_employees：已對應 hswork user 的所有 MOA 員工
+        // attendance_employees：已對應 hswork user 的所有 MOA 員工（含上下班時間）
         $allEmpStmt = $db->query("
-            SELECT ae.user_id, ae.moa_name, ae.moa_dept, u.real_name AS hswork_name
+            SELECT ae.user_id, ae.moa_name, ae.moa_dept, ae.work_start_time, ae.work_end_time,
+                   u.real_name AS hswork_name
             FROM attendance_employees ae
             LEFT JOIN users u ON ae.user_id = u.id
             WHERE ae.user_id IS NOT NULL
@@ -397,6 +403,8 @@ switch ($action) {
                 'name' => $emp['moa_name'],
                 'dept' => $emp['moa_dept'] ?: '',
                 'hswork_name' => $emp['hswork_name'] ?? '',
+                'work_start_time' => $emp['work_start_time'],
+                'work_end_time' => $emp['work_end_time'],
             );
         }
         // 補上 leaveRows 裡可能未出現在 attendance_employees 的員工
@@ -461,6 +469,8 @@ switch ($action) {
                     'late_minutes' => null,
                     'early_leave_minutes' => null,
                     'absent_minutes' => null,
+                    'work_start_time' => $info['work_start_time'] ?? null,
+                    'work_end_time' => $info['work_end_time'] ?? null,
                     'hswork_name' => $info['hswork_name'],
                     '_synthetic' => true,
                     '_row_type' => $rowType,
