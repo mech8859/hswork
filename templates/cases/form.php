@@ -517,7 +517,7 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             <div class="form-group" style="flex:0 0 180px">
                 <label>承辦業務</label>
                 <select name="sales_id" class="form-control">
-                    <option value="">請選擇</option>
+                    <option value="">不指派</option>
                     <?php foreach ($salesUsers as $u): ?>
                     <option value="<?= $u['id'] ?>" <?= ($case['sales_id'] ?? '') == $u['id'] ? 'selected' : '' ?>><?= e($u['real_name']) ?><?= !empty($u['is_active']) ? '' : '(離職)' ?></option>
                     <?php endforeach; ?>
@@ -2762,7 +2762,7 @@ var CASE_DATA = {
             <div class="form-group">
                 <label>承辦業務</label>
                 <select id="modalSalesId" class="form-control">
-                    <option value="">請選擇</option>
+                    <option value="">不指派</option>
                     <?php foreach ($salesUsers as $u): ?>
                     <option value="<?= $u['id'] ?>"><?= e($u['real_name']) ?><?= !empty($u['is_active']) ? '' : '(離職)' ?></option>
                     <?php endforeach; ?>
