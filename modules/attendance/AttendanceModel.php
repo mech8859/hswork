@@ -336,7 +336,20 @@ class AttendanceModel
             $this->db->exec("INSERT INTO attendance_settings (id, moa_company_id, moa_org_id) VALUES (1, 4545, 200021)");
             $row = $this->db->query("SELECT * FROM attendance_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
         }
+        // 沒 cron_token 自動產生（migration 已加欄位則用既有；舊環境若沒這欄位就跳過）
+        if (isset($row['cron_token']) && empty($row['cron_token'])) {
+            $tok = bin2hex(random_bytes(16));
+            $this->db->prepare("UPDATE attendance_settings SET cron_token = ? WHERE id = 1")->execute(array($tok));
+            $row['cron_token'] = $tok;
+        }
         return $row;
+    }
+
+    public function regenerateCronToken()
+    {
+        $tok = bin2hex(random_bytes(16));
+        $this->db->prepare("UPDATE attendance_settings SET cron_token = ? WHERE id = 1")->execute(array($tok));
+        return $tok;
     }
 
     public function saveSettings($companyId, $orgId, $cookie = null)

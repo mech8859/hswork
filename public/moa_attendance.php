@@ -6,10 +6,14 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_once __DIR__ . '/../modules/attendance/AttendanceModel.php';
 
-Auth::requireLogin();
-if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('attendance.view') && !Auth::hasPermission('all')) {
-    Session::flash('error', '無考勤管理權限');
-    redirect('/index.php');
+// cron_sync 用 token 驗證，跳過 session 登入；其餘 action 走正常登入
+$_isCron = (($_GET['action'] ?? '') === 'cron_sync') && !empty($_GET['token']);
+if (!$_isCron) {
+    Auth::requireLogin();
+    if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('attendance.view') && !Auth::hasPermission('all')) {
+        Session::flash('error', '無考勤管理權限');
+        redirect('/index.php');
+    }
 }
 
 $model = new AttendanceModel();
@@ -131,6 +135,17 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    case 'regen_token':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/moa_attendance.php?action=sync_config'); }
+        if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/moa_attendance.php?action=sync_config'); }
+        if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('all')) {
+            Session::flash('error', '無權限'); redirect('/moa_attendance.php?action=sync_config');
+        }
+        $newTok = $model->regenerateCronToken();
+        Session::flash('success', 'Cron token 已重新產生：' . substr($newTok, 0, 8) . '...');
+        redirect('/moa_attendance.php?action=sync_config');
+        break;
+
     case 'sync_now':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/moa_attendance.php?action=sync_config'); }
         if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/moa_attendance.php?action=sync_config'); }
@@ -155,9 +170,15 @@ switch ($action) {
         break;
 
     case 'cron_sync':
-        // CRON 用：純文字輸出，不需 session（用 token 驗證）
-        // 為簡化先沿用登入 session；後續可改 token
+        // CRON 用：純文字輸出，token 驗證（跳過登入 session）
         header('Content-Type: text/plain; charset=utf-8');
+        $_token = $_GET['token'] ?? '';
+        $_set = $model->getSettings();
+        if (empty($_set['cron_token']) || !hash_equals((string)$_set['cron_token'], (string)$_token)) {
+            http_response_code(403);
+            echo "FORBIDDEN: token 不正確\n";
+            exit;
+        }
         $df = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 day'));
         $dt = $_GET['date_to']   ?? date('Y-m-d', strtotime('-1 day'));
         set_time_limit(180);

@@ -77,8 +77,23 @@
 <div class="card">
     <div class="card-header">自動同步（cron）</div>
     <div style="padding:14px 16px;font-size:.9rem;line-height:1.7">
-        固定每日 06:00 拉前一天的打卡記錄：
-        <pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:.8rem">0 6 * * * curl -A "Mozilla/5.0" -s "https://hswork.com.tw/moa_attendance.php?action=cron_sync"</pre>
-        目前需在管理者已登入下執行（cron 用 token 驗證可後續加上）。
+        <p>排程用 URL（每日 10:00 拉前一天到今天的打卡）：</p>
+        <?php
+        $_cronUrl = 'https://hswork.com.tw/moa_attendance.php?action=cron_sync&token=' . e($settings['cron_token'] ?? '');
+        ?>
+        <input type="text" readonly value="<?= $_cronUrl ?>" class="form-control" style="font-family:monospace;font-size:.8rem;background:#f5f5f5" onclick="this.select()">
+        <div class="d-flex gap-1 mt-1">
+            <form method="POST" action="/moa_attendance.php?action=regen_token" onsubmit="return confirm('重新產生 token 後舊 URL 失效，需重新設定排程。確定？')">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn btn-outline btn-sm">🔄 重新產生 token</button>
+            </form>
+        </div>
+        <p style="margin-top:14px"><strong>排程設定方式（擇一）：</strong></p>
+        <ul style="margin-left:20px">
+            <li><strong>cron-job.org</strong> 或其他免費排程服務 → 新增 job → 貼上 URL → 排程「每日 10:00」</li>
+            <li>主機支援 cron：<pre style="background:#f5f5f5;padding:6px;border-radius:4px;font-size:.78rem;margin:4px 0">0 10 * * * curl -A "Mozilla/5.0" -s "<?= e($_cronUrl) ?>" &gt; /dev/null</pre></li>
+            <li>內部 Mac/Server cron：同上</li>
+        </ul>
+        <p style="color:#999;font-size:.8rem">⚠ MOA cookie 若過期，自動同步會失敗（last_sync_status=failed）。建議搭配定期檢查狀態。</p>
     </div>
 </div>
