@@ -1425,6 +1425,61 @@ $renderSalesMonthTable = function ($title, $field, $isMoney, $isFloat) use ($wlS
     ?>
 </div>
 
+<!-- 二十、每小時收款金額 業務 × 月份（收款 ÷ 工時） -->
+<div class="card">
+    <div class="card-header analysis-header">二十、每小時收款金額 業務 × 月份<small style="opacity:.7;margin-left:8px">（總收款金額 ÷ 總工作時數，元/小時）</small></div>
+    <div class="table-responsive">
+        <table class="table table-sm analysis-table">
+            <thead><tr>
+                <th>業務</th>
+                <?php foreach ($months as $m): ?><th><?= (int)substr($m, 5) ?>月</th><?php endforeach; ?>
+                <th class="col-total">合計</th>
+            </tr></thead>
+            <tbody>
+            <?php
+            $monthHourSum = array(); $monthPaySum = array();
+            $allHourSum = 0; $allPaySum = 0;
+            foreach ($wlSalesData as $name => $mdata):
+                $rowHours = 0; $rowPay = 0;
+                foreach ($months as $m) {
+                    $h = isset($mdata[$m]['hours']) ? $mdata[$m]['hours'] : 0;
+                    $p = isset($mdata[$m]['payment']) ? $mdata[$m]['payment'] : 0;
+                    $rowHours += $h;
+                    $rowPay   += $p;
+                    if (!isset($monthHourSum[$m])) { $monthHourSum[$m] = 0; $monthPaySum[$m] = 0; }
+                    $monthHourSum[$m] += $h;
+                    $monthPaySum[$m]  += $p;
+                }
+                $allHourSum += $rowHours; $allPaySum += $rowPay;
+                if ($rowHours <= 0 && $rowPay <= 0) continue; // 兩者都 0 才隱藏
+            ?>
+                <tr>
+                    <td style="font-weight:600"><?= e($name) ?></td>
+                    <?php foreach ($months as $m):
+                        $h = isset($mdata[$m]['hours']) ? $mdata[$m]['hours'] : 0;
+                        $p = isset($mdata[$m]['payment']) ? $mdata[$m]['payment'] : 0;
+                        $rate = $h > 0 ? $p / $h : null;
+                    ?>
+                    <td><?= $rate !== null ? '$' . number_format($rate, 0) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= $rowHours > 0 ? '$' . number_format($rowPay / $rowHours, 0) : '' ?></td>
+                </tr>
+            <?php endforeach; ?>
+                <tr class="row-total">
+                    <td>合計</td>
+                    <?php foreach ($months as $m):
+                        $h = isset($monthHourSum[$m]) ? $monthHourSum[$m] : 0;
+                        $p = isset($monthPaySum[$m]) ? $monthPaySum[$m] : 0;
+                    ?>
+                    <td><?= $h > 0 ? '$' . number_format($p / $h, 0) : '' ?></td>
+                    <?php endforeach; ?>
+                    <td class="col-total"><?= $allHourSum > 0 ? '$' . number_format($allPaySum / $allHourSum, 0) : '' ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- 鑽取明細（內嵌在卡片下方）-->
 <div id="drillInline" style="display:none">
     <div class="card" style="margin-top:-8px;border-top:3px solid var(--primary);background:#fafbff">
