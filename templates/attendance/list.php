@@ -85,10 +85,17 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
                     <td class="text-right" style="font-size:.8rem;color:#666">
                         <?= e(_m2hm($r['expected_minutes'])) ?> / <?= e(_m2hm($r['actual_minutes'])) ?>
                     </td>
-                    <td class="text-center" style="<?= ($r['sign_in_time'] === null || ($r['sign_in_time'] && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic']))) ? 'color:#c62828;font-weight:600' : '' ?>">
+                    <?php $_canEditAtt = Auth::hasPermission('attendance.manage') || Auth::hasPermission('all'); ?>
+                    <td class="text-center sign-cell <?= $_canEditAtt ? 'editable' : '' ?>"
+                        data-field="sign_in" data-name="<?= e($r['moa_name']) ?>" data-date="<?= e($r['work_date']) ?>"
+                        data-orig="<?= $r['sign_in_time'] ? substr($r['sign_in_time'], 0, 5) : '' ?>"
+                        style="<?= ($r['sign_in_time'] === null || ($r['sign_in_time'] && $r['sign_in_time'] > '08:00:00' && empty($r['_synthetic']))) ? 'color:#c62828;font-weight:600' : '' ?>">
                         <?= $r['sign_in_time'] ? substr($r['sign_in_time'], 0, 5) : ($r['sign_in_status'] ?: '') ?>
                     </td>
-                    <td class="text-center" style="<?= $r['sign_out_time'] === null ? 'color:#c62828;font-weight:600' : '' ?>">
+                    <td class="text-center sign-cell <?= $_canEditAtt ? 'editable' : '' ?>"
+                        data-field="sign_out" data-name="<?= e($r['moa_name']) ?>" data-date="<?= e($r['work_date']) ?>"
+                        data-orig="<?= $r['sign_out_time'] ? substr($r['sign_out_time'], 0, 5) : '' ?>"
+                        style="<?= ($r['sign_out_time'] === null && empty($r['_synthetic'])) ? 'color:#c62828;font-weight:600' : '' ?>">
                         <?= $r['sign_out_time'] ? substr($r['sign_out_time'], 0, 5) : ($r['sign_out_status'] ?: '') ?>
                     </td>
                     <?php
@@ -135,3 +142,58 @@ $_otTypeLabels = array('weekday'=>'平日','rest_day'=>'休息日','holiday'=>'�
         </table>
     </div>
 </div>
+
+<?php if (Auth::hasPermission('attendance.manage') || Auth::hasPermission('all')): ?>
+<style>
+.sign-cell.editable { cursor: pointer; }
+.sign-cell.editable:hover { background: #e3f2fd !important; }
+.sign-cell input.cell-time { width: 78px; padding: 2px 4px; font-size: .85rem; border: 1px solid #1976d2; border-radius: 3px; }
+</style>
+<script>
+(function(){
+    var csrf = '<?= e(Session::getCsrfToken()) ?>';
+    document.querySelectorAll('td.sign-cell.editable').forEach(function(cell){
+        cell.addEventListener('click', function(e){
+            if (cell.querySelector('input')) return;
+            var orig = cell.getAttribute('data-orig') || '';
+            var input = document.createElement('input');
+            input.type = 'time';
+            input.className = 'cell-time';
+            input.value = orig;
+            cell.innerHTML = '';
+            cell.appendChild(input);
+            input.focus();
+            var saved = false;
+            input.addEventListener('keydown', function(ev){
+                if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                else if (ev.key === 'Escape') { saved = true; cell.textContent = orig; }
+            });
+            input.addEventListener('blur', function(){
+                if (saved) return;
+                var newVal = input.value;
+                if (newVal === orig) { cell.textContent = orig || ''; return; }
+                var fd = new FormData();
+                fd.append('moa_name', cell.getAttribute('data-name'));
+                fd.append('work_date', cell.getAttribute('data-date'));
+                fd.append(cell.getAttribute('data-field'), newVal);
+                fd.append('csrf_token', csrf);
+                fetch('/moa_attendance.php?action=update_record', {method:'POST', body:fd, credentials:'same-origin'})
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){
+                        if (d && d.success) {
+                            cell.textContent = newVal || '—';
+                            cell.setAttribute('data-orig', newVal);
+                            cell.style.background = '#c8e6c9';
+                            setTimeout(function(){ cell.style.background = ''; }, 800);
+                        } else {
+                            alert('儲存失敗：' + (d && d.error || '未知錯誤'));
+                            cell.textContent = orig;
+                        }
+                    })
+                    .catch(function(){ alert('網路錯誤'); cell.textContent = orig; });
+            });
+        });
+    });
+})();
+</script>
+<?php endif; ?>

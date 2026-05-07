@@ -113,6 +113,76 @@ switch ($action) {
         require __DIR__ . '/../templates/layouts/footer.php';
         break;
 
+    case 'update_record':
+        // AJAX 編輯 簽到 / 簽退（手動補卡）
+        header('Content-Type: application/json; charset=utf-8');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(array('success'=>false,'error'=>'method')); exit; }
+        if (!verify_csrf()) { echo json_encode(array('success'=>false,'error'=>'CSRF')); exit; }
+        if (!Auth::hasPermission('attendance.manage') && !Auth::hasPermission('all')) {
+            echo json_encode(array('success'=>false,'error'=>'無權限')); exit;
+        }
+        $name = trim($_POST['moa_name'] ?? '');
+        $date = trim($_POST['work_date'] ?? '');
+        if ($name === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            echo json_encode(array('success'=>false,'error'=>'參數錯誤')); exit;
+        }
+        // 容許「清空」：傳空字串 → null
+        $signInField  = array_key_exists('sign_in',  $_POST);
+        $signOutField = array_key_exists('sign_out', $_POST);
+        $toFull = function ($v) {
+            $v = trim((string)$v);
+            if ($v === '') return null;
+            if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $v, $m)) {
+                $hh = str_pad($m[1], 2, '0', STR_PAD_LEFT); $mm = $m[2]; $ss = isset($m[3]) ? $m[3] : '00';
+                return "$hh:$mm:$ss";
+            }
+            return null;
+        };
+        $signIn  = $signInField  ? $toFull($_POST['sign_in'])  : null;
+        $signOut = $signOutField ? $toFull($_POST['sign_out']) : null;
+
+        $db = Database::getInstance();
+        $check = $db->prepare("SELECT id FROM attendance_records WHERE moa_name = ? AND work_date = ? LIMIT 1");
+        $check->execute(array($name, $date));
+        $existsId = (int)$check->fetchColumn();
+
+        if ($existsId > 0) {
+            $sets = array(); $params = array();
+            if ($signInField)  { $sets[] = 'sign_in_time = ?';  $params[] = $signIn;  $sets[] = "sign_in_status = '手動'"; }
+            if ($signOutField) { $sets[] = 'sign_out_time = ?'; $params[] = $signOut; $sets[] = "sign_out_status = '手動'"; }
+            if (!$sets) { echo json_encode(array('success'=>true,'noop'=>1)); exit; }
+            $sets[] = "sync_source = 'manual'";
+            $params[] = $existsId;
+            $db->prepare("UPDATE attendance_records SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+        } else {
+            // 找該員工的 user_id / dept
+            $empStmt = $db->prepare("SELECT user_id, moa_employee_no, moa_dept FROM attendance_employees WHERE moa_name = ? LIMIT 1");
+            $empStmt->execute(array($name));
+            $emp = $empStmt->fetch(PDO::FETCH_ASSOC) ?: array();
+            $weekdays = array('日','一','二','三','四','五','六');
+            $weekday = '周' . $weekdays[(int)date('w', strtotime($date))];
+            $db->prepare("
+                INSERT INTO attendance_records
+                    (user_id, moa_name, moa_employee_no, moa_dept, work_date, weekday,
+                     sign_in_time, sign_out_time, sign_in_status, sign_out_status, sync_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')
+            ")->execute(array(
+                !empty($emp['user_id']) ? (int)$emp['user_id'] : null,
+                $name,
+                $emp['moa_employee_no'] ?? null,
+                $emp['moa_dept'] ?? null,
+                $date,
+                $weekday,
+                $signInField ? $signIn : null,
+                $signOutField ? $signOut : null,
+                $signInField  ? '手動' : null,
+                $signOutField ? '手動' : null,
+            ));
+        }
+        AuditLog::log('attendance_records', 'manual_edit', 0, "$name $date 簽到/簽退手動編輯");
+        echo json_encode(array('success'=>true, 'sign_in'=>$signIn, 'sign_out'=>$signOut));
+        exit;
+
     case 'sync_config':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!verify_csrf()) { Session::flash('error', '安全驗證失敗'); redirect('/moa_attendance.php?action=sync_config'); }
