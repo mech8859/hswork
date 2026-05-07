@@ -431,8 +431,11 @@ if ($case && isset($caseLockState) && ($case['status'] === 'closed' || !empty($c
             <div class="form-group">
                 <label>是否已完工</label>
                 <select name="is_completed" class="form-control">
-                    <option value="0" <?= empty($case['is_completed']) ? 'selected' : '' ?>>未完工</option>
-                    <option value="1" <?= !empty($case['is_completed']) ? 'selected' : '' ?>>已完工</option>
+                    <?php if (!$case): ?>
+                    <option value="" selected>請選擇</option>
+                    <?php endif; ?>
+                    <option value="0" <?= $case && empty($case['is_completed']) ? 'selected' : '' ?>>未完工</option>
+                    <option value="1" <?= $case && !empty($case['is_completed']) ? 'selected' : '' ?>>已完工</option>
                 </select>
             </div>
             <div class="form-group">
