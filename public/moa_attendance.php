@@ -298,47 +298,92 @@ switch ($action) {
             );
         }
 
-        // 補合成列：請假但當天沒打卡 → 也顯示出來
-        $existingKeys = array();
-        foreach ($records as $r) {
-            if (!empty($r['user_id'])) $existingKeys[$r['user_id'] . '|' . $r['work_date']] = true;
+        // 國定假日 map
+        $holStmt = $db->prepare("SELECT holiday_date, name, is_workday FROM holidays WHERE holiday_date BETWEEN ? AND ?");
+        $holStmt->execute(array($filters['date_from'], $filters['date_to']));
+        $holidayMap = array();
+        foreach ($holStmt->fetchAll(PDO::FETCH_ASSOC) as $h) {
+            $holidayMap[$h['holiday_date']] = $h;
         }
-        $weekdays = array('日','一','二','三','四','五','六');
+
+        // 收集這個區間內「曾經出現」的員工（打卡或請假任一）
+        $existingKeys = array();
+        $userSet = array();
+        foreach ($records as $r) {
+            if (!empty($r['user_id'])) {
+                $existingKeys[$r['user_id'] . '|' . $r['work_date']] = true;
+                $userSet[(int)$r['user_id']] = array(
+                    'name' => $r['moa_name'],
+                    'dept' => $r['moa_dept'],
+                    'hswork_name' => $r['hswork_name'] ?? '',
+                );
+            }
+        }
         foreach ($leaveRows as $lv) {
-            $startTs = strtotime(max($lv['start_date'], $filters['date_from']));
-            $endTs   = strtotime(min($lv['end_date'],   $filters['date_to']));
+            $uid = (int)$lv['user_id'];
+            if (!isset($userSet[$uid])) {
+                $userSet[$uid] = array(
+                    'name' => $lv['moa_name'] ?: $lv['hswork_name'],
+                    'dept' => $lv['moa_dept'] ?: '',
+                    'hswork_name' => $lv['hswork_name'],
+                );
+            }
+        }
+
+        // 展開「員工 × 日期區間」全部的列；缺打卡的列依優先序標：請假 > 國定假日 > 週末 > 未簽
+        $weekdays = array('日','一','二','三','四','五','六');
+        $startTs = strtotime($filters['date_from']);
+        $endTs   = strtotime($filters['date_to']);
+        foreach ($userSet as $uid => $info) {
             for ($t = $startTs; $t <= $endTs; $t += 86400) {
                 $d = date('Y-m-d', $t);
-                $key = $lv['user_id'] . '|' . $d;
-                if (isset($existingKeys[$key])) continue; // 已有打卡列就不重複
-                $name = $lv['moa_name'] ?: $lv['hswork_name'];
-                $dept = $lv['moa_dept'] ?: '';
-                // 套用 name / dept 篩選
+                $key = $uid . '|' . $d;
+                if (isset($existingKeys[$key])) continue;
+                $name = $info['name'] ?: '';
+                $dept = $info['dept'] ?: '';
                 if (!empty($filters['name']) && $name !== $filters['name']) continue;
                 if (!empty($filters['dept']) && $dept !== $filters['dept']) continue;
-                if (!empty($filters['only_abnormal'])) continue; // 整天請假非異常
-                if (!empty($filters['unmatched'])) continue;     // 已有 user_id
+                if (!empty($filters['only_abnormal'])) continue;
+                if (!empty($filters['unmatched'])) continue;
+
+                $weekdayNum = (int)date('w', $t);
+                $isWeekend = ($weekdayNum === 0 || $weekdayNum === 6);
+                $hasLeave = isset($leaveMap[$key]);
+                $holiday = isset($holidayMap[$d]) ? $holidayMap[$d] : null;
+
+                if ($hasLeave) {
+                    $status = '請假'; $rowType = 'leave';
+                } elseif ($holiday && empty($holiday['is_workday'])) {
+                    $status = $holiday['name']; $rowType = 'holiday';
+                } elseif ($isWeekend) {
+                    $status = $weekdayNum === 0 ? '週日' : '週六'; $rowType = 'weekend';
+                } else {
+                    $status = '未簽'; $rowType = 'no_record';
+                }
+
                 $records[] = array(
                     'id' => null,
-                    'user_id' => (int)$lv['user_id'],
+                    'user_id' => $uid,
                     'moa_name' => $name,
                     'moa_employee_no' => null,
                     'moa_dept' => $dept,
                     'work_date' => $d,
-                    'weekday' => '周' . $weekdays[(int)date('w', $t)],
+                    'weekday' => '周' . $weekdays[$weekdayNum],
                     'is_abnormal' => 0,
-                    'has_application' => 1,
+                    'has_application' => $hasLeave ? 1 : 0,
                     'expected_minutes' => null,
                     'actual_minutes' => null,
                     'sign_in_time' => null,
                     'sign_out_time' => null,
-                    'sign_in_status' => '請假',
-                    'sign_out_status' => '請假',
+                    'sign_in_status' => $status,
+                    'sign_out_status' => $status,
                     'late_minutes' => null,
                     'early_leave_minutes' => null,
                     'absent_minutes' => null,
-                    'hswork_name' => $lv['hswork_name'],
+                    'hswork_name' => $info['hswork_name'],
                     '_synthetic' => true,
+                    '_row_type' => $rowType,
+                    '_holiday_name' => $holiday['name'] ?? null,
                 );
                 $existingKeys[$key] = true;
             }
