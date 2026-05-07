@@ -211,6 +211,9 @@
         <?php if (Auth::hasPermission('overtime.manage') || Auth::hasPermission('overtime.own') || Auth::hasPermission('overtime.view')): ?>
         <li><a href="/overtimes.php" class="<?= ($currentPage ?? '') === 'overtimes' ? 'active' : '' ?>">⏰ 加班單管理</a></li>
         <?php endif; ?>
+        <?php if (Auth::hasPermission('attendance.manage') || Auth::hasPermission('attendance.view') || Auth::hasPermission('all')): ?>
+        <li><a href="/moa_attendance.php" class="<?= ($currentPage ?? '') === 'moa_attendance' ? 'active' : '' ?>">🕒 MOA 考勤</a></li>
+        <?php endif; ?>
         <?php if (Auth::hasPermission('inter_branch.manage') || Auth::hasPermission('inter_branch.view')): ?>
         <li><a href="/inter_branch.php" class="<?= ($currentPage ?? '') === 'inter_branch' && !isset($_GET['action']) ? 'active' : '' ?>">💰 點工費管理</a></li>
         <li><a href="/inter_branch.php?action=attendance" class="<?= ($currentPage ?? '') === 'inter_branch' && (isset($_GET['action']) && $_GET['action'] === 'attendance') ? 'active' : '' ?>">📋 點工出勤登錄</a></li>

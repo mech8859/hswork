@@ -7,14 +7,36 @@ class ExcelReader
 {
     /**
      * 讀取檔案，回傳二維陣列（含標題行）
+     * @param string $filePath
+     * @param string|null $sheetName 指定 xlsx 內的工作表名稱（例如「考勤詳細」），null=第一張
      */
-    public static function read($filePath)
+    public static function read($filePath, $sheetName = null)
     {
         $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         if ($ext === 'csv') {
             return self::readCsv($filePath);
         }
-        return self::readXlsx($filePath);
+        return self::readXlsx($filePath, $sheetName);
+    }
+
+    /**
+     * 列出 xlsx 內的所有工作表名稱
+     */
+    public static function listSheets($filePath)
+    {
+        $names = array();
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true) return $names;
+        $wbXml = $zip->getFromName('xl/workbook.xml');
+        if ($wbXml) {
+            $doc = new DOMDocument();
+            $doc->loadXML($wbXml);
+            foreach ($doc->getElementsByTagName('sheet') as $s) {
+                $names[] = $s->getAttribute('name');
+            }
+        }
+        $zip->close();
+        return $names;
     }
 
     /**
@@ -42,7 +64,7 @@ class ExcelReader
     /**
      * 讀取 .xlsx（用 ZIP + XML 解析，不需 PhpSpreadsheet）
      */
-    private static function readXlsx($filePath)
+    private static function readXlsx($filePath, $sheetName = null)
     {
         $rows = array();
         $zip = new ZipArchive();
@@ -65,8 +87,40 @@ class ExcelReader
             }
         }
 
-        // 讀取第一個 sheet
-        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        // 解析 workbook.xml 與 rels，找指定 sheetName 對應的 sheet*.xml；找不到就退回 sheet1
+        $sheetTarget = 'xl/worksheets/sheet1.xml';
+        if ($sheetName !== null) {
+            $wbXml = $zip->getFromName('xl/workbook.xml');
+            $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
+            if ($wbXml && $relsXml) {
+                $wbDoc = new DOMDocument(); $wbDoc->loadXML($wbXml);
+                $relsDoc = new DOMDocument(); $relsDoc->loadXML($relsXml);
+                $rIdMap = array();
+                foreach ($relsDoc->getElementsByTagName('Relationship') as $rel) {
+                    $rIdMap[$rel->getAttribute('Id')] = $rel->getAttribute('Target');
+                }
+                foreach ($wbDoc->getElementsByTagName('sheet') as $s) {
+                    if ($s->getAttribute('name') === $sheetName) {
+                        $rid = $s->getAttribute('r:id');
+                        if (!$rid) {
+                            // 處理 sheet 元素 namespace 寫法差異
+                            foreach ($s->attributes as $attr) {
+                                if ($attr->localName === 'id' && stripos($attr->name, 'r:') !== false) {
+                                    $rid = $attr->value; break;
+                                }
+                            }
+                        }
+                        if ($rid && isset($rIdMap[$rid])) {
+                            $target = ltrim($rIdMap[$rid], '/');
+                            // workbook.xml 的 target 通常是 worksheets/sheet2.xml，前綴 xl/
+                            $sheetTarget = (strpos($target, 'xl/') === 0) ? $target : 'xl/' . $target;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        $sheetXml = $zip->getFromName($sheetTarget);
         if (!$sheetXml) { $zip->close(); return $rows; }
 
         $doc = new DOMDocument();
