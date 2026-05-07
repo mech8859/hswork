@@ -539,9 +539,21 @@ class AttendanceModel
                 sort($seconds);
                 $minSec = $seconds[0];
                 $maxSec = end($seconds);
-                $signIn  = sprintf('%02d:%02d:%02d', floor($minSec/3600), floor($minSec/60)%60, $minSec%60);
-                $signOut = ($minSec === $maxSec) ? null
-                          : sprintf('%02d:%02d:%02d', floor($maxSec/3600), floor($maxSec/60)%60, $maxSec%60);
+                $fmt = function ($s) { return sprintf('%02d:%02d:%02d', floor($s/3600), floor($s/60)%60, $s%60); };
+                if ($minSec === $maxSec) {
+                    // 只有一筆打卡：用 12:00 切分 — 早上(<12:00)當簽到、下午當簽退
+                    if ($minSec < 12 * 3600) {
+                        $signIn = $fmt($minSec); $signOut = null;
+                        $signInStatus = '正常'; $signOutStatus = '只有單筆打卡';
+                    } else {
+                        $signIn = null; $signOut = $fmt($minSec);
+                        $signInStatus = '只有單筆打卡'; $signOutStatus = '正常';
+                    }
+                } else {
+                    $signIn = $fmt($minSec);
+                    $signOut = $fmt($maxSec);
+                    $signInStatus = '正常'; $signOutStatus = '正常';
+                }
                 $existsRec->execute(array($name, $date));
                 $isUpdate = (bool)$existsRec->fetchColumn();
 
@@ -557,8 +569,8 @@ class AttendanceModel
                     $weekday,
                     $signIn,
                     $signOut,
-                    '正常',
-                    $signOut === null ? '只有單筆打卡' : '正常',
+                    $signInStatus,
+                    $signOutStatus,
                 ));
                 if ($isUpdate) $stats['updated']++; else $stats['inserted']++;
                 $stats['days']++;
