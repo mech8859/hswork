@@ -306,19 +306,30 @@ switch ($action) {
             $holidayMap[$h['holiday_date']] = $h;
         }
 
-        // 收集這個區間內「曾經出現」的員工（打卡或請假任一）
+        // 收集這個區間內所有要展開的員工：以 attendance_employees 全表為基礎
+        // （這樣沒打卡也沒請假的員工也會被列出來，即「真曠職」候選）
         $existingKeys = array();
         $userSet = array();
         foreach ($records as $r) {
             if (!empty($r['user_id'])) {
                 $existingKeys[$r['user_id'] . '|' . $r['work_date']] = true;
-                $userSet[(int)$r['user_id']] = array(
-                    'name' => $r['moa_name'],
-                    'dept' => $r['moa_dept'],
-                    'hswork_name' => $r['hswork_name'] ?? '',
-                );
             }
         }
+        // attendance_employees：已對應 hswork user 的所有 MOA 員工
+        $allEmpStmt = $db->query("
+            SELECT ae.user_id, ae.moa_name, ae.moa_dept, u.real_name AS hswork_name
+            FROM attendance_employees ae
+            LEFT JOIN users u ON ae.user_id = u.id
+            WHERE ae.user_id IS NOT NULL
+        ");
+        foreach ($allEmpStmt->fetchAll(PDO::FETCH_ASSOC) as $emp) {
+            $userSet[(int)$emp['user_id']] = array(
+                'name' => $emp['moa_name'],
+                'dept' => $emp['moa_dept'] ?: '',
+                'hswork_name' => $emp['hswork_name'] ?? '',
+            );
+        }
+        // 補上 leaveRows 裡可能未出現在 attendance_employees 的員工
         foreach ($leaveRows as $lv) {
             $uid = (int)$lv['user_id'];
             if (!isset($userSet[$uid])) {
